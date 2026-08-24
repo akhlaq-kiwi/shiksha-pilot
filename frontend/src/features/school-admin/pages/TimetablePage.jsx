@@ -1510,9 +1510,11 @@ export default function TimetablePage() {
         <div id="timetable-print-area" className="p-8 bg-white text-black font-sans space-y-8" style={{ width: '175mm' }}>
           <div className="border-b-2 border-black pb-4 text-center">
             <h1 className="text-2xl font-bold uppercase tracking-wider">Academic Timetable Schedule</h1>
-            {selectedClassId && classes.find(c => String(c.id) === String(selectedClassId)) && (
-              <p className="text-sm font-bold mt-1">Class: {classes.find(c => String(c.id) === String(selectedClassId)).name}</p>
-            )}
+            {selectedClassId && (() => {
+              const cls = classes.find(c => String(c.id) === String(selectedClassId));
+              if (!cls) return null;
+              return <p className="text-sm font-bold mt-1">Class: {cls.name}{cls.section ? ` - ${cls.section}` : ''}</p>;
+            })()}
           </div>
           {(() => {
             const selectedDaysList = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']

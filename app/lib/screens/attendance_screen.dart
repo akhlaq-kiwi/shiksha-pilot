@@ -213,6 +213,28 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     }
   }
 
+  String _formatYmd(DateTime d) {
+    return '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  }
+
+  bool _isHolidayDate(DateTime d) {
+    final targetStr = _formatYmd(d);
+
+    // Check standard national holidays (15 August, 2 October, 25 December, 1 January, 26 January, 1 May)
+    final mmDd = '${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    if (mmDd == '08-15' || mmDd == '10-02' || mmDd == '12-25' || mmDd == '01-01' || mmDd == '01-26' || mmDd == '05-01') {
+      return true;
+    }
+
+    return _holidays.any((h) {
+      if (h == null) return false;
+      final raw = (h['date'] ?? h['holiday_date'] ?? h['start_date'] ?? h['date_from'] ?? '').toString().trim();
+      if (raw.isEmpty) return false;
+      final clean = raw.split(' ')[0].split('T')[0];
+      return clean == targetStr;
+    });
+  }
+
   Future<void> _fetchTeacherStudentsAndHistory() async {
     if (_selectedClassId == null) return;
     setState(() {
@@ -240,29 +262,35 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   Future<void> _fetchTeacherAttendanceForDate() async {
     if (_selectedClassId == null || _teacherSelectedDate == null) return;
-    final dateStr = _teacherSelectedDate!.toIso8601String().split('T')[0];
+    final dateStr = _formatYmd(_teacherSelectedDate!);
 
     try {
       final history = await widget.attendanceService.getTeacherAttendanceHistory(_selectedClassId!, dateStr);
       setState(() {
         _markedHistory = history;
-        _isSubmittedForSelectedDate = history.isNotEmpty;
+        final totalStudentsCount = _students.length;
+        final markedCount = history.length;
+        _isSubmittedForSelectedDate = totalStudentsCount > 0 && markedCount >= totalStudentsCount;
         _isOffline = false;
 
-        // If already submitted, map status
-        if (_isSubmittedForSelectedDate) {
-          for (var record in history) {
-            final sId = record['student_id'] as int;
-            final status = record['status'] as String;
-            _tempAttendance[sId] = status;
-          }
-        } else {
-          // If not submitted, clear temp marking
-          _tempAttendance.clear();
+        // Clear temp state so previous date statuses never leak across dates
+        _tempAttendance.clear();
+
+        // Map actual saved attendance records from DB for the selected date (if any exist)
+        for (var record in history) {
+          final sId = record['student_id'] as int;
+          final status = record['status'] as String;
+          _tempAttendance[sId] = status;
         }
       });
     } catch (e) {
-      if (e is SocketException || e.toString().contains('SocketException') || e.toString().contains('Failed host lookup')) {
+      final errStr = e.toString().toLowerCase();
+      if (e is SocketException || 
+          errStr.contains('socketexception') || 
+          errStr.contains('failed host lookup') || 
+          errStr.contains('connection reset') || 
+          errStr.contains('connection abort') || 
+          errStr.contains('clientexception')) {
         setState(() {
           _isOffline = true;
         });
@@ -328,7 +356,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       _isTeacherSubmitting = true;
     });
 
-    final dateStr = _teacherSelectedDate!.toIso8601String().split('T')[0];
+    final dateStr = _formatYmd(_teacherSelectedDate!);
 
     try {
       // Mark attendance sequentially / concurrently for all students in sheet
@@ -351,18 +379,37 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           content: Text('Attendance Submitted'),
           behavior: SnackBarBehavior.floating,
           backgroundColor: Colors.green,
+          duration: Duration(seconds: 1),
         ),
       );
 
       // Refresh data
       await _fetchTeacherAttendanceForDate();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString().replaceAll('Exception:', '').trim()),
-          backgroundColor: Colors.red,
-        ),
-      );
+      final errStr = e.toString().replaceAll('Exception:', '').trim();
+      final errLower = errStr.toLowerCase();
+      if (errLower.contains('holiday') || errLower.contains('sunday') || errLower.contains('leave')) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('No Attendance Required', style: TextStyle(fontWeight: FontWeight.bold)),
+            content: Text('Attendance is not required for the selected date because it is a scheduled holiday or weekend.\n\n($errStr)'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errStr),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } finally {
       setState(() {
         _isTeacherSubmitting = false;
@@ -478,12 +525,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.calendar_today_rounded, size: 20),
-            onPressed: () => _openCalendarPicker(context, isTeacher),
-          ),
-        ],
       ),
       body: Column(
         children: [
@@ -510,6 +551,54 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _openCalendarPicker(BuildContext context, bool isTeacher) async {
+    if (!isTeacher) return;
+    
+    final initialDate = _teacherSelectedDate ?? _teacherToday;
+    final firstDate = _teacherAcademicYearStart;
+    final lastDate = _teacherToday;
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate.isAfter(lastDate) ? lastDate : (initialDate.isBefore(firstDate) ? firstDate : initialDate),
+      firstDate: firstDate,
+      lastDate: lastDate,
+      helpText: 'SELECT ATTENDANCE DATE',
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Colors.indigo,
+              onPrimary: Colors.white,
+              onSurface: Colors.black87,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      final targetDays = picked.difference(_teacherAcademicYearStart).inDays;
+      if (targetDays >= 0 && targetDays < _teacherTotalDays) {
+        setState(() {
+          _teacherCurrentPageIndex = targetDays;
+          _teacherSelectedDate = picked;
+          _isLoadingAttendanceForDate = true;
+        });
+        if (_teacherPageController.hasClients) {
+          _teacherPageController.animateToPage(
+            targetDays,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
+        } else {
+          _fetchTeacherAttendanceForDate();
+        }
+      }
+    }
   }
 
   // -----------------------------------------------------------------------------
@@ -1111,8 +1200,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               final date = _teacherAcademicYearStart.add(Duration(days: index));
               final isSelectedDateToday = date.day == _teacherToday.day && date.month == _teacherToday.month && date.year == _teacherToday.year;
               final isSunday = date.weekday == DateTime.sunday;
-              final dateStr = date.toIso8601String().split('T')[0];
-              final isHoliday = _holidays.any((h) => h['date'] == dateStr);
+              final dateStr = _formatYmd(date);
+              final isHoliday = _isHolidayDate(date);
 
               if (_isLoadingTeacherData) {
                 return const Center(child: CircularProgressIndicator());
@@ -1230,7 +1319,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                             children: [
                               // Roll & Name block
                               Expanded(
-                                flex: 2,
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
@@ -1246,20 +1334,37 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                                   ],
                                 ),
                               ),
-                              
-                              // Segmented Controls (Radio buttons design chip style)
-                              Expanded(
-                                flex: 3,
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.end,
-                                  children: [
-                                    _buildStatusChip('Present', 'Present', sId, isEditable),
-                                    const SizedBox(width: 4),
-                                    _buildStatusChip('Absent', 'Absent', sId, isEditable),
-                                    const SizedBox(width: 4),
-                                    _buildStatusChip('Leave', 'Leave', sId, isEditable),
-                                  ],
+
+                              // Middle Green Check Indicator (Instantly shown when P, A, or L is selected!)
+                              if (currentMark != null && currentMark.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(2),
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFFE8F5E9),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.check_circle_rounded,
+                                      color: Color(0xFF2E7D32),
+                                      size: 22,
+                                    ),
+                                  ),
                                 ),
+
+                              const SizedBox(width: 4),
+                              
+                              // Segmented Controls (50% larger PAL Boxes!)
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _buildStatusChip('Present', 'Present', sId, isEditable),
+                                  const SizedBox(width: 6),
+                                  _buildStatusChip('Absent', 'Absent', sId, isEditable),
+                                  const SizedBox(width: 6),
+                                  _buildStatusChip('Leave', 'Leave', sId, isEditable),
+                                ],
                               ),
                             ],
                           ),
@@ -1280,7 +1385,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             !_isSubmittedForSelectedDate && 
             _students.isNotEmpty &&
             _teacherSelectedDate!.weekday != DateTime.sunday &&
-            !_holidays.any((h) => h['date'] == _teacherSelectedDate!.toIso8601String().split('T')[0]))
+            !_isHolidayDate(_teacherSelectedDate!))
           Padding(
             padding: const EdgeInsets.all(16),
             child: SizedBox(
@@ -1319,23 +1424,32 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               });
             }
           : null,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(10),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        width: 42,
+        height: 42,
+        alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.12) : Colors.grey.shade50,
-          borderRadius: BorderRadius.circular(8),
+          color: isSelected ? color.withOpacity(0.18) : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: isSelected ? color : Colors.grey.shade300,
-            width: isSelected ? 1.5 : 1.0,
+            width: isSelected ? 2.0 : 1.0,
           ),
+          boxShadow: isSelected ? [
+            BoxShadow(
+              color: color.withOpacity(0.18),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            )
+          ] : [],
         ),
         child: Text(
           label[0], // P / A / L
           style: TextStyle(
             fontWeight: FontWeight.w900,
-            fontSize: 12,
-            color: isSelected ? color : Colors.grey.shade600,
+            fontSize: 16,
+            color: isSelected ? color : Colors.grey.shade700,
           ),
         ),
       ),
@@ -1396,50 +1510,5 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         ],
       ),
     );
-  }
-
-  // -----------------------------------------------------------------------------
-  // Calendar Dialog Picker
-  // -----------------------------------------------------------------------------
-  Future<void> _openCalendarPicker(BuildContext context, bool isTeacher) async {
-    final currentStudentMonth = DateTime(
-      _studentToday.year,
-      _studentToday.month + (_studentMonthPageIndex - 500),
-      1,
-    );
-    final DateTime initial = isTeacher ? _teacherSelectedDate! : currentStudentMonth;
-    final DateTime startLimit = isTeacher ? _teacherAcademicYearStart : DateTime(2020, 1, 1);
-    final DateTime endLimit = isTeacher ? _teacherToday : DateTime(2030, 12, 31);
-
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: initial,
-      firstDate: startLimit,
-      lastDate: endLimit,
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Color(0xFF2196F3),
-              onPrimary: Colors.white,
-              onSurface: Colors.black87,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-
-    if (picked != null) {
-      if (isTeacher) {
-        final page = picked.difference(_teacherAcademicYearStart).inDays;
-        _teacherPageController.jumpToPage(page);
-      } else {
-        final targetMonth = DateTime(picked.year, picked.month, 1);
-        final baseMonth = DateTime(_studentToday.year, _studentToday.month, 1);
-        final diffInMonths = (targetMonth.year - baseMonth.year) * 12 + (targetMonth.month - baseMonth.month);
-        _studentMonthPageController.jumpToPage(500 + diffInMonths);
-      }
-    }
   }
 }

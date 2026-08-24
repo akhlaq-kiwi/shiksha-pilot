@@ -596,7 +596,7 @@ export default function QuestionPaperDesignerPage() {
       if (existingIndex > -1) {
         const classObj = classes.find(c => String(c.id) === String(selectedClassId));
         const subjectObj = subjects.find(s => String(s.id) === String(selectedSubjectId));
-        paperState.className = classObj ? classObj.name : 'Unknown Class';
+        paperState.className = classObj ? `${classObj.name}${classObj.section ? ` - ${classObj.section}` : ''}` : 'Unknown Class';
         paperState.subjectName = subjectObj ? subjectObj.name : 'Unknown Subject';
         
         const updatedPapers = [...savedPapers];
@@ -616,7 +616,7 @@ export default function QuestionPaperDesignerPage() {
     // Find class name and subject name
     const classObj = classes.find(c => String(c.id) === String(selectedClassId));
     const subjectObj = subjects.find(s => String(s.id) === String(selectedSubjectId));
-    const className = classObj ? classObj.name : 'Unknown Class';
+    const className = classObj ? `${classObj.name}${classObj.section ? ` - ${classObj.section}` : ''}` : 'Unknown Class';
     const subjectName = subjectObj ? subjectObj.name : 'Unknown Subject';
 
     let paperId = currentPaperId;
@@ -2063,7 +2063,8 @@ export default function QuestionPaperDesignerPage() {
     return () => document.removeEventListener('selectionchange', handleSelectionChange);
   }, []);
 
-  const activeClassName = (classes.find(c => String(c.id) === String(selectedClassId))?.name) || 'Class';
+  const activeClassObj = classes.find(c => String(c.id) === String(selectedClassId));
+  const activeClassName = activeClassObj ? `${activeClassObj.name}${activeClassObj.section ? ` - ${activeClassObj.section}` : ''}` : 'Class';
   const activeSubjectName = (subjects.find(s => String(s.id) === String(selectedSubjectId))?.name) || 'Subject';
   const activeExamName = (exams.find(e => String(e.id) === String(examName))?.name) || 'N/A';
 

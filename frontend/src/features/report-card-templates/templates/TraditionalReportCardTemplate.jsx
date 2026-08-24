@@ -1,5 +1,5 @@
 import React from 'react';
-import { SIGNATURE_GAP, STAMP_SPACE } from '../reportCardLayout';
+import { SIGNATURE_GAP, STAMP_SPACE, PAGE_CONTENT_MIN_HEIGHT } from '../reportCardLayout';
 
 /**
  * Template 3: Traditional School Format Report Card
@@ -21,83 +21,75 @@ export default function TraditionalReportCardTemplate({ data, config = {} }) {
   let metaPadding = '8px 12px';
 
   if (subCount <= 4) {
-    // 4 or fewer subjects: Generously expanded rows, text & vertical spacing
-    cellPadding = '26px 14px';
-    headerPadding = '18px 14px';
-    fontSizePx = '14px';
-    containerPadding = '9.5mm';
-    innerPaddingPx = '24px';
-    sectionGapPx = '28px';
-    metaPadding = '14px 14px';
-  } else if (subCount === 5) {
-    // 5 subjects: Expanded rows & padding to fill vertical space
-    cellPadding = '22px 14px';
-    headerPadding = '16px 14px';
-    fontSizePx = '13.5px';
-    containerPadding = '9mm';
-    innerPaddingPx = '22px';
-    sectionGapPx = '24px';
-    metaPadding = '12px 14px';
-  } else if (subCount === 6) {
-    // 6 subjects: Taller rows & padding to eliminate large white space gap
-    cellPadding = '18px 14px';
-    headerPadding = '14px 14px';
+    // 1–4 subjects
+    cellPadding = '12px 14px';
+    headerPadding = '10px 12px';
     fontSizePx = '13px';
-    containerPadding = '8.5mm';
-    innerPaddingPx = '20px';
-    sectionGapPx = '22px';
-    metaPadding = '10px 12px';
-  } else if (subCount === 7) {
-    // 7 subjects: Comfortably padded rows
-    cellPadding = '14px 14px';
-    headerPadding = '12px 14px';
-    fontSizePx = '12.5px';
     containerPadding = '8mm';
     innerPaddingPx = '18px';
-    sectionGapPx = '18px';
-    metaPadding = '10px 12px';
-  } else if (subCount <= 9) {
-    // 8–9 subjects (Default 8): Standard table padding
-    cellPadding = '10px 14px';
-    headerPadding = '10px 14px';
+    sectionGapPx = '12px';
+    metaPadding = '12px 14px';
+  } else if (subCount <= 6) {
+    // 5–6 subjects
+    cellPadding = '8px 12px';
+    headerPadding = '8px 12px';
     fontSizePx = '12px';
     containerPadding = '7.5mm';
     innerPaddingPx = '16px';
-    sectionGapPx = '16px';
-    metaPadding = '8px 12px';
-  } else if (subCount <= 11) {
-    // 10–11 subjects: Compact table padding
+    sectionGapPx = '10px';
+    metaPadding = '10px 12px';
+  } else if (subCount <= 8) {
+    // 7–8 subjects
     cellPadding = '6px 10px';
     headerPadding = '6px 10px';
     fontSizePx = '11.5px';
-    containerPadding = '6mm';
+    containerPadding = '7mm';
     innerPaddingPx = '14px';
-    sectionGapPx = '12px';
-    metaPadding = '6px 10px';
-  } else {
-    // 12+ subjects: Extra compact table padding
+    sectionGapPx = '8px';
+    metaPadding = '8px 10px';
+  } else if (subCount <= 10) {
+    // 9–10 subjects
     cellPadding = '4px 8px';
-    headerPadding = '4px 8px';
+    headerPadding = '5px 8px';
     fontSizePx = '11px';
-    containerPadding = '4.5mm';
+    containerPadding = '6mm';
     innerPaddingPx = '12px';
     sectionGapPx = '8px';
-    metaPadding = '5px 8px';
+    metaPadding = '7px 8px';
+  } else if (subCount <= 12) {
+    // 11–12 subjects
+    cellPadding = '3px 6px';
+    headerPadding = '4px 6px';
+    fontSizePx = '10.5px';
+    containerPadding = '5mm';
+    innerPaddingPx = '10px';
+    sectionGapPx = '6px';
+    metaPadding = '6px 6px';
+  } else {
+    // 13+ subjects
+    cellPadding = '2px 5px';
+    headerPadding = '3px 5px';
+    fontSizePx = '10px';
+    containerPadding = '4mm';
+    innerPaddingPx = '8px';
+    sectionGapPx = '5px';
+    metaPadding = '4px 5px';
   }
 
   return (
     <div
-      className="w-full bg-amber-50/20 text-zinc-900 font-serif relative h-full flex flex-col"
+      className="w-full bg-amber-50/20 text-zinc-900 font-serif relative h-full flex flex-col justify-between"
       style={{
         padding: containerPadding,
         boxSizing: 'border-box',
         border: '8px double #1e3a8a',
         borderRadius: '2px',
-        minHeight: '100%'
+        minHeight: PAGE_CONTENT_MIN_HEIGHT,
+        height: '100%'
       }}
     >
       {/* Decorative Outer Border */}
-      <div className="border border-zinc-900 flex-1 flex flex-col" style={{ padding: innerPaddingPx, gap: sectionGapPx, boxSizing: 'border-box' }}>
+      <div className="border border-zinc-900 flex-1 flex flex-col justify-between h-full" style={{ padding: innerPaddingPx, gap: sectionGapPx, boxSizing: 'border-box' }}>
         <div>
           {/* Header */}
           <div className="text-center border-b-2 border-zinc-900 pb-4 mb-4">
@@ -113,7 +105,7 @@ export default function TraditionalReportCardTemplate({ data, config = {} }) {
             <h1 className="text-2xl font-bold uppercase tracking-tight text-zinc-950 font-display">
               {school.name}
             </h1>
-            <p className="text-xs text-zinc-700 italic mt-0.5">
+            <p className="text-xs text-zinc-700 font-semibold mt-0.5 uppercase tracking-wide">
               {school.address}
             </p>
             <div className="mt-2 text-sm font-bold uppercase tracking-widest text-zinc-900 border-t border-b border-zinc-900 inline-block px-6 py-1">
@@ -152,10 +144,10 @@ export default function TraditionalReportCardTemplate({ data, config = {} }) {
             </div>
           </div>
 
-          {/* Traditional Marks Table */}
-          <div className="font-sans">
+          {/* Traditional Marks Table Container - Expands dynamically for small subject counts */}
+          <div className="font-sans flex-1 flex flex-col justify-between">
             {exam.is_final_session_report ? (
-              <table className="w-full border border-zinc-900 border-collapse text-zinc-900" style={{ fontSize: fontSizePx }}>
+              <table className="w-full h-full border border-zinc-900 border-collapse text-zinc-900" style={{ fontSize: fontSizePx }}>
                 <thead>
                   <tr className="bg-zinc-950 text-white font-bold uppercase text-[9.5px] tracking-wide">
                     <th rowSpan={2} style={{ padding: headerPadding }} className="text-left border-r border-zinc-800">Subject</th>
@@ -198,8 +190,7 @@ export default function TraditionalReportCardTemplate({ data, config = {} }) {
                       <td style={{ padding: cellPadding }} className="text-center font-bold text-xs">{sub.grade || '—'}</td>
                     </tr>
                   ))}
-                </tbody>
-                <tfoot>
+                  {/* Total Marks Row (Inside tbody so height expands equally with subject rows) */}
                   <tr className="bg-zinc-100 font-bold border-t-2 border-zinc-900">
                     <td style={{ padding: cellPadding }} className="border-r border-zinc-900">Grand Total</td>
                     {(data.session_exams || ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam']).map(exName => (
@@ -212,10 +203,10 @@ export default function TraditionalReportCardTemplate({ data, config = {} }) {
                     <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-900 font-mono font-bold text-sm text-zinc-950">{summary.total_obtained ?? '—'}</td>
                     <td style={{ padding: cellPadding }} className="text-center font-bold text-sm">{summary.grade || '—'}</td>
                   </tr>
-                </tfoot>
+                </tbody>
               </table>
             ) : (
-              <table className="w-full border border-zinc-900 border-collapse text-zinc-900" style={{ fontSize: fontSizePx }}>
+              <table className="w-full h-full border border-zinc-900 border-collapse text-zinc-900" style={{ fontSize: fontSizePx }}>
                 <thead>
                   <tr className="bg-zinc-950 text-white font-bold uppercase text-[11px] tracking-wide">
                     <th style={{ padding: headerPadding }} className="text-left border-r border-zinc-800">Subject</th>
@@ -241,8 +232,7 @@ export default function TraditionalReportCardTemplate({ data, config = {} }) {
                       </td>
                     </tr>
                   ))}
-                </tbody>
-                <tfoot>
+                  {/* Total Marks Row (Inside tbody so height expands equally with subject rows) */}
                   <tr className="bg-zinc-100 font-bold border-t-2 border-zinc-900">
                     <td style={{ padding: cellPadding }} className="border-r border-zinc-900">Grand Total</td>
                     <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-900 font-mono">{summary.total_max}</td>
@@ -251,56 +241,70 @@ export default function TraditionalReportCardTemplate({ data, config = {} }) {
                     <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-900 font-bold text-sm">{summary.grade}</td>
                     <td style={{ padding: cellPadding }} className="text-center font-bold text-xs">{summary.result}</td>
                   </tr>
-                </tfoot>
+                </tbody>
               </table>
             )}
           </div>
         </div>
 
-        {/* Performance Summary Cards (5 columns) - Locked at a CONSTANT 10px gap below table */}
-        <div className="grid grid-cols-5 gap-2 font-sans" style={{ marginTop: '10px' }}>
-          <div className="bg-emerald-50 border border-emerald-200 p-2 rounded text-center flex flex-col justify-center">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 block">Total Marks</span>
-            <span className="text-xs font-bold font-mono text-emerald-950 mt-0.5">{summary.total_obtained} / {summary.total_max}</span>
+          {/* Performance Summary Cards (5 columns) - Locked at EXACT constant 5px gap below Total Marks row */}
+          <div className="grid grid-cols-5 gap-2 font-sans" style={{ marginTop: '5px' }}>
+            <div className="bg-emerald-50 border border-emerald-200 p-2 rounded text-center flex flex-col justify-center">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 block">Total Marks</span>
+              <span className="text-xs font-bold font-mono text-emerald-950 mt-0.5">{summary.total_obtained} / {summary.total_max}</span>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 p-2 rounded text-center flex flex-col justify-center">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 block">Percentage</span>
+              <span className="text-xs font-bold font-mono text-amber-950 mt-0.5">{summary.percentage}%</span>
+            </div>
+
+            <div className="bg-emerald-50 border border-emerald-200 p-2 rounded text-center flex flex-col justify-center">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 block">Overall Grade</span>
+              <span className="text-xs font-bold text-emerald-950 mt-0.5">Grade {summary.grade}</span>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 p-2.5 rounded-lg text-center flex flex-col justify-center">
+              <span className="text-[11px] font-bold text-amber-800 uppercase block">Attendance</span>
+              <span className="text-xs font-bold font-mono text-amber-950 mt-0.5">
+                {(() => {
+                  const rate = summary?.attendance?.attendance_rate ?? data?.attendance?.attendance_rate ?? summary?.attendance_rate ?? data?.attendance_rate;
+                  return (rate !== null && rate !== undefined && !isNaN(rate)) ? `${Math.round(rate)}%` : '—';
+                })()}
+              </span>
+            </div>
+
+            <div className="bg-emerald-50 border border-emerald-200 p-2 rounded text-center flex flex-col justify-center">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 block">Class Rank</span>
+              <span className="text-xs font-bold font-mono text-emerald-950 mt-0.5">{summary.class_rank || '1st'}</span>
+            </div>
           </div>
 
-          <div className="bg-amber-50 border border-amber-200 p-2 rounded text-center flex flex-col justify-center">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 block">Percentage</span>
-            <span className="text-xs font-bold font-mono text-amber-950 mt-0.5">{summary.percentage}%</span>
-          </div>
+          {/* Teacher Remarks (Rendered ONLY if non-empty remark exists, placed JUST BELOW 5 Summary Cards) */}
+          {(() => {
+            const remarkText = summary?.teacher_remark || data?.teacher_remark || data?.report_card_remark || school?.report_card_remark;
+            if (!remarkText || remarkText.toString().trim() === '') return null;
+            return (
+              <div className="mt-2.5 px-1 font-sans text-xs leading-normal">
+                <strong className="font-bold text-zinc-900">Teacher Remarks:</strong>{' '}
+                <span className="font-bold italic text-emerald-700">"{remarkText}"</span>
+              </div>
+            );
+          })()}
 
-          <div className="bg-emerald-50 border border-emerald-200 p-2 rounded text-center flex flex-col justify-center">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 block">Overall Grade</span>
-            <span className="text-xs font-bold text-emerald-950 mt-0.5">Grade {summary.grade}</span>
+          {/* Dual Signatures locked below 5 summary boxes & remarks */}
+          <div className="pb-1 font-sans flex justify-between items-end text-xs font-bold text-zinc-900 px-6" style={{ marginTop: '75px' }}>
+            <div className="inline-flex flex-col items-center">
+              <div style={{ height: STAMP_SPACE }} aria-hidden="true" />
+              <div className="w-full border-b border-zinc-900 mb-1.5" />
+              <span className="uppercase text-[11px] font-bold tracking-wider text-zinc-950 whitespace-nowrap">Class Teacher Signature</span>
+            </div>
+            <div className="inline-flex flex-col items-center">
+              <div style={{ height: STAMP_SPACE }} aria-hidden="true" />
+              <div className="w-full border-b border-zinc-900 mb-1.5" />
+              <span className="uppercase text-[11px] font-bold tracking-wider text-zinc-950 whitespace-nowrap">Principal Signature & Stamp</span>
+            </div>
           </div>
-
-          <div className="bg-amber-50 border border-amber-200 p-2 rounded text-center flex flex-col justify-center">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 block">Attendance</span>
-            <span className="text-xs font-bold font-mono text-amber-950 mt-0.5">{summary.attendance?.attendance_rate ?? 90.3}%</span>
-          </div>
-
-          <div className="bg-emerald-50 border border-emerald-200 p-2 rounded text-center flex flex-col justify-center">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 block">Class Rank</span>
-            <span className="text-xs font-bold font-mono text-emerald-950 mt-0.5">{summary.class_rank || '1st'}</span>
-          </div>
-        </div>
-
-        {/* Dual Signatures pinned to the bottom of the page */}
-        <div
-          className="pb-1 font-sans flex justify-between items-end text-xs font-bold text-zinc-900 px-6"
-          style={{ marginTop: 'auto' }}
-        >
-          <div className="inline-flex flex-col items-center">
-            <div style={{ height: STAMP_SPACE }} aria-hidden="true" />
-            <div className="w-full border-b border-zinc-900 mb-1.5" />
-            <span className="uppercase text-[11px] font-bold tracking-wider text-zinc-950 whitespace-nowrap">Class Teacher Signature</span>
-          </div>
-          <div className="inline-flex flex-col items-center">
-            <div style={{ height: STAMP_SPACE }} aria-hidden="true" />
-            <div className="w-full border-b border-zinc-900 mb-1.5" />
-            <span className="uppercase text-[11px] font-bold tracking-wider text-zinc-950 whitespace-nowrap">Principal Signature & Stamp</span>
-          </div>
-        </div>
       </div>
     </div>
   );

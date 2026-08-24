@@ -59,102 +59,45 @@ class FeeRepository extends BaseRepository
     public function getTotalCollectedBySchool(int $schoolId, ?int $academicYearId = null): float
     {
         if ($academicYearId !== null) {
-            $stmtYear = $this->pdo->prepare("SELECT start_date, end_date FROM academic_years WHERE id = :id LIMIT 1");
-            $stmtYear->execute([':id' => $academicYearId]);
-            $yearDates = $stmtYear->fetch(PDO::FETCH_ASSOC);
-            $startDate = $yearDates ? $yearDates['start_date'] : null;
-            $endDate = $yearDates ? $yearDates['end_date'] : null;
-
-            if ($startDate && $endDate) {
-                $stmt = $this->pdo->prepare("
-                    SELECT COALESCE(SUM(fp.amount_paid), 0) 
-                    FROM fee_payments fp
-                    LEFT JOIN students s ON fp.student_id = s.id
-                    WHERE fp.school_id = :sid AND fp.status = 'PAID'
-                      AND (
-                        fp.academic_year_id = :ayid
-                        OR (
-                          fp.created_at >= (SELECT created_at FROM academic_years WHERE id = :ayid_2 LIMIT 1)
-                          AND fp.academic_year_id != :ayid_3
-                          AND (s.status = 'Inactive' OR s.status = 'Alumni' OR s.status = 'Archived')
-                        )
-                      )
-                ");
-                $stmt->execute([
-                    ':sid' => $schoolId, 
-                    ':ayid' => $academicYearId,
-                    ':ayid_2' => $academicYearId,
-                    ':ayid_3' => $academicYearId
-                ]);
-            } else {
-                $stmt = $this->pdo->prepare("
-                    SELECT COALESCE(SUM(fp.amount_paid), 0) 
-                    FROM fee_payments fp
-                    LEFT JOIN students s ON fp.student_id = s.id
-                    WHERE fp.school_id = :sid AND fp.status = 'PAID'
-                      AND (
-                        fp.academic_year_id = :ayid
-                        OR (
-                          fp.created_at >= (SELECT created_at FROM academic_years WHERE id = :ayid_2 LIMIT 1)
-                          AND fp.academic_year_id != :ayid_3
-                          AND (s.status = 'Inactive' OR s.status = 'Alumni' OR s.status = 'Archived')
-                        )
-                      )
-                ");
-                $stmt->execute([
-                    ':sid' => $schoolId, 
-                    ':ayid' => $academicYearId,
-                    ':ayid_2' => $academicYearId,
-                    ':ayid_3' => $academicYearId
-                ]);
-            }
+            $stmt = $this->pdo->prepare("
+                SELECT COALESCE(SUM(fp.amount_paid), 0) 
+                FROM fee_payments fp
+                JOIN students s ON fp.student_id = s.id
+                WHERE fp.school_id = :sid AND fp.status = 'PAID'
+                  AND (
+                    s.academic_year_id = :ayid
+                    OR (
+                      fp.created_at >= (SELECT created_at FROM academic_years WHERE id = :ayid_2 LIMIT 1)
+                      AND (s.status = 'Inactive' OR s.status = 'Alumni' OR s.status = 'Archived')
+                    )
+                  )
+            ");
+            $stmt->execute([
+                ':sid' => $schoolId, 
+                ':ayid' => $academicYearId,
+                ':ayid_2' => $academicYearId
+            ]);
             $monthlyCollected = (float)$stmt->fetchColumn();
 
-            if ($startDate && $endDate) {
-                $stmtAdd = $this->pdo->prepare("
-                    SELECT COALESCE(SUM(afp.amount), 0) 
-                    FROM additional_fee_payments afp
-                    JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
-                    LEFT JOIN students s ON afp.student_id = s.id
-                    WHERE afp.school_id = :sid AND afp.status = 'Paid'
-                      AND (
-                        aft.academic_year_id = :ayid
-                        OR (
-                          afp.updated_at >= (SELECT created_at FROM academic_years WHERE id = :ayid_2 LIMIT 1)
-                          AND aft.academic_year_id != :ayid_3
-                          AND (s.status = 'Inactive' OR s.status = 'Alumni' OR s.status = 'Archived')
-                        )
-                      )
-                ");
-                $stmtAdd->execute([
-                    ':sid' => $schoolId, 
-                    ':ayid' => $academicYearId,
-                    ':ayid_2' => $academicYearId,
-                    ':ayid_3' => $academicYearId
-                ]);
-            } else {
-                $stmtAdd = $this->pdo->prepare("
-                    SELECT COALESCE(SUM(afp.amount), 0) 
-                    FROM additional_fee_payments afp
-                    JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
-                    LEFT JOIN students s ON afp.student_id = s.id
-                    WHERE afp.school_id = :sid AND afp.status = 'Paid'
-                      AND (
-                        aft.academic_year_id = :ayid
-                        OR (
-                          afp.updated_at >= (SELECT created_at FROM academic_years WHERE id = :ayid_2 LIMIT 1)
-                          AND aft.academic_year_id != :ayid_3
-                          AND (s.status = 'Inactive' OR s.status = 'Alumni' OR s.status = 'Archived')
-                        )
-                      )
-                ");
-                $stmtAdd->execute([
-                    ':sid' => $schoolId, 
-                    ':ayid' => $academicYearId,
-                    ':ayid_2' => $academicYearId,
-                    ':ayid_3' => $academicYearId
-                ]);
-            }
+            $stmtAdd = $this->pdo->prepare("
+                SELECT COALESCE(SUM(afp.amount), 0) 
+                FROM additional_fee_payments afp
+                JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+                JOIN students s ON afp.student_id = s.id
+                WHERE afp.school_id = :sid AND LOWER(afp.status) = 'paid'
+                  AND (
+                    aft.academic_year_id = :ayid
+                    OR (
+                      afp.updated_at >= (SELECT created_at FROM academic_years WHERE id = :ayid_2 LIMIT 1)
+                      AND (s.status = 'Inactive' OR s.status = 'Alumni' OR s.status = 'Archived')
+                    )
+                  )
+            ");
+            $stmtAdd->execute([
+                ':sid' => $schoolId, 
+                ':ayid' => $academicYearId,
+                ':ayid_2' => $academicYearId
+            ]);
             $additionalCollected = (float)$stmtAdd->fetchColumn();
         } else {
             $stmt = $this->pdo->prepare("

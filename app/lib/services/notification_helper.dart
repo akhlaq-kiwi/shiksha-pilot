@@ -15,6 +15,7 @@ import '../screens/fees_card_screen.dart';
 import '../screens/salary_card_screen.dart';
 import '../screens/exam_list_screen.dart';
 import '../screens/homework_list_screen.dart';
+import '../screens/achievements_screen.dart';
 import 'package:school_hub/services/http_service.dart' as http;
 import '../services/leave_service.dart';
 import '../services/exam_service.dart';
@@ -314,6 +315,13 @@ class NotificationHelper {
         userRole: userRole,
         selectedStudentId: notifStudentId ?? studentId,
       );
+    } else if (link.contains('achievements') || title.toLowerCase().contains('achievement') || message.toLowerCase().contains('achievement')) {
+      targetScreen = AchievementsScreen(
+        baseUrl: baseUrl,
+        token: token,
+        userRole: userRole,
+        studentId: notifStudentId ?? studentId,
+      );
     } else {
       targetScreen = NotificationCenterScreen(
         baseUrl: leaveService.baseUrl,
@@ -420,11 +428,20 @@ class NotificationHelper {
           token: token,
         );
 
+      case NotificationEvent.achievementAttendanceAward:
+      case NotificationEvent.achievementAcademicTopper:
+      case 'ACHIEVEMENT_UNLOCKED':
+      case 'ACHIEVEMENT_GENERATED':
+        return AchievementsScreen(
+          baseUrl: baseUrl,
+          token: token,
+          userRole: userRole,
+          studentId: studentId,
+        );
+
       case NotificationEvent.announcementPublished:
       case NotificationEvent.attendanceMarkedAbsent:
       case NotificationEvent.attendanceNotMarkedReminder:
-      case NotificationEvent.achievementAttendanceAward:
-      case NotificationEvent.achievementAcademicTopper:
       case NotificationEvent.feeFollowupDueToday:
       case NotificationEvent.feeFollowupOverdue:
         // These have no dedicated mobile screen yet; the notification centre

@@ -229,7 +229,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 final childPhoto = child['photo_path']?.toString() ?? '';
                 Widget leadingWidget;
                 if (childPhoto.isNotEmpty) {
-                  final fullUrl = childPhoto.startsWith('http') ? childPhoto : '${widget.leaveService.baseUrl}$childPhoto';
+                  final String cleanPath = childPhoto.startsWith('/') ? childPhoto : '/$childPhoto';
+                  final fullUrl = childPhoto.startsWith('http') ? childPhoto : '${widget.leaveService.baseUrl}$cleanPath';
                   leadingWidget = CircleAvatar(
                     backgroundImage: CachedNetworkImageProvider(fullUrl),
                     backgroundColor: Colors.indigo.shade50,
@@ -441,7 +442,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     String photoUrl = _userPhoto;
     Widget avatarWidget;
     if (photoUrl.isNotEmpty) {
-      final fullUrl = photoUrl.startsWith('http') ? photoUrl : '${widget.leaveService.baseUrl}$photoUrl';
+      final String cleanPath = photoUrl.startsWith('/') ? photoUrl : '/$photoUrl';
+      final fullUrl = photoUrl.startsWith('http') ? photoUrl : '${widget.leaveService.baseUrl}$cleanPath';
       avatarWidget = CircleAvatar(
         radius: 46,
         backgroundImage: CachedNetworkImageProvider(fullUrl),

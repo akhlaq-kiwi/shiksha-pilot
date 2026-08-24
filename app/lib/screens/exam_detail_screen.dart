@@ -114,163 +114,271 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
 
   void _showSchemeModal() {
     final List<dynamic> scheme = _details['scheme'] ?? [];
+    final List<dynamic> publishedClassSchemes = (_details['published_class_schemes'] as List<dynamic>?) ?? [];
+    final bool isTeacher = (widget.userRole == 'TEACHER');
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.8,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(24),
-            topRight: Radius.circular(24),
-          ),
-        ),
-        child: Column(
-          children: [
-            const SizedBox(height: 12),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Examination Timetable Scheme',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.black87),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              widget.examName,
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
-            ),
-            const Divider(height: 24),
-            Expanded(
-              child: scheme.isEmpty
-                  ? const Center(child: Text('No timetable entries found.'))
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: scheme.length,
-                      itemBuilder: (context, index) {
-                        final paper = scheme[index];
-                        final sub = paper['subject_name'] ?? 'Subject';
-                        final date = paper['exam_date'] ?? '';
-                        final start = paper['start_time'] ?? '';
-                        final end = paper['end_time'] ?? '';
-                        final maxM = paper['max_marks']?.toString() ?? '100';
-                        final passM = paper['passing_marks']?.toString() ?? '33';
-                        final room = paper['room'] ?? 'As scheduled';
+      builder: (context) {
+        int? expandedClassIndex;
 
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade50,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.grey.shade200),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                sub,
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.black87),
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Text(
-                                              'Date: ',
-                                              style: TextStyle(fontSize: 13, color: Colors.indigo.shade800, fontWeight: FontWeight.bold),
-                                            ),
-                                            Expanded(
-                                              child: Text(
-                                                _formatDate(date),
-                                                style: TextStyle(fontSize: 13, color: Colors.grey.shade700, fontWeight: FontWeight.bold),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 12),
-                                        Row(
-                                          children: [
-                                            Text(
-                                              'Max: ',
-                                              style: TextStyle(fontSize: 12, color: Colors.indigo.shade800, fontWeight: FontWeight.bold),
-                                            ),
-                                            Expanded(
-                                              child: Text(
-                                                '${_formatMarks(maxM)} Marks',
-                                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Text(
-                                              'Time: ',
-                                              style: TextStyle(fontSize: 13, color: Colors.indigo.shade800, fontWeight: FontWeight.bold),
-                                            ),
-                                            Expanded(
-                                              child: Text(
-                                                '${_formatTime(start)} - ${_formatTime(end)}',
-                                                style: TextStyle(fontSize: 13, color: Colors.grey.shade700, fontWeight: FontWeight.bold),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 12),
-                                        Row(
-                                          children: [
-                                            Text(
-                                              'Pass: ',
-                                              style: TextStyle(fontSize: 12, color: Colors.indigo.shade800, fontWeight: FontWeight.bold),
-                                            ),
-                                            Expanded(
-                                              child: Text(
-                                                '${_formatMarks(passM)} Marks',
-                                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        );
-                      },
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.8,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(24),
+                  topRight: Radius.circular(24),
+                ),
+              ),
+              child: Column(
+                children: [
+                  const SizedBox(height: 12),
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
                     ),
-            ),
-          ],
-        ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Examination Timetable Scheme',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.black87),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.examName,
+                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
+                  ),
+                  const Divider(height: 24),
+                  Expanded(
+                    child: isTeacher
+                        ? (publishedClassSchemes.isEmpty
+                            ? const Center(child: Text('No published examination schemes found.'))
+                            : ListView.builder(
+                                padding: const EdgeInsets.all(16),
+                                itemCount: publishedClassSchemes.length,
+                                itemBuilder: (context, index) {
+                                  final item = publishedClassSchemes[index];
+                                  final className = item['class_name'] ?? 'Class';
+                                  final List<dynamic> papers = (item['scheme'] as List<dynamic>?) ?? [];
+                                  final isExpanded = (expandedClassIndex == index);
+
+                                  return Container(
+                                    margin: const EdgeInsets.only(bottom: 12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                        color: isExpanded ? Colors.indigo.shade300 : Colors.grey.shade200,
+                                        width: isExpanded ? 1.5 : 1,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.03),
+                                          blurRadius: 6,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        InkWell(
+                                          borderRadius: BorderRadius.circular(16),
+                                          onTap: () {
+                                            setModalState(() {
+                                              expandedClassIndex = isExpanded ? null : index;
+                                            });
+                                          },
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                            child: Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    Container(
+                                                      padding: const EdgeInsets.all(8),
+                                                      decoration: BoxDecoration(
+                                                        color: isExpanded ? Colors.indigo.shade50 : Colors.grey.shade100,
+                                                        borderRadius: BorderRadius.circular(10),
+                                                      ),
+                                                      child: Icon(
+                                                        Icons.class_rounded,
+                                                        color: isExpanded ? Colors.indigo.shade800 : Colors.grey.shade600,
+                                                        size: 20,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 12),
+                                                    Text(
+                                                      className,
+                                                      style: TextStyle(
+                                                        fontSize: 15,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: isExpanded ? Colors.indigo.shade900 : Colors.black87,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                Icon(
+                                                  isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                                                  color: isExpanded ? Colors.indigo.shade800 : Colors.grey.shade500,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                        if (isExpanded) ...[
+                                          const Divider(height: 1),
+                                          Padding(
+                                            padding: const EdgeInsets.all(12),
+                                            child: papers.isEmpty
+                                                ? const Padding(
+                                                    padding: EdgeInsets.all(16),
+                                                    child: Text('No scheduled papers for this class.', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                                                  )
+                                                : Column(
+                                                    children: papers.map((paper) => _buildPaperItemCard(paper)).toList(),
+                                                  ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ))
+                        : (scheme.isEmpty
+                            ? const Center(child: Text('No timetable entries found.'))
+                            : ListView.builder(
+                                padding: const EdgeInsets.all(16),
+                                itemCount: scheme.length,
+                                itemBuilder: (context, index) {
+                                  return _buildPaperItemCard(scheme[index]);
+                                },
+                              )),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildPaperItemCard(dynamic paper) {
+    final sub = paper['subject_name'] ?? 'Subject';
+    final date = paper['exam_date'] ?? '';
+    final start = paper['start_time'] ?? '';
+    final end = paper['end_time'] ?? '';
+    final maxM = paper['max_marks']?.toString() ?? '100';
+    final passM = paper['passing_marks']?.toString() ?? '33';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            sub,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.black87),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'Date: ',
+                          style: TextStyle(fontSize: 13, color: Colors.indigo.shade800, fontWeight: FontWeight.bold),
+                        ),
+                        Expanded(
+                          child: Text(
+                            _formatDate(date),
+                            style: TextStyle(fontSize: 13, color: Colors.grey.shade700, fontWeight: FontWeight.bold),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Text(
+                          'Max: ',
+                          style: TextStyle(fontSize: 12, color: Colors.indigo.shade800, fontWeight: FontWeight.bold),
+                        ),
+                        Expanded(
+                          child: Text(
+                            '${_formatMarks(maxM)} Marks',
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'Time: ',
+                          style: TextStyle(fontSize: 13, color: Colors.indigo.shade800, fontWeight: FontWeight.bold),
+                        ),
+                        Expanded(
+                          child: Text(
+                            '${_formatTime(start)} - ${_formatTime(end)}',
+                            style: TextStyle(fontSize: 13, color: Colors.grey.shade700, fontWeight: FontWeight.bold),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Text(
+                          'Pass: ',
+                          style: TextStyle(fontSize: 12, color: Colors.indigo.shade800, fontWeight: FontWeight.bold),
+                        ),
+                        Expanded(
+                          child: Text(
+                            '${_formatMarks(passM)} Marks',
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -418,6 +526,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
     String? sheetError;
 
     final Map<int, TextEditingController> marksControllers = {};
+    final Map<int, FocusNode> marksFocusNodes = {};
     final Map<int, bool> absentMap = {};
 
     showModalBottomSheet(
@@ -439,6 +548,8 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                 final data = await widget.examService.getMarksSheet(widget.examId, subId);
                 marksControllers.forEach((_, c) => c.dispose());
                 marksControllers.clear();
+                marksFocusNodes.forEach((_, f) => f.dispose());
+                marksFocusNodes.clear();
                 absentMap.clear();
 
                 bool anyExistingMarks = false;
@@ -455,6 +566,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                   marksControllers[sId] = TextEditingController(
                     text: (marksObtained != null && !isAbsent) ? marksObtained.toString() : '',
                   );
+                  marksFocusNodes[sId] = FocusNode();
                   absentMap[sId] = isAbsent;
                 }
 
@@ -489,6 +601,28 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
 
             Future<void> saveMarks() async {
               if (isResultPublished) return;
+
+              // Validation: Ensure all non-absent students have marks entered
+              for (var s in studentsList) {
+                final sId = s['student_id'] as int;
+                final isAb = absentMap[sId] ?? false;
+                final valStr = marksControllers[sId]?.text.trim() ?? '';
+                final studentName = s['student_name'] ?? 'Student';
+
+                if (!isAb && valStr.isEmpty) {
+                  marksFocusNodes[sId]?.requestFocus();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Please enter marks for "$studentName" or mark as Absent.'),
+                      backgroundColor: Colors.red.shade700,
+                      behavior: SnackBarBehavior.floating,
+                      duration: const Duration(seconds: 3),
+                    ),
+                  );
+                  return;
+                }
+              }
+
               setModalState(() {
                 isSaving = true;
               });
@@ -602,56 +736,58 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                   ),
                   const Divider(height: 1),
 
-                  // Subjects Bar
-                  Container(
-                    height: 50,
-                    color: Colors.grey.shade50,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      itemCount: scheme.length,
-                      itemBuilder: (context, idx) {
-                        final item = scheme[idx];
-                        final subId = (item['subject_id'] is int)
-                            ? item['subject_id'] as int
-                            : int.tryParse(item['subject_id'].toString()) ?? 0;
-                        final subName = item['subject_name'] ?? 'Subject';
-                        final isSelected = subId == selectedSubjectId;
+                  // Subjects Bar (Only if no error)
+                  if (sheetError == null) ...[
+                    Container(
+                      height: 50,
+                      color: Colors.grey.shade50,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        itemCount: scheme.length,
+                        itemBuilder: (context, idx) {
+                          final item = scheme[idx];
+                          final subId = (item['subject_id'] is int)
+                              ? item['subject_id'] as int
+                              : int.tryParse(item['subject_id'].toString()) ?? 0;
+                          final subName = item['subject_name'] ?? 'Subject';
+                          final isSelected = subId == selectedSubjectId;
 
-                        return GestureDetector(
-                          onTap: () {
-                            if (subId != selectedSubjectId) {
-                              setModalState(() {
-                                selectedSubjectId = subId;
-                                marksSheetData = null;
-                              });
-                              loadMarksForSubject(subId);
-                            }
-                          },
-                          child: Container(
-                            margin: const EdgeInsets.only(right: 10),
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: isSelected ? Colors.indigo.shade700 : Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: isSelected ? Colors.indigo.shade700 : Colors.grey.shade300,
+                          return GestureDetector(
+                            onTap: () {
+                              if (subId != selectedSubjectId) {
+                                setModalState(() {
+                                  selectedSubjectId = subId;
+                                  marksSheetData = null;
+                                });
+                                loadMarksForSubject(subId);
+                              }
+                            },
+                            child: Container(
+                              margin: const EdgeInsets.only(right: 10),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: isSelected ? Colors.indigo.shade700 : Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: isSelected ? Colors.indigo.shade700 : Colors.grey.shade300,
+                                ),
+                              ),
+                              child: Text(
+                                subName,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: isSelected ? Colors.white : Colors.indigo.shade900,
+                                ),
                               ),
                             ),
-                            child: Text(
-                              subName,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: isSelected ? Colors.white : Colors.indigo.shade900,
-                              ),
-                            ),
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
                     ),
-                  ),
-                  const Divider(height: 1),
+                    const Divider(height: 1),
+                  ],
 
                   Expanded(
                     child: isLoadingSheet
@@ -659,16 +795,42 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                         : sheetError != null
                             ? Center(
                                 child: Padding(
-                                  padding: const EdgeInsets.all(20),
+                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Text(sheetError!, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-                                      const SizedBox(height: 12),
-                                      ElevatedButton(
-                                        onPressed: () => loadMarksForSubject(selectedSubjectId),
-                                        child: const Text('Retry'),
-                                      )
+                                      Container(
+                                        padding: const EdgeInsets.all(20),
+                                        decoration: BoxDecoration(
+                                          color: Colors.amber.shade50,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(
+                                          Icons.assignment_ind_outlined,
+                                          size: 48,
+                                          color: Colors.amber.shade800,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 20),
+                                      const Text(
+                                        'No class Assigned to you yet',
+                                        style: TextStyle(
+                                          fontSize: 17,
+                                          fontWeight: FontWeight.w900,
+                                          color: Colors.black87,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Please contact school administrator to assign a class to your teacher profile.',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500,
+                                          color: Colors.grey.shade600,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -820,34 +982,65 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                                         ),
                                                       );
                                                     } else {
-                                                      return SizedBox(
-                                                        width: 75,
-                                                        height: 42,
-                                                        child: TextField(
-                                                          controller: marksControllers[sId],
-                                                          enabled: isEditingMode && !isAb && !isResultPublished,
-                                                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                                          inputFormatters: [
-                                                            FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                                                            MaxValueTextInputFormatter(maxM),
-                                                          ],
-                                                          textAlign: TextAlign.center,
-                                                          style: TextStyle(
-                                                            fontWeight: FontWeight.bold,
-                                                            fontSize: 14,
-                                                            color: (isEditingMode && !isResultPublished) ? Colors.black87 : Colors.indigo.shade900,
-                                                          ),
-                                                          decoration: InputDecoration(
-                                                            hintText: isAb ? 'ABS' : '0.0',
-                                                            hintStyle: TextStyle(fontSize: 12, color: isAb ? Colors.red : Colors.grey),
-                                                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                                            filled: true,
-                                                            fillColor: isAb ? Colors.red.shade50 : ((isEditingMode && !isResultPublished) ? Colors.white : Colors.grey.shade100),
-                                                          ),
-                                                        ),
-                                                      );
-                                                    }
+                                                       return SizedBox(
+                                                         width: 75,
+                                                         height: 42,
+                                                         child: TextField(
+                                                           controller: marksControllers[sId],
+                                                           focusNode: marksFocusNodes[sId],
+                                                           enabled: isEditingMode && !isAb && !isResultPublished,
+                                                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                                           textInputAction: (index < studentsList.length - 1) ? TextInputAction.next : TextInputAction.done,
+                                                           inputFormatters: [
+                                                             FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                                                             MaxValueTextInputFormatter(maxM),
+                                                           ],
+                                                           textAlign: TextAlign.center,
+                                                           style: TextStyle(
+                                                             fontWeight: FontWeight.bold,
+                                                             fontSize: 14,
+                                                             color: (isEditingMode && !isResultPublished) ? Colors.black87 : Colors.indigo.shade900,
+                                                           ),
+                                                           onChanged: (val) {
+                                                             final cleanVal = val.replaceAll(RegExp(r'\D'), '');
+                                                             if (index < studentsList.length - 1) {
+                                                               final nextSt = studentsList[index + 1];
+                                                               final nextId = nextSt['student_id'] as int;
+                                                               final nextFocus = marksFocusNodes[nextId];
+
+                                                               if (cleanVal.length >= 3) {
+                                                                 nextFocus?.requestFocus();
+                                                               } else if (cleanVal.length == 2) {
+                                                                 if (cleanVal == '10' && maxM >= 100) {
+                                                                   Future.delayed(const Duration(milliseconds: 300), () {
+                                                                     if (marksControllers[sId]?.text == '10') {
+                                                                       nextFocus?.requestFocus();
+                                                                     }
+                                                                   });
+                                                                 } else {
+                                                                   nextFocus?.requestFocus();
+                                                                 }
+                                                               }
+                                                             }
+                                                           },
+                                                           onSubmitted: (_) {
+                                                             if (index < studentsList.length - 1) {
+                                                               final nextSt = studentsList[index + 1];
+                                                               final nextId = nextSt['student_id'] as int;
+                                                               marksFocusNodes[nextId]?.requestFocus();
+                                                             }
+                                                           },
+                                                           decoration: InputDecoration(
+                                                             hintText: isAb ? 'ABS' : '0.0',
+                                                             hintStyle: TextStyle(fontSize: 12, color: isAb ? Colors.red : Colors.grey),
+                                                             contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                                             filled: true,
+                                                             fillColor: isAb ? Colors.red.shade50 : ((isEditingMode && !isResultPublished) ? Colors.white : Colors.grey.shade100),
+                                                           ),
+                                                         ),
+                                                       );
+                                                     }
                                                   })(),
                                                 ],
                                               );
@@ -858,8 +1051,8 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                               ),
                   ),
 
-                  // Action Button (Hidden if Result Published)
-                  if (!isResultPublished)
+                  // Action Button (Hidden if Result Published or if error state)
+                  if (!isResultPublished && sheetError == null)
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -1627,31 +1820,6 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                           padding: const EdgeInsets.all(20),
                           child: Column(
                             children: [
-                              // Download Action Button
-                              ElevatedButton.icon(
-                                onPressed: _isDownloading ? null : () => _downloadReportCardPDF(rcData, setModalState),
-                                icon: _isDownloading
-                                    ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          color: Colors.white,
-                                          strokeWidth: 2,
-                                        ),
-                                      )
-                                    : const Icon(Icons.download_rounded),
-                                label: Text(_isDownloading ? 'Downloading...' : 'Download Report Card (PDF)'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.indigo.shade900,
-                                  foregroundColor: Colors.white,
-                                  minimumSize: const Size.fromHeight(50),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 20),
-
                               // Formatted Report Card Container (Dynamic Active Template Match)
                               Builder(
                                 builder: (context) {
@@ -1661,6 +1829,9 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                   final Color cardBg = theme['cardBg'] as Color;
                                   final BoxBorder border = theme['border'] as BoxBorder;
                                   final String badgeTitle = theme['badgeTitle'] as String;
+
+                                  final bool isFinalReport = (rcData['is_final_session_report'] == true) || 
+                                      (rcData['badge_title']?.toString().toUpperCase() == 'FINAL ACADEMIC REPORT CARD');
 
                                   return Container(
                                     padding: const EdgeInsets.all(16),
@@ -1774,7 +1945,9 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                                              borderRadius: BorderRadius.circular(4),
                                                            ),
                                                            child: Text(
-                                                             (rcData['exam_name'] ?? widget.examName).toString().toUpperCase(),
+                                                             isFinalReport 
+                                                                 ? 'FINAL ACADEMIC REPORT CARD'
+                                                                 : (rcData['exam_name'] ?? widget.examName).toString().toUpperCase(),
                                                              style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Color(0xFF042F2E)),
                                                            ),
                                                          ),
@@ -1824,76 +1997,92 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                          const SizedBox(height: 16),
 
                                          // Scholastic Performance Marks Table
-                                         Container(
-                                           decoration: BoxDecoration(
-                                             borderRadius: BorderRadius.circular(8),
-                                             border: Border.all(color: Colors.teal.shade900),
-                                           ),
-                                           child: Column(
-                                             children: [
-                                               // Table Header
-                                               Container(
-                                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                                 decoration: const BoxDecoration(
-                                                   color: Color(0xFF042F2E),
-                                                   borderRadius: BorderRadius.only(topLeft: Radius.circular(6), topRight: Radius.circular(6)),
-                                                 ),
-                                                 child: const Row(
-                                                   children: [
-                                                     Expanded(flex: 3, child: Text('SUBJECT', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white))),
-                                                     Expanded(flex: 2, child: Text('OBTAINED', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white))),
-                                                     Expanded(flex: 2, child: Text('MAX', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white))),
-                                                     Expanded(flex: 2, child: Text('PASS', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white))),
-                                                     Expanded(flex: 2, child: Text('GRADE', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white))),
-                                                     Expanded(flex: 2, child: Text('VERDICT', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white))),
-                                                   ],
-                                                 ),
-                                               ),
-                                               // Table Rows
-                                               ...((rcData['subjects'] as List? ?? []).map((sub) {
-                                                 final String sName = (sub['subject_name'] ?? '').toString();
-                                                 final String maxM = (sub['max_marks'] ?? '-').toString();
-                                                 final String passM = (sub['passing_marks'] ?? '-').toString();
-                                                 final String obt = (sub['marks_obtained'] ?? '-').toString();
-                                                 final String grade = (sub['grade'] ?? '-').toString();
-                                                 final String res = (sub['result'] ?? 'PASS').toString().toUpperCase();
-                                                 final bool isFail = res == 'FAIL';
-
-                                                 return Container(
+                                         if (isFinalReport)
+                                           _buildFinalReportCardTable(rcData)
+                                         else
+                                           Container(
+                                             decoration: BoxDecoration(
+                                               borderRadius: BorderRadius.circular(8),
+                                               border: Border.all(color: Colors.teal.shade900),
+                                             ),
+                                             child: Column(
+                                               children: [
+                                                 // Table Header
+                                                 Container(
                                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                                   decoration: BoxDecoration(
-                                                     border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+                                                   decoration: const BoxDecoration(
+                                                     color: Color(0xFF042F2E),
+                                                     borderRadius: BorderRadius.only(topLeft: Radius.circular(6), topRight: Radius.circular(6)),
                                                    ),
-                                                   child: Row(
+                                                   child: const Row(
                                                      children: [
-                                                       Expanded(flex: 3, child: Text(sName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87))),
-                                                       Expanded(flex: 2, child: Text(obt, textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: isFail ? Colors.red.shade700 : Colors.teal.shade900))),
-                                                       Expanded(flex: 2, child: Text(maxM, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, color: Colors.black87))),
-                                                       Expanded(flex: 2, child: Text(passM, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, color: Colors.black54))),
-                                                       Expanded(flex: 2, child: Text(grade, textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isFail ? Colors.red.shade700 : Colors.teal.shade900))),
-                                                       Expanded(
-                                                         flex: 2,
-                                                         child: Center(
-                                                           child: Container(
-                                                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                             decoration: BoxDecoration(
-                                                               color: isFail ? Colors.red.shade100 : Colors.teal.shade100,
-                                                               borderRadius: BorderRadius.circular(4),
-                                                             ),
-                                                             child: Text(
-                                                               res,
-                                                               style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: isFail ? Colors.red.shade900 : Colors.teal.shade900),
+                                                       Expanded(flex: 3, child: Text('SUBJECT', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white))),
+                                                       Expanded(flex: 2, child: Text('OBTAINED', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white))),
+                                                       Expanded(flex: 2, child: Text('MAX', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white))),
+                                                       Expanded(flex: 2, child: Text('PASS', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white))),
+                                                       Expanded(flex: 2, child: Text('GRADE', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white))),
+                                                       Expanded(flex: 2, child: Text('VERDICT', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white))),
+                                                     ],
+                                                   ),
+                                                 ),
+                                                 // Table Rows
+                                                 ...((rcData['subjects'] as List? ?? []).map((sub) {
+                                                   final String sName = (sub['subject_name'] ?? '').toString();
+                                                   final String rawObt = (sub['marks_obtained'] ?? '').toString().toUpperCase().trim();
+                                                   final String rawMax = (sub['max_marks'] ?? '').toString().toUpperCase().trim();
+                                                   final String rawGrade = (sub['grade'] ?? '').toString().toUpperCase().trim();
+
+                                                   final bool isGradeOnly = sub['is_grade_only'] == true || 
+                                                       sub['evaluation_type'] == 'grade' || 
+                                                       rawMax == '0' || rawMax == '0.0' || rawMax == 'GRADE' ||
+                                                       (['A+', 'A', 'B', 'C', 'D', 'E', 'F'].contains(rawObt) && rawObt != 'ABSENT');
+
+                                                   final String assignedGrade = (isGradeOnly && ['A+', 'A', 'B', 'C', 'D', 'E', 'F'].contains(rawObt)) 
+                                                       ? rawObt 
+                                                       : (rawGrade.isNotEmpty && rawGrade != '—' && rawGrade != '-' ? rawGrade : (rawObt.isNotEmpty && rawObt != '—' && rawObt != '-' ? rawObt : 'A'));
+
+                                                   final String obt = isGradeOnly ? assignedGrade : (sub['marks_obtained'] ?? '—').toString();
+                                                   final String maxM = isGradeOnly ? 'GRADE' : (sub['max_marks'] ?? '—').toString();
+                                                   final String passM = isGradeOnly ? 'C' : (sub['passing_marks'] ?? '—').toString();
+                                                   final String grade = isGradeOnly ? assignedGrade : (sub['grade'] ?? '—').toString();
+                                                   final String res = (sub['result'] ?? 'PASS').toString().toUpperCase();
+                                                   final bool isFail = res == 'FAIL';
+
+                                                   return Container(
+                                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                                     decoration: BoxDecoration(
+                                                       border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+                                                     ),
+                                                     child: Row(
+                                                       children: [
+                                                         Expanded(flex: 3, child: Text(sName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87))),
+                                                         Expanded(flex: 2, child: Text(obt, textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: isFail ? Colors.red.shade700 : Colors.teal.shade900))),
+                                                         Expanded(flex: 2, child: Text(maxM, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, color: Colors.black87))),
+                                                         Expanded(flex: 2, child: Text(passM, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, color: Colors.black54))),
+                                                         Expanded(flex: 2, child: Text(grade, textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isFail ? Colors.red.shade700 : Colors.teal.shade900))),
+                                                         Expanded(
+                                                           flex: 2,
+                                                           child: Center(
+                                                             child: Container(
+                                                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                               decoration: BoxDecoration(
+                                                                 color: isFail ? Colors.red.shade100 : Colors.teal.shade100,
+                                                                 borderRadius: BorderRadius.circular(4),
+                                                               ),
+                                                               child: Text(
+                                                                 res,
+                                                                 style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: isFail ? Colors.red.shade900 : Colors.teal.shade900),
+                                                               ),
                                                              ),
                                                            ),
                                                          ),
-                                                       ),
-                                                     ],
-                                                   ),
-                                                 );
-                                               })).toList(),
-                                             ],
+                                                       ],
+                                                     ),
+                                                   );
+                                                 })).toList(),
+                                               ],
+                                             ),
                                            ),
-                                         ),
                                          const SizedBox(height: 16),
 
                                          // Performance Summary Cards Row (5 columns matching Admin Portal)
@@ -2000,6 +2189,253 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
     };
   }
 
+  Widget _buildFinalReportCardTable(Map<String, dynamic> rcData) {
+    final List<dynamic> subjects = (rcData['subjects'] as List?) ?? [];
+    final List<dynamic> sessionExams = (rcData['session_exams'] as List?) ?? ['Quarterly Examination', 'Half Yearly Examination', 'Annual Examination'];
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF042F2E)),
+      ),
+      child: Column(
+        children: [
+          // Top Header Row
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+            decoration: const BoxDecoration(
+              color: Color(0xFF042F2E),
+              borderRadius: BorderRadius.only(topLeft: Radius.circular(6), topRight: Radius.circular(6)),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    const Expanded(flex: 3, child: Text('SUBJECT', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white))),
+                    ...sessionExams.map((exName) {
+                      final shortName = exName.toString().toUpperCase();
+                      return Expanded(
+                        flex: 4,
+                        child: Text(
+                          shortName,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.white),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      );
+                    }).toList(),
+                    const Expanded(flex: 4, child: Text('GRAND TOTAL', textAlign: TextAlign.center, style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.white))),
+                    const Expanded(flex: 2, child: Text('GRADE', textAlign: TextAlign.center, style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white))),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                const Divider(color: Colors.white24, height: 1),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    const Expanded(flex: 3, child: SizedBox()),
+                    ...sessionExams.map((_) {
+                      return const Expanded(
+                        flex: 4,
+                        child: Row(
+                          children: [
+                            Expanded(child: Text('M.M.', textAlign: TextAlign.center, style: TextStyle(fontSize: 8, color: Colors.amber, fontWeight: FontWeight.bold))),
+                            Expanded(child: Text('OBT.', textAlign: TextAlign.center, style: TextStyle(fontSize: 8, color: Colors.amber, fontWeight: FontWeight.bold))),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    const Expanded(
+                      flex: 4,
+                      child: Row(
+                        children: [
+                          Expanded(child: Text('MAX', textAlign: TextAlign.center, style: TextStyle(fontSize: 8, color: Colors.amber, fontWeight: FontWeight.bold))),
+                          Expanded(child: Text('OBT.', textAlign: TextAlign.center, style: TextStyle(fontSize: 8, color: Colors.amber, fontWeight: FontWeight.bold))),
+                        ],
+                      ),
+                    ),
+                    const Expanded(flex: 2, child: SizedBox()),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // Data Rows
+          ...subjects.map((sub) {
+            final String sName = (sub['subject_name'] ?? '').toString();
+            final Map<String, dynamic> examScores = Map<String, dynamic>.from(sub['exam_scores'] ?? {});
+            final String grandMax = (sub['grand_total_max'] ?? sub['max_marks'] ?? '-').toString();
+            final String grandObt = (sub['grand_total_obtained'] ?? sub['marks_obtained'] ?? '-').toString();
+            final String grade = (sub['grade'] ?? '-').toString();
+
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+              decoration: BoxDecoration(
+                border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: Text(
+                      sName,
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87),
+                    ),
+                  ),
+                  ...sessionExams.map((exName) {
+                    final sc = examScores[exName] ?? examScores[exName.toString()];
+                    final String rawMM = sc != null ? (sc['max_marks'] ?? '-').toString().toUpperCase().trim() : '100';
+                    final String rawObt = sc != null ? (sc['marks_obtained'] ?? '-').toString().toUpperCase().trim() : '';
+                    final bool isGradeSub = rawMM == '0' || rawMM == '0.0' || rawMM == 'GRADE' || ['A+', 'A', 'B', 'C', 'D', 'E', 'F'].contains(rawObt);
+                    final String mm = isGradeSub ? 'GRADE' : rawMM;
+                    final String obt = isGradeSub ? (rawObt.isNotEmpty && rawObt != '—' ? rawObt : 'A') : (sc != null ? (sc['marks_obtained'] ?? '-').toString() : '—');
+                    final bool isAbs = sc != null && (sc['is_absent'] == true || obt == 'ABSENT');
+
+                    return Expanded(
+                      flex: 4,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              mm,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontSize: 10, color: Colors.black54),
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              obt,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: isAbs ? Colors.red.shade700 : Colors.teal.shade900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                  Expanded(
+                    flex: 4,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            grandMax,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87),
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            grandObt,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.teal.shade900),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      grade,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.teal.shade900),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+
+          // Total Marks Footer Row (matching Admin Portal report card)
+          Builder(
+            builder: (context) {
+              final Map<String, dynamic> examTotalsMap = Map<String, dynamic>.from(rcData['exam_totals'] ?? {});
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.teal.shade50,
+                  borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(6), bottomRight: Radius.circular(6)),
+                  border: Border(top: BorderSide(color: Colors.teal.shade900, width: 1.5)),
+                ),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      flex: 3,
+                      child: Text(
+                        'Total Marks',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF042F2E)),
+                      ),
+                    ),
+                    ...sessionExams.map((exName) {
+                      final exTot = Map<String, dynamic>.from(examTotalsMap[exName] ?? examTotalsMap[exName.toString()] ?? {});
+                      return Expanded(
+                        flex: 4,
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '${exTot['max_marks'] ?? 0}',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87),
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                '${exTot['marks_obtained'] ?? 0}',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF042F2E)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    Expanded(
+                      flex: 4,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '${rcData['total_max'] ?? 0}',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.black87),
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              '${rcData['total_obtained'] ?? 0}',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF042F2E)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        '${rcData['grade'] ?? '—'}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Color(0xFF042F2E)),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   Map<String, dynamic> _getTemplateTheme(String templateCode) {
     switch (templateCode) {
       case 'modern':
@@ -2090,11 +2526,12 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
       final String className = (reportCard['class_name'] ?? '').toString();
       final String classSection = (reportCard['class_section'] ?? '').toString();
       final String fullClass = classSection.isNotEmpty ? '$className ($classSection)' : className;
-      final String rollNo = (reportCard['roll_no'] ?? '—').toString();
-      final String fatherName = (reportCard['father_name'] ?? '—').toString();
-      final String motherName = (reportCard['mother_name'] ?? '—').toString();
-      final String admissionNo = (reportCard['admission_no'] ?? '—').toString();
+      final String rollNo = (reportCard['roll_no'] ?? '-').toString();
+      final String fatherName = (reportCard['father_name'] ?? '-').toString();
+      final String motherName = (reportCard['mother_name'] ?? '-').toString();
+      final String admissionNo = (reportCard['admission_no'] ?? '-').toString();
       final List<dynamic> subjects = reportCard['subjects'] as List? ?? [];
+      final bool isPdfFinalReport = false;
 
       final double totalMax = double.tryParse((reportCard['total_max'] ?? reportCard['total_max_marks'] ?? 0.0).toString()) ?? 0.0;
       final double totalObtained = double.tryParse((reportCard['total_obtained'] ?? reportCard['total_marks_obtained'] ?? 0.0).toString()) ?? 0.0;
@@ -2108,7 +2545,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
 
       final String schoolAddress = (reportCard['school_address'] ?? '').toString();
       final String schoolLogo = (reportCard['school_logo'] ?? '').toString();
-      final String dob = (reportCard['dob'] ?? '—').toString();
+      final String dob = (reportCard['dob'] ?? '-').toString();
 
       pw.MemoryImage? logoImage;
       if (schoolLogo.isNotEmpty) {
@@ -2120,42 +2557,108 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
         } catch (_) {}
       }
 
+      final int subCount = subjects.length;
+
+      // Dynamic layout density scaling matching Web Report Card
+      double cellPaddingV = 4.0;
+      double headerPaddingV = 6.0;
+      double tableFontSize = 8.5;
+      double headerFontSize = 8.5;
+      double sectionGap = 12.0;
+      double infoPaddingV = 10.0;
+      double summaryLabelSize = 7.0;
+      double summaryValueSize = 11.0;
+      double summaryPaddingV = 6.0;
+
+      if (subCount <= 4) {
+        // 4 or fewer subjects: Expanded rows & font sizes to fill A4 page naturally
+        cellPaddingV = 22.0;
+        headerPaddingV = 14.0;
+        tableFontSize = 11.5;
+        headerFontSize = 11.0;
+        sectionGap = 24.0;
+        infoPaddingV = 14.0;
+        summaryLabelSize = 8.5;
+        summaryValueSize = 14.0;
+        summaryPaddingV = 10.0;
+      } else if (subCount == 5) {
+        cellPaddingV = 18.0;
+        headerPaddingV = 12.0;
+        tableFontSize = 11.0;
+        headerFontSize = 10.5;
+        sectionGap = 20.0;
+        infoPaddingV = 13.0;
+        summaryLabelSize = 8.0;
+        summaryValueSize = 13.5;
+        summaryPaddingV = 9.0;
+      } else if (subCount == 6) {
+        cellPaddingV = 14.0;
+        headerPaddingV = 10.0;
+        tableFontSize = 10.5;
+        headerFontSize = 10.0;
+        sectionGap = 18.0;
+        infoPaddingV = 12.0;
+        summaryLabelSize = 7.8;
+        summaryValueSize = 13.0;
+        summaryPaddingV = 8.0;
+      } else if (subCount <= 8) {
+        cellPaddingV = 10.0;
+        headerPaddingV = 8.0;
+        tableFontSize = 9.5;
+        headerFontSize = 9.0;
+        sectionGap = 15.0;
+        infoPaddingV = 11.0;
+        summaryLabelSize = 7.5;
+        summaryValueSize = 12.0;
+        summaryPaddingV = 7.0;
+      }
+
       pdf.addPage(
         pw.Page(
           pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.all(24),
+          margin: const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           build: (pw.Context context) {
             return pw.Container(
+              height: double.infinity,
               decoration: pw.BoxDecoration(
-                border: pw.Border.all(color: PdfColors.teal900, width: 2),
-                borderRadius: pw.BorderRadius.circular(8),
+                border: pw.Border.all(color: PdfColor.fromHex('#042F2E'), width: 2),
+                borderRadius: pw.BorderRadius.circular(10),
               ),
               padding: const pw.EdgeInsets.all(16),
               child: pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
-                  // School Banner Header (Matching Modern Template Admin Banner)
+                  // School Banner Header
                   pw.Container(
                     padding: const pw.EdgeInsets.all(12),
                     decoration: pw.BoxDecoration(
-                      color: PdfColors.teal900,
-                      borderRadius: pw.BorderRadius.circular(6),
+                      color: PdfColor.fromHex('#042F2E'),
+                      borderRadius: pw.BorderRadius.circular(8),
                     ),
                     child: pw.Row(
                       children: [
-                        if (logoImage != null) ...[
-                          pw.Container(
-                            width: 50,
-                            height: 50,
-                            decoration: pw.BoxDecoration(
-                              borderRadius: pw.BorderRadius.circular(6),
-                              color: PdfColors.white,
-                            ),
-                            padding: const pw.EdgeInsets.all(4),
-                            child: pw.Image(logoImage, fit: pw.BoxFit.contain),
+                        pw.Container(
+                          width: 52,
+                          height: 52,
+                          decoration: pw.BoxDecoration(
+                            borderRadius: pw.BorderRadius.circular(8),
+                            color: PdfColors.amber400,
                           ),
-                          pw.SizedBox(width: 12),
-                        ],
+                          padding: const pw.EdgeInsets.all(4),
+                          child: logoImage != null
+                              ? pw.Image(logoImage, fit: pw.BoxFit.contain)
+                              : pw.Center(
+                                  child: pw.Text(
+                                    schoolName.isNotEmpty ? schoolName[0] : 'S',
+                                    style: pw.TextStyle(
+                                      fontSize: 26,
+                                      fontWeight: pw.FontWeight.bold,
+                                      color: PdfColor.fromHex('#042F2E'),
+                                    ),
+                                  ),
+                                ),
+                        ),
+                        pw.SizedBox(width: 12),
                         pw.Expanded(
                           child: pw.Column(
                             crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -2163,7 +2666,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                               pw.Text(
                                 schoolName,
                                 style: pw.TextStyle(
-                                  fontSize: 16,
+                                  fontSize: 17,
                                   fontWeight: pw.FontWeight.bold,
                                   color: PdfColors.amber300,
                                 ),
@@ -2172,24 +2675,27 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                 pw.SizedBox(height: 2),
                                 pw.Text(
                                   schoolAddress,
-                                  style: const pw.TextStyle(fontSize: 9, color: PdfColors.teal100),
+                                  style: const pw.TextStyle(fontSize: 9.5, color: PdfColors.teal100),
                                 ),
                               ],
-                              pw.SizedBox(height: 4),
+                              pw.SizedBox(height: 5),
                               pw.Row(
                                 children: [
                                   pw.Container(
-                                    padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: const pw.BoxDecoration(color: PdfColors.amber400),
+                                    padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: pw.BoxDecoration(
+                                      color: PdfColors.amber400,
+                                      borderRadius: pw.BorderRadius.circular(4),
+                                    ),
                                     child: pw.Text(
-                                      examName.toUpperCase(),
-                                      style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#042F2E')),
+                                      (isPdfFinalReport ? 'FINAL ACADEMIC REPORT CARD' : examName).toUpperCase(),
+                                      style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#042F2E')),
                                     ),
                                   ),
-                                  pw.SizedBox(width: 8),
+                                  pw.SizedBox(width: 10),
                                   pw.Text(
                                     'Session: $academicYear',
-                                    style: const pw.TextStyle(fontSize: 9, color: PdfColors.white),
+                                    style: pw.TextStyle(fontSize: 9.5, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
                                   ),
                                 ],
                               ),
@@ -2199,14 +2705,14 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                       ],
                     ),
                   ),
-                  pw.SizedBox(height: 10),
+                  pw.SizedBox(height: sectionGap),
 
                   // Student Details Grid
                   pw.Container(
-                    padding: const pw.EdgeInsets.all(10),
+                    padding: pw.EdgeInsets.symmetric(horizontal: 12, vertical: infoPaddingV),
                     decoration: pw.BoxDecoration(
                       color: PdfColors.grey100,
-                      borderRadius: pw.BorderRadius.circular(6),
+                      borderRadius: pw.BorderRadius.circular(8),
                       border: pw.Border.all(color: PdfColors.grey300),
                     ),
                     child: pw.Column(
@@ -2218,7 +2724,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                             pw.Expanded(child: _pdfInfoCell("MOTHER'S NAME", motherName, isBold: true)),
                           ],
                         ),
-                        pw.SizedBox(height: 6),
+                        pw.SizedBox(height: 8),
                         pw.Row(
                           children: [
                             pw.Expanded(child: _pdfInfoCell('CLASS & SECTION', fullClass, isBold: true)),
@@ -2229,61 +2735,165 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                       ],
                     ),
                   ),
-                  pw.SizedBox(height: 12),
+                  pw.SizedBox(height: sectionGap),
 
-                  // Marks Table (Matching Admin Portal Column Headers: SUBJECT, OBTAINED, MAX, PASS, GRADE, VERDICT)
-                  pw.Table(
-                    border: pw.TableBorder.all(color: PdfColors.grey400),
-                    children: [
-                      // Header Row
-                      pw.TableRow(
-                        decoration: const pw.BoxDecoration(color: PdfColors.teal900),
-                        children: [
-                          _pdfTableHeaderCell('SUBJECT'),
-                          _pdfTableHeaderCell('OBTAINED'),
-                          _pdfTableHeaderCell('MAX'),
-                          _pdfTableHeaderCell('PASS'),
-                          _pdfTableHeaderCell('GRADE'),
-                          _pdfTableHeaderCell('VERDICT'),
-                        ],
-                      ),
-                      // Data Rows
-                      ...subjects.map((sub) {
-                        final String sName = (sub['subject_name'] ?? '').toString();
-                        final String maxM = (sub['max_marks'] ?? '-').toString();
-                        final String passM = (sub['passing_marks'] ?? '-').toString();
-                        final String obt = (sub['marks_obtained'] ?? '-').toString();
-                        final String sGrade = (sub['grade'] ?? '-').toString();
-                        final String sRes = (sub['result'] ?? (sub['is_absent'] == 1 ? 'FAIL' : 'PASS')).toString().toUpperCase();
-                        final bool isFail = sRes == 'FAIL';
-
-                        return pw.TableRow(
+                  // Marks Table (Exact Matching Image 2 Web PDF layout)
+                  if (isPdfFinalReport)
+                    pw.Table(
+                      border: pw.TableBorder.all(color: PdfColor.fromHex('#042F2E')),
+                      columnWidths: {
+                        0: const pw.FlexColumnWidth(3.2), // SUBJECT
+                        1: const pw.FlexColumnWidth(1.4), // Q1 MM
+                        2: const pw.FlexColumnWidth(1.4), // Q1 OBT
+                        3: const pw.FlexColumnWidth(1.4), // HY MM
+                        4: const pw.FlexColumnWidth(1.4), // HY OBT
+                        5: const pw.FlexColumnWidth(1.4), // AN MM
+                        6: const pw.FlexColumnWidth(1.4), // AN OBT
+                        7: const pw.FlexColumnWidth(1.6), // GRAND MAX
+                        8: const pw.FlexColumnWidth(1.6), // GRAND OBT
+                        9: const pw.FlexColumnWidth(1.4), // GRADE
+                      },
+                      children: [
+                        // Header Row 1
+                        pw.TableRow(
+                          decoration: pw.BoxDecoration(color: PdfColor.fromHex('#042F2E')),
                           children: [
-                            _pdfTableCell(sName, alignLeft: true),
-                            _pdfTableCell(obt, isBold: true, color: isFail ? PdfColors.red700 : PdfColors.teal900),
-                            _pdfTableCell(maxM),
-                            _pdfTableCell(passM),
-                            _pdfTableCell(sGrade),
-                            _pdfTableCell(sRes, color: isFail ? PdfColors.red700 : PdfColors.teal900, isBold: true),
+                            _pdfTableHeaderCell('SUBJECT', verticalPadding: headerPaddingV, fontSize: headerFontSize),
+                            ...((reportCard['session_exams'] as List? ?? ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam']).map((ex) {
+                              return pw.Container(
+                                padding: pw.EdgeInsets.symmetric(vertical: headerPaddingV, horizontal: 2),
+                                alignment: pw.Alignment.center,
+                                child: pw.Text(
+                                  ex.toString().toUpperCase().replaceAll('EXAMINATION', 'EXAM'),
+                                  textAlign: pw.TextAlign.center,
+                                  style: pw.TextStyle(color: PdfColors.white, fontSize: headerFontSize - 1.5, fontWeight: pw.FontWeight.bold),
+                                ),
+                              );
+                            })),
+                            pw.Container(
+                              padding: pw.EdgeInsets.symmetric(vertical: headerPaddingV, horizontal: 2),
+                              alignment: pw.Alignment.center,
+                              child: pw.Text('GRAND TOTAL', textAlign: pw.TextAlign.center, style: pw.TextStyle(color: PdfColors.white, fontSize: headerFontSize - 1.5, fontWeight: pw.FontWeight.bold)),
+                            ),
+                            _pdfTableHeaderCell('GRADE', verticalPadding: headerPaddingV, fontSize: headerFontSize),
                           ],
-                        );
-                      }).toList(),
-                    ],
-                  ),
-                  pw.SizedBox(height: 12),
+                        ),
+                        // Header Row 2 (M.M. and OBT.)
+                        pw.TableRow(
+                          decoration: pw.BoxDecoration(color: PdfColor.fromHex('#033E3B')),
+                          children: [
+                            _pdfTableHeaderCell('', verticalPadding: 3, fontSize: 7),
+                            ...((reportCard['session_exams'] as List? ?? ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam']).expand((_) => [
+                              _pdfTableHeaderCell('M.M.', verticalPadding: 3, fontSize: 7.5, color: PdfColors.amber300),
+                              _pdfTableHeaderCell('OBT.', verticalPadding: 3, fontSize: 7.5, color: PdfColors.amber300),
+                            ])),
+                            _pdfTableHeaderCell('MAX', verticalPadding: 3, fontSize: 7.5, color: PdfColors.amber300),
+                            _pdfTableHeaderCell('OBT.', verticalPadding: 3, fontSize: 7.5, color: PdfColors.amber300),
+                            _pdfTableHeaderCell('', verticalPadding: 3, fontSize: 7),
+                          ],
+                        ),
+                        // Data Rows
+                        ...subjects.map((sub) {
+                          final String sName = (sub['subject_name'] ?? '').toString();
+                          final Map<String, dynamic> examScores = Map<String, dynamic>.from(sub['exam_scores'] ?? {});
+                          final String grandMax = (sub['grand_total_max'] ?? sub['max_marks'] ?? '-').toString();
+                          final String grandObt = (sub['grand_total_obtained'] ?? sub['marks_obtained'] ?? '-').toString();
+                          final String sGrade = (sub['grade'] ?? '-').toString();
+                          final List<dynamic> sessionExams = (reportCard['session_exams'] as List?) ?? ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam'];
 
-                  // Summary Cards Row (5 columns matching Admin Portal)
+                          return pw.TableRow(
+                            children: [
+                              _pdfTableCell(sName, alignLeft: true, verticalPadding: cellPaddingV, fontSize: tableFontSize),
+                              ...sessionExams.expand((exName) {
+                                final sc = examScores[exName] ?? examScores[exName.toString()];
+                                final String mm = sc != null ? (sc['max_marks'] ?? '-').toString() : '100';
+                                final String obt = sc != null ? (sc['marks_obtained'] ?? '-').toString() : '-';
+                                return [
+                                  _pdfTableCell(mm, isBold: false, color: PdfColors.grey700, verticalPadding: cellPaddingV, fontSize: tableFontSize - 0.5),
+                                  _pdfTableCell(obt, isBold: true, color: PdfColor.fromHex('#042F2E'), verticalPadding: cellPaddingV, fontSize: tableFontSize - 0.5),
+                                ];
+                              }),
+                              _pdfTableCell(grandMax, isBold: true, color: PdfColors.grey900, verticalPadding: cellPaddingV, fontSize: tableFontSize - 0.5),
+                              _pdfTableCell(grandObt, isBold: true, color: PdfColor.fromHex('#042F2E'), verticalPadding: cellPaddingV, fontSize: tableFontSize - 0.5),
+                              _pdfTableCell(sGrade, isBold: true, color: PdfColor.fromHex('#042F2E'), verticalPadding: cellPaddingV, fontSize: tableFontSize),
+                            ],
+                          );
+                        }).toList(),
+                        // Total Marks Footer Row
+                        pw.TableRow(
+                          decoration: const pw.BoxDecoration(color: PdfColors.teal50),
+                          children: [
+                            _pdfTableCell('Total Marks', alignLeft: true, isBold: true, color: PdfColor.fromHex('#042F2E'), verticalPadding: cellPaddingV, fontSize: tableFontSize),
+                            ...((reportCard['session_exams'] as List? ?? ['Quarterly Examination', 'Half Yearly Examination', 'Annual Examination']).expand((exName) {
+                              final Map<String, dynamic> examTotalsMap = Map<String, dynamic>.from(reportCard['exam_totals'] ?? {});
+                              final exTot = Map<String, dynamic>.from(examTotalsMap[exName] ?? examTotalsMap[exName.toString()] ?? {});
+                              final String exMax = (exTot['max_marks'] ?? 0).toString();
+                              final String exObt = (exTot['marks_obtained'] ?? 0).toString();
+                              return [
+                                _pdfTableCell(exMax, isBold: true, color: PdfColors.grey900, verticalPadding: cellPaddingV, fontSize: tableFontSize - 0.5),
+                                _pdfTableCell(exObt, isBold: true, color: PdfColor.fromHex('#042F2E'), verticalPadding: cellPaddingV, fontSize: tableFontSize - 0.5),
+                              ];
+                            })),
+                            _pdfTableCell('${reportCard['total_max'] ?? 0}', isBold: true, color: PdfColors.grey900, verticalPadding: cellPaddingV, fontSize: tableFontSize - 0.5),
+                            _pdfTableCell('${reportCard['total_obtained'] ?? 0}', isBold: true, color: PdfColor.fromHex('#042F2E'), verticalPadding: cellPaddingV, fontSize: tableFontSize - 0.5),
+                            _pdfTableCell('${reportCard['grade'] ?? '—'}', isBold: true, color: PdfColor.fromHex('#042F2E'), verticalPadding: cellPaddingV, fontSize: tableFontSize),
+                          ],
+                        ),
+                      ],
+                    )
+                  else
+                    pw.Table(
+                      border: pw.TableBorder.all(color: PdfColors.grey400),
+                      children: [
+                        // Header Row
+                        pw.TableRow(
+                          decoration: pw.BoxDecoration(color: PdfColor.fromHex('#042F2E')),
+                          children: [
+                            _pdfTableHeaderCell('SUBJECT', verticalPadding: headerPaddingV, fontSize: headerFontSize),
+                            _pdfTableHeaderCell('OBTAINED', verticalPadding: headerPaddingV, fontSize: headerFontSize),
+                            _pdfTableHeaderCell('MAX', verticalPadding: headerPaddingV, fontSize: headerFontSize),
+                            _pdfTableHeaderCell('PASS', verticalPadding: headerPaddingV, fontSize: headerFontSize),
+                            _pdfTableHeaderCell('GRADE', verticalPadding: headerPaddingV, fontSize: headerFontSize),
+                            _pdfTableHeaderCell('VERDICT', verticalPadding: headerPaddingV, fontSize: headerFontSize),
+                          ],
+                        ),
+                        // Data Rows
+                        ...subjects.map((sub) {
+                          final String sName = (sub['subject_name'] ?? '').toString();
+                          final String maxM = (sub['max_marks'] ?? '-').toString();
+                          final String passM = (sub['passing_marks'] ?? '-').toString();
+                          final String obt = (sub['marks_obtained'] ?? '-').toString();
+                          final String sGrade = (sub['grade'] ?? '-').toString();
+                          final String sRes = (sub['result'] ?? (sub['is_absent'] == 1 ? 'FAIL' : 'PASS')).toString().toUpperCase();
+                          final bool isFail = sRes == 'FAIL';
+
+                          return pw.TableRow(
+                            children: [
+                              _pdfTableCell(sName, alignLeft: true, verticalPadding: cellPaddingV, fontSize: tableFontSize),
+                              _pdfTableCell(obt, isBold: true, color: isFail ? PdfColors.red700 : PdfColor.fromHex('#042F2E'), verticalPadding: cellPaddingV, fontSize: tableFontSize),
+                              _pdfTableCell(maxM, verticalPadding: cellPaddingV, fontSize: tableFontSize),
+                              _pdfTableCell(passM, verticalPadding: cellPaddingV, fontSize: tableFontSize),
+                              _pdfTableCell(sGrade, verticalPadding: cellPaddingV, fontSize: tableFontSize),
+                              _pdfTableCell(sRes, color: isFail ? PdfColors.red700 : PdfColor.fromHex('#042F2E'), isBold: true, verticalPadding: cellPaddingV, fontSize: tableFontSize),
+                            ],
+                          );
+                        }).toList(),
+                      ],
+                    ),
+                  pw.SizedBox(height: sectionGap),
+
+                  // Summary Cards Row
                   pw.Row(
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
-                      _pdfSummaryBox('TOTAL MARKS', '${totalObtained.toStringAsFixed(0)} / ${totalMax.toStringAsFixed(0)}', PdfColors.teal50, PdfColors.teal900),
-                      _pdfSummaryBox('PERCENTAGE', '${percentage.toStringAsFixed(1)}%', PdfColors.amber50, PdfColors.amber900),
-                      _pdfSummaryBox('OVERALL GRADE', 'Grade $grade', PdfColors.teal50, PdfColors.teal900),
-                      _pdfSummaryBox('ATTENDANCE', attRate, PdfColors.amber50, PdfColors.amber900),
-                      _pdfSummaryBox('CLASS RANK', classRank.split(' ')[0], PdfColors.teal50, PdfColors.teal900),
+                      _pdfSummaryBox('TOTAL MARKS', '${totalObtained.toStringAsFixed(0)} / ${totalMax.toStringAsFixed(0)}', PdfColors.teal50, PdfColor.fromHex('#042F2E'), labelFontSize: summaryLabelSize, valueFontSize: summaryValueSize, verticalPadding: summaryPaddingV),
+                      _pdfSummaryBox('PERCENTAGE', '${percentage.toStringAsFixed(1)}%', PdfColors.amber50, PdfColors.amber900, labelFontSize: summaryLabelSize, valueFontSize: summaryValueSize, verticalPadding: summaryPaddingV),
+                      _pdfSummaryBox('OVERALL GRADE', 'Grade $grade', PdfColors.teal50, PdfColor.fromHex('#042F2E'), labelFontSize: summaryLabelSize, valueFontSize: summaryValueSize, verticalPadding: summaryPaddingV),
+                      _pdfSummaryBox('ATTENDANCE', attRate, PdfColors.amber50, PdfColors.amber900, labelFontSize: summaryLabelSize, valueFontSize: summaryValueSize, verticalPadding: summaryPaddingV),
+                      _pdfSummaryBox('CLASS RANK', classRank.split(' ')[0], PdfColors.teal50, PdfColor.fromHex('#042F2E'), labelFontSize: summaryLabelSize, valueFontSize: summaryValueSize, verticalPadding: summaryPaddingV),
                     ],
                   ),
-                  pw.SizedBox(height: 10),
+                  pw.SizedBox(height: 12),
 
                   if (remark.isNotEmpty) ...[
                     pw.Container(
@@ -2294,9 +2904,9 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                         border: pw.Border.all(color: PdfColors.grey300),
                         borderRadius: pw.BorderRadius.circular(4),
                       ),
-                      child: pw.Text('Remarks: $remark', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey800)),
+                      child: pw.Text('Remarks: $remark', style: const pw.TextStyle(fontSize: 8.5, color: PdfColors.grey800)),
                     ),
-                    pw.SizedBox(height: 10),
+                    pw.SizedBox(height: 12),
                   ],
 
                   pw.Spacer(),
@@ -2307,16 +2917,18 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                     children: [
                       pw.Column(
                         children: [
-                          pw.Container(width: 120, height: 1, color: PdfColors.black),
+                          pw.SizedBox(height: 38), // Increased blank space by 35% for physical stamp & signature
+                          pw.Container(width: 140, height: 1, color: PdfColors.black),
                           pw.SizedBox(height: 4),
-                          pw.Text('CLASS TEACHER SIGNATURE', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+                          pw.Text('CLASS TEACHER SIGNATURE', style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, color: PdfColors.grey700)),
                         ],
                       ),
                       pw.Column(
                         children: [
-                          pw.Container(width: 120, height: 1, color: PdfColors.black),
+                          pw.SizedBox(height: 38), // Increased blank space by 35% for physical stamp & signature
+                          pw.Container(width: 140, height: 1, color: PdfColors.black),
                           pw.SizedBox(height: 4),
-                          pw.Text('PRINCIPAL SIGNATURE & STAMP', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+                          pw.Text('PRINCIPAL SIGNATURE & STAMP', style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, color: PdfColors.grey700)),
                         ],
                       ),
                     ],
@@ -2386,12 +2998,12 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        pw.Text(label, style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey600)),
+        pw.Text(label, style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey600)),
         pw.SizedBox(height: 2),
         pw.Text(
           value,
           style: pw.TextStyle(
-            fontSize: isBold ? 10 : 9,
+            fontSize: isBold ? 10.5 : 9.5,
             fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
             color: PdfColors.black,
           ),
@@ -2400,24 +3012,24 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
     );
   }
 
-  pw.Widget _pdfTableHeaderCell(String text) {
+  pw.Widget _pdfTableHeaderCell(String text, {double verticalPadding = 4, double fontSize = 8, PdfColor? color}) {
     return pw.Padding(
-      padding: const pw.EdgeInsets.all(4),
+      padding: pw.EdgeInsets.symmetric(horizontal: 4, vertical: verticalPadding),
       child: pw.Text(
         text,
-        style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+        style: pw.TextStyle(fontSize: fontSize, fontWeight: pw.FontWeight.bold, color: color ?? PdfColors.white),
         textAlign: pw.TextAlign.center,
       ),
     );
   }
 
-  pw.Widget _pdfTableCell(String text, {bool alignLeft = false, bool isBold = false, PdfColor? color}) {
+  pw.Widget _pdfTableCell(String text, {bool alignLeft = false, bool isBold = false, PdfColor? color, double verticalPadding = 3, double fontSize = 8}) {
     return pw.Padding(
-      padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+      padding: pw.EdgeInsets.symmetric(horizontal: 6, vertical: verticalPadding),
       child: pw.Text(
         text,
         style: pw.TextStyle(
-          fontSize: 8,
+          fontSize: fontSize,
           fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
           color: color ?? PdfColors.black,
         ),
@@ -2426,20 +3038,21 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
     );
   }
 
-  pw.Widget _pdfSummaryBox(String label, String value, PdfColor bg, PdfColor textCol) {
+  pw.Widget _pdfSummaryBox(String label, String value, PdfColor bg, PdfColor textCol, {double labelFontSize = 7, double valueFontSize = 11, double verticalPadding = 6}) {
     return pw.Container(
-      width: 90,
-      padding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 6),
+      width: 92,
+      padding: pw.EdgeInsets.symmetric(vertical: verticalPadding, horizontal: 4),
       decoration: pw.BoxDecoration(
         color: bg,
         borderRadius: pw.BorderRadius.circular(6),
         border: pw.Border.all(color: textCol, width: 0.5),
       ),
       child: pw.Column(
+        mainAxisAlignment: pw.MainAxisAlignment.center,
         children: [
-          pw.Text(label, style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold, color: textCol)),
-          pw.SizedBox(height: 2),
-          pw.Text(value, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: textCol)),
+          pw.Text(label, style: pw.TextStyle(fontSize: labelFontSize, fontWeight: pw.FontWeight.bold, color: textCol)),
+          pw.SizedBox(height: 3),
+          pw.Text(value, style: pw.TextStyle(fontSize: valueFontSize, fontWeight: pw.FontWeight.bold, color: textCol)),
         ],
       ),
     );
@@ -2623,32 +3236,56 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.error_outline_rounded, size: 64, color: Colors.red.shade400),
-                        const SizedBox(height: 16),
-                        Text(
-                          _errorMessage!,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 16, color: Colors.grey.shade700, fontWeight: FontWeight.w500),
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: _loadDetails,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.indigo.shade700,
-                            foregroundColor: Colors.white,
+              ? (() {
+                  final isNoClass = _errorMessage!.contains('No class') || _errorMessage!.contains('Class Teacher') || _errorMessage!.contains('assigned');
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.shade50,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              isNoClass ? Icons.assignment_ind_outlined : Icons.error_outline_rounded,
+                              size: 48,
+                              color: isNoClass ? Colors.amber.shade800 : Colors.red.shade400,
+                            ),
                           ),
-                          child: const Text('Try Again'),
-                        ),
-                      ],
+                          const SizedBox(height: 20),
+                          Text(
+                            isNoClass ? 'No class Assigned to you yet' : _errorMessage!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 17, color: Colors.black87, fontWeight: FontWeight.w900),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            isNoClass
+                                ? 'Please contact school administrator to assign a class to your teacher profile.'
+                                : 'An error occurred while loading examination details.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 13, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
+                          ),
+                          if (!isNoClass) ...[
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: _loadDetails,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.indigo.shade700,
+                                foregroundColor: Colors.white,
+                              ),
+                              child: const Text('Try Again'),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
-                  ),
-                )
+                  );
+                })()
               : ListView(
                   padding: const EdgeInsets.all(20),
                   children: [

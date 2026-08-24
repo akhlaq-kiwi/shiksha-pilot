@@ -18,8 +18,8 @@ export default function SinglePageReportCardWrapper({ children, subjectsCount = 
   const contentRef = useRef(null);
   const [scale, setScale] = useState(1);
 
-  // Target maximum height available on standard A4 portrait page with 5mm print margins (~270mm = 1020px at 96dpi)
-  const TARGET_MAX_HEIGHT_PX = 1020;
+  // Target maximum height available on standard A4 portrait page with equal top and bottom print margins (~280mm = 1056px at 96dpi)
+  const TARGET_MAX_HEIGHT_PX = 1056;
 
   const calculateScale = useCallback(() => {
     if (!contentRef.current) return;
@@ -85,7 +85,7 @@ export default function SinglePageReportCardWrapper({ children, subjectsCount = 
       style={{
         width: '194mm',
         height: `${TARGET_MAX_HEIGHT_PX}px`,
-        maxHeight: '272mm',
+        maxHeight: '280mm',
         boxSizing: 'border-box',
         pageBreakInside: 'avoid',
         breakInside: 'avoid',
@@ -102,7 +102,7 @@ export default function SinglePageReportCardWrapper({ children, subjectsCount = 
           signal the scaler needs. */}
       <div
         ref={contentRef}
-        className="single-page-report-content w-full"
+        className="single-page-report-content w-full h-full flex flex-col"
         style={{
           // Both dimensions are divided by the scale so that, once the transform
           // is applied, the template still covers the full printable page.

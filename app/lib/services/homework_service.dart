@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:http/http.dart' as http;
+import 'package:school_hub/services/http_service.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class HomeworkService {

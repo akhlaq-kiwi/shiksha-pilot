@@ -251,50 +251,6 @@ class LeaveRequestService extends BaseService
             if ($newStatus === 'APPROVED') {
                 $updateData['approved_by'] = (int)$user['id'];
                 $updateData['approved_at'] = date('Y-m-d H:i:s');
-
-                // If student leave, integrate with attendance
-                if ($leave['applicant_role'] === 'STUDENT') {
-                    $studentId = (int)$leave['student_id'];
-                    $classId = $this->getStudentClassId($pdo, $studentId);
-
-                    // Fetch holidays
-                    $holidays = $this->getHolidaysList($pdo, $schoolId);
-
-                    // Iterate dates
-                    $current = strtotime($leave['from_date']);
-                    $end = strtotime($leave['to_date']);
-
-                    while ($current <= $end) {
-                        $dateStr = date('Y-m-d', $current);
-                        $dayOfWeek = (int)date('N', $current);
-
-                        // Skip Sunday (7) and Holidays
-                        if ($dayOfWeek !== 7 && !in_array($dateStr, $holidays, true)) {
-                            // Upsert attendance record as Leave
-                            $stmtCheck = $pdo->prepare("SELECT id FROM attendance WHERE student_id = :sid AND date = :date LIMIT 1");
-                            $stmtCheck->execute([':sid' => $studentId, ':date' => $dateStr]);
-                            $attId = $stmtCheck->fetchColumn();
-
-                            if ($attId !== false) {
-                                $stmtUp = $pdo->prepare("UPDATE attendance SET status = 'Leave', marked_by = :marked_by WHERE id = :id");
-                                $stmtUp->execute([':marked_by' => $user['id'], ':id' => $attId]);
-                            } else {
-                                $stmtIn = $pdo->prepare("
-                                    INSERT INTO attendance (school_id, student_id, class_id, date, status, marked_by)
-                                    VALUES (:school_id, :student_id, :class_id, :date, 'Leave', :marked_by)
-                                ");
-                                $stmtIn->execute([
-                                    ':school_id' => $schoolId,
-                                    ':student_id' => $studentId,
-                                    ':class_id' => $classId,
-                                    ':date' => $dateStr,
-                                    ':marked_by' => $user['id']
-                                ]);
-                            }
-                        }
-                        $current = strtotime('+1 day', $current);
-                    }
-                }
             } else {
                 $updateData['rejected_by'] = (int)$user['id'];
                 $updateData['rejected_at'] = date('Y-m-d H:i:s');
@@ -381,26 +337,6 @@ class LeaveRequestService extends BaseService
                 'status' => 'CANCELLED',
                 'updated_at' => date('Y-m-d H:i:s')
             ]);
-
-            // Revert attendance if the leave was previously APPROVED
-            if ($oldStatus === 'APPROVED' && $leave['applicant_role'] === 'STUDENT') {
-                $studentId = (int)$leave['student_id'];
-                $from = $leave['from_date'];
-                $to = $leave['to_date'];
-
-                // Delete 'Leave' attendance records created for this leave request
-                $stmtDel = $pdo->prepare("
-                    DELETE FROM attendance 
-                    WHERE student_id = :sid 
-                      AND date BETWEEN :from_date AND :to_date 
-                      AND status = 'Leave'
-                ");
-                $stmtDel->execute([
-                    ':sid' => $studentId,
-                    ':from_date' => $from,
-                    ':to_date' => $to
-                ]);
-            }
 
             // If creator cancelled, notify admin. If admin cancelled, notify creator.
             if ($isCreator) {
@@ -514,7 +450,7 @@ class LeaveRequestService extends BaseService
                       AND (s.status IS NULL OR UPPER(s.status) = 'ACTIVE')
                       AND s.exit_date IS NULL
                       AND LOWER(s.email) = LOWER(:email)
-                    ORDER BY COALESCE(ay.is_current, 0) DESC, s.id DESC
+                    ORDER BY (CASE WHEN ay.status = 'ACTIVE' THEN 2 WHEN ay.is_current = 1 THEN 1 ELSE 0 END) DESC, s.id DESC
                 ");
                 $stmt->execute([':sid' => $schoolId, ':email' => $email]);
                 $raw = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -550,7 +486,7 @@ class LeaveRequestService extends BaseService
                 (s.guardian_phone = :p3 AND s.guardian_phone IS NOT NULL AND s.guardian_phone != '') OR
                 (s.student_mobile = :p4 AND s.student_mobile IS NOT NULL AND s.student_mobile != '')
               )
-            ORDER BY COALESCE(ay.is_current, 0) DESC, s.id DESC
+            ORDER BY (CASE WHEN ay.status = 'ACTIVE' THEN 2 WHEN ay.is_current = 1 THEN 1 ELSE 0 END) DESC, s.id DESC
         ");
 
         $stmt->execute([

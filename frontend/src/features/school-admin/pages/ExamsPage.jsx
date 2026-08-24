@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Plus, ArrowLeft, Calendar, Clock, BookOpen, UserCheck, 
@@ -534,6 +534,8 @@ export default function ExamsPage() {
   // Local Marks Spreadsheet State
   const [marksSheet, setMarksSheet] = useState(null);
   const [savingMarkStudentId, setSavingMarkStudentId] = useState(null);
+  const markInputRefs = useRef({});
+  const autoAdvanceTimerRef = useRef(null);
 
   // Local Report Cards State
   const [reportCards, setReportCards] = useState([]);
@@ -690,13 +692,25 @@ export default function ExamsPage() {
     setGradeScales(updated);
   };
 
-  const handleResetGradesDefault = () => {
+  const DEFAULT_REPORT_CARD_REMARK = "It was excellent performance by you really appreciable work you have done";
+
+  const handleResetGradesDefault = async () => {
     setGradeScales([
       { min_percentage: 75, max_percentage: 100, grade: 'A', grade_point: 10, remark: 'Excellent' },
       { min_percentage: 60, max_percentage: 74.99, grade: 'B', grade_point: 8, remark: 'Good' },
       { min_percentage: 40, max_percentage: 59.99, grade: 'C', grade_point: 6, remark: 'Average' },
       { min_percentage: 0, max_percentage: 39.99, grade: 'D', grade_point: 0, remark: 'Fail' }
     ]);
+    try {
+      await schoolService.updateSchoolProfile({
+        report_card_remark: DEFAULT_REPORT_CARD_REMARK
+      });
+      setReportCardRemark(DEFAULT_REPORT_CARD_REMARK);
+      setSchoolProfile(prev => ({ ...(prev || {}), report_card_remark: DEFAULT_REPORT_CARD_REMARK }));
+      setGradeSuccess('Reset to default grading scales and report card remark successfully.');
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   // Load Initial Dashboard Data
@@ -719,7 +733,7 @@ export default function ExamsPage() {
       setGradeScales(gradesList || []);
       if (profile) {
         setSchoolProfile(profile);
-        setReportCardRemark(profile.report_card_remark || '');
+        setReportCardRemark(profile.report_card_remark ?? '');
       }
     } catch (err) {
       console.error(err);
@@ -1346,7 +1360,8 @@ export default function ExamsPage() {
     if (!element) return;
 
     setSubmitting(true);
-    const classNameStr = classes.find(c => c.id === parseInt(selectedClassId))?.name || 'Scheme';
+    const clsObj = classes.find(c => c.id === parseInt(selectedClassId)) || examClassStatuses.find(c => c.id === parseInt(selectedClassId));
+    const classNameStr = clsObj ? `${clsObj.name}${clsObj.section ? ` - ${clsObj.section}` : ''}` : 'Scheme';
     schoolAdminService.logClientAudit({
       module: 'Examinations',
       action: 'Scheme Downloaded',
@@ -1375,7 +1390,8 @@ export default function ExamsPage() {
     const printElement = document.getElementById('printable-scheme');
     if (!printElement) return;
 
-    const classNameStr = classes.find(c => c.id === parseInt(selectedClassId))?.name || 'Scheme';
+    const clsObj = classes.find(c => c.id === parseInt(selectedClassId)) || examClassStatuses.find(c => c.id === parseInt(selectedClassId));
+    const classNameStr = clsObj ? `${clsObj.name}${clsObj.section ? ` - ${clsObj.section}` : ''}` : 'Scheme';
     schoolAdminService.logClientAudit({
       module: 'Examinations',
       action: 'Scheme Printed',
@@ -1884,7 +1900,7 @@ export default function ExamsPage() {
               break-inside: avoid !important;
               page-break-after: always !important;
               break-after: page !important;
-              max-height: 275mm !important;
+              max-height: 280mm !important;
               overflow: hidden !important;
               margin: 0 auto !important;
             }
@@ -1893,7 +1909,7 @@ export default function ExamsPage() {
               break-after: page !important;
               page-break-inside: avoid !important;
               break-inside: avoid !important;
-              max-height: 275mm !important;
+              max-height: 280mm !important;
               overflow: hidden !important;
               margin: 0 auto !important;
             }
@@ -2239,7 +2255,7 @@ export default function ExamsPage() {
               break-inside: avoid !important;
               page-break-after: always !important;
               break-after: page !important;
-              max-height: 275mm !important;
+              max-height: 280mm !important;
               overflow: hidden !important;
               margin: 0 auto !important;
             }
@@ -2327,7 +2343,7 @@ export default function ExamsPage() {
                   breakAfter: 'page',
                   pageBreakInside: 'avoid',
                   breakInside: 'avoid',
-                  maxHeight: '275mm',
+                  maxHeight: '280mm',
                   overflow: 'hidden'
                 }}
               >
@@ -2534,24 +2550,24 @@ export default function ExamsPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div onClick={(evt) => evt.stopPropagation()}>
-                        {!isReadOnly && (
-                          <DropdownMenu>
+                        <DropdownMenu>
+                          {!isReadOnly && (
                             <DropdownItem onClick={() => handleEditExamClick(e)}>
                               Edit Examination
                             </DropdownItem>
-                            {e.status === 'Published' ? (
-                              <DropdownItem onClick={() => handlePublishMasterExam(e, 'Draft')} className="text-rose-600 font-semibold hover:bg-rose-50">
-                                Revert to Draft
+                          )}
+                          {e.status === 'Published' ? (
+                            <DropdownItem onClick={() => handlePublishMasterExam(e, 'Draft')} className="text-rose-600 font-semibold hover:bg-rose-50">
+                              Revert to Draft
+                            </DropdownItem>
+                          ) : (
+                            (e.start_date && e.end_date && String(e.start_date).trim() !== '' && String(e.start_date).trim() !== '-' && String(e.end_date).trim() !== '' && String(e.end_date).trim() !== '-') && (
+                              <DropdownItem onClick={() => handlePublishMasterExam(e, 'Published')} className="text-emerald-600 font-semibold hover:bg-emerald-50">
+                                Publish Examination
                               </DropdownItem>
-                            ) : (
-                              (e.start_date && e.end_date && String(e.start_date).trim() !== '' && String(e.start_date).trim() !== '-' && String(e.end_date).trim() !== '' && String(e.end_date).trim() !== '-') && (
-                                <DropdownItem onClick={() => handlePublishMasterExam(e, 'Published')} className="text-emerald-600 font-semibold hover:bg-emerald-50">
-                                  Publish Examination
-                                </DropdownItem>
-                              )
-                            )}
-                          </DropdownMenu>
-                        )}
+                            )
+                          )}
+                        </DropdownMenu>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -2906,7 +2922,7 @@ export default function ExamsPage() {
                                 : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800'
                             }`}
                             onClick={() => {
-                              if (currentClass.status === 'Published' && !isReadOnly) {
+                              if (currentClass.status === 'Published') {
                                 handleUnpublishClassResults(selectedExam, currentClass.id);
                               }
                             }}
@@ -2921,7 +2937,7 @@ export default function ExamsPage() {
                       </div>
                     </div>
                     <div className="pt-2">
-                      {currentClass.status === 'Draft' && !isReadOnly ? (
+                      {currentClass.status === 'Draft' ? (
                         <Button className="w-full flex items-center justify-center gap-2 text-xs font-bold bg-green-600 hover:bg-green-700 text-white" onClick={() => handlePublishClassResults(selectedExam, currentClass.id)}>
                           <CheckCircle className="h-4 w-4" /> Publish Result
                         </Button>
@@ -2929,8 +2945,7 @@ export default function ExamsPage() {
                         <Button 
                           type="button"
                           className="w-full text-xs font-bold bg-amber-600/10 hover:bg-amber-600/20 text-amber-600 border border-amber-600/20 cursor-pointer flex items-center justify-center gap-2" 
-                          onClick={() => { if (!isReadOnly) handleUnpublishClassResults(selectedExam, currentClass.id); }}
-                          disabled={isReadOnly}
+                          onClick={() => handleUnpublishClassResults(selectedExam, currentClass.id)}
                         >
                           <AlertCircle className="h-4 w-4" /> Move to Draft
                         </Button>
@@ -2954,7 +2969,13 @@ export default function ExamsPage() {
             </Button>
             <div>
               <h3 className="text-xl font-bold text-text-primary">Manage Exam Timetable</h3>
-              <p className="text-xs text-text-secondary">{selectedExam.name} — Class: {classes.find(c => c.id === parseInt(selectedClassId))?.name || ''}</p>
+              <p className="text-xs text-text-secondary">
+                {selectedExam.name} — Class: {(() => {
+                  const cls = classes.find(c => c.id === parseInt(selectedClassId)) || examClassStatuses.find(c => c.id === parseInt(selectedClassId));
+                  if (!cls) return '';
+                  return `${cls.name}${cls.section ? ` - ${cls.section}` : ''}`;
+                })()}
+              </p>
             </div>
           </div>
 
@@ -3250,7 +3271,13 @@ export default function ExamsPage() {
             </Button>
             <div>
               <h3 className="text-xl font-bold text-text-primary">Subject Marks Sheet</h3>
-              <p className="text-xs text-text-secondary">{selectedExam.name} — Class: {classes.find(c => c.id === parseInt(selectedClassId))?.name || ''}</p>
+              <p className="text-xs text-text-secondary">
+                {selectedExam.name} — Class: {(() => {
+                  const cls = classes.find(c => c.id === parseInt(selectedClassId)) || examClassStatuses.find(c => c.id === parseInt(selectedClassId));
+                  if (!cls) return '';
+                  return `${cls.name}${cls.section ? ` - ${cls.section}` : ''}`;
+                })()}
+              </p>
             </div>
           </div>
 
@@ -3299,7 +3326,7 @@ export default function ExamsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {marksSheet.students.map(s => {
+                  {marksSheet.students.map((s, idx) => {
                     const isReadOnlyField = false;
                     const currentPaper = timetablePapers.find(p => p.subject_id.toString() === selectedSubjectId);
                     const isGradeSheet = marksSheet.evaluation_type === 'grade' || parseFloat(marksSheet.max_marks) === 0 || currentPaper?.evaluation_type === 'grade';
@@ -3340,6 +3367,7 @@ export default function ExamsPage() {
                             })()
                           ) : (
                             <Input 
+                              ref={el => { markInputRefs.current[s.student_id] = el; }}
                               type="text"
                               inputMode="numeric"
                               pattern="[0-9]*"
@@ -3347,7 +3375,62 @@ export default function ExamsPage() {
                               className="h-8 text-xs font-mono w-full"
                               disabled={s.is_absent === 1 || isReadOnlyField}
                               value={s.is_absent === 1 ? '' : (s.marks_obtained !== null && s.marks_obtained !== undefined ? s.marks_obtained : '')}
-                              onChange={e => handleMarkCellChange(s.student_id, 'marks_obtained', e.target.value)}
+                              onChange={e => {
+                                const val = e.target.value;
+                                handleMarkCellChange(s.student_id, 'marks_obtained', val);
+
+                                const cleanVal = val.replace(/\D/g, '');
+                                const maxM = parseFloat(marksSheet?.max_marks || 100);
+                                const nextStudent = marksSheet?.students?.[idx + 1];
+
+                                if (nextStudent) {
+                                  const focusNext = () => {
+                                    const nextEl = markInputRefs.current[nextStudent.student_id];
+                                    if (nextEl) {
+                                      nextEl.focus();
+                                      if (nextEl.select) nextEl.select();
+                                    }
+                                  };
+
+                                  if (cleanVal.length >= 3) {
+                                    if (autoAdvanceTimerRef.current) clearTimeout(autoAdvanceTimerRef.current);
+                                    focusNext();
+                                  } else if (cleanVal.length === 2) {
+                                    if (cleanVal === '10' && maxM >= 100) {
+                                      if (autoAdvanceTimerRef.current) clearTimeout(autoAdvanceTimerRef.current);
+                                      autoAdvanceTimerRef.current = setTimeout(() => {
+                                        focusNext();
+                                      }, 300);
+                                    } else {
+                                      if (autoAdvanceTimerRef.current) clearTimeout(autoAdvanceTimerRef.current);
+                                      focusNext();
+                                    }
+                                  }
+                                }
+                              }}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter' || e.key === 'ArrowDown') {
+                                  e.preventDefault();
+                                  const nextStudent = marksSheet?.students?.[idx + 1];
+                                  if (nextStudent) {
+                                    const nextEl = markInputRefs.current[nextStudent.student_id];
+                                    if (nextEl) {
+                                      nextEl.focus();
+                                      if (nextEl.select) nextEl.select();
+                                    }
+                                  }
+                                } else if (e.key === 'ArrowUp') {
+                                  e.preventDefault();
+                                  const prevStudent = marksSheet?.students?.[idx - 1];
+                                  if (prevStudent) {
+                                    const prevEl = markInputRefs.current[prevStudent.student_id];
+                                    if (prevEl) {
+                                      prevEl.focus();
+                                      if (prevEl.select) prevEl.select();
+                                    }
+                                  }
+                                }
+                              }}
                             />
                           )}
                         </TableCell>
@@ -3390,7 +3473,13 @@ export default function ExamsPage() {
             </Button>
             <div>
               <h3 className="text-xl font-bold text-text-primary">Student Report Cards</h3>
-              <p className="text-xs text-text-secondary">{selectedExam.name} — Class: {classes.find(c => c.id === parseInt(selectedClassId))?.name || ''}</p>
+              <p className="text-xs text-text-secondary">
+                {selectedExam.name} — Class: {(() => {
+                  const cls = classes.find(c => c.id === parseInt(selectedClassId)) || examClassStatuses.find(c => c.id === parseInt(selectedClassId));
+                  if (!cls) return '';
+                  return `${cls.name}${cls.section ? ` - ${cls.section}` : ''}`;
+                })()}
+              </p>
             </div>
           </div>
 
@@ -3640,7 +3729,7 @@ export default function ExamsPage() {
                 break-inside: avoid !important;
                 page-break-after: always !important;
                 break-after: page !important;
-                max-height: 275mm !important;
+                max-height: 280mm !important;
                 overflow: hidden !important;
                 margin: 0 auto !important;
               }
@@ -3668,7 +3757,7 @@ export default function ExamsPage() {
                     breakAfter: 'page',
                     pageBreakInside: 'avoid',
                     breakInside: 'avoid',
-                    maxHeight: '275mm',
+                    maxHeight: '280mm',
                     overflow: 'hidden'
                   }}
                 >
@@ -3691,7 +3780,11 @@ export default function ExamsPage() {
               <div>
                 <h3 className="text-xl font-bold text-text-primary">Final Academic Report Cards</h3>
                 <p className="text-xs text-text-secondary">
-                  Annual Session Summary — Class: {classes.find(c => c.id === parseInt(selectedClassId))?.name || ''} | Session: {currentAcademicYear?.name || '2026–2027'}
+                  Annual Session Summary — Class: {(() => {
+                    const cls = classes.find(c => c.id === parseInt(selectedClassId)) || examClassStatuses.find(c => c.id === parseInt(selectedClassId));
+                    if (!cls) return '';
+                    return `${cls.name}${cls.section ? ` - ${cls.section}` : ''}`;
+                  })()} | Session: {currentAcademicYear?.name || '2026–2027'}
                 </p>
               </div>
             </div>
@@ -4147,7 +4240,11 @@ export default function ExamsPage() {
                         {selectedExam.name} Examination Scheme
                       </h3>
                       <h4 className="text-sm font-semibold text-zinc-600 mt-1">
-                        Class: {classes.find(c => c.id === parseInt(selectedClassId))?.name || ''}
+                        Class: {(() => {
+                          const cls = classes.find(c => c.id === parseInt(selectedClassId)) || examClassStatuses.find(c => c.id === parseInt(selectedClassId));
+                          if (!cls) return '';
+                          return `${cls.name}${cls.section ? ` - ${cls.section}` : ''}`;
+                        })()}
                       </h4>
                     </div>
 

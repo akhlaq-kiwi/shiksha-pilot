@@ -22,7 +22,7 @@ void callbackDispatcher() {
           final prefs = await SharedPreferences.getInstance();
           final token = prefs.getString('auth_token') ?? '';
           final userRole = prefs.getString('user_role') ?? '';
-          final baseUrl = prefs.getString('base_url') ?? 'http://10.174.49.71:8000';
+          final baseUrl = prefs.getString('base_url') ?? 'https://app.shikshapilot.com';
           if (token.isEmpty || userRole.isEmpty) return true;
 
           final roleUpper = userRole.toUpperCase();
@@ -153,8 +153,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
-
-  final String _baseUrl = 'http://10.174.49.71:8000';
+  final String _baseUrl = 'https://app.shikshapilot.com';
 
   @override
   void initState() {
@@ -163,14 +162,13 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       vsync: this,
       duration: const Duration(milliseconds: 2000),
     );
-    _fadeAnimation = CurvedAnimation(
-      parent: _animationController,
-      curve: const Interval(0.0, 0.7, curve: Curves.easeIn),
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
     );
-    _scaleAnimation = CurvedAnimation(
-      parent: _animationController,
-      curve: const Interval(0.1, 0.9, curve: Curves.easeOutBack),
+    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOutBack),
     );
+
     _animationController.forward();
     _checkAuthSession();
   }
@@ -187,7 +185,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
     final role = prefs.getString('user_role');
-    final baseUrl = prefs.getString('base_url') ?? 'http://10.174.49.71:8000';
+    final baseUrl = prefs.getString('base_url') ?? 'https://app.shikshapilot.com';
     await prefs.setString('base_url', baseUrl);
 
     if (token != null && role != null) {
@@ -336,7 +334,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _serverUrlController = TextEditingController(text: 'http://10.174.49.71:8000');
+  final _serverUrlController = TextEditingController(text: 'https://app.shikshapilot.com');
   
   bool _obscurePassword = true;
   bool _isLoading = false;
@@ -358,19 +356,12 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _loadServerUrl() async {
     final prefs = await SharedPreferences.getInstance();
     final savedUrl = prefs.getString('base_url');
-    if (savedUrl != null && savedUrl.isNotEmpty && savedUrl != 'https://qa.shikshapilot.com' && savedUrl != 'https://app.shikshapilot.com') {
-      if (mounted) {
-        setState(() {
-          _serverUrlController.text = savedUrl;
-        });
-      }
-    } else {
-      await prefs.setString('base_url', 'http://10.174.49.71:8000');
-      if (mounted) {
-        setState(() {
-          _serverUrlController.text = 'http://10.174.49.71:8000';
-        });
-      }
+    final activeUrl = (savedUrl != null && savedUrl.isNotEmpty) ? savedUrl : 'https://app.shikshapilot.com';
+    await prefs.setString('base_url', activeUrl);
+    if (mounted) {
+      setState(() {
+        _serverUrlController.text = activeUrl;
+      });
     }
   }
 
@@ -800,6 +791,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                 ),
                         ),
+
                       ],
                     ),
                   ),

@@ -287,14 +287,23 @@ try {
 
             $stmtSalaryList = $pdo->prepare("
                 SELECT 
-                    CASE 
-                        WHEN sp.payment_month LIKE 'Previous Year - %' THEN CONCAT('Previous Year Salary - ', st.name, ' (', SUBSTRING(sp.payment_month, 17), ')')
-                        WHEN sp.academic_year_id != st.academic_year_id THEN CONCAT('Previous Year Salary - ', st.name)
-                        ELSE st.name 
-                    END AS description, 
-                    'Salary Payment' AS category, sp.payment_date AS expense_date, sp.amount_paid AS amount
+                    st.name AS description, 
+                    CONCAT(
+                        'Salary Payment',
+                        CASE 
+                            WHEN sp.payment_month IS NOT NULL AND sp.payment_month != '' THEN CONCAT(' (', REPLACE(sp.payment_month, 'Previous Year - ', ''), ')')
+                            ELSE ''
+                        END,
+                        CASE 
+                            WHEN ay.name IS NOT NULL AND ay.name != '' THEN CONCAT(' [', ay.name, ']')
+                            ELSE ''
+                        END
+                    ) AS category, 
+                    sp.payment_date AS expense_date, 
+                    sp.amount_paid AS amount
                 FROM staff_payments sp
                 JOIN staff st ON sp.staff_id = st.id
+                LEFT JOIN academic_years ay ON sp.academic_year_id = ay.id
                 WHERE sp.school_id = :sid 
                   AND sp.created_at {$operator} :from_ts 
                   AND sp.created_at <= :to_ts

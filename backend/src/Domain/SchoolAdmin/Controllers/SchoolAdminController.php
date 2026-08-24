@@ -917,26 +917,9 @@ class SchoolAdminController extends BaseController
         $userRole = $user['role'] ?? '';
         if ($userRole === 'TEACHER') {
             $uri = $_SERVER['REQUEST_URI'] ?? '';
-
-            // /api/school/my-permissions is always accessible to inspect active permissions
-            if (str_contains($uri, '/api/school/my-permissions')) {
-                return;
-            }
-
-            // Retrieve teacher permissions
-            $permsData = $this->service->getMyPermissions($user);
-            $permissions = $permsData['permissions'] ?? [];
-
-            // If teacher has zero web permissions, they are not authorized at all
-            if (empty($permissions)) {
-                throw new \App\Shared\Exceptions\ForbiddenException('Access Denied. No role assigned.');
-            }
-
-            // Route-to-Permission mapping
-            $uri = $_SERVER['REQUEST_URI'] ?? '';
             $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-            
-            // 1. Shared/Bootstrap endpoints (always allowed for authorized teachers)
+
+            // 1. Shared/Bootstrap endpoints (always allowed for teachers)
             $isShared = false;
             $sharedPaths = [
                 '/api/school/my-permissions',
@@ -971,6 +954,19 @@ class SchoolAdminController extends BaseController
                         break;
                     }
                 }
+            }
+
+            if ($isShared) {
+                return;
+            }
+
+            // Retrieve teacher permissions
+            $permsData = $this->service->getMyPermissions($user);
+            $permissions = $permsData['permissions'] ?? [];
+
+            // If teacher has zero web permissions, they are not authorized for admin management routes
+            if (empty($permissions)) {
+                throw new \App\Shared\Exceptions\ForbiddenException('Access Denied. No role assigned.');
             }
 
             if ($isShared) {
@@ -1450,6 +1446,26 @@ class SchoolAdminController extends BaseController
         $id = (int)$args['id'];
         $filename = "";
         $excelData = $this->service->exportFinancialReport($user, $id, $filename);
+
+        $response->getBody()->write($excelData);
+        return $response
+            ->withHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            ->withHeader('Content-Disposition', 'attachment; filename="' . $filename . '"')
+            ->withHeader('Pragma', 'no-cache')
+            ->withHeader('Expires', '0');
+    }
+
+    public function exportFinancialPreviewReport(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $params = $request->getQueryParams();
+        $from = $params['from_date'] ?? '';
+        $to = $params['to_date'] ?? '';
+
+        $filename = "";
+        $excelData = $this->service->exportFinancialPreviewReport($user, $from, $to, $filename);
 
         $response->getBody()->write($excelData);
         return $response
@@ -2015,5 +2031,27 @@ class SchoolAdminController extends BaseController
         $filters = $request->getQueryParams();
         $data = $this->service->getLatePaymentPenaltyHistory($user, $filters);
         return $this->success($response, $data);
+    }
+
+    public function getMediaBase64(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $params = $request->getQueryParams();
+        $rawUrl = trim($params['url'] ?? '');
+
+        if (empty($rawUrl)) {
+            return $this->error($response, 'URL parameter is required', 400);
+        }
+
+        $contents = $this->service->getMediaContents($rawUrl);
+        if ($contents === null) {
+            return $this->error($response, 'Media file could not be retrieved', 404);
+        }
+
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $mimeType = $finfo->buffer($contents) ?: 'image/jpeg';
+        $dataUrl = 'data:' . $mimeType . ';base64,' . base64_encode($contents);
+
+        return $this->success($response, ['data_url' => $dataUrl]);
     }
 }

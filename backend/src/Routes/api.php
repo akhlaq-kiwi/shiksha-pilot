@@ -80,6 +80,7 @@ return function (App $app) {
     $app->post('/api/school/staff-payments/disburse-previous-year', [SchoolAdminController::class, 'disbursePreviousYearStaffSalary']);
     $app->delete('/api/school/staff-payments/{id}', [SchoolAdminController::class, 'revertStaffSalary']);
     $app->get('/api/school/financial-reports/preview', [SchoolAdminController::class, 'getFinancialPreview']);
+    $app->get('/api/school/financial-reports/preview/export', [SchoolAdminController::class, 'exportFinancialPreviewReport']);
     $app->get('/api/school/financial-reports', [SchoolAdminController::class, 'getFinancialReports']);
     $app->post('/api/school/financial-reports', [SchoolAdminController::class, 'createFinancialReport']);
     $app->put('/api/school/financial-reports/{id}/settle', [SchoolAdminController::class, 'updateFinancialReportStatus']);
@@ -259,14 +260,16 @@ return function (App $app) {
     $app->post('/api/school/security/audit-logs/log', [SchoolAdminController::class, 'logClientAuditAction']);
     $app->get('/api/school/security/login-history', [SchoolAdminController::class, 'getSchoolLoginHistory']);
 
-    // Public Achievements Gallery Domain
+    // Public Achievements Gallery & Media Base64 Domain
     $app->get('/api/school/achievements', [SchoolAdminController::class, 'getAchievements']);
     $app->get('/api/school/achievements/{id}/report-card', [SchoolAdminController::class, 'getAchievementReportCard']);
+    $app->get('/api/common/media-base64', [SchoolAdminController::class, 'getMediaBase64']);
 
     // Teacher Domain
     $app->get('/api/teacher/dashboard', [TeacherController::class, 'getDashboard']);
     $app->get('/api/teacher/classes', [TeacherController::class, 'getMyClasses']);
     $app->get('/api/teacher/students', [TeacherController::class, 'getStudentList']);
+    $app->get('/api/teacher/outstanding', [TeacherController::class, 'getOutstanding']);
     $app->post('/api/teacher/attendance', [TeacherController::class, 'markAttendance']);
     $app->get('/api/teacher/attendance', [TeacherController::class, 'getAttendanceHistory']);
     $app->get('/api/teacher/assignments', [TeacherController::class, 'getAssignments']);

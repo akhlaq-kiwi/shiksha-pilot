@@ -145,7 +145,7 @@ class StudentService extends BaseService
                   )
                   AND (s.status IS NULL OR UPPER(s.status) = 'ACTIVE')
                   AND s.exit_date IS NULL
-                ORDER BY COALESCE(ay.is_current, 0) DESC, s.id DESC
+                ORDER BY (CASE WHEN ay.status = 'ACTIVE' THEN 2 WHEN ay.is_current = 1 THEN 1 ELSE 0 END) DESC, s.id DESC
                 LIMIT 1
             ");
             $stmt->execute([
@@ -168,7 +168,7 @@ class StudentService extends BaseService
                   AND LOWER(s.email) = LOWER(:email)
                   AND (s.status IS NULL OR UPPER(s.status) = 'ACTIVE')
                   AND s.exit_date IS NULL
-                ORDER BY COALESCE(ay.is_current, 0) DESC, s.id DESC
+                ORDER BY (CASE WHEN ay.status = 'ACTIVE' THEN 2 WHEN ay.is_current = 1 THEN 1 ELSE 0 END) DESC, s.id DESC
                 LIMIT 1
             ");
             $stmt->execute([
@@ -445,7 +445,7 @@ class StudentService extends BaseService
                 SELECT s.id, s.class_id, c.name AS class_name 
                 FROM students s 
                 JOIN classes c ON s.class_id = c.id
-                WHERE c.name = :class_name AND c.academic_year_id = :ayid AND s.school_id = :sid AND s.status = 'ACTIVE'
+                WHERE c.name = :class_name AND c.academic_year_id = :ayid AND s.school_id = :sid
             ");
             $stmtCohort->execute([
                 ':class_name' => $ex['class_name'],
@@ -525,11 +525,19 @@ class StudentService extends BaseService
                     $anyData = true;
                     $absent = (int)$m['is_absent'] === 1;
                     if (!$absent) {
-                        $obtained = (float)$m['marks_obtained'];
-                        $totalObtained += $obtained;
-                        $passed = $obtained >= $passM;
-                        $subjectPct = ($maxM > 0) ? ($obtained / $maxM) * 100 : 0.0;
-                        $subjectGrade = $resolveGrade($subjectPct);
+                        $rawObtained = $m['marks_obtained'];
+                        $isGradePaper = ((float)$p['max_marks'] === 0.0) || (!is_null($rawObtained) && $rawObtained !== '' && !is_numeric($rawObtained) && strtoupper(trim((string)$rawObtained)) !== 'ABSENT');
+                        if ($isGradePaper) {
+                            $obtained = (!is_null($rawObtained) && $rawObtained !== '') ? (string)$rawObtained : '—';
+                            $subjectGrade = $obtained !== '—' ? $obtained : 'A';
+                            $passed = true;
+                        } else {
+                            $obtained = (float)$rawObtained;
+                            $totalObtained += $obtained;
+                            $passed = $obtained >= $passM;
+                            $subjectPct = ($maxM > 0) ? ($obtained / $maxM) * 100 : 0.0;
+                            $subjectGrade = $resolveGrade($subjectPct);
+                        }
                     } else {
                         $subjectGrade = 'F';
                         $passed = false;
@@ -540,12 +548,16 @@ class StudentService extends BaseService
                 if (!$passed) {
                     $allPassed = false;
                 }
-                $totalMax += $maxM;
+                if ((float)$p['max_marks'] > 0) {
+                    $totalMax += $maxM;
+                }
+
+                $isGradeSubject = ((float)$p['max_marks'] === 0.0) || ($m && !is_null($m['marks_obtained']) && $m['marks_obtained'] !== '' && !is_numeric($m['marks_obtained']) && strtoupper(trim((string)$m['marks_obtained'])) !== 'ABSENT');
 
                 $subjectMarks[] = [
                     'subject_name' => $p['subject_name'],
-                    'max_marks' => $maxM,
-                    'passing_marks' => $passM,
+                    'max_marks' => $isGradeSubject ? 'GRADE' : $maxM,
+                    'passing_marks' => $isGradeSubject ? 'C' : $passM,
                     'marks_obtained' => $absent ? 'ABSENT' : ($obtained !== null ? $obtained : '-'),
                     'grade' => $absent ? 'F' : ($obtained !== null ? $subjectGrade : '-'),
                     'remarks' => $remarks,
@@ -557,7 +569,7 @@ class StudentService extends BaseService
             $stmtAtt = $pdo->prepare("
                 SELECT 
                     COUNT(*) AS total,
-                    SUM(CASE WHEN status IN ('PRESENT', 'LATE') THEN 1 ELSE 0 END) AS present
+                    SUM(CASE WHEN LOWER(status) IN ('present', 'late') THEN 1 ELSE 0 END) AS present
                 FROM attendance
                 WHERE student_id = :sid AND date BETWEEN :start_d AND :end_d
             ");
@@ -590,7 +602,7 @@ class StudentService extends BaseService
                 'father_name' => $student['father_name'] ?? '',
                 'mother_name' => $student['mother_name'] ?? '',
                 'dob' => $student['dob'] ?? '',
-                'class_name' => $ex['class_name'],
+                'class_name' => $this->formatShortClassName($ex['class_name'] ?: ''),
                 'class_section' => $ex['class_section'],
                 'academic_year_name' => $ex['academic_year_name'],
                 'school_name' => $school['name'] ?? 'Academic Portal',
@@ -618,6 +630,225 @@ class StudentService extends BaseService
         return $reportCards;
     }
 
+    private function compileFinalAcademicReportCard(
+        array $user,
+        array $student,
+        array $school,
+        string $schoolAddress,
+        ?string $schoolLogoUrl,
+        string $tplCode,
+        array $publishedExams,
+        array $gradeScales,
+        callable $resolveGrade,
+        array $annualExam
+    ): array {
+        $studentId = (int)$student['id'];
+        $classId = (int)$student['class_id'];
+        $schoolId = (int)($user['school_id'] ?? 0);
+        $pdo = $this->repo->getPdo();
+
+        // 1. Collect published exam names & IDs for this academic year
+        $sessionExams = [];
+        $publishedExamIds = [];
+        foreach ($publishedExams as $pe) {
+            $eName = $pe['exam_name'];
+            if (!in_array($eName, $sessionExams)) {
+                $sessionExams[] = $eName;
+            }
+            $publishedExamIds[] = (int)$pe['id'];
+        }
+
+        if (empty($publishedExamIds)) {
+            $publishedExamIds[] = (int)$annualExam['id'];
+        }
+        $inExamIds = implode(',', $publishedExamIds);
+
+        // Fetch papers for these exams in student's class
+        $stmtPapers = $pdo->prepare("
+            SELECT ep.*, s.name AS subject_name, e.name AS exam_name
+            FROM examination_papers ep
+            JOIN subjects s ON ep.subject_id = s.id
+            JOIN examinations e ON ep.exam_id = e.id
+            WHERE ep.exam_id IN ({$inExamIds}) AND ep.class_id = :cid
+            ORDER BY ep.exam_date ASC, s.id ASC
+        ");
+        $stmtPapers->execute([':cid' => $classId]);
+        $allPapers = $stmtPapers->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        // Fetch marks for this student across these exams
+        $stmtMarks = $pdo->prepare("
+            SELECT * FROM examination_marks 
+            WHERE exam_id IN ({$inExamIds}) AND student_id = :sid
+        ");
+        $stmtMarks->execute([':sid' => $studentId]);
+        $allMarks = $stmtMarks->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        $marksByPaperId = [];
+        foreach ($allMarks as $m) {
+            $marksByPaperId[(int)$m['paper_id']] = $m;
+        }
+
+        // Group scores by subject_name -> exam_name
+        $subjectScoresMap = [];
+        foreach ($allPapers as $p) {
+            $subjName = $p['subject_name'];
+            $exName = $p['exam_name'];
+            $pid = (int)$p['id'];
+            $m = $marksByPaperId[$pid] ?? null;
+
+            $maxM = (float)$p['max_marks'];
+            $passM = (float)$p['passing_marks'];
+            $obt = null;
+            $isAbsent = false;
+
+            if ($m) {
+                $isAbsent = ((int)$m['is_absent'] === 1);
+                if (!$isAbsent && $m['marks_obtained'] !== null) {
+                    $obt = (float)$m['marks_obtained'];
+                }
+            }
+
+            if (!isset($subjectScoresMap[$subjName])) {
+                $subjectScoresMap[$subjName] = [];
+            }
+            $subjectScoresMap[$subjName][$exName] = [
+                'max_marks' => $maxM,
+                'passing_marks' => $passM,
+                'marks_obtained' => $isAbsent ? 'ABSENT' : ($obt !== null ? $obt : '—'),
+                'raw_obtained' => $isAbsent ? 0.0 : ($obt !== null ? $obt : 0.0),
+                'is_absent' => $isAbsent,
+                'has_score' => ($obt !== null && !$isAbsent)
+            ];
+        }
+
+        $finalSubjects = [];
+        $grandSessionMax = 0.0;
+        $grandSessionObtained = 0.0;
+        $allPassed = true;
+
+        foreach ($subjectScoresMap as $subjName => $examScores) {
+            $subGrandMax = 0.0;
+            $subGrandObt = 0.0;
+
+            foreach ($sessionExams as $exName) {
+                $sc = $examScores[$exName] ?? null;
+                if ($sc) {
+                    $subGrandMax += (float)$sc['max_marks'];
+                    if ($sc['has_score']) {
+                        $subGrandObt += (float)$sc['raw_obtained'];
+                    }
+                }
+            }
+
+            $subPct = $subGrandMax > 0 ? ($subGrandObt / $subGrandMax) * 100 : 0.0;
+            $subGrade = $resolveGrade($subPct);
+            $subPassed = $subGrandMax > 0 ? ($subGrandObt >= ($subGrandMax * 0.33)) : true;
+            if (!$subPassed) {
+                $allPassed = false;
+            }
+
+            $grandSessionMax += $subGrandMax;
+            $grandSessionObtained += $subGrandObt;
+
+            $finalSubjects[] = [
+                'subject_name' => $subjName,
+                'exam_scores' => $examScores,
+                'grand_total_max' => $subGrandMax,
+                'grand_total_obtained' => $subGrandObt,
+                'max_marks' => $subGrandMax,
+                'marks_obtained' => $subGrandObt,
+                'passing_marks' => round($subGrandMax * 0.33, 2),
+                'grade' => $subGrade,
+                'result' => $subPassed ? 'PASS' : 'FAIL'
+            ];
+        }
+
+        $overallPct = $grandSessionMax > 0 ? round(($grandSessionObtained / $grandSessionMax) * 100, 2) : 0.0;
+        $overallGrade = $resolveGrade($overallPct);
+
+        $examTotalsMap = [];
+        foreach ($sessionExams as $exName) {
+            $exMax = 0.0;
+            $exObt = 0.0;
+            foreach ($subjectScoresMap as $subjScores) {
+                $sc = $subjScores[$exName] ?? null;
+                if ($sc) {
+                    $exMax += (float)$sc['max_marks'];
+                    if ($sc['has_score']) {
+                        $exObt += (float)$sc['raw_obtained'];
+                    }
+                }
+            }
+            $examTotalsMap[$exName] = [
+                'max_marks' => $exMax,
+                'marks_obtained' => $exObt
+            ];
+        }
+
+        // Fetch Attendance
+        $stmtAY = $pdo->prepare("SELECT * FROM academic_years WHERE id = :id LIMIT 1");
+        $stmtAY->execute([':id' => $annualExam['academic_year_id']]);
+        $ayDetail = $stmtAY->fetch(\PDO::FETCH_ASSOC);
+        $startD = $ayDetail ? $ayDetail['start_date'] : '2020-01-01';
+        $endD = $ayDetail ? $ayDetail['end_date'] : '2030-12-31';
+
+        $stmtAtt = $pdo->prepare("
+            SELECT 
+                COUNT(*) AS total,
+                SUM(CASE WHEN LOWER(status) IN ('present', 'late') THEN 1 ELSE 0 END) AS present
+            FROM attendance
+            WHERE student_id = :sid AND date BETWEEN :start_d AND :end_d
+        ");
+        $stmtAtt->execute([
+            ':sid' => $studentId,
+            ':start_d' => $startD,
+            ':end_d' => $endD
+        ]);
+        $att = $stmtAtt->fetch(\PDO::FETCH_ASSOC);
+        $attTotal = (int)($att['total'] ?? 0);
+        $attPresent = (int)($att['present'] ?? 0);
+        $attRate = $attTotal > 0 ? round(($attPresent / $attTotal) * 100, 2) : 100.00;
+
+        return [
+            'is_final_session_report' => true,
+            'badge_title' => 'FINAL ACADEMIC REPORT CARD',
+            'exam_id' => (int)$annualExam['id'],
+            'exam_name' => 'FINAL ACADEMIC REPORT CARD',
+            'original_exam_name' => $annualExam['exam_name'],
+            'student_id' => $studentId,
+            'student_name' => $student['name'],
+            'roll_no' => $student['roll_no'],
+            'admission_no' => $student['sr_no'] ?? $student['admission_no'] ?? '',
+            'father_name' => $student['father_name'] ?? '',
+            'mother_name' => $student['mother_name'] ?? '',
+            'dob' => $student['dob'] ?? '',
+            'class_name' => $annualExam['class_name'],
+            'class_section' => $annualExam['class_section'],
+            'academic_year_name' => $annualExam['academic_year_name'],
+            'school_name' => $school['name'] ?? 'Academic Portal',
+            'school_address' => $schoolAddress,
+            'school_logo' => $schoolLogoUrl,
+            'report_card_remark' => $school['report_card_remark'] ?? null,
+            'template_code' => $tplCode,
+            'session_exams' => $sessionExams,
+            'subjects' => $finalSubjects,
+            'exam_totals' => $examTotalsMap,
+            'total_max' => $grandSessionMax,
+            'total_obtained' => $grandSessionObtained,
+            'percentage' => $overallPct,
+            'grade' => $overallGrade,
+            'result' => $allPassed ? 'PASS' : 'FAIL',
+            'class_rank' => "1 of 1",
+            'section_rank' => "1 of 1",
+            'attendance' => [
+                'working_days' => $attTotal,
+                'present_days' => $attPresent,
+                'attendance_rate' => $attRate
+            ],
+            'status' => 'Published'
+        ];
+    }
+
     public function getFeesCard(array $user): array
     {
         $student = $this->resolveStudent($user);
@@ -633,19 +864,36 @@ class StudentService extends BaseService
         }
 
         // 1. Fetch class fee config
-        $stmtCfg = $pdo->prepare("SELECT * FROM class_fee_configurations WHERE school_id = :sid AND class_id = :cid LIMIT 1");
-        $stmtCfg->execute([':sid' => $schoolId, ':cid' => $classId]);
+        if ($academicYearId > 0) {
+            $stmtCfg = $pdo->prepare("SELECT * FROM class_fee_configurations WHERE school_id = :sid AND class_id = :cid AND (academic_year_id = :ayid OR academic_year_id IS NULL) LIMIT 1");
+            $stmtCfg->execute([':sid' => $schoolId, ':cid' => $classId, ':ayid' => $academicYearId]);
+        } else {
+            $stmtCfg = $pdo->prepare("SELECT * FROM class_fee_configurations WHERE school_id = :sid AND class_id = :cid LIMIT 1");
+            $stmtCfg->execute([':sid' => $schoolId, ':cid' => $classId]);
+        }
         $config = $stmtCfg->fetch();
         if (!$config && $classId) {
-            $stmtFallback = $pdo->prepare("
-                SELECT cfg.* 
-                FROM class_fee_configurations cfg
-                JOIN classes c1 ON cfg.class_id = c1.id
-                JOIN classes c2 ON c1.name COLLATE utf8mb4_unicode_ci = c2.name COLLATE utf8mb4_unicode_ci AND c1.school_id = c2.school_id
-                WHERE cfg.school_id = :sid AND c2.id = :cid
-                LIMIT 1
-            ");
-            $stmtFallback->execute([':sid' => $schoolId, ':cid' => $classId]);
+            if ($academicYearId > 0) {
+                $stmtFallback = $pdo->prepare("
+                    SELECT cfg.* 
+                    FROM class_fee_configurations cfg
+                    JOIN classes c1 ON cfg.class_id = c1.id
+                    JOIN classes c2 ON c1.name COLLATE utf8mb4_unicode_ci = c2.name COLLATE utf8mb4_unicode_ci AND c1.school_id = c2.school_id
+                    WHERE cfg.school_id = :sid AND c2.id = :cid AND (cfg.academic_year_id = :ayid OR cfg.academic_year_id IS NULL)
+                    LIMIT 1
+                ");
+                $stmtFallback->execute([':sid' => $schoolId, ':cid' => $classId, ':ayid' => $academicYearId]);
+            } else {
+                $stmtFallback = $pdo->prepare("
+                    SELECT cfg.* 
+                    FROM class_fee_configurations cfg
+                    JOIN classes c1 ON cfg.class_id = c1.id
+                    JOIN classes c2 ON c1.name COLLATE utf8mb4_unicode_ci = c2.name COLLATE utf8mb4_unicode_ci AND c1.school_id = c2.school_id
+                    WHERE cfg.school_id = :sid AND c2.id = :cid
+                    LIMIT 1
+                ");
+                $stmtFallback->execute([':sid' => $schoolId, ':cid' => $classId]);
+            }
             $config = $stmtFallback->fetch();
         }
         $monthlyFeesAmountMap = [];
@@ -659,9 +907,14 @@ class StudentService extends BaseService
         $stmtFeeStruct->execute([':sid' => $schoolId, ':cid' => $classId]);
         $fallbackAmount = (float)($stmtFeeStruct->fetchColumn() ?: 0.0);
 
-        // 3. Fetch paid records from fee_payments
-        $stmtPay = $pdo->prepare("SELECT * FROM fee_payments WHERE school_id = :sid AND student_id = :stid");
-        $stmtPay->execute([':sid' => $schoolId, ':stid' => $studentId]);
+        // 3. Fetch paid records from fee_payments for current academic year
+        if ($academicYearId > 0) {
+            $stmtPay = $pdo->prepare("SELECT * FROM fee_payments WHERE school_id = :sid AND student_id = :stid AND (academic_year_id = :ayid OR academic_year_id IS NULL)");
+            $stmtPay->execute([':sid' => $schoolId, ':stid' => $studentId, ':ayid' => $academicYearId]);
+        } else {
+            $stmtPay = $pdo->prepare("SELECT * FROM fee_payments WHERE school_id = :sid AND student_id = :stid");
+            $stmtPay->execute([':sid' => $schoolId, ':stid' => $studentId]);
+        }
         $payments = $stmtPay->fetchAll();
         $paymentsMap = [];
         foreach ($payments as $p) {
@@ -707,14 +960,24 @@ class StudentService extends BaseService
             }
         }
 
-        // 4. Fetch additional fee payments
-        $stmtAdd = $pdo->prepare("
-            SELECT afp.*, aft.name AS fee_name, aft.due_date AS type_due_date
-            FROM additional_fee_payments afp
-            JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
-            WHERE afp.school_id = :sid AND afp.student_id = :stid
-        ");
-        $stmtAdd->execute([':sid' => $schoolId, ':stid' => $studentId]);
+        // 4. Fetch additional fee payments for current academic year (or Previous Year Dues)
+        if ($academicYearId > 0) {
+            $stmtAdd = $pdo->prepare("
+                SELECT afp.*, aft.name AS fee_name, aft.due_date AS type_due_date
+                FROM additional_fee_payments afp
+                JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+                WHERE afp.school_id = :sid AND afp.student_id = :stid AND (aft.academic_year_id = :ayid OR aft.academic_year_id IS NULL OR aft.name = 'Previous Year Dues')
+            ");
+            $stmtAdd->execute([':sid' => $schoolId, ':stid' => $studentId, ':ayid' => $academicYearId]);
+        } else {
+            $stmtAdd = $pdo->prepare("
+                SELECT afp.*, aft.name AS fee_name, aft.due_date AS type_due_date
+                FROM additional_fee_payments afp
+                JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+                WHERE afp.school_id = :sid AND afp.student_id = :stid
+            ");
+            $stmtAdd->execute([':sid' => $schoolId, ':stid' => $studentId]);
+        }
         $additionalPayments = $stmtAdd->fetchAll();
 
         $additionalFees = [];
@@ -1049,7 +1312,7 @@ class StudentService extends BaseService
         $academicYearId = (int) ($student['academic_year_id'] ?? 0);
         $pdo = $this->repo->getPdo();
 
-        $stmt = $pdo->prepare("
+        $sql = "
             SELECT DISTINCT e.id, e.name, e.start_date, e.end_date,
                    COALESCE(ecs.scheme_published, 0) AS scheme_published,
                    COALESCE(ecs.admit_card_published, 0) AS admit_card_published,
@@ -1058,21 +1321,27 @@ class StudentService extends BaseService
             LEFT JOIN examination_class_status ecs ON e.id = ecs.exam_id AND ecs.class_id = :class_id
             WHERE e.school_id = :school_id 
               AND e.status = 'Published'
-              AND (e.academic_year_id = :ayid OR :ayid_check = 0 OR e.academic_year_id IS NULL)
-            ORDER BY 
-              CASE 
-                WHEN LOWER(e.name) LIKE '%quarterly%' THEN 1 
-                WHEN LOWER(e.name) LIKE '%half%' THEN 2 
-                WHEN LOWER(e.name) LIKE '%annual%' THEN 3 
-                ELSE 4 
-              END ASC, e.start_date ASC, e.id ASC
-        ");
-        $stmt->execute([
+        ";
+        $params = [
             ':class_id' => $classId,
-            ':school_id' => $schoolId,
-            ':ayid' => $academicYearId,
-            ':ayid_check' => $academicYearId
-        ]);
+            ':school_id' => $schoolId
+        ];
+
+        if ($academicYearId > 0) {
+            $sql .= " AND (e.academic_year_id = :ayid OR e.academic_year_id IS NULL)";
+            $params[':ayid'] = $academicYearId;
+        }
+
+        $sql .= " ORDER BY 
+            CASE 
+              WHEN LOWER(e.name) LIKE '%quarterly%' THEN 1 
+              WHEN LOWER(e.name) LIKE '%half%' THEN 2 
+              WHEN LOWER(e.name) LIKE '%annual%' THEN 3 
+              ELSE 4 
+            END ASC, e.start_date ASC, e.id ASC";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
         $exams = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
         $today = date('Y-m-d');
@@ -1100,24 +1369,37 @@ class StudentService extends BaseService
         $classId = (int)$student['class_id'];
         $pdo = $this->repo->getPdo();
 
-        // 1. Fetch class base monthly fee configurations
-        $stmtBase = $pdo->prepare("SELECT amount FROM class_fee_configurations WHERE class_id = :class_id AND school_id = :school_id LIMIT 1");
+        // 1. Fetch class base monthly fee configurations (monthly_fees JSON column)
+        $stmtBase = $pdo->prepare("
+            SELECT monthly_fees FROM class_fee_configurations 
+            WHERE class_id = :class_id AND school_id = :school_id 
+            ORDER BY id DESC LIMIT 1
+        ");
         $stmtBase->execute([':class_id' => $classId, ':school_id' => $schoolId]);
-        $fallbackAmount = (float)$stmtBase->fetchColumn();
+        $rawMonthlyFees = $stmtBase->fetchColumn();
+        $classMonthlyFees = [];
+        if ($rawMonthlyFees) {
+            $classMonthlyFees = json_decode((string)$rawMonthlyFees, true) ?: [];
+        }
 
         // 2. Fetch specific student monthly fee configurations
-        $stmtMonths = $pdo->prepare("SELECT fee_month, amount FROM student_monthly_fee_configurations WHERE student_id = :student_id AND school_id = :school_id");
+        $stmtMonths = $pdo->prepare("
+            SELECT fee_month, amount 
+            FROM student_monthly_fee_configurations 
+            WHERE student_id = :student_id AND school_id = :school_id
+        ");
         $stmtMonths->execute([':student_id' => $studentId, ':school_id' => $schoolId]);
-        $monthlyFeesAmountMap = $stmtMonths->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
+        $studentMonthlyFees = $stmtMonths->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
 
-        // 3. Fetch paid records from fee_payments
-        $stmtPay = $pdo->prepare("SELECT * FROM fee_payments WHERE school_id = :sid AND student_id = :stid");
+        // 3. Fetch paid records from fee_payments (only count status = PAID / SUCCESS)
+        $stmtPay = $pdo->prepare("
+            SELECT fee_month, SUM(COALESCE(amount_paid, 0)) AS total_paid
+            FROM fee_payments
+            WHERE school_id = :sid AND student_id = :stid AND (LOWER(status) = 'paid' OR LOWER(status) = 'success')
+            GROUP BY fee_month
+        ");
         $stmtPay->execute([':sid' => $schoolId, ':stid' => $studentId]);
-        $payments = $stmtPay->fetchAll();
-        $paymentsMap = [];
-        foreach ($payments as $p) {
-            $paymentsMap[$p['fee_month']] = $p;
-        }
+        $paidMap = $stmtPay->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
 
         // Generate months structure
         $allAcademicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
@@ -1129,35 +1411,34 @@ class StudentService extends BaseService
 
         $monthlyDue = 0.0;
         foreach ($allAcademicMonths as $month) {
-            $monthAmount = isset($monthlyFeesAmountMap[$month]) ? (float)$monthlyFeesAmountMap[$month] : $fallbackAmount;
+            if (isset($studentMonthlyFees[$month])) {
+                $monthAmount = (float)$studentMonthlyFees[$month];
+            } else if (isset($classMonthlyFees[$month])) {
+                $monthAmount = (float)$classMonthlyFees[$month];
+            } else {
+                $monthAmount = 0.0;
+            }
+
             $monthIdx = array_search($month, $allAcademicMonths, true);
             $isFuture = $monthIdx > $currentMonthIdx;
 
-            if (!isset($paymentsMap[$month])) {
-                if (!$isFuture) {
-                    $monthlyDue += $monthAmount;
-                }
+            if (!$isFuture && $monthAmount > 0) {
+                $paidForMonth = isset($paidMap[$month]) ? (float)$paidMap[$month] : 0.0;
+                $dueForMonth = max(0.0, $monthAmount - $paidForMonth);
+                $monthlyDue += $dueForMonth;
             }
         }
 
-        // 4. Fetch additional fee payments
+        // 4. Fetch additional fee payments (where status is NOT Paid)
         $stmtAdd = $pdo->prepare("
-            SELECT afp.amount, afp.status
+            SELECT COALESCE(SUM(afp.amount), 0)
             FROM additional_fee_payments afp
-            WHERE afp.school_id = :sid AND afp.student_id = :stid
+            WHERE afp.school_id = :sid AND afp.student_id = :stid AND LOWER(afp.status) != 'paid'
         ");
         $stmtAdd->execute([':sid' => $schoolId, ':stid' => $studentId]);
-        $additionalPayments = $stmtAdd->fetchAll(PDO::FETCH_ASSOC);
+        $additionalDue = (float)$stmtAdd->fetchColumn();
 
-        $additionalDue = 0.0;
-        foreach ($additionalPayments as $row) {
-            $isPaid = strtolower($row['status']) === 'paid';
-            if (!$isPaid) {
-                $additionalDue += (float)$row['amount'];
-            }
-        }
-
-        return $monthlyDue + $additionalDue;
+        return round($monthlyDue + $additionalDue, 2);
     }
 
     public function getExamDetails(array $user, int $examId): array
@@ -1198,13 +1479,25 @@ class StudentService extends BaseService
         }
 
         // Check if there is an active finance setting for due restriction
-        $academicYearId = (int)$student['academic_year_id'];
+        $academicYearId = (int)($student['academic_year_id'] ?? 0);
         $stmtSetting = $pdo->prepare("
             SELECT enable_due_restriction, max_allowed_due, restrict_admit_card, restrict_exam_result FROM school_finance_settings 
-            WHERE school_id = :sid AND academic_year_id = :ayid LIMIT 1
+            WHERE school_id = :sid AND (academic_year_id = :ayid OR academic_year_id IS NULL OR academic_year_id = 0)
+            ORDER BY id DESC LIMIT 1
         ");
         $stmtSetting->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
         $settings = $stmtSetting->fetch(PDO::FETCH_ASSOC);
+
+        if (!$settings) {
+            $stmtSettingFallback = $pdo->prepare("
+                SELECT enable_due_restriction, max_allowed_due, restrict_admit_card, restrict_exam_result 
+                FROM school_finance_settings 
+                WHERE school_id = :sid 
+                ORDER BY id DESC LIMIT 1
+            ");
+            $stmtSettingFallback->execute([':sid' => $schoolId]);
+            $settings = $stmtSettingFallback->fetch(PDO::FETCH_ASSOC);
+        }
 
         $admitCardRestricted = false;
         $resultRestricted = false;
@@ -1258,7 +1551,7 @@ class StudentService extends BaseService
         if ($admitCardPublished && !$admitCardRestricted) {
             $stmtAdmit = $pdo->prepare("
                 SELECT esa.seat_number, esa.room_name, esa.bench_number, esa.seat_position,
-                       s.name AS school_name, ay.name AS academic_year, c.name AS class_name,
+                       s.name AS school_name, ay.name AS academic_year, c.name AS class_name, c.section AS class_section,
                        std.name AS student_name, std.roll_no
                 FROM examination_seating_allocations esa
                 JOIN examination_seating_plans esp ON esa.seating_plan_id = esp.id
@@ -1272,11 +1565,17 @@ class StudentService extends BaseService
             $stmtAdmit->execute([':exam_id' => $examId, ':student_id' => $studentId]);
             $admit = $stmtAdmit->fetch(PDO::FETCH_ASSOC);
             if ($admit) {
+                $baseShort = $this->formatShortClassName($admit['class_name'] ?: '');
+                $fullClassName = $baseShort;
+                if (!empty($admit['class_section']) && strpos($fullClassName, $admit['class_section']) === false) {
+                    $fullClassName .= ' - ' . $admit['class_section'];
+                }
+
                 $response['admit_card'] = [
                     'school_name' => $admit['school_name'],
                     'academic_year' => $admit['academic_year'],
                     'student_name' => $admit['student_name'],
-                    'class_name' => $admit['class_name'] ?: '—',
+                    'class_name' => $fullClassName ?: '—',
                     'roll_no' => $admit['roll_no'] ?: '—',
                     'room_name' => $admit['room_name'],
                     'bench_number' => $admit['bench_number'],

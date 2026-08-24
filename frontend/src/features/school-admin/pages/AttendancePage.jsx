@@ -313,6 +313,13 @@ export default function AttendancePage() {
       leave,
       percentage
     };
+  }).sort((a, b) => {
+    if (b.percentage !== a.percentage) {
+      return b.percentage - a.percentage;
+    }
+    const rollA = parseInt(a.student.roll_no, 10) || 0;
+    const rollB = parseInt(b.student.roll_no, 10) || 0;
+    return rollA - rollB;
   });
 
   const totalReportRecords = workingRecords.length;
@@ -423,7 +430,7 @@ export default function AttendancePage() {
                 <label className="text-xs font-bold text-text-secondary uppercase">Month</label>
                 <Select value={selectedReportMonth} onChange={e => setSelectedReportMonth(e.target.value)}>
                   <option value="all">All Months</option>
-                  {Array.from({ length: 12 }, (_, i) => i + 1).map(m => {
+                  {[4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3].map(m => {
                     const monthName = new Date(2026, m - 1).toLocaleString('default', { month: 'long' });
                     return <option key={m} value={m}>{monthName}</option>;
                   })}

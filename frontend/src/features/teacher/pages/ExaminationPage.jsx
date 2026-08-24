@@ -33,6 +33,7 @@ export default function ExaminationPage({ classes, exams, allStudents }) {
   const [savedAt, setSavedAt] = useState(null);
   const [isDirty, setIsDirty] = useState(false);
   const inputRefs = useRef({});
+  const autoTimerRef = useRef(null);
 
   const students = allStudents[selectedClass] || [];
   const exam = exams.find((e) => e.id === selectedExam);
@@ -100,9 +101,35 @@ export default function ExaminationPage({ classes, exams, allStudents }) {
     return GRADE_BANDS.find((b) => pct >= b.minPct) || NOT_ENTERED;
   };
 
-  const setMark = (id, value) => {
+  const setMark = (id, value, index) => {
     setMarks((prev) => ({ ...prev, [id]: value }));
     setIsDirty(true);
+
+    if (!isGradeType && value !== '' && value != null && index !== undefined) {
+      const cleanVal = String(value).replace(/\D/g, '');
+      const moveNext = () => {
+        const next = students[index + 1];
+        if (next) {
+          const el = inputRefs.current[next.id];
+          if (el) { el.focus(); el.select?.(); }
+        }
+      };
+
+      if (cleanVal.length >= 3) {
+        if (autoTimerRef.current) clearTimeout(autoTimerRef.current);
+        moveNext();
+      } else if (cleanVal.length === 2) {
+        if (cleanVal === '10' && totalMarks >= 100) {
+          if (autoTimerRef.current) clearTimeout(autoTimerRef.current);
+          autoTimerRef.current = setTimeout(() => {
+            moveNext();
+          }, 300);
+        } else {
+          if (autoTimerRef.current) clearTimeout(autoTimerRef.current);
+          moveNext();
+        }
+      }
+    }
   };
 
   /** Keyboard-first entry: Enter / ↓ move down, ↑ moves up — no mouse needed. */
@@ -325,7 +352,7 @@ export default function ExaminationPage({ classes, exams, allStudents }) {
                               placeholder="—"
                               aria-label={`Score for ${s.name}, out of ${totalMarks}`}
                               aria-invalid={isInvalid || undefined}
-                              onChange={(e) => setMark(s.id, e.target.value)}
+                              onChange={(e) => setMark(s.id, e.target.value, i)}
                               onKeyDown={(e) => handleKeyDown(e, i)}
                               className={`h-8 w-20 text-center tabular-nums ${
                                 isInvalid ? 'border-danger-500 focus-visible:ring-danger-500/40' : ''

@@ -3,6 +3,12 @@ frontend/node_modules/
 .bin/
 frontend/dist/
 backend/vendor/
+build/
+.dart_tool/
+.gradle/
+**/build/
+**/.dart_tool/
+**/.gradle/
 
 # Flutter & Mobile App Builds
 app/build/

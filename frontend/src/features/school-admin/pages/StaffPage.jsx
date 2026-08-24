@@ -15,6 +15,7 @@ import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 import { DropdownMenu, DropdownItem } from '../../../common/ui/DropdownMenu';
 import CredentialsDialog from '../../../common/components/CredentialsDialog';
 import { resolveFileUrl } from '../../../common/utils/fileUrl';
+import TeacherIdentityCardPreview from '../components/TeacherIdentityCardPreview';
 
 // Self-healing avatar image component to handle loading errors gracefully
 const TeacherAvatar = ({ src, name, updatedAt }) => {
@@ -192,9 +193,11 @@ const getVisibleMonths = (joiningDateStr, workingYearStartStr) => {
 };
 
 export default function StaffPage() {
+  const { currentYear, isReadOnly, isDraft } = useAcademicYear();
   const [searchParams] = useSearchParams();
-  const [view, setView] = useState('list'); // 'list', 'details'
+  const [view, setView] = useState('list'); // 'list', 'details', 'identity-cards'
   const [selectedTeacherId, setSelectedTeacherId] = useState(null);
+  const [selectedTeacherForIdCard, setSelectedTeacherForIdCard] = useState(null);
   const [totalPeriodsLimit, setTotalPeriodsLimit] = useState(8);
 
   useEffect(() => {
@@ -321,8 +324,6 @@ export default function StaffPage() {
     }
   };
 
-  const { isReadOnly } = useAcademicYear();
-
   useEffect(() => {
     loadStaff(true);
     const fetchTimetableSettings = async () => {
@@ -389,6 +390,21 @@ export default function StaffPage() {
   const teachers = staff.filter(s => s.role === 'TEACHER' || s.role === 'Teacher');
   const totalTeachers = teachers.length;
   const activeTeachersCount = teachers.filter(s => s.status === 'ACTIVE').length;
+
+  if (view === 'identity-cards') {
+    return (
+      <TeacherIdentityCardPreview
+        teachers={teachers}
+        schoolProfile={schoolProfile}
+        currentYear={currentYear}
+        selectedTeacherId={selectedTeacherForIdCard}
+        onBack={() => {
+          setView('list');
+          setSelectedTeacherForIdCard(null);
+        }}
+      />
+    );
+  }
 
   const filteredStaff = teachers.filter(s => {
     const matchesSearch = s.name.toLowerCase().includes(staffSearch.toLowerCase()) ||
@@ -996,6 +1012,16 @@ export default function StaffPage() {
                 <h2 className="text-2xl font-bold text-text-primary tracking-tight font-display">Teacher Profile</h2>
               </div>
               <div className="flex items-center gap-3">
+                <Button 
+                  variant="outline" 
+                  className="flex items-center gap-2 font-bold border-border"
+                  onClick={() => {
+                    setSelectedTeacherForIdCard(t.id);
+                    setView('identity-cards');
+                  }}
+                >
+                  <CreditCard className="h-4 w-4 text-emerald-600" /> Identity Card
+                </Button>
                 {isInactiveTeacher && (
                   <Button 
                     onClick={() => {
@@ -1168,13 +1194,17 @@ export default function StaffPage() {
                   <div className="flex items-center justify-between border-b border-border pb-4 mb-4">
                     <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider">Salary Card</h3>
                     <span className="text-xs text-text-secondary font-bold">
-                      Academic Year: {academicYears.find(y => y.is_current)?.name || academicYears.find(y => y.status === 'Draft')?.name || '—'}
+                      Academic Year: {currentYear?.name || academicYears.find(y => y.is_current)?.name || academicYears.find(y => y.status === 'Draft')?.name || '—'}
                     </span>
                   </div>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                    {getVisibleMonths(t.joining_date, (academicYears.find(y => y.is_current) || academicYears.find(y => y.status === 'Draft'))?.start_date).map(month => {
-                      const payment = (t.salary_payments || []).find(p => p.payment_month === month);
+                    {getVisibleMonths(t.joining_date, currentYear?.start_date || (academicYears.find(y => y.is_current) || academicYears.find(y => y.status === 'Draft'))?.start_date).map(month => {
+                      const payment = (t.salary_payments || []).find(p => 
+                        p.payment_month === month && 
+                        (!t.previous_year_pending || parseInt(p.academic_year_id, 10) !== parseInt(t.previous_year_pending.academic_year_id, 10)) &&
+                        !String(p.payment_month).startsWith('Previous Year - ')
+                      );
                       const isPaid = !!payment;
                       const isLocked = payment ? !!payment.is_locked : false;
                       
@@ -1261,13 +1291,14 @@ export default function StaffPage() {
                               </Button>
                             ) : (
                               <Button 
-                                disabled={isReadOnly && t.is_migrated}
+                                disabled={(isReadOnly && t.is_migrated) || isDraft}
+                                title={isDraft ? 'Salary cannot be disbursed under a Draft Academic Year.' : ''}
                                 onClick={() => {
-                                  if (isReadOnly && t.is_migrated) return;
+                                  if ((isReadOnly && t.is_migrated) || isDraft) return;
                                   setDisburseMonth(month);
                                   setIsDisburseDialogOpen(true);
                                 }}
-                                className={`w-full h-8 text-xs font-bold ${(isReadOnly && t.is_migrated) ? 'bg-zinc-200 text-zinc-400 dark:bg-zinc-800 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 text-white'}`}
+                                className={`w-full h-8 text-xs font-bold ${((isReadOnly && t.is_migrated) || isDraft) ? 'bg-zinc-200 text-zinc-400 dark:bg-zinc-800 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 text-white'}`}
                               >
                                 Disburse
                               </Button>
@@ -1290,15 +1321,24 @@ export default function StaffPage() {
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                      {['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'].map(month => {
+                      {(t.previous_year_pending.valid_months && t.previous_year_pending.valid_months.length > 0 ? t.previous_year_pending.valid_months : ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March']).map(month => {
                         const isPending = t.previous_year_pending.pending_months.includes(month);
                         const payment = (t.salary_payments || []).find(p => 
-                          p.payment_month === month || 
+                          (parseInt(p.academic_year_id, 10) === parseInt(t.previous_year_pending.academic_year_id, 10) && (p.payment_month === month || p.payment_month === `Previous Year - ${month}`)) || 
                           p.payment_month === `Previous Year - ${month}`
                         );
-                        const isPaid = !isPending || !!payment;
+                        const isPaid = payment ? true : (!isPending ? true : false);
                         const isLocked = payment ? !!payment.is_locked : false;
-                        const salaryAmount = t.previous_year_pending.salary || 0.0;
+                        const isJoiningMonth = t.previous_year_pending?.joining_month_proration && t.previous_year_pending.joining_month_proration.month === month;
+                        let salaryAmount = t.previous_year_pending.salary || 0.0;
+                        let isProrated = false;
+                        if (isPaid && payment) {
+                          salaryAmount = payment.amount_paid;
+                          isProrated = !!payment.proration_details;
+                        } else if (isJoiningMonth) {
+                          salaryAmount = t.previous_year_pending.joining_month_proration.payable_salary;
+                          isProrated = true;
+                        }
 
                         return (
                           <div 
@@ -1316,10 +1356,10 @@ export default function StaffPage() {
                                 <p className="text-[11px] text-text-secondary font-bold uppercase mt-0.5">
                                   {isPaid ? (
                                     <span className="inline-flex items-center gap-1 text-green-600">
-                                      <CheckCircle className="h-3 w-3" /> Paid
+                                      <CheckCircle className="h-3 w-3" /> Paid {isProrated && '(Prorated)'}
                                     </span>
                                   ) : (
-                                    <span className="text-amber-500">Pending</span>
+                                    <span className="text-amber-500">Pending {isProrated && '(Prorated)'}</span>
                                   )}
                                 </p>
                               </div>
@@ -1376,14 +1416,15 @@ export default function StaffPage() {
                                 )
                               ) : (
                                 <Button 
-                                  disabled={isReadOnly && t.is_migrated}
+                                  disabled={(isReadOnly && t.is_migrated) || isDraft}
+                                  title={isDraft ? 'Salary cannot be disbursed under a Draft Academic Year.' : ''}
                                   onClick={() => {
-                                    if (isReadOnly && t.is_migrated) return;
+                                    if ((isReadOnly && t.is_migrated) || isDraft) return;
                                     setPrevYearDisburseMonths([month]);
                                     setPrevYearDisburseTotal(salaryAmount);
                                     setIsPrevYearDisburseOpen(true);
                                   }}
-                                  className={`w-full h-8 text-xs font-bold ${(isReadOnly && t.is_migrated) ? 'bg-zinc-200 text-zinc-400 dark:bg-zinc-800 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-700 text-white'}`}
+                                  className={`w-full h-8 text-xs font-bold ${((isReadOnly && t.is_migrated) || isDraft) ? 'bg-zinc-200 text-zinc-400 dark:bg-zinc-800 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-700 text-white'}`}
                                 >
                                   Disburse
                                 </Button>
@@ -1411,42 +1452,54 @@ export default function StaffPage() {
               <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Teachers</h2>
               <p className="text-text-secondary text-sm mt-1">{totalTeachers} teachers · {activeTeachersCount} active</p>
             </div>
-            {!isReadOnly && (
-            <Button className="flex items-center gap-2 font-bold shadow-xs hover:shadow-md transition-all duration-200" onClick={() => {
-              setNewStaff({
-                id: null,
-                name: '',
-                role: 'Teacher',
-                department: '',
-                email: '',
-                phone: '',
-                emergency_phone: '',
-                photo_path: '',
-                father_name: '',
-                mother_name: '',
-                joining_date: '',
-                exit_date: '',
-                salary: '',
-                current_address_line: '',
-                current_city: '',
-                current_state: '',
-                current_country: 'India',
-                current_pin_code: '',
-                permanent_address_line: '',
-                permanent_city: '',
-                permanent_state: '',
-                permanent_country: 'India',
-                permanent_pin_code: '',
-                same_as_current: 0,
-                documents: []
-              });
-              setFormErrors({});
-              setUploadError('');
-              setIsAddStaffOpen(true);
-            }}>
-              <Plus className="h-4 w-4" /> Add Teacher
-            </Button>
-          )}
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSelectedTeacherForIdCard(null);
+                  setView('identity-cards');
+                }}
+                className="flex items-center gap-2 font-bold shadow-xs hover:shadow-md transition-all duration-200 border-border"
+              >
+                <CreditCard className="h-4 w-4 text-emerald-600" /> Identity Cards
+              </Button>
+              {!isReadOnly && (
+                <Button className="flex items-center gap-2 font-bold shadow-xs hover:shadow-md transition-all duration-200" onClick={() => {
+                  setNewStaff({
+                    id: null,
+                    name: '',
+                    role: 'Teacher',
+                    department: '',
+                    email: '',
+                    phone: '',
+                    emergency_phone: '',
+                    photo_path: '',
+                    father_name: '',
+                    mother_name: '',
+                    joining_date: '',
+                    exit_date: '',
+                    salary: '',
+                    current_address_line: '',
+                    current_city: '',
+                    current_state: '',
+                    current_country: 'India',
+                    current_pin_code: '',
+                    permanent_address_line: '',
+                    permanent_city: '',
+                    permanent_state: '',
+                    permanent_country: 'India',
+                    permanent_pin_code: '',
+                    same_as_current: 0,
+                    documents: []
+                  });
+                  setFormErrors({});
+                  setUploadError('');
+                  setIsAddStaffOpen(true);
+                }}>
+                  <Plus className="h-4 w-4" /> Add Teacher
+                </Button>
+              )}
+            </div>
           </div>
 
           {error && (
@@ -1494,6 +1547,12 @@ export default function StaffPage() {
                         <DropdownMenu>
                           <DropdownItem onClick={() => { setSelectedTeacherId(t.id); setView('details'); }}>
                             View Details
+                          </DropdownItem>
+                          <DropdownItem onClick={() => {
+                            setSelectedTeacherForIdCard(t.id);
+                            setView('identity-cards');
+                          }}>
+                            Identity Card
                           </DropdownItem>
                           <DropdownItem onClick={() => {
                             setCredentialsTarget(t);
@@ -2119,18 +2178,21 @@ export default function StaffPage() {
               <div className="space-y-6">
                 <div className="flex items-start justify-between border-b-2 border-zinc-950 pb-4">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-zinc-950 text-white rounded-md flex items-center justify-center font-bold text-2xl flex-shrink-0 shadow-2xs select-none">
-                      {schoolProfile?.name ? schoolProfile.name.charAt(0).toUpperCase() : 'S'}
-                    </div>
+                    {schoolProfile?.logo_path ? (
+                      <img 
+                        src={schoolProfile.logo_path} 
+                        alt={schoolProfile.name || 'School Logo'} 
+                        className="w-12 h-12 object-contain rounded-md flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 bg-zinc-950 text-white rounded-md flex items-center justify-center font-bold text-2xl flex-shrink-0 shadow-2xs select-none">
+                        {schoolProfile?.name ? schoolProfile.name.charAt(0).toUpperCase() : 'S'}
+                      </div>
+                    )}
                     <div>
                       <h1 className="text-lg font-bold text-zinc-950 tracking-tight leading-none uppercase">{schoolProfile?.name || 'ABC Public School'}</h1>
                       <p className="text-[11px] text-zinc-500 mt-1 uppercase tracking-wider font-bold">Teacher Payout Payslip</p>
                     </div>
-                  </div>
-                  <div className="text-right text-[11px] text-zinc-600 leading-normal">
-                    <p className="font-bold text-zinc-950">{schoolProfile?.street_address || '123 Main Street'}</p>
-                    <p>{schoolProfile?.city || 'City'}, {schoolProfile?.state || 'State'} - {schoolProfile?.pin_code || ''}</p>
-                    <p>Phone: {schoolProfile?.contact_phone || '—'}</p>
                   </div>
                 </div>
 
@@ -2203,24 +2265,11 @@ export default function StaffPage() {
                   </table>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 text-[11px] text-zinc-500 pt-4 border-t border-dashed border-zinc-200 font-medium">
+                <div className="text-[11px] text-zinc-500 pt-4 border-t border-dashed border-zinc-200 font-medium">
                   <div>
                     <p>Payment Date: <span className="text-zinc-800 font-bold">{formatDate(selectedSlipPayment.payment_date)}</span></p>
                     <p>Payment Transaction ID: <span className="text-zinc-800 font-mono font-bold">TXN-SL-{String(selectedSlipPayment.id).padStart(5, '0')}</span></p>
                   </div>
-                  <div className="text-right">
-                    <p>Slip Generated Date: <span className="text-zinc-800 font-bold">{formatDate((() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })())}</span></p>
-                    <p>Payment Status: <span className="text-green-600 font-bold uppercase">PAID</span></p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Principal Signature Signoff */}
-              <div className="pt-16 flex justify-end">
-                <div className="text-center w-40 text-xs text-zinc-700">
-                  <div className="border-b border-zinc-400 h-10 w-full mb-2"></div>
-                  <p className="font-bold text-zinc-900">Principal Signature</p>
-                  <p className="text-[11px] text-zinc-500">School Administration</p>
                 </div>
               </div>
             </div>

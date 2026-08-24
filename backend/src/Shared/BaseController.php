@@ -62,6 +62,8 @@ abstract class BaseController
                     if ($sStatus !== 'ACTIVE' || !empty($staffRow['exit_date'])) {
                         $isInactive = true;
                     }
+                } else {
+                    $isInactive = true;
                 }
             }
 
@@ -84,7 +86,7 @@ abstract class BaseController
             if ($isInactive) {
                 $stmtOff = $pdo->prepare("UPDATE users SET status = 'INACTIVE' WHERE id = :id");
                 $stmtOff->execute([':id' => $dbUser['id']]);
-                throw new UnauthorizedException("Your account marked as Inactive Please contact Academy management");
+                throw new UnauthorizedException("This account is Inactive");
             }
         }
 
