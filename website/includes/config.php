@@ -5,8 +5,12 @@
  */
 
 // Detect scheme so local dev (http) and production (https) both resolve
-// correctly without hardcoding a protocol.
-$scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+// correctly without hardcoding a protocol. X-Forwarded-Proto is checked too:
+// behind a TLS-terminating proxy $_SERVER['HTTPS'] is unset even on https.
+$scheme = (
+    (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+    || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https')
+) ? 'https' : 'http';
 
 define('SITE_NAME', 'Shiksha Pilot');
 define('SITE_DOMAIN', 'www.shikshapilot.com');
@@ -18,7 +22,15 @@ define('SITE_TWITTER', '@shikshapilot');
 // Local dev may not be on the production domain — ASSET_BASE/PAGE_BASE
 // resolve relative to whatever host actually served the request, so
 // stylesheets/scripts/links work under `php -S localhost:8000` too.
-$currentHost = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? SITE_DOMAIN);
+//
+// Production is the exception: every internal link must be the canonical
+// https://www URL. Deriving them from HTTP_HOST meant a page served on the
+// apex host emitted a page full of links that each 301'd, which is what
+// stalled crawling. Only a host carrying an explicit port (dev) keeps the
+// request host; anything else gets pinned to SITE_URL.
+$requestHost = $_SERVER['HTTP_HOST'] ?? SITE_DOMAIN;
+$isLocalDev  = (bool) preg_match('/:[0-9]+$/', $requestHost);
+$currentHost = $isLocalDev ? $scheme . '://' . $requestHost : SITE_URL;
 define('ASSET_BASE', $currentHost . '/assets');
 define('PAGE_BASE', $currentHost);
 

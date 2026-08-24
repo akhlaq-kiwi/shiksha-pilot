@@ -9,15 +9,15 @@
 
 ## Pages
 
-- [Home](https://shikshapilot.com/): Product overview — what Shiksha Pilot is, the four portals, and the core modules.
-- [Features](https://shikshapilot.com/features): Detailed breakdown of each module — attendance, exams and report cards, fee collection, timetable and substitutions, leave requests, announcements.
-- [Mobile App](https://shikshapilot.com/mobile-app): What the Android app does, an FAQ (pricing, iOS availability, offline use), and the download link.
-- [Book a Demo](https://shikshapilot.com/contact): Contact form to request a live walkthrough.
+- [Home](https://www.shikshapilot.com/): Product overview — what Shiksha Pilot is, the four portals, and the core modules.
+- [Features](https://www.shikshapilot.com/features): Detailed breakdown of each module — attendance, exams and report cards, fee collection, timetable and substitutions, leave requests, announcements.
+- [Mobile App](https://www.shikshapilot.com/mobile-app): What the Android app does, an FAQ (pricing, iOS availability, offline use), and the download link.
+- [Book a Demo](https://www.shikshapilot.com/contact): Contact form to request a live walkthrough.
 
 ## Notes for automated agents
 
 - This site is fully server-rendered PHP; every page's full content is present in the initial HTML response — no JavaScript execution is required to read any page.
 - Structured data (schema.org JSON-LD) is present on every page: `Organization` sitewide, `SoftwareApplication` on the homepage, `FAQPage` on the mobile app page.
-- A machine-readable sitemap is available at [/sitemap.xml](https://shikshapilot.com/sitemap.xml).
-- There is no pricing page yet — pricing is not published and should not be inferred or quoted; direct users to [Book a Demo](https://shikshapilot.com/contact) for that.
+- A machine-readable sitemap is available at [/sitemap.xml](https://www.shikshapilot.com/sitemap.xml).
+- There is no pricing page yet — pricing is not published and should not be inferred or quoted; direct users to [Book a Demo](https://www.shikshapilot.com/contact) for that.
 - The Android app is not yet published to Google Play — the in-page "Get it on Google Play" button is a placeholder, not a live link.

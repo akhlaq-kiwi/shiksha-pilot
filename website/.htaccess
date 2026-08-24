@@ -6,16 +6,24 @@ DirectoryIndex index.php
 <IfModule mod_rewrite.c>
   RewriteEngine On
 
-  # 1. Force HTTPS — skipped when the Host header carries an explicit port
-  #    (i.e. local/Docker dev, http://localhost:2005), since that's never
-  #    true for the real domain in production.
-  RewriteCond %{HTTPS} off
+  # 1. One single 301 to the canonical origin (https + www). Doing HTTPS and
+  #    www as two separate rules produced a two-hop chain on every apex/http
+  #    entry, which Search Console flags — this collapses both into one hop.
+  #
+  #    "Already canonical" means: served over TLS *and* on the www host. TLS is
+  #    detected two ways because on shared hosting HTTPS terminates at a proxy
+  #    and %{HTTPS} stays "off" on the backend — testing %{HTTPS} alone made
+  #    every request redirect to itself forever, so Googlebot saw a redirect
+  #    loop and could not crawl any page.
+  #    Skipped entirely when the Host carries a port (local/Docker dev).
   RewriteCond %{HTTP_HOST} !:[0-9]+$
-  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+  RewriteCond %{HTTPS} off
+  RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+  RewriteRule ^ https://www.shikshapilot.com%{REQUEST_URI} [L,R=301]
 
-  # 2. Force the canonical www host — avoids duplicate-content URLs
-  #    ranking against each other.
-  RewriteCond %{HTTP_HOST} ^shikshapilot\.com$ [NC]
+  # 2. Already https, but on the apex (or any other) host -> canonical www.
+  RewriteCond %{HTTP_HOST} !:[0-9]+$
+  RewriteCond %{HTTP_HOST} !^www\.shikshapilot\.com$ [NC]
   RewriteRule ^ https://www.shikshapilot.com%{REQUEST_URI} [L,R=301]
 
   # 3. Collapse trailing slashes (except the root) — /features/ -> /features
