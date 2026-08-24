@@ -2032,4 +2032,26 @@ class SchoolAdminController extends BaseController
         $data = $this->service->getLatePaymentPenaltyHistory($user, $filters);
         return $this->success($response, $data);
     }
+
+    public function getMediaBase64(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $params = $request->getQueryParams();
+        $rawUrl = trim($params['url'] ?? '');
+
+        if (empty($rawUrl)) {
+            return $this->error($response, 'URL parameter is required', 400);
+        }
+
+        $contents = $this->service->getMediaContents($rawUrl);
+        if ($contents === null) {
+            return $this->error($response, 'Media file could not be retrieved', 404);
+        }
+
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $mimeType = $finfo->buffer($contents) ?: 'image/jpeg';
+        $dataUrl = 'data:' . $mimeType . ';base64,' . base64_encode($contents);
+
+        return $this->success($response, ['data_url' => $dataUrl]);
+    }
 }
