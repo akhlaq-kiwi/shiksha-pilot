@@ -5,7 +5,7 @@ import { Card } from '../../../common/ui/card';
 import html2pdf from 'html2pdf.js';
 import { resolveFileUrl } from '../../../common/utils/fileUrl';
 import { schoolService } from '../../../common/services/schoolService';
-import { apiClient } from '../../../common/services/apiClient';
+import { inlineContainerImages } from '../../../common/utils/inlineImages';
 
 // Self-healing Student Avatar with gender/initials fallback for ID Cards
 const IdCardAvatar = ({ src, name, updatedAt }) => {
@@ -17,7 +17,6 @@ const IdCardAvatar = ({ src, name, updatedAt }) => {
     return (
       <img
         src={cleanUrl}
-        crossOrigin="anonymous"
         alt={name || 'Student'}
         onError={() => setError(true)}
         className="w-full h-full object-cover block p-0 m-0 border-none"
@@ -36,79 +35,6 @@ const IdCardAvatar = ({ src, name, updatedAt }) => {
       <span className="text-[11px] font-bold uppercase tracking-wider">{initials}</span>
     </div>
   );
-};
-
-const convertImagesToDataUrls = async (container) => {
-  if (!container) return () => {};
-  const imgs = Array.from(container.querySelectorAll('img'));
-  const restoredMap = new Map();
-
-  await Promise.all(imgs.map(async (img) => {
-    const currentSrc = img.src;
-    if (!currentSrc || currentSrc.startsWith('data:')) return;
-    try {
-      let dataUrl = null;
-
-      // Method 1: Try direct CORS fetch
-      try {
-        const response = await fetch(currentSrc, { mode: 'cors', credentials: 'omit' }).catch(() => fetch(currentSrc));
-        if (response && response.ok) {
-          const blob = await response.blob();
-          dataUrl = await new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result);
-            reader.onerror = () => resolve(null);
-            reader.readAsDataURL(blob);
-          });
-        }
-      } catch (_) {}
-
-      // Method 2: Try Canvas with crossOrigin = 'anonymous'
-      if (!dataUrl || !dataUrl.startsWith('data:')) {
-        try {
-          const imageObj = new Image();
-          imageObj.crossOrigin = 'anonymous';
-          await new Promise((resolve) => {
-            imageObj.onload = resolve;
-            imageObj.onerror = resolve;
-            imageObj.src = currentSrc;
-          });
-
-          if (imageObj.naturalWidth || imageObj.width) {
-            const canvas = document.createElement('canvas');
-            canvas.width = imageObj.naturalWidth || imageObj.width;
-            canvas.height = imageObj.naturalHeight || imageObj.height;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(imageObj, 0, 0);
-            dataUrl = canvas.toDataURL('image/jpeg', 0.98);
-          }
-        } catch (_) {}
-      }
-
-      // Method 3: Backend Media Base64 Proxy Fallback (Guaranteed solution for S3 without CORS headers)
-      if (!dataUrl || !dataUrl.startsWith('data:')) {
-        try {
-          const res = await apiClient.get(`/api/common/media-base64?url=${encodeURIComponent(currentSrc)}`);
-          if (res && res.data_url) {
-            dataUrl = res.data_url;
-          }
-        } catch (_) {}
-      }
-
-      if (dataUrl && dataUrl.startsWith('data:')) {
-        restoredMap.set(img, currentSrc);
-        img.src = dataUrl;
-      }
-    } catch (e) {
-      console.warn('Image dataUrl conversion skipped for:', currentSrc, e);
-    }
-  }));
-
-  return () => {
-    restoredMap.forEach((origSrc, img) => {
-      img.src = origSrc;
-    });
-  };
 };
 
 export default function ClassIdentityCardPreview({
@@ -175,7 +101,7 @@ export default function ClassIdentityCardPreview({
     let restoreFn = null;
     try {
       try {
-        restoreFn = await convertImagesToDataUrls(container);
+        restoreFn = await inlineContainerImages(container);
       } catch (convErr) {
         console.warn('Image pre-conversion failed:', convErr);
       }
@@ -430,8 +356,7 @@ export default function ClassIdentityCardPreview({
                       {!logoError && schoolLogo ? (
                         <img
                           src={schoolLogo}
-                          crossOrigin="anonymous"
-                          alt="Logo"
+                                            alt="Logo"
                           onError={() => setLogoError(true)}
                           className="id-card-header-logo h-8 w-auto max-w-[90px] object-contain shrink-0 drop-shadow-xs"
                           style={{ maxHeight: '32px', maxWidth: '90px', width: 'auto', objectFit: 'contain' }}
