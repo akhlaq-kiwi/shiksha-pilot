@@ -680,6 +680,127 @@ class SchoolAdminService extends BaseService
     // Students
     // -------------------------------------------------------------------------
 
+    private function getNextClassNameForPromotion(string $rawClassName): ?string
+    {
+        $name = trim($rawClassName);
+        if (empty($name)) return null;
+
+        $clean = trim((string)preg_replace('/\s*[-–(].*$/', '', $name));
+
+        $classOrder = ['Nursery', 'LKG', 'UKG', 'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5', 'Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10', 'Class 11', 'Class 12'];
+        foreach ($classOrder as $index => $cName) {
+            if (strcasecmp($clean, $cName) === 0) {
+                if ($index + 1 < count($classOrder)) {
+                    return $classOrder[$index + 1];
+                }
+                return null;
+            }
+        }
+        $ordinals = [
+            'nursery' => 'LKG', 'pre-nursery' => 'Nursery', 'playgroup' => 'Nursery',
+            'lkg' => 'UKG', 'lower kindergarten' => 'UKG', 'lower kindergarten (lkg)' => 'UKG', 'kg 1' => 'UKG',
+            'ukg' => 'Class 1', 'upper kindergarten' => 'Class 1', 'upper kindergarten (ukg)' => 'Class 1', 'kg' => 'Class 1', 'kg 2' => 'Class 1',
+            '1st' => 'Class 2', 'class 1st' => 'Class 2', 'class 1' => 'Class 2', '1' => 'Class 2',
+            '2nd' => 'Class 3', 'class 2nd' => 'Class 3', 'class 2' => 'Class 3', '2' => 'Class 3',
+            '3rd' => 'Class 4', 'class 3rd' => 'Class 4', 'class 3' => 'Class 4', '3' => 'Class 4',
+            '4th' => 'Class 5', 'class 4th' => 'Class 5', 'class 4' => 'Class 5', '4' => 'Class 5',
+            '5th' => 'Class 6', 'class 5th' => 'Class 6', 'class 5' => 'Class 6', '5' => 'Class 6',
+            '6th' => 'Class 7', 'class 6th' => 'Class 7', 'class 6' => 'Class 7', '6' => 'Class 7',
+            '7th' => 'Class 8', 'class 8th' => 'Class 8', 'class 7' => 'Class 8', '7' => 'Class 8',
+            '8th' => 'Class 9', 'class 8th' => 'Class 9', 'class 8' => 'Class 9', '8' => 'Class 9',
+            '9th' => 'Class 10', 'class 9th' => 'Class 10', 'class 9' => 'Class 10', '9' => 'Class 10',
+            '10th' => 'Class 11', 'class 10th' => 'Class 11', 'class 10' => 'Class 11', '10' => 'Class 11',
+            '11th' => 'Class 12', 'class 11th' => 'Class 12', 'class 11' => 'Class 12', '11' => 'Class 12',
+        ];
+
+        $lower = strtolower($clean);
+        if (isset($ordinals[$lower])) {
+            return $ordinals[$lower];
+        }
+
+        if (preg_match('/(\d+)/', $clean, $matches)) {
+            $num = (int)$matches[1];
+            if ($num >= 1 && $num < 12) {
+                return 'Class ' . ($num + 1);
+            }
+        }
+
+        return null;
+    }
+
+    private function repairUnassignedClassesForActiveStudents(PDO $pdo, int $schoolId, ?int $academicYearId = null): void
+    {
+        if ($academicYearId === null || $academicYearId <= 0) {
+            $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+            $academicYearId = $workingYear ? (int)$workingYear['id'] : null;
+        }
+        if ($academicYearId === null || $academicYearId <= 0) {
+            return;
+        }
+
+        try {
+            $stmtNull = $pdo->prepare("
+                SELECT s.id, s.name, s.sr_no, s.admission_no, s.father_name 
+                FROM students s 
+                WHERE s.school_id = :sid AND s.academic_year_id = :ayid AND (s.class_id IS NULL OR s.class_id = 0) AND s.status = 'ACTIVE'
+            ");
+            $stmtNull->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+            $nullStudents = $stmtNull->fetchAll(PDO::FETCH_ASSOC);
+
+            if (empty($nullStudents)) {
+                return;
+            }
+
+            foreach ($nullStudents as $ns) {
+                $studentId = (int)$ns['id'];
+                
+                $stmtPrev = $pdo->prepare("
+                    SELECT s.class_id, c.name AS prev_class_name, c.stream
+                    FROM students s
+                    JOIN classes c ON s.class_id = c.id
+                    WHERE s.school_id = :sid 
+                      AND s.academic_year_id != :ayid 
+                      AND (
+                        (s.sr_no = :sr_no AND :sr_no != '' AND :sr_no IS NOT NULL) OR 
+                        (s.admission_no = :adm_no AND :adm_no != '' AND :adm_no IS NOT NULL) OR 
+                        (s.name = :name)
+                      )
+                    ORDER BY s.id DESC LIMIT 1
+                ");
+                $stmtPrev->execute([
+                    ':sid' => $schoolId,
+                    ':ayid' => $academicYearId,
+                    ':sr_no' => $ns['sr_no'] ?? '',
+                    ':adm_no' => $ns['admission_no'] ?? '',
+                    ':name' => $ns['name']
+                ]);
+                $prevRec = $stmtPrev->fetch(PDO::FETCH_ASSOC);
+
+                if ($prevRec && !empty($prevRec['prev_class_name'])) {
+                    $prevClassName = $prevRec['prev_class_name'];
+                    $nextClassName = $this->getNextClassNameForPromotion($prevClassName) ?: $prevClassName;
+                    
+                    $targetClassId = $this->findClassByNameAndSection($pdo, $schoolId, $academicYearId, $nextClassName, null, $prevRec['stream'] ?? null);
+                    if ($targetClassId === null) {
+                        $stmtInsC = $pdo->prepare("INSERT INTO classes (school_id, name, section, stream, academic_year_id) VALUES (:sid, :name, NULL, :stream, :ayid)");
+                        $stmtInsC->execute([
+                            ':sid' => $schoolId,
+                            ':name' => trim($nextClassName),
+                            ':stream' => $prevRec['stream'] ?? null,
+                            ':ayid' => $academicYearId
+                        ]);
+                        $targetClassId = (int)$pdo->lastInsertId();
+                    }
+
+                    if ($targetClassId) {
+                        $stmtFix = $pdo->prepare("UPDATE students SET class_id = :cid WHERE id = :id AND school_id = :sid");
+                        $stmtFix->execute([':cid' => $targetClassId, ':id' => $studentId, ':sid' => $schoolId]);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {}
+    }
+
     public function getStudents(array $user, array $filters = []): array
     {
         $schoolId = $this->getSchoolId($user);
@@ -707,6 +828,9 @@ class SchoolAdminService extends BaseService
                 $filters['academic_year_id'] = (int)$workingYear['id'];
             }
         }
+        $targetAyId = !empty($filters['academic_year_id']) ? (int)$filters['academic_year_id'] : null;
+        $this->repairUnassignedClassesForActiveStudents($pdo, $schoolId, $targetAyId);
+
         $students = $this->studentRepo->findBySchool($schoolId, $filters);
         return $students;
     }
@@ -714,6 +838,12 @@ class SchoolAdminService extends BaseService
     public function getStudentById(array $user, int $id): array
     {
         $schoolId = $this->getSchoolId($user);
+        $pdo = $this->studentRepo->getPdo();
+        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+        $workingYearId = $workingYear ? (int)$workingYear['id'] : 0;
+
+        $this->repairUnassignedClassesForActiveStudents($pdo, $schoolId, $workingYearId);
+
         $student = $this->studentRepo->findDetailById($schoolId, $id);
         if ($student === null) {
             throw new NotFoundException('Student not found');
@@ -1355,8 +1485,15 @@ class SchoolAdminService extends BaseService
 
         $isFirstAY = $this->isFirstAcademicYear($schoolId, $academicYearId);
         $studentCategory = !empty($data['student_category']) ? trim($data['student_category']) : null;
-        if ($isFirstAY && (empty($studentCategory) || !in_array($studentCategory, ['Existing Student', 'New Admission'], true))) {
-            throw new ValidationException(['student_category' => 'Student Category (Existing Student or New Admission) is required.']);
+        if ($isFirstAY) {
+            if (empty($studentCategory) || !in_array($studentCategory, ['Existing Student', 'New Admission'], true)) {
+                throw new ValidationException(['student_category' => 'Student Category (Existing Student or New Admission) is required.']);
+            }
+        } else {
+            // In all subsequent academic years (after migration), any newly enrolled student is 100% a 'New Admission'!
+            if (empty($studentCategory)) {
+                $studentCategory = 'New Admission';
+            }
         }
 
         $parentPhone = !empty($data['parent_phone']) ? trim((string)$data['parent_phone']) : (!empty($data['father_phone']) ? trim((string)$data['father_phone']) : (!empty($data['student_mobile']) ? trim((string)$data['student_mobile']) : null));
@@ -1883,7 +2020,7 @@ class SchoolAdminService extends BaseService
 
     private function syncExistingAnnualFeePayment(PDO $pdo, int $schoolId, int $studentId, int $classId, ?int $academicYearId, ?string $studentCategory): void
     {
-        if ($studentCategory === 'New Admission') {
+        if (empty($studentCategory) || $studentCategory === 'New Admission') {
             return;
         }
 
@@ -3981,26 +4118,11 @@ class SchoolAdminService extends BaseService
                         $outstanding = $this->getStudentOutstandingBalanceForYear($pdo, $studentId, $schoolId, $prevYearId);
                         
                         $newClassId = null;
+                        $currentClassName = $stuInfo['name'] ?? '';
+
                         if ($action === 'promote') {
                             $studentsPromotedCount++;
-                            $currentClassName = $stuInfo['name'] ?? '';
-                            $nextClassName = null;
-
-                            foreach ($classOrder as $index => $name) {
-                                if (strcasecmp(trim($currentClassName), $name) === 0) {
-                                    if ($index + 1 < count($classOrder)) {
-                                        $nextClassName = $classOrder[$index + 1];
-                                    }
-                                    break;
-                                }
-                            }
-
-                            if ($nextClassName === null && preg_match('/Class\s+(\d+)/i', $currentClassName, $matches)) {
-                                $num = (int)$matches[1];
-                                if ($num >= 1 && $num < 12) {
-                                    $nextClassName = 'Class ' . ($num + 1);
-                                }
-                            }
+                            $nextClassName = $this->getNextClassNameForPromotion($currentClassName);
 
                             if ($nextClassName !== null) {
                                 $fId = $this->findClassByNameAndSection($pdo, $schoolId, $newYearId, $nextClassName, null, $stuInfo['stream'] ?? null);
@@ -4017,9 +4139,25 @@ class SchoolAdminService extends BaseService
                                     $newClassId = (int)$pdo->lastInsertId();
                                 }
                             }
+
+                            // Fallback if promotion name matching failed: maintain student in target class of new AY
+                            if ($newClassId === null && !empty($currentClassName)) {
+                                $fId = $this->findClassByNameAndSection($pdo, $schoolId, $newYearId, $currentClassName, null, $stuInfo['stream'] ?? null);
+                                if ($fId !== null) {
+                                    $newClassId = $fId;
+                                } else {
+                                    $stmtCreateC = $pdo->prepare("INSERT INTO classes (school_id, name, section, stream, academic_year_id) VALUES (:sid, :name, NULL, :stream, :new_ay_id)");
+                                    $stmtCreateC->execute([
+                                        ':sid' => $schoolId,
+                                        ':name' => trim($currentClassName),
+                                        ':stream' => $stuInfo['stream'] ?? null,
+                                        ':new_ay_id' => $newYearId
+                                    ]);
+                                    $newClassId = (int)$pdo->lastInsertId();
+                                }
+                            }
                         } elseif ($action === 'repeat') {
                             $studentsRepeatedCount++;
-                            $currentClassName = $stuInfo['name'] ?? '';
 
                             if (!empty($currentClassName)) {
                                 $fId = $this->findClassByNameAndSection($pdo, $schoolId, $newYearId, $currentClassName, null, $stuInfo['stream'] ?? null);
@@ -4097,6 +4235,8 @@ class SchoolAdminService extends BaseService
 
                             if ($existingStudentId !== false) {
                                 $newStudentId = (int)$existingStudentId;
+                                $stmtUpdateCat = $pdo->prepare("UPDATE students SET student_category = 'Existing Student' WHERE id = :id AND school_id = :sid");
+                                $stmtUpdateCat->execute([':id' => $newStudentId, ':sid' => $schoolId]);
                             } else {
                                 unset($oldStu['id']);
                                 unset($oldStu['created_at']);
@@ -4106,6 +4246,7 @@ class SchoolAdminService extends BaseService
                                 $oldStu['academic_year_id'] = $newYearId;
                                 $oldStu['status'] = 'ACTIVE';
                                 $oldStu['roll_no'] = $newRollNo;
+                                $oldStu['student_category'] = 'Existing Student';
                                 unset($oldStu['section']);
 
                                 $cols = array_keys($oldStu);
