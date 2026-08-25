@@ -679,6 +679,8 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
 
   // Load configuration for the selected class and active academic year
   useEffect(() => {
+    let isCancelled = false;
+
     const fetchConfig = async () => {
       if (!selectedClassId) {
         setIsConfigLocked(false);
@@ -702,6 +704,8 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
         const allConfigs = await schoolService.getClassFeeConfigurations({
           academic_year_id: activeYear.id
         });
+
+        if (isCancelled) return;
 
         let config = null;
         if (allConfigs && allConfigs.length > 0) {
@@ -731,13 +735,18 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
           });
         }
       } catch (err) {
+        if (isCancelled) return;
         console.error(err);
         setFeeError('Failed to load class fee configuration.');
       }
     };
 
     fetchConfig();
-  }, [selectedClassId, academicYears, uniqueClassGroups, classes]);
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [selectedClassId, currentYear?.id]);
 
   const isCourseClassConfigured = useMemo(() => {
     if (!courseSelectedClassId) return false;
