@@ -4383,23 +4383,6 @@ class SchoolAdminService extends BaseService
                                             ':desc' => $lppDescription,
                                             ':uid' => $user['id'] ?? 1
                                         ]);
-
-                                        // Create dashboard notifications
-                                        $stmtNotif = $pdo->prepare("
-                                            INSERT INTO dashboard_notifications (school_id, user_role, title, message, link, is_read)
-                                            VALUES (:sid, :role, 'Late Payment Penalty', :msg, '/student/fees', 0)
-                                        ");
-                                        $notifMsg = "A late payment penalty of INR " . $penaltyAmount . " has been applied for previous year dues.";
-                                        $stmtNotif->execute([
-                                            ':sid' => $schoolId,
-                                            ':role' => 'STUDENT',
-                                            ':msg' => $notifMsg
-                                        ]);
-                                        $stmtNotif->execute([
-                                            ':sid' => $schoolId,
-                                            ':role' => 'PARENT',
-                                            ':msg' => $notifMsg
-                                        ]);
                                     }
                                 }
                             }
