@@ -8,9 +8,11 @@ use App\Domain\Auth\Repositories\AuthRepository;
 use App\Domain\Platform\Repositories\AuditLogRepository;
 use App\Domain\Platform\Repositories\PlansRepository;
 use App\Domain\Platform\Repositories\SchoolRepository;
+use App\Domain\Platform\Repositories\EarlyAccessRequestRepository;
 use App\Domain\Platform\Repositories\WebsiteLeadRepository;
 use App\Shared\BaseService;
 use App\Shared\Exceptions\NotFoundException;
+use App\Shared\Exceptions\ValidationException;
 use App\Shared\Validation\Validator;
 use PDO;
 use Psr\Log\LoggerInterface;
@@ -23,6 +25,7 @@ class PlatformService extends BaseService
         private AuthRepository        $users,
         private PlansRepository       $plans,
         private WebsiteLeadRepository $websiteLeads,
+        private EarlyAccessRequestRepository $earlyAccess,
         ?LoggerInterface $logger = null,
     ) {
         parent::__construct($logger);
@@ -45,6 +48,100 @@ class PlatformService extends BaseService
         }
 
         $this->websiteLeads->delete($id);
+    }
+
+    // -------------------------------------------------------------------------
+    // Early access requests (Android tester sign-ups from the marketing site)
+    // -------------------------------------------------------------------------
+
+    /** Pending first — this is a worklist, not an archive. */
+    public function getEarlyAccessRequests(array $filters = []): array
+    {
+        $pdo = $this->earlyAccess->getPdo();
+
+        $sql    = 'SELECT id, email, name, school, status, notes, invited_at, created_at
+                     FROM early_access_requests';
+        $params = [];
+
+        $status = strtoupper(trim((string) ($filters['status'] ?? '')));
+        if (in_array($status, ['PENDING', 'INVITED', 'DECLINED'], true)) {
+            $sql .= ' WHERE status = :status';
+            $params['status'] = $status;
+        }
+
+        $sql .= " ORDER BY (status = 'PENDING') DESC, created_at DESC LIMIT 1000";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+
+        return $stmt->fetchAll();
+    }
+
+    /** Counts per status, so the page can show what is outstanding at a glance. */
+    public function getEarlyAccessSummary(): array
+    {
+        $rows = $this->earlyAccess->getPdo()
+            ->query('SELECT status, COUNT(*) AS n FROM early_access_requests GROUP BY status')
+            ->fetchAll();
+
+        $summary = ['PENDING' => 0, 'INVITED' => 0, 'DECLINED' => 0];
+        foreach ($rows as $row) {
+            $summary[$row['status']] = (int) $row['n'];
+        }
+        $summary['TOTAL'] = array_sum($summary);
+
+        return $summary;
+    }
+
+    /**
+     * Mark where a sign-up has got to. Nothing here touches Play — adding
+     * someone to the tester list is a manual step in the Console, and this
+     * only records that a human has done it.
+     *
+     * @throws ValidationException on an unknown status
+     * @throws NotFoundException   when the row is gone
+     */
+    public function updateEarlyAccessRequest(int $id, string $status, ?string $notes): array
+    {
+        $status = strtoupper(trim($status));
+        if (!in_array($status, ['PENDING', 'INVITED', 'DECLINED'], true)) {
+            throw new ValidationException(['status' => 'Status must be PENDING, INVITED or DECLINED.']);
+        }
+
+        $row = $this->earlyAccess->findById($id);
+        if (!$row) {
+            throw new NotFoundException('Early access request not found.');
+        }
+
+        // Stamp invited_at the first time it turns INVITED, and clear it if the
+        // status is walked back, so the column never contradicts the status.
+        $stmt = $this->earlyAccess->getPdo()->prepare(
+            'UPDATE early_access_requests
+                SET status = :status,
+                    notes = :notes,
+                    invited_at = CASE
+                        WHEN :status2 = \'INVITED\' THEN COALESCE(invited_at, NOW())
+                        ELSE NULL
+                    END
+              WHERE id = :id'
+        );
+        $stmt->execute([
+            'status'  => $status,
+            'status2' => $status,
+            'notes'   => ($notes === null || $notes === '') ? null : $notes,
+            'id'      => $id,
+        ]);
+
+        return $this->earlyAccess->findById($id) ?? [];
+    }
+
+    public function deleteEarlyAccessRequest(int $id): void
+    {
+        if (!$this->earlyAccess->findById($id)) {
+            throw new NotFoundException('Early access request not found.');
+        }
+
+        $this->earlyAccess->delete($id);
     }
 
     private function actorInfo(array $actor): array
