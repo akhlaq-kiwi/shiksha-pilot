@@ -1,0 +1,12 @@
+# Copy to android/key.properties and fill in. Never commit the real file.
+#
+# Generate the upload keystore once, and keep a backup somewhere the whole team
+# can reach — losing it means every future update must be re-signed by Google:
+#
+#   keytool -genkey -v -keystore ~/shikshapilot-upload.jks \
+#     -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+#
+storeFile=/absolute/path/to/shikshapilot-upload.jks
+storePassword=
+keyAlias=upload
+keyPassword=
