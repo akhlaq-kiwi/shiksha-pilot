@@ -326,4 +326,48 @@ class AuthService extends BaseService
 
         return $profile;
     }
+
+    // ---------------------------------------------------------------------
+    // Account deletion requests (PF-04)
+    // ---------------------------------------------------------------------
+
+    /**
+     * Current deletion state for a user, shaped for the app's settings screen.
+     */
+    public function getDeletionRequest(int $userId): ?array
+    {
+        return $this->repo->findLatestDeletionRequest($userId);
+    }
+
+    /**
+     * File a deletion request.
+     *
+     * Deliberately idempotent: tapping the button twice returns the existing
+     * pending request rather than queuing a second one for the school admin to
+     * wade through.
+     *
+     * @throws ValidationException when the account cannot be found.
+     */
+    public function requestDeletion(int $userId, ?string $reason): array
+    {
+        $existing = $this->repo->findPendingDeletionRequest($userId);
+        if ($existing !== null) {
+            return ['id' => (int)$existing['id'], 'status' => 'PENDING', 'already_pending' => true];
+        }
+
+        $user = $this->repo->findById($userId);
+        if ($user === null) {
+            throw new ValidationException(['account' => 'Account not found.']);
+        }
+
+        $id = $this->repo->createDeletionRequest($user, $reason);
+
+        return ['id' => $id, 'status' => 'PENDING', 'already_pending' => false];
+    }
+
+    /** Withdraw a pending request. Returns false when there was nothing to cancel. */
+    public function cancelDeletionRequest(int $userId, int $requestId): bool
+    {
+        return $this->repo->cancelDeletionRequest($userId, $requestId);
+    }
 }

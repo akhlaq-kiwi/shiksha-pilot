@@ -17556,6 +17556,146 @@ Only approve the settlement after reviewing all financial records.
     {
         return $this->storage->contentTypeForPath($rawUrl);
     }
+
+    // ---------------------------------------------------------------------
+    // Account deletion requests (PF-04)
+    // ---------------------------------------------------------------------
+
+    /** Pending-first queue of deletion requests for the admin's own school. */
+    public function getAccountDeletionRequests(array $user, array $filters = []): array
+    {
+        $pdo      = $this->studentRepo->getPdo();
+        $schoolId = (int)$user['school_id'];
+
+        $sql = "SELECT r.id, r.user_id, r.contact_name, r.contact_phone, r.reason,
+                       r.status, r.resolution_note, r.resolved_at, r.created_at,
+                       u.role AS user_role,
+                       resolver.name AS resolved_by_name
+                  FROM account_deletion_requests r
+                  LEFT JOIN users u ON u.id = r.user_id
+                  LEFT JOIN users resolver ON resolver.id = r.resolved_by
+                 WHERE r.school_id = :sid";
+
+        $params = ['sid' => $schoolId];
+
+        $status = strtoupper(trim((string)($filters['status'] ?? '')));
+        if (in_array($status, ['PENDING', 'COMPLETED', 'REJECTED', 'CANCELLED'], true)) {
+            $sql .= " AND r.status = :status";
+            $params['status'] = $status;
+        }
+
+        // Pending first — this is a worklist, not an archive.
+        $sql .= " ORDER BY (r.status = 'PENDING') DESC, r.id DESC LIMIT 500";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Resolve a request. COMPLETED performs the erasure; REJECTED just records
+     * the decision.
+     *
+     * The erasure scrubs the login identity on the users row — name, phone,
+     * email, password — and marks it DELETED so the account can no longer be
+     * used. Attendance, fee and exam rows are left alone: they belong to the
+     * school's records, and the decision behind this feature was that a user
+     * cannot unilaterally destroy them. The phone is replaced rather than
+     * nulled because the column is UNIQUE NOT NULL and other rows key off it.
+     *
+     * @throws ValidationException when the action is unknown or the request is
+     *                             not pending.
+     * @throws NotFoundException   when the request does not belong to this school.
+     */
+    public function resolveAccountDeletionRequest(array $user, int $requestId, string $action, ?string $note): array
+    {
+        $action = strtoupper(trim($action));
+        if (!in_array($action, ['COMPLETED', 'REJECTED'], true)) {
+            throw new ValidationException(['action' => 'Action must be COMPLETED or REJECTED.']);
+        }
+
+        $pdo      = $this->studentRepo->getPdo();
+        $schoolId = (int)$user['school_id'];
+
+        $stmt = $pdo->prepare(
+            "SELECT id, user_id, status FROM account_deletion_requests
+              WHERE id = :id AND school_id = :sid LIMIT 1"
+        );
+        $stmt->execute(['id' => $requestId, 'sid' => $schoolId]);
+        $row = $stmt->fetch();
+
+        if ($row === false) {
+            throw new NotFoundException('Deletion request not found.');
+        }
+        if ($row['status'] !== 'PENDING') {
+            throw new ValidationException(['status' => 'This request has already been resolved.']);
+        }
+
+        $targetUserId = (int)$row['user_id'];
+
+        $pdo->beginTransaction();
+        try {
+            if ($action === 'COMPLETED') {
+                $this->anonymiseUserAccount($pdo, $targetUserId);
+            }
+
+            $update = $pdo->prepare(
+                "UPDATE account_deletion_requests
+                    SET status = :status,
+                        resolution_note = :note,
+                        resolved_by = :by,
+                        resolved_at = NOW()
+                  WHERE id = :id"
+            );
+            $update->execute([
+                'status' => $action,
+                'note'   => ($note === null || $note === '') ? null : $note,
+                'by'     => (int)$user['id'],
+                'id'     => $requestId,
+            ]);
+
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+
+        return ['id' => $requestId, 'status' => $action];
+    }
+
+    /**
+     * Irreversibly strip the login identity from a users row.
+     *
+     * Keeps the row itself so every foreign key pointing at it stays valid —
+     * deleting it would cascade through attendance and fee history.
+     */
+    private function anonymiseUserAccount(PDO $pdo, int $userId): void
+    {
+        // The phone column is UNIQUE, so the placeholder has to be unique too.
+        $placeholder = 'deleted_' . $userId . '_' . bin2hex(random_bytes(4));
+
+        $stmt = $pdo->prepare(
+            "UPDATE users
+                SET name = 'Deleted account',
+                    phone = :phone,
+                    email = NULL,
+                    password = :password,
+                    plain_password = NULL,
+                    status = 'DELETED'
+              WHERE id = :id"
+        );
+        $stmt->execute([
+            'phone'    => substr($placeholder, 0, 20),
+            // Not a usable credential: no plaintext hashes to this.
+            'password' => password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT),
+            'id'       => $userId,
+        ]);
+
+        // Any device still holding a token would otherwise keep receiving pushes.
+        $pdo->prepare('DELETE FROM device_tokens WHERE user_id = :id')
+            ->execute(['id' => $userId]);
+    }
 }
 
 
