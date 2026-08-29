@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/notification_categories.dart';
 import 'http_service.dart' as http;
 import 'notification_helper.dart';
+import '../config.dart';
 
 /// Handles a push that arrives while the app is terminated or backgrounded.
 ///
@@ -188,7 +189,7 @@ class PushNotificationService {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token') ?? '';
     final userRole = prefs.getString('user_role') ?? '';
-    final baseUrl = prefs.getString('base_url') ?? 'https://app.shikshapilot.com';
+    final baseUrl = resolveBaseUrlFrom(prefs);
     final studentId = prefs.getInt('selected_student_id');
 
     final payload = {

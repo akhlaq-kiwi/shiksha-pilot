@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:school_hub/services/http_service.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../config.dart';
 
 class HomeworkService {
   final String baseUrl;
@@ -11,7 +12,7 @@ class HomeworkService {
 
   static Future<HomeworkService> create() async {
     final prefs = await SharedPreferences.getInstance();
-    final baseUrl = prefs.getString('base_url') ?? 'https://app.shikshapilot.com';
+    final baseUrl = resolveBaseUrlFrom(prefs);
     final token = prefs.getString('auth_token') ?? '';
     return HomeworkService(baseUrl: baseUrl, token: token);
   }

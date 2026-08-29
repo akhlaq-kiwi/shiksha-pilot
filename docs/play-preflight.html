@@ -1,0 +1,906 @@
+<title>Play Store Pre-Flight</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    --ground:    #f4f6f8;
+    --surface:   #ffffff;
+    --surface-2: #eef1f5;
+    --ink:       #12161d;
+    --muted:     #59636f;
+    --faint:     #8a94a0;
+    --rule:      #dbe2e9;
+    --rule-firm: #c3ccd6;
+    --accent:    #14528a;
+    --accent-sw: #e4edf6;
+    --blocker:   #b4331f;
+    --blocker-sw:#fbe8e4;
+    --caution:   #99610f;
+    --caution-sw:#fbf0da;
+    --clear:     #16704a;
+    --clear-sw:  #dff0e7;
+
+    --display: "Barlow Condensed", "Arial Narrow", sans-serif;
+    --body: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:    #0e1116;
+      --surface:   #161b22;
+      --surface-2: #1c222b;
+      --ink:       #e5eaf1;
+      --muted:     #97a2af;
+      --faint:     #6d7783;
+      --rule:      #262e39;
+      --rule-firm: #38424f;
+      --accent:    #6aaae4;
+      --accent-sw: #14293f;
+      --blocker:   #e8836e;
+      --blocker-sw:#3a1d17;
+      --caution:   #dda23f;
+      --caution-sw:#372814;
+      --clear:     #58bd8b;
+      --clear-sw:  #12301f;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:    #0e1116;
+    --surface:   #161b22;
+    --surface-2: #1c222b;
+    --ink:       #e5eaf1;
+    --muted:     #97a2af;
+    --faint:     #6d7783;
+    --rule:      #262e39;
+    --rule-firm: #38424f;
+    --accent:    #6aaae4;
+    --accent-sw: #14293f;
+    --blocker:   #e8836e;
+    --blocker-sw:#3a1d17;
+    --caution:   #dda23f;
+    --caution-sw:#372814;
+    --clear:     #58bd8b;
+    --clear-sw:  #12301f;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 0 24px 96px;
+  }
+
+  /* ---------- masthead ---------- */
+
+  .masthead {
+    border-bottom: 2px solid var(--ink);
+    padding: 56px 0 20px;
+    margin-bottom: 32px;
+  }
+
+  .eyebrow {
+    font-family: var(--display);
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 10px;
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-size: clamp(44px, 8vw, 76px);
+    font-weight: 700;
+    line-height: 0.94;
+    letter-spacing: -0.015em;
+    margin: 0 0 18px;
+    text-wrap: balance;
+  }
+
+  .standfirst {
+    font-size: 17px;
+    color: var(--muted);
+    max-width: 62ch;
+    margin: 0;
+  }
+
+  .standfirst strong { color: var(--ink); font-weight: 600; }
+
+  /* ---------- instrument cluster ---------- */
+
+  .cluster {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    margin-bottom: 44px;
+  }
+
+  .gauge {
+    background: var(--surface);
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .gauge-n {
+    font-family: var(--display);
+    font-size: 40px;
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .gauge-l {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  .n-blocker { color: var(--blocker); }
+  .n-caution { color: var(--caution); }
+  .n-clear   { color: var(--clear); }
+  .n-accent  { color: var(--accent); }
+
+  /* ---------- sections ---------- */
+
+  section { margin-bottom: 52px; }
+
+  .sec-head {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    border-bottom: 1px solid var(--rule-firm);
+    padding-bottom: 10px;
+    margin-bottom: 8px;
+  }
+
+  .sec-tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: var(--faint);
+    white-space: nowrap;
+  }
+
+  h2 {
+    font-family: var(--display);
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: -0.005em;
+    margin: 0;
+    flex: 1;
+  }
+
+  .sec-note {
+    color: var(--muted);
+    font-size: 14.5px;
+    max-width: 68ch;
+    margin: 0 0 22px;
+  }
+
+  /* ---------- checklist items ---------- */
+
+  .items { display: flex; flex-direction: column; gap: 14px; }
+
+  .item {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--rule-firm);
+    padding: 18px 20px;
+  }
+
+  .item.is-blocker { border-left-color: var(--blocker); }
+  .item.is-caution { border-left-color: var(--caution); }
+  .item.is-clear   { border-left-color: var(--clear); }
+
+  .item-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 9px;
+  }
+
+  .id {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--faint);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .item-top h3 {
+    font-family: var(--body);
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0;
+    flex: 1;
+    min-width: 220px;
+    line-height: 1.35;
+  }
+
+  .chip {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+
+  .chip-blocker { background: var(--blocker-sw); color: var(--blocker); }
+  .chip-caution { background: var(--caution-sw); color: var(--caution); }
+  .chip-clear   { background: var(--clear-sw);   color: var(--clear); }
+  .chip-accent  { background: var(--accent-sw);  color: var(--accent); }
+
+  .item p { margin: 0 0 9px; color: var(--muted); font-size: 14.5px; max-width: 74ch; }
+  .item p:last-child { margin-bottom: 0; }
+  .item p strong { color: var(--ink); font-weight: 600; }
+
+  .fix {
+    border-top: 1px dashed var(--rule-firm);
+    margin-top: 12px;
+    padding-top: 11px;
+  }
+
+  .fix-l {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 5px;
+  }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    background: var(--surface-2);
+    padding: 1px 5px;
+    border-radius: 2px;
+    color: var(--ink);
+    word-break: break-word;
+  }
+
+  /* ---------- phases ---------- */
+
+  .phases {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    border-top: 1px solid var(--rule);
+  }
+
+  .phase {
+    display: grid;
+    grid-template-columns: 64px 1fr;
+    gap: 20px;
+    padding: 20px 0;
+    border-bottom: 1px solid var(--rule);
+    align-items: start;
+  }
+
+  .phase-n {
+    font-family: var(--display);
+    font-size: 34px;
+    font-weight: 700;
+    color: var(--accent);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .phase h3 {
+    font-family: var(--body);
+    font-size: 16.5px;
+    font-weight: 600;
+    margin: 0 0 3px;
+  }
+
+  .phase-when {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--faint);
+    letter-spacing: 0.04em;
+    display: block;
+    margin-bottom: 8px;
+  }
+
+  .phase p { margin: 0; color: var(--muted); font-size: 14.5px; max-width: 72ch; }
+
+  /* ---------- decisions ---------- */
+
+  .decision {
+    background: var(--surface);
+    border: 1px solid var(--rule-firm);
+    padding: 20px;
+    margin-bottom: 14px;
+  }
+
+  .decision h3 {
+    font-family: var(--body);
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0 0 8px;
+  }
+
+  .decision p { margin: 0 0 10px; color: var(--muted); font-size: 14.5px; max-width: 74ch; }
+  .decision p:last-child { margin-bottom: 0; }
+
+  .branch {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+    margin-top: 12px;
+  }
+
+  .branch-card {
+    background: var(--surface-2);
+    padding: 13px 15px;
+    border-top: 2px solid var(--rule-firm);
+  }
+
+  .branch-card.good { border-top-color: var(--clear); }
+  .branch-card.bad  { border-top-color: var(--caution); }
+
+  .branch-card h4 {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    margin: 0 0 6px;
+    color: var(--ink);
+  }
+
+  .branch-card p { font-size: 13.5px; margin: 0; color: var(--muted); }
+
+  /* ---------- verified strip ---------- */
+
+  .verified {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+  }
+
+  .v-cell {
+    background: var(--surface);
+    padding: 13px 16px;
+    font-size: 13.5px;
+    color: var(--muted);
+  }
+
+  .v-cell b {
+    display: block;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--clear);
+    font-weight: 600;
+    margin-bottom: 3px;
+  }
+
+  footer {
+    margin-top: 64px;
+    padding-top: 18px;
+    border-top: 1px solid var(--rule);
+    font-size: 13px;
+    color: var(--faint);
+    max-width: 72ch;
+  }
+
+  a { color: var(--accent); text-underline-offset: 2px; }
+  a:focus-visible, .item:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  @media (max-width: 560px) {
+    .phase { grid-template-columns: 44px 1fr; gap: 14px; }
+    .phase-n { font-size: 26px; }
+    .masthead { padding-top: 36px; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">Shiksha Pilot &middot; Android Release</p>
+    <h1>Play Store Pre-Flight</h1>
+    <p class="standfirst">
+      What stands between <code>app/</code> and a production listing on Google Play. Findings below
+      come from reading the Flutter project as it stands today &mdash; <strong>six items block the
+      first upload</strong>, and one of them (the account-deletion route) does not exist anywhere
+      in the app, backend, or website yet.
+    </p>
+  </header>
+
+  <div class="cluster">
+    <div class="gauge">
+      <span class="gauge-n n-blocker">6</span>
+      <span class="gauge-l">Hard blockers</span>
+    </div>
+    <div class="gauge">
+      <span class="gauge-n n-caution">4</span>
+      <span class="gauge-l">Needs a decision</span>
+    </div>
+    <div class="gauge">
+      <span class="gauge-n n-clear">8</span>
+      <span class="gauge-l">Already correct</span>
+    </div>
+    <div class="gauge">
+      <span class="gauge-n n-accent">1.0.0<span style="font-size:22px">+1</span></span>
+      <span class="gauge-l">Current version</span>
+    </div>
+  </div>
+
+  <section>
+    <div class="sec-head">
+      <span class="sec-tag">SECTION A</span>
+      <h2>Blockers in the code</h2>
+    </div>
+    <p class="sec-note">
+      Every item here either gets the upload rejected outright or fails policy review. All six are
+      engineering work on our side, and none depend on the Play Console account existing yet.
+    </p>
+
+    <div class="items">
+
+      <article class="item is-blocker">
+        <div class="item-top">
+          <span class="id">PF-01</span>
+          <h3>Release builds are signed with the debug keystore</h3>
+          <span class="chip chip-blocker">Rejects upload</span>
+        </div>
+        <p>
+          <code>android/app/build.gradle.kts</code> sets
+          <code>signingConfig = signingConfigs.getByName("debug")</code> inside the
+          <code>release</code> block &mdash; the comment says it is there so
+          <code>flutter run --release</code> works. Play refuses any artifact signed with the
+          debug key, so nothing can be uploaded until this changes.
+        </p>
+        <div class="fix">
+          <span class="fix-l">Fix</span>
+          <p>
+            Generate an upload keystore, keep it out of git, read it from an untracked
+            <code>android/key.properties</code>, and add a real <code>release</code> signing config.
+            Enrol in Play App Signing so Google holds the distribution key &mdash; losing an upload
+            key is then recoverable, losing a self-managed app key is not.
+          </p>
+        </div>
+      </article>
+
+      <article class="item is-blocker">
+        <div class="item-top">
+          <span class="id">PF-02</span>
+          <h3>The login screen lets anyone repoint the app at any server</h3>
+          <span class="chip chip-blocker">Security</span>
+        </div>
+        <p>
+          <code>lib/main.dart</code> has a <code>_serverUrlController</code> field whose value is
+          written straight to <code>base_url</code> and used for every subsequent call, including
+          <code>/api/auth/login</code>. A user &mdash; or anyone who hands them a URL &mdash; can
+          point the app at an arbitrary host and the app will post real credentials to it.
+        </p>
+        <p>
+          This is a development affordance. It pairs badly with <strong>PF-03</strong>: together they
+          allow credentials to be sent to an attacker-controlled server over plain HTTP.
+        </p>
+        <div class="fix">
+          <span class="fix-l">Fix</span>
+          <p>
+            Compile the field out of release builds &mdash; gate it behind <code>kDebugMode</code>,
+            or move the base URL to a <code>--dart-define</code> baked in at build time. Production
+            should always use <code>https://app.shikshapilot.com</code>.
+          </p>
+        </div>
+      </article>
+
+      <article class="item is-blocker">
+        <div class="item-top">
+          <span class="id">PF-03</span>
+          <h3><code>usesCleartextTraffic="true"</code> in the manifest</h3>
+          <span class="chip chip-blocker">Security</span>
+        </div>
+        <p>
+          <code>AndroidManifest.xml</code> opts the whole app back into unencrypted HTTP. The
+          default base URL is already HTTPS, so nothing needs it &mdash; it is almost certainly a
+          leftover from local development against a plain-HTTP dev server.
+        </p>
+        <div class="fix">
+          <span class="fix-l">Fix</span>
+          <p>
+            Remove the attribute. If a plain-HTTP dev server is still needed locally, allow it
+            through a debug-only network security config rather than for every build.
+          </p>
+        </div>
+      </article>
+
+      <article class="item is-blocker">
+        <div class="item-top">
+          <span class="id">PF-04</span>
+          <h3>No account or data deletion route exists</h3>
+          <span class="chip chip-blocker">Policy</span>
+        </div>
+        <p>
+          Searching <code>app/lib</code>, <code>backend/src</code> and <code>frontend/src</code> for
+          any deletion path returns nothing. Play's User Data policy requires apps with accounts to
+          offer deletion both <strong>inside the app</strong> and at a <strong>publicly reachable
+          web URL</strong> that can be used without installing the app.
+        </p>
+        <p>
+          There is a real nuance worth raising with whoever owns compliance: accounts here are
+          provisioned by the school, not self-registered, and a parent deleting their own record has
+          consequences for the school's attendance and fee history. The usual resolution for
+          school-provisioned software is a documented request-and-erase route rather than a
+          self-service hard delete &mdash; but the public URL and the in-app entry point are still
+          required, and the Data Safety form asks for the URL directly.
+        </p>
+        <div class="fix">
+          <span class="fix-l">Fix</span>
+          <p>
+            Decide the deletion model first, then build: a settings entry in the app, a
+            <code>/delete-account</code> page on the marketing site, and a backend route that
+            performs whatever the decision turns out to be.
+          </p>
+        </div>
+      </article>
+
+      <article class="item is-blocker">
+        <div class="item-top">
+          <span class="id">PF-05</span>
+          <h3><code>REQUEST_IGNORE_BATTERY_OPTIMIZATIONS</code> is declared</h3>
+          <span class="chip chip-blocker">Policy</span>
+        </div>
+        <p>
+          Play treats this as a restricted permission with a narrow list of acceptable uses, and
+          apps that declare it without qualifying get rejected. The app uses WorkManager for
+          background sync, which is <em>not</em> on the acceptable-use list on its own.
+        </p>
+        <div class="fix">
+          <span class="fix-l">Fix</span>
+          <p>
+            Confirm whether anything actually depends on it &mdash; periodic WorkManager tasks do
+            not &mdash; and if not, delete the line. Removing it is far cheaper than arguing the
+            exemption during review.
+          </p>
+        </div>
+      </article>
+
+      <article class="item is-blocker">
+        <div class="item-top">
+          <span class="id">PF-06</span>
+          <h3>No build pipeline, and <code>google-services.json</code> is untracked</h3>
+          <span class="chip chip-caution">Release engineering</span>
+        </div>
+        <p>
+          <code>.github/workflows/</code> contains only the three web deploy workflows. The Firebase
+          config is correctly gitignored, which means any automated build needs it injected as a
+          secret &mdash; and today the release bundle can only be produced on a laptop that happens
+          to have both that file and the (not yet existing) keystore.
+        </p>
+        <div class="fix">
+          <span class="fix-l">Fix</span>
+          <p>
+            Add a manually triggered <code>build-android.yml</code> mirroring the existing
+            deploy workflows' shape: keystore and <code>google-services.json</code> as base64
+            secrets, <code>flutter build appbundle</code>, upload the <code>.aab</code> as an
+            artifact. Automating the Play upload itself can wait for a later release.
+          </p>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="sec-tag">SECTION B</span>
+      <h2>Decisions only you can make</h2>
+    </div>
+    <p class="sec-note">
+      These change the plan's shape rather than its contents. The first one changes the timeline by
+      weeks, so it is worth settling before anything else starts.
+    </p>
+
+    <div class="decision">
+      <h3>1. Organization account, or personal?</h3>
+      <p>
+        This is the single biggest lever on the release date. Google requires new
+        <strong>personal</strong> developer accounts to run a closed test with at least
+        <strong>12 testers for 14 continuous days</strong> before production access is unlocked.
+        Organization accounts are exempt from that requirement.
+      </p>
+      <div class="branch">
+        <div class="branch-card good">
+          <h4>Organization &mdash; recommended</h4>
+          <p>
+            Needs a verifiable legal entity and a D-U-N-S number. Verification takes days to a few
+            weeks, but skips the 12-tester gate entirely and is the right fit for software sold to
+            schools.
+          </p>
+        </div>
+        <div class="branch-card bad">
+          <h4>Personal</h4>
+          <p>
+            Faster to open, but adds a mandatory 14-day closed test with 12 real testers before you
+            can ship to production &mdash; likely the longest single item on the critical path.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="decision">
+      <h3>2. Does the app target children?</h3>
+      <p>
+        The audience declaration is not a formality. If the listing says the app is aimed at
+        children, the <strong>Families policy</strong> applies: restricted SDKs, a stricter ads and
+        data regime, and an additional review pass. Firebase Messaging in particular needs checking
+        against that policy.
+      </p>
+      <p>
+        The likely correct answer is that the app targets <strong>parents, teachers and school
+        staff</strong> &mdash; adults acting on behalf of students &mdash; which keeps it out of
+        Families. That claim needs to be true of the UI, though: any student-facing surface makes it
+        harder to defend.
+      </p>
+    </div>
+
+    <div class="decision">
+      <h3>3. App name and listing identity</h3>
+      <p>
+        The manifest label is <code>ShikshaPilot</code> (one word) while the product is branded
+        <strong>Shiksha Pilot</strong> everywhere else. Pick one before the listing is created
+        &mdash; the store name is changeable later, but the installed launcher label being different
+        from the store name looks like an error to users.
+      </p>
+    </div>
+
+    <div class="decision">
+      <h3>4. Who is the account holder?</h3>
+      <p>
+        The Play account owns the app forever and is painful to transfer. It should belong to the
+        company, on a shared address nobody loses access to &mdash; not an individual's personal
+        Google account.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="sec-tag">SECTION C</span>
+      <h2>Console and listing work</h2>
+    </div>
+    <p class="sec-note">
+      Human work in the Play Console, most of it parallelisable with Section A. The privacy policy
+      requirement is already satisfied.
+    </p>
+
+    <div class="items">
+
+      <article class="item is-caution">
+        <div class="item-top">
+          <span class="id">PF-07</span>
+          <h3>Data Safety declaration</h3>
+          <span class="chip chip-caution">Needs drafting</span>
+        </div>
+        <p>
+          Must be accurate and match observable behaviour; mismatches are a common rejection cause.
+          From the code, the app collects at minimum: <strong>phone number and password</strong>
+          (login), <strong>name and role</strong>, <strong>student photos</strong> shown in profile
+          and ID card screens, and an <strong>FCM registration token</strong> tied to the device.
+          Each needs a purpose, a retention answer, and an encryption-in-transit answer.
+        </p>
+      </article>
+
+      <article class="item is-caution">
+        <div class="item-top">
+          <span class="id">PF-08</span>
+          <h3>Store listing assets</h3>
+          <span class="chip chip-caution">Needs producing</span>
+        </div>
+        <p>
+          A 512&times;512 icon, a 1024&times;500 feature graphic, between two and eight phone
+          screenshots, a short description capped at 80 characters, and a full description. The
+          screenshots are the real work &mdash; they need a populated demo school rather than empty
+          states.
+        </p>
+      </article>
+
+      <article class="item is-caution">
+        <div class="item-top">
+          <span class="id">PF-09</span>
+          <h3>Content rating and audience questionnaires</h3>
+          <span class="chip chip-caution">Blocked on B2</span>
+        </div>
+        <p>
+          The IARC rating questionnaire and the target-audience declaration both flow from decision
+          2 above. Straightforward once that is settled.
+        </p>
+      </article>
+
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="sec-tag">SECTION D</span>
+      <h2>Order of work</h2>
+    </div>
+    <p class="sec-note">
+      Numbered because the dependencies are real: account verification has the longest lead time and
+      gates the last two phases, so it starts on day one regardless of code readiness.
+    </p>
+
+    <div class="phases">
+
+      <div class="phase">
+        <span class="phase-n">01</span>
+        <div>
+          <h3>Open and verify the Play account</h3>
+          <span class="phase-when">Start immediately &middot; days to weeks, mostly waiting</span>
+          <p>
+            Settle decisions 1 and 4, pay the one-time $25 registration fee, and submit
+            organization verification. Nothing else on this list takes as long in wall-clock time,
+            and none of it is engineering effort.
+          </p>
+        </div>
+      </div>
+
+      <div class="phase">
+        <span class="phase-n">02</span>
+        <div>
+          <h3>Clear the code blockers</h3>
+          <span class="phase-when">Parallel with 01 &middot; PF-01 through PF-06</span>
+          <p>
+            Signing config first, since nothing can be built or tested without it. PF-04 is the
+            long pole &mdash; it needs a product decision before any code gets written, so raise it
+            at the start of this phase rather than the end.
+          </p>
+        </div>
+      </div>
+
+      <div class="phase">
+        <span class="phase-n">03</span>
+        <div>
+          <h3>First signed bundle to the internal track</h3>
+          <span class="phase-when">After 01 and 02 &middot; same day once both land</span>
+          <p>
+            Upload an <code>.aab</code> to the internal testing track, which has no review delay and
+            takes up to 100 testers. This is where signing problems, missing ProGuard rules and
+            release-only crashes surface &mdash; run it against the real production API before
+            polishing any listing copy.
+          </p>
+        </div>
+      </div>
+
+      <div class="phase">
+        <span class="phase-n">04</span>
+        <div>
+          <h3>Complete the listing and policy forms</h3>
+          <span class="phase-when">Parallel with 03 &middot; PF-07 through PF-09</span>
+          <p>
+            Data Safety, content rating, audience declaration, store assets, and the privacy policy
+            and account-deletion URLs. Play will not let you promote to production with any of these
+            outstanding.
+          </p>
+        </div>
+      </div>
+
+      <div class="phase">
+        <span class="phase-n">05</span>
+        <div>
+          <h3>Closed test with a pilot school</h3>
+          <span class="phase-when">Optional for organizations &middot; mandatory 14 days if personal</span>
+          <p>
+            Worth doing on its own merits even when not required: one real school's parents and
+            teachers on the closed track will find things no internal tester will. If decision 1
+            went the personal route, this phase is compulsory and needs 12 testers for 14
+            continuous days.
+          </p>
+        </div>
+      </div>
+
+      <div class="phase">
+        <span class="phase-n">06</span>
+        <div>
+          <h3>Production rollout</h3>
+          <span class="phase-when">First review typically several days</span>
+          <p>
+            Promote to production as a staged rollout rather than 100% &mdash; start around 20% so a
+            release-only defect can be halted. Expect the first review to be the slowest; later
+            updates clear much faster. Once live, swap the placeholder Play button on the marketing
+            site for the real listing URL.
+          </p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="sec-tag">SECTION E</span>
+      <h2>Already in good shape</h2>
+    </div>
+    <p class="sec-note">
+      Checked and correct &mdash; listed so nobody spends time re-verifying them.
+    </p>
+
+    <div class="verified">
+      <div class="v-cell">
+        <b>Application ID</b>
+        <code>com.shikshapilot.app</code> is a sensible permanent identifier and matches the
+        Firebase config.
+      </div>
+      <div class="v-cell">
+        <b>Target SDK</b>
+        Flutter 3.44 with <code>compileSdk 36</code> clears Play's current API level floor with
+        room to spare.
+      </div>
+      <div class="v-cell">
+        <b>Privacy policy</b>
+        Live at <code>/privacy-policy</code> on the marketing site &mdash; the listing needs a URL
+        and one already exists.
+      </div>
+      <div class="v-cell">
+        <b>ProGuard rules</b>
+        <code>proguard-rules.pro</code> already covers Flutter embedding, WorkManager and the Play
+        Core stubs.
+      </div>
+      <div class="v-cell">
+        <b>Permissions</b>
+        Aside from PF-05, the set is minimal and justifiable &mdash; no location, contacts, camera
+        or storage.
+      </div>
+      <div class="v-cell">
+        <b>Secrets hygiene</b>
+        <code>google-services.json</code> is gitignored and nothing sensitive is tracked in the
+        repository.
+      </div>
+      <div class="v-cell">
+        <b>Launcher icon</b>
+        <code>mipmap-anydpi-v26</code> defines a proper adaptive icon with separate background and
+        foreground layers.
+      </div>
+      <div class="v-cell">
+        <b>Notification setup</b>
+        FCM channel, silhouette tray icon and the cold-start click intent filter are all correctly
+        configured in the manifest.
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Compiled from the state of <code>app/</code> at the current commit. Every finding was read
+    directly from the file named alongside it. Timings for account verification and store
+    review are Google's, not ours, and have historically varied a lot &mdash; treat phase 01 as the
+    critical path until it clears.
+  </footer>
+
+</div>

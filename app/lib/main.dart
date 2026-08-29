@@ -10,6 +10,7 @@ import 'screens/home_screen.dart';
 import 'services/leave_service.dart';
 import 'services/auth_service.dart';
 import 'services/notification_helper.dart';
+import 'config.dart';
 
 const String fetchNotificationsTask = "com.shikshapilot.schoolhub.fetchNotifications";
 
@@ -22,7 +23,7 @@ void callbackDispatcher() {
           final prefs = await SharedPreferences.getInstance();
           final token = prefs.getString('auth_token') ?? '';
           final userRole = prefs.getString('user_role') ?? '';
-          final baseUrl = prefs.getString('base_url') ?? 'https://app.shikshapilot.com';
+          final baseUrl = resolveBaseUrlFrom(prefs);
           if (token.isEmpty || userRole.isEmpty) return true;
 
           final roleUpper = userRole.toUpperCase();
@@ -153,7 +154,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
-  final String _baseUrl = 'https://app.shikshapilot.com';
 
   @override
   void initState() {
@@ -185,7 +185,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
     final role = prefs.getString('user_role');
-    final baseUrl = prefs.getString('base_url') ?? 'https://app.shikshapilot.com';
+    final baseUrl = resolveBaseUrlFrom(prefs);
     await prefs.setString('base_url', baseUrl);
 
     if (token != null && role != null) {
@@ -334,11 +334,9 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _serverUrlController = TextEditingController(text: 'https://app.shikshapilot.com');
   
   bool _obscurePassword = true;
   bool _isLoading = false;
-  bool _showServerConfig = false;
   String _errorMessage = '';
 
   String? _phoneValidationError;
@@ -355,21 +353,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _loadServerUrl() async {
     final prefs = await SharedPreferences.getInstance();
-    final savedUrl = prefs.getString('base_url');
-    final activeUrl = (savedUrl != null && savedUrl.isNotEmpty) ? savedUrl : 'https://app.shikshapilot.com';
-    await prefs.setString('base_url', activeUrl);
-    if (mounted) {
-      setState(() {
-        _serverUrlController.text = activeUrl;
-      });
-    }
+    await prefs.setString(kBaseUrlPrefKey, resolveBaseUrlFrom(prefs));
   }
 
   @override
   void dispose() {
     _phoneController.dispose();
     _passwordController.dispose();
-    _serverUrlController.dispose();
     super.dispose();
   }
 
@@ -381,9 +371,9 @@ class _LoginScreenState extends State<LoginScreen> {
       _errorMessage = '';
     });
 
-    final activeBaseUrl = _serverUrlController.text.trim().replaceAll(RegExp(r'/$'), '');
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('base_url', activeBaseUrl);
+    final activeBaseUrl = resolveBaseUrlFrom(prefs);
+    await prefs.setString(kBaseUrlPrefKey, activeBaseUrl);
 
     try {
       final authService = AuthService(baseUrl: activeBaseUrl);
@@ -502,8 +492,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (rawError.contains('SocketException') || rawError.contains('ClientException') || rawError.contains('Connection refused') || rawError.contains('Failed host lookup')) {
         setState(() {
-          _errorMessage = 'Cannot connect to server at "$activeBaseUrl". Please check Server Settings or Network Connection.';
-          _showServerConfig = true;
+          _errorMessage = 'Cannot reach Shiksha Pilot. Check your internet connection and try again.';
         });
       } else if (errorMsg.toLowerCase().contains('mobile no not found')) {
         setState(() {

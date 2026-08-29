@@ -47,3 +47,8 @@ app.*.map.json
 # Firebase configuration
 **/android/app/google-services.json
 google-services.json
+
+# Android upload signing — never commit the keystore or its passwords (PF-01).
+**/android/key.properties
+**/*.jks
+**/*.keystore

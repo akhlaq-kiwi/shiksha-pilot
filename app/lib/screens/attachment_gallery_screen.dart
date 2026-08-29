@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../config.dart';
 
 class AttachmentGalleryScreen extends StatefulWidget {
   final List<dynamic> attachments;
@@ -60,7 +61,7 @@ class _AttachmentGalleryScreenState extends State<AttachmentGalleryScreen> {
     final prefs = await SharedPreferences.getInstance();
     String activeBaseUrl = widget.baseUrl.trim();
     if (activeBaseUrl.isEmpty || !activeBaseUrl.startsWith('http')) {
-      activeBaseUrl = prefs.getString('base_url') ?? 'https://app.shikshapilot.com';
+      activeBaseUrl = resolveBaseUrlFrom(prefs);
     }
     final cleanBaseUrl = activeBaseUrl.replaceAll(RegExp(r'/$'), '');
 
@@ -127,7 +128,7 @@ class _AttachmentGalleryScreenState extends State<AttachmentGalleryScreen> {
       final prefs = await SharedPreferences.getInstance();
       String activeBaseUrl = widget.baseUrl.trim();
       if (activeBaseUrl.isEmpty || !activeBaseUrl.startsWith('http')) {
-        activeBaseUrl = prefs.getString('base_url') ?? 'https://app.shikshapilot.com';
+        activeBaseUrl = resolveBaseUrlFrom(prefs);
       }
       final cleanBaseUrl = activeBaseUrl.replaceAll(RegExp(r'/$'), '');
 
