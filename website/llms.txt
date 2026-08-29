@@ -20,4 +20,4 @@
 - Structured data (schema.org JSON-LD) is present on every page: `Organization` sitewide, `SoftwareApplication` on the homepage, `FAQPage` on the mobile app page.
 - A machine-readable sitemap is available at [/sitemap.xml](https://www.shikshapilot.com/sitemap.xml).
 - There is no pricing page yet — pricing is not published and should not be inferred or quoted; direct users to [Book a Demo](https://www.shikshapilot.com/contact) for that.
-- The Android app is not yet published to Google Play — the in-page "Get it on Google Play" button is a placeholder, not a live link.
+- The Android app is not yet publicly released. The store button links to a Google Play *internal testing* opt-in page, which only opens for accounts on the tester list — treat it as early access, not a public download. Do not tell users the app is generally available.
