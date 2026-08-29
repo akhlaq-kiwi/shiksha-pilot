@@ -221,6 +221,20 @@ section{ padding: 56px 0; }
 .store-btn .s-small{ font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.8; }
 .store-btn .s-big{ font-family: var(--font-display); font-weight: 700; font-size: 16.5px; }
 .store-note{ font-family: var(--font-hand); font-size: 14.5px; color: var(--ink-soft); }
+/* Text link sitting beside the store badge — deliberately not a second button,
+   so it does not compete with the primary action. */
+.store-link{
+  font-family: var(--font-hand); font-size: 15.5px; font-weight: 700;
+  color: var(--ink); text-decoration: underline; text-underline-offset: 3px;
+  text-decoration-thickness: 2px; text-decoration-color: var(--coral);
+  white-space: nowrap;
+}
+.store-link:hover{ color: var(--coral-deep); text-decoration-color: var(--coral-deep); }
+.store-link:focus-visible{ outline: 3px solid var(--coral); outline-offset: 3px; border-radius: 2px; }
+
+/* The nav is sticky and 78px tall, so anchored sections need to clear it or
+   their heading lands underneath. */
+#early-access{ scroll-margin-top: 100px; }
 
 .phone-wrap{ position: relative; display:flex; justify-content:center; }
 .phone{ width: 240px; background: var(--ink); border-radius: 34px; padding: 12px; box-shadow: 8px 8px 0 var(--coral); transform: rotate(-2deg); }
