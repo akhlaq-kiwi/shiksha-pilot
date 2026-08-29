@@ -1,0 +1,93 @@
+name: Build Android App Bundle
+
+# Manual-only, matching the deploy workflows. Produces a signed .aab for
+# upload to the Play Console; it does not upload anything itself.
+on:
+  workflow_dispatch:
+    inputs:
+      build_name:
+        description: 'Version name shown in Play (e.g. 1.0.0). Leave blank to use pubspec.'
+        required: false
+      build_number:
+        description: 'Version code — must be higher than every build already uploaded to Play.'
+        required: true
+
+concurrency:
+  group: build-android
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      # google-services.json and the upload keystore are both gitignored, so a
+      # build machine has to be given them. Stored as base64 so the secret is a
+      # single line and no newline handling is needed.
+      - name: Restore Firebase config
+        run: |
+          echo "${{ secrets.ANDROID_GOOGLE_SERVICES_JSON_B64 }}" | base64 -d > app/android/app/google-services.json
+          test -s app/android/app/google-services.json
+
+      - name: Restore upload keystore
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_B64 }}" | base64 -d > "$RUNNER_TEMP/upload-keystore.jks"
+          test -s "$RUNNER_TEMP/upload-keystore.jks"
+          cat > app/android/key.properties <<EOF
+          storeFile=$RUNNER_TEMP/upload-keystore.jks
+          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          EOF
+
+      - name: Build app bundle
+        working-directory: app
+        run: |
+          set -e
+          ARGS="--release --build-number=${{ github.event.inputs.build_number }}"
+          if [ -n "${{ github.event.inputs.build_name }}" ]; then
+            ARGS="$ARGS --build-name=${{ github.event.inputs.build_name }}"
+          fi
+          flutter pub get
+          flutter build appbundle $ARGS
+
+      # A debug-signed bundle is silently useless — Play rejects it on upload —
+      # so fail here instead, where the cause is obvious.
+      - name: Verify the bundle is not debug-signed
+        working-directory: app
+        run: |
+          set -e
+          AAB=build/app/outputs/bundle/release/app-release.aab
+          test -f "$AAB"
+          SIGNER=$(keytool -printcert -jarfile "$AAB" | grep -m1 'Owner:' || true)
+          echo "Signed by: $SIGNER"
+          if echo "$SIGNER" | grep -q 'CN=Android Debug'; then
+            echo "::error::Bundle is signed with the debug key — check that key.properties was written."
+            exit 1
+          fi
+
+      - name: Upload bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-${{ github.event.inputs.build_number }}
+          path: app/build/app/outputs/bundle/release/app-release.aab
+          retention-days: 30
+
+      - name: Remove signing material
+        if: always()
+        run: rm -f app/android/key.properties "$RUNNER_TEMP/upload-keystore.jks"

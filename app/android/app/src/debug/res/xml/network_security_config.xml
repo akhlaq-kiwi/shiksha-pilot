@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug builds only. Allows plain HTTP so the app can be run against a local
+  API server (http://10.0.2.2:8080 from the emulator, or a LAN address). The
+  release manifest has no cleartext permission at all, so a shipped build can
+  only ever talk HTTPS.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

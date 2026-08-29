@@ -20,6 +20,7 @@ import 'package:school_hub/services/http_service.dart' as http;
 import '../services/leave_service.dart';
 import '../services/exam_service.dart';
 import '../main.dart';
+import '../config.dart';
 
 class NotificationHelper {
   static final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
@@ -69,7 +70,7 @@ class NotificationHelper {
             final token = prefs.getString('auth_token') ?? '';
             final userRole = prefs.getString('user_role') ?? '';
             final studentId = prefs.getInt('selected_student_id');
-            final baseUrl = prefs.getString('base_url') ?? 'https://app.shikshapilot.com';
+            final baseUrl = resolveBaseUrlFrom(prefs);
 
             // Unauthenticated deep linking redirect to login
             if (token.isEmpty || userRole.isEmpty) {

@@ -1,0 +1,26 @@
+# Copy to android/key.properties and fill in. Never commit the real file.
+#
+# Generate the upload keystore once, then keep a backup somewhere the whole
+# team can reach — a password manager or company vault, not one laptop.
+#
+#   keytool -genkey -v \
+#     -keystore ~/shikshapilot-upload.jks \
+#     -storetype JKS \
+#     -keyalg RSA -keysize 2048 -validity 10000 \
+#     -alias shikshapilot-upload
+#
+# The alias names the key inside the keystore. It is arbitrary as far as
+# Gradle is concerned — it only has to match keyAlias below — but a keystore
+# outlives the machine it was made on and may end up holding keys for more
+# than one app, so name it after this app rather than something generic.
+#
+# "upload" in the name is the other half of the meaning: under Play App
+# Signing this key only signs the .aab we send to Google, who then re-sign
+# with their own key before the app reaches devices.
+#
+# storeFile must be an absolute path — a relative one resolves against
+# android/ and fails quietly.
+storeFile=/absolute/path/to/shikshapilot-upload.jks
+storePassword=
+keyAlias=shikshapilot-upload
+keyPassword=
