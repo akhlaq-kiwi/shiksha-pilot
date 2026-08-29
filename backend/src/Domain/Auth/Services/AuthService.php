@@ -10,6 +10,8 @@ use App\Shared\BaseService;
 use App\Shared\Exceptions\ForbiddenException;
 use App\Shared\Exceptions\NotFoundException;
 use App\Shared\Exceptions\ValidationException;
+use App\Shared\Notifications\NotificationCatalog;
+use App\Shared\Notifications\PushDispatcher;
 
 class AuthService extends BaseService
 {
@@ -362,6 +364,8 @@ class AuthService extends BaseService
 
         $id = $this->repo->createDeletionRequest($user, $reason);
 
+        $this->notifyAdminsOfDeletionRequest($user);
+
         return ['id' => $id, 'status' => 'PENDING', 'already_pending' => false];
     }
 
@@ -369,5 +373,55 @@ class AuthService extends BaseService
     public function cancelDeletionRequest(int $userId, int $requestId): bool
     {
         return $this->repo->cancelDeletionRequest($userId, $requestId);
+    }
+
+    /**
+     * Tell the school's administrators a request is waiting.
+     *
+     * Without this the only way to find a request is to visit the Security
+     * page and look, while the public /delete-account page commits us to
+     * acting within 30 days.
+     *
+     * Never allowed to fail the request itself: the user has done their part
+     * the moment the row is written, and a push outage must not turn into an
+     * error on their screen.
+     */
+    private function notifyAdminsOfDeletionRequest(array $user): void
+    {
+        $schoolId = isset($user['school_id']) ? (int)$user['school_id'] : 0;
+        if ($schoolId <= 0) {
+            return;
+        }
+
+        $name  = trim((string)($user['name'] ?? '')) ?: 'A user';
+        $phone = trim((string)($user['phone'] ?? ''));
+
+        $title   = 'Account deletion requested';
+        $message = $phone !== ''
+            ? sprintf('%s (%s) asked for their account to be deleted. Review it under Security.', $name, $phone)
+            : sprintf('%s asked for their account to be deleted. Review it under Security.', $name);
+        $link    = '/school-admin/security';
+        $event   = 'ACCOUNT_DELETION_REQUESTED';
+
+        try {
+            $pdo  = $this->repo->getPdo();
+            $stmt = $pdo->prepare(
+                "INSERT INTO dashboard_notifications
+                        (school_id, user_role, title, message, link, category, event_key, is_read)
+                 VALUES (:school_id, 'SCHOOL_ADMIN', :title, :message, :link, :category, :event_key, 0)"
+            );
+            $stmt->execute([
+                ':school_id' => $schoolId,
+                ':title'     => $title,
+                ':message'   => $message,
+                ':link'      => $link,
+                ':category'  => NotificationCatalog::categoryFor($event),
+                ':event_key' => $event,
+            ]);
+
+            PushDispatcher::pushOnly($pdo, $schoolId, 'SCHOOL_ADMIN', null, $event, $title, $message, $link);
+        } catch (\Throwable $e) {
+            error_log('AuthService: could not notify admins of deletion request: ' . $e->getMessage());
+        }
     }
 }
