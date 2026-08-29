@@ -325,6 +325,16 @@ final class NotificationCatalog
             'link'     => '/school-admin/profile/subscription',
             'label'    => "The school's subscription plan was upgraded",
         ],
+        'ACCOUNT_DELETION_REQUESTED' => [
+            'category' => self::CAT_ADMIN,
+            'delivery' => self::DELIVERY_PUSH,
+            'audience' => ['SCHOOL_ADMIN'],
+            // High: the public /delete-account page commits to acting within
+            // 30 days, and nothing else surfaces these requests.
+            'priority' => 'high',
+            'link'     => '/school-admin/security',
+            'label'    => 'Someone requested deletion of their account',
+        ],
 
         // ---------------- SYSTEM (device-only) ----------------
         'FILE_DOWNLOAD_COMPLETE' => [
