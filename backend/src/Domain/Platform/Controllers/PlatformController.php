@@ -314,4 +314,46 @@ class PlatformController extends BaseController
 
         return $this->success($response, null, 'Lead deleted successfully.');
     }
+
+    // -------------------------------------------------------------------------
+    // Early access requests (Android tester sign-ups from the marketing site)
+    // -------------------------------------------------------------------------
+
+    public function getEarlyAccessRequests(Request $request, Response $response): Response
+    {
+        $actor = $this->authenticate($request);
+        $this->requireRole($actor, ['SUPER_ADMIN']);
+
+        return $this->success($response, [
+            'requests' => $this->service->getEarlyAccessRequests($request->getQueryParams()),
+            'summary'  => $this->service->getEarlyAccessSummary(),
+        ]);
+    }
+
+    public function updateEarlyAccessRequest(Request $request, Response $response, array $args): Response
+    {
+        $actor = $this->authenticate($request);
+        $this->requireRole($actor, ['SUPER_ADMIN']);
+
+        $body  = (array) ($request->getParsedBody() ?? []);
+        $notes = trim((string) ($body['notes'] ?? ''));
+
+        $data = $this->service->updateEarlyAccessRequest(
+            (int) ($args['id'] ?? 0),
+            (string) ($body['status'] ?? ''),
+            $notes !== '' ? $notes : null
+        );
+
+        return $this->success($response, $data, 'Request updated.');
+    }
+
+    public function deleteEarlyAccessRequest(Request $request, Response $response, array $args): Response
+    {
+        $actor = $this->authenticate($request);
+        $this->requireRole($actor, ['SUPER_ADMIN']);
+
+        $this->service->deleteEarlyAccessRequest((int) ($args['id'] ?? 0));
+
+        return $this->success($response, null, 'Request deleted.');
+    }
 }

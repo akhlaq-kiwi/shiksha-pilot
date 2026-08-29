@@ -46,6 +46,11 @@ return function (App $app) {
     $app->get('/api/platform/schools/{id}/teachers', [PlatformController::class, 'getSchoolTeachers']);
     $app->get('/api/platform/website-leads', [PlatformController::class, 'getWebsiteLeads']);
     $app->delete('/api/platform/website-leads/{id}', [PlatformController::class, 'deleteWebsiteLead']);
+
+    // Early access sign-ups for the Android app (marketing site -> tester list)
+    $app->get('/api/platform/early-access', [PlatformController::class, 'getEarlyAccessRequests']);
+    $app->put('/api/platform/early-access/{id}', [PlatformController::class, 'updateEarlyAccessRequest']);
+    $app->delete('/api/platform/early-access/{id}', [PlatformController::class, 'deleteEarlyAccessRequest']);
     $app->get('/api/platform/schools/{id}/students', [PlatformController::class, 'getSchoolStudents']);
     $app->get('/api/platform/schools/{id}/subscriptions', [PlatformController::class, 'getSchoolSubscriptions']);
     $app->get('/api/platform/schools/{id}/academic-years', [PlatformController::class, 'getSchoolAcademicYears']);

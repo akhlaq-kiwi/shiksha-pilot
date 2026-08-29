@@ -112,4 +112,20 @@ export const platformService = {
   async deleteWebsiteLead(id) {
     return apiClient.delete(`/api/platform/website-leads/${id}`);
   },
+
+  // Early access sign-ups for the Android app
+  async getEarlyAccessRequests(params = {}) {
+    const query = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== '' && v != null)
+    ).toString();
+    return apiClient.get(`/api/platform/early-access${query ? `?${query}` : ''}`);
+  },
+
+  async updateEarlyAccessRequest(id, status, notes) {
+    return apiClient.put(`/api/platform/early-access/${id}`, { status, notes });
+  },
+
+  async deleteEarlyAccessRequest(id) {
+    return apiClient.delete(`/api/platform/early-access/${id}`);
+  },
 };
