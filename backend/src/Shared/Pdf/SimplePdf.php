@@ -77,25 +77,51 @@ class SimplePdf
         $logoPath = $fields['Logo Path'] ?? '';
 
         if (($isFeeReceipt || $isSalarySlip) && !empty($logoPath)) {
-            // Find absolute path with fallback checks
-            $absPath = "";
-            $searchPaths = [
-                dirname(__DIR__, 3) . '/public' . $logoPath,
-                dirname(__DIR__, 3) . $logoPath,
-                dirname(__DIR__, 4) . '/public' . $logoPath,
-                dirname(__DIR__, 4) . $logoPath,
-                'd:/BN School/backend/public' . $logoPath
-            ];
-            foreach ($searchPaths as $p) {
-                if (file_exists($p)) {
-                    $absPath = $p;
-                    break;
+            $imageData = null;
+
+            // 1. If logoPath is a full HTTP/HTTPS URL (e.g. S3 bucket URL)
+            if (str_starts_with($logoPath, 'http://') || str_starts_with($logoPath, 'https://')) {
+                $context = stream_context_create([
+                    'http' => ['timeout' => 5, 'follow_location' => 1],
+                    'ssl'  => ['verify_peer' => false, 'verify_peer_name' => false]
+                ]);
+                $imageData = @file_get_contents($logoPath, false, $context);
+            }
+
+            // 2. If not loaded yet, check local file paths
+            if (empty($imageData)) {
+                $cleanPath = '/' . ltrim($logoPath, '/');
+                $searchPaths = [
+                    dirname(__DIR__, 3) . '/public' . $cleanPath,
+                    dirname(__DIR__, 3) . $cleanPath,
+                    dirname(__DIR__, 4) . '/public' . $cleanPath,
+                    dirname(__DIR__, 4) . $cleanPath,
+                    'd:/BN School/backend/public' . $cleanPath
+                ];
+                foreach ($searchPaths as $p) {
+                    if (file_exists($p)) {
+                        $imageData = @file_get_contents($p);
+                        break;
+                    }
                 }
             }
 
-            if (!empty($absPath)) {
+            // 3. If relative path and S3 base URL is configured
+            if (empty($imageData)) {
+                $s3Base = getenv('STORAGE_URL') ?: (getenv('S3_URL') ?: (getenv('AWS_BUCKET_URL') ?: ''));
+                if (!empty($s3Base)) {
+                    $fullS3Url = rtrim($s3Base, '/') . '/' . ltrim($logoPath, '/');
+                    $context = stream_context_create([
+                        'http' => ['timeout' => 5, 'follow_location' => 1],
+                        'ssl'  => ['verify_peer' => false, 'verify_peer_name' => false]
+                    ]);
+                    $imageData = @file_get_contents($fullS3Url, false, $context);
+                }
+            }
+
+            if (!empty($imageData)) {
                 try {
-                    $info = getimagesize($absPath);
+                    $info = @getimagesizefromstring($imageData);
                     if ($info) {
                         $w = $info[0];
                         $h = $info[1];
@@ -108,17 +134,8 @@ class SimplePdf
                         $logoHeight = (int)($h * $scale);
 
                         // Method 1: Try GD conversion first (if GD is loaded)
-                        if (function_exists('imagecreatefromjpeg')) {
-                            $srcImg = null;
-                            if (($mime === 'image/jpeg' || $mime === 'image/jpg') && function_exists('imagecreatefromjpeg')) {
-                                $srcImg = imagecreatefromjpeg($absPath);
-                            } elseif ($mime === 'image/png' && function_exists('imagecreatefrompng')) {
-                                $srcImg = imagecreatefrompng($absPath);
-                            } elseif ($mime === 'image/gif' && function_exists('imagecreatefromgif')) {
-                                $srcImg = imagecreatefromgif($absPath);
-                            } elseif ($mime === 'image/webp' && function_exists('imagecreatefromwebp')) {
-                                $srcImg = imagecreatefromwebp($absPath);
-                            }
+                        if (function_exists('imagecreatefromstring')) {
+                            $srcImg = @imagecreatefromstring($imageData);
 
                             if ($srcImg) {
                                 $destImg = imagecreatetruecolor($logoWidth, $logoHeight);
@@ -133,39 +150,36 @@ class SimplePdf
                                 imagedestroy($srcImg);
                                 imagedestroy($destImg);
 
-                                 if (!empty($imgStream)) {
-                                     $logoObjId = 5;
-                                     $this->isPng = false;
-                                     $this->logoPixelWidth = $logoWidth;
-                                     $this->logoPixelHeight = $logoHeight;
-                                 }
+                                if (!empty($imgStream)) {
+                                    $logoObjId = 5;
+                                    $this->isPng = false;
+                                    $this->logoPixelWidth = $logoWidth;
+                                    $this->logoPixelHeight = $logoHeight;
+                                }
                             }
                         }
 
                         // Method 2: Direct file loading fallback (if GD is missing)
                         if ($logoObjId === 0) {
                             if ($mime === 'image/jpeg' || $mime === 'image/jpg') {
-                                $imgStream = file_get_contents($absPath);
+                                $imgStream = $imageData;
                                 if (!empty($imgStream)) {
-                                     $logoObjId = 5;
-                                     $this->isPng = false;
-                                     $this->logoPixelWidth = $w;
-                                     $this->logoPixelHeight = $h;
+                                    $logoObjId = 5;
+                                    $this->isPng = false;
+                                    $this->logoPixelWidth = $w;
+                                    $this->logoPixelHeight = $h;
                                 }
                             } elseif ($mime === 'image/png') {
-                                $rawBytes = file_get_contents($absPath);
-                                if (!empty($rawBytes)) {
-                                    $pngInfo = $this->parsePng($rawBytes);
-                                    if ($pngInfo) {
-                                         $imgStream = $pngInfo['data'];
-                                         $logoObjId = 5;
-                                         $this->isPng = true;
-                                         $this->logoPixelWidth = $pngInfo['width'];
-                                         $this->logoPixelHeight = $pngInfo['height'];
-                                        if (!empty($pngInfo['smask'])) {
-                                            $this->hasSMask = true;
-                                            $this->smaskStream = $pngInfo['smask'];
-                                        }
+                                $pngInfo = $this->parsePng($imageData);
+                                if ($pngInfo) {
+                                    $imgStream = $pngInfo['data'];
+                                    $logoObjId = 5;
+                                    $this->isPng = true;
+                                    $this->logoPixelWidth = $pngInfo['width'];
+                                    $this->logoPixelHeight = $pngInfo['height'];
+                                    if (!empty($pngInfo['smask'])) {
+                                        $this->hasSMask = true;
+                                        $this->smaskStream = $pngInfo['smask'];
                                     }
                                 }
                             }
