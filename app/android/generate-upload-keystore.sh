@@ -18,9 +18,16 @@ set -euo pipefail
 # nags about it on every use. Gradle detects the type from the file, so the
 # conventional .jks filename is kept.
 ALIAS="shikshapilot-upload"
-KEYSTORE="${KEYSTORE_PATH:-$HOME/shikshapilot-upload.jks}"
 ANDROID_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$ANDROID_DIR/../.." && pwd)"
+
+# Both live in the gitignored secrets/ folder at the repo root. Gradle reads
+# android/key.properties, so that stays where it is and simply points at the
+# keystore next door.
+SECRETS_DIR="${SECRETS_DIR:-$REPO_ROOT/secrets}"
+KEYSTORE="${KEYSTORE_PATH:-$SECRETS_DIR/shikshapilot-upload.jks}"
 PROPS="$ANDROID_DIR/key.properties"
+SECRETS_PROPS="$SECRETS_DIR/key.properties"
 
 if [ -e "$KEYSTORE" ]; then
   echo "A keystore already exists at $KEYSTORE"
@@ -28,6 +35,9 @@ if [ -e "$KEYSTORE" ]; then
   echo "file aside first — and be certain nothing has been published with it."
   exit 1
 fi
+
+mkdir -p "$SECRETS_DIR"
+chmod 700 "$SECRETS_DIR"
 
 echo "Creating the Shiksha Pilot upload keystore."
 echo "  keystore : $KEYSTORE"
@@ -67,25 +77,34 @@ keytool -genkeypair -v \
 chmod 600 "$KEYSTORE"
 
 umask 077
-cat > "$PROPS" <<EOF
+write_props() {
+  cat > "$1" <<EOF
 storeFile=$KEYSTORE
 storePassword=$PASS
 keyAlias=$ALIAS
 keyPassword=$PASS
 EOF
-chmod 600 "$PROPS"
+  chmod 600 "$1"
+}
+
+# Gradle reads android/key.properties; the copy in secrets/ keeps the password
+# alongside the keystore it belongs to, which is what gets backed up.
+write_props "$PROPS"
+write_props "$SECRETS_PROPS"
 
 unset PASS PASS2 KEYSTORE_PASS
 
 echo
 echo "Created:"
-echo "  $KEYSTORE   (chmod 600)"
-echo "  $PROPS      (chmod 600, gitignored)"
+echo "  $KEYSTORE        (chmod 600, gitignored)"
+echo "  $SECRETS_PROPS   (chmod 600, gitignored)"
+echo "  $PROPS           (chmod 600, gitignored — this is the one Gradle reads)"
 echo
 echo "To inspect the certificate:"
 echo "  keytool -list -v -keystore \"$KEYSTORE\" -alias $ALIAS"
 echo
-echo "NEXT — back this file up before you do anything else."
-echo "Put $KEYSTORE and its password in the company password manager or vault."
-echo "It is not in git, and it cannot be regenerated. Losing it means Google has"
-echo "to reset your upload key before you can ship another update."
+echo "NEXT — back these up before you do anything else."
+echo "Copy the keystore and its password into the company password manager or"
+echo "vault. secrets/ is gitignored, which also means git will not protect it:"
+echo "'git clean -xfd' deletes ignored files, and re-cloning the repo loses the"
+echo "folder entirely. Treat what is on disk as a working copy, not a backup."

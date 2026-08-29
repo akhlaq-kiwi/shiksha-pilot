@@ -47,3 +47,11 @@ app/android/app/google-services.json
 backend/config/firebase-service-account.json
 *.apk
 app-release.apk
+
+# Android signing material — see secrets/README.md (PF-01).
+# Ignore the folder's *contents* rather than the folder itself, so the README
+# and the nested .gitignore stay tracked; git cannot descend into a directory
+# that is ignored outright.
+secrets/*
+!secrets/.gitignore
+!secrets/README.md
