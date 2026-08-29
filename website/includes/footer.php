@@ -17,6 +17,7 @@
   <div class="wrap foot-legal">
     <a href="<?php echo PAGE_BASE; ?>/privacy-policy">Privacy Policy</a>
     <a href="<?php echo PAGE_BASE; ?>/terms">Terms of Use</a>
+    <a href="<?php echo PAGE_BASE; ?>/delete-account">Delete Account</a>
   </div>
 </footer>
 

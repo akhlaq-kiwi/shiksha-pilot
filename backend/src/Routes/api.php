@@ -263,6 +263,15 @@ return function (App $app) {
     // Public Achievements Gallery & Media Base64 Domain
     $app->get('/api/school/achievements', [SchoolAdminController::class, 'getAchievements']);
     $app->get('/api/school/achievements/{id}/report-card', [SchoolAdminController::class, 'getAchievementReportCard']);
+    // Account deletion (PF-04) — user-facing, any authenticated role.
+    $app->get('/api/account/deletion-request', [AuthController::class, 'getAccountDeletionRequest']);
+    $app->post('/api/account/deletion-request', [AuthController::class, 'requestAccountDeletion']);
+    $app->delete('/api/account/deletion-request/{id}', [AuthController::class, 'cancelAccountDeletion']);
+
+    // Account deletion queue — school admin fulfils the requests.
+    $app->get('/api/school/account-deletion-requests', [SchoolAdminController::class, 'getAccountDeletionRequests']);
+    $app->post('/api/school/account-deletion-requests/{id}/resolve', [SchoolAdminController::class, 'resolveAccountDeletionRequest']);
+
     $app->get('/api/common/media', [SchoolAdminController::class, 'streamMedia']);
     $app->get('/api/common/media-base64', [SchoolAdminController::class, 'getMediaBase64']);
 
