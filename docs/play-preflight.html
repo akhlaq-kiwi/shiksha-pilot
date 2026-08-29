@@ -438,19 +438,19 @@
     <h1>Play Store Pre-Flight</h1>
     <p class="standfirst">
       What stands between <code>app/</code> and a production listing on Google Play. Findings below
-      Six items blocked the first upload; <strong>five are now fixed and verified against a real
-      release build</strong>. The one that remains &mdash; the account-deletion route &mdash; is
-      blocked on a product decision rather than on engineering time.
+      Six items blocked the first upload. <strong>All six are now fixed and verified.</strong>
+      What is left is not engineering: a Play developer account, an upload keystore, the store
+      listing, and the policy questionnaires.
     </p>
   </header>
 
   <div class="cluster">
     <div class="gauge">
-      <span class="gauge-n n-blocker">1</span>
+      <span class="gauge-n n-clear">0</span>
       <span class="gauge-l">Blockers left</span>
     </div>
     <div class="gauge">
-      <span class="gauge-n n-clear">5</span>
+      <span class="gauge-n n-clear">6</span>
       <span class="gauge-l">Blockers cleared</span>
     </div>
     <div class="gauge">
@@ -473,9 +473,9 @@
       <h2>Blockers in the code</h2>
     </div>
     <p class="sec-note">
-      Every item here either gets the upload rejected outright or fails policy review. Five are
-      done and verified against a real release build; <strong>PF-04 is the only one still
-      open</strong>, and it is waiting on a product decision rather than on engineering time.
+      Every item here either gets the upload rejected outright or fails policy review. All six are
+      done: the first five verified against a real release build, and PF-04 verified end to end
+      against the running stack.
     </p>
 
     <div class="items">
@@ -561,11 +561,11 @@
         </div>
       </article>
 
-      <article class="item is-blocker">
+      <article class="item is-done">
         <div class="item-top">
           <span class="id">PF-04</span>
           <h3>No account or data deletion route exists</h3>
-          <span class="chip chip-blocker">Only blocker left</span>
+          <span class="chip chip-done">Fixed</span>
         </div>
         <p>
           Searching <code>app/lib</code>, <code>backend/src</code> and <code>frontend/src</code> for
@@ -582,11 +582,23 @@
           required, and the Data Safety form asks for the URL directly.
         </p>
         <div class="fix">
-          <span class="fix-l">Fix</span>
+          <span class="fix-l">Done</span>
           <p>
-            Decide the deletion model first, then build: a settings entry in the app, a
-            <code>/delete-account</code> page on the marketing site, and a backend route that
-            performs whatever the decision turns out to be.
+            Built as request-and-erase across four surfaces: a destructive-styled
+            <strong>Delete my account</strong> entry in the app's Settings, a queue on the
+            school-admin Security page, the backend routes and table behind them, and a public
+            <code>/delete-account</code> page linked from the site footer for people who no longer
+            have the app installed.
+          </p>
+          <p>
+            Completing a request scrubs name, phone, email and password, marks the account
+            <code>DELETED</code> and drops the user's push tokens. The users row itself survives so
+            attendance and fee history keep their foreign keys &mdash; which was the whole reason
+            for choosing this model over a hard delete.
+          </p>
+          <p>
+            Verified end to end against the local stack, including cross-school isolation on both
+            admin endpoints.
           </p>
         </div>
       </article>
