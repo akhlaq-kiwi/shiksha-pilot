@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription } from '../../../common/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
 import { Select } from '../../../common/ui/select';
+import { Input } from '../../../common/ui/input';
+import { Dialog } from '../../../common/ui/dialog';
 import { Button } from '../../../common/ui/button';
 import { schoolAdminService } from '../../../common/services/schoolAdminService';
 import { UserMinus, RefreshCw, AlertTriangle } from 'lucide-react';
@@ -41,6 +43,11 @@ export default function AccountDeletionRequests() {
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState('');
 
+  // The request currently being resolved, plus the operator's inputs.
+  const [target, setTarget] = useState(null); // { request, action }
+  const [typedPhone, setTypedPhone] = useState('');
+  const [note, setNote] = useState('');
+
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -57,28 +64,38 @@ export default function AccountDeletionRequests() {
 
   useEffect(() => { load(); }, [load]);
 
-  const resolve = async (request, action) => {
-    const isComplete = action === 'COMPLETED';
+  const openResolve = (request, action) => {
+    setTarget({ request, action });
+    setTypedPhone('');
+    setNote('');
+    setError('');
+  };
 
-    const confirmed = window.confirm(
-      isComplete
-        ? `Permanently erase the account for ${request.contact_name} (${request.contact_phone})?\n\n`
-          + 'Their name, mobile number, email and password will be removed and they will no longer '
-          + 'be able to sign in. Attendance, fee and exam records are kept.\n\nThis cannot be undone.'
-        : `Reject the deletion request from ${request.contact_name}? Their account stays active.`
-    );
-    if (!confirmed) return;
+  const closeResolve = () => {
+    if (busyId) return; // Don't yank the dialog out from under an in-flight request.
+    setTarget(null);
+    setTypedPhone('');
+    setNote('');
+  };
 
-    const note = window.prompt(
-      isComplete ? 'Note for the record (optional)' : 'Reason for rejecting (optional)',
-      ''
-    );
-    if (note === null) return; // Cancelled the prompt.
+  // Erasing is irreversible, so it requires the operator to type the phone
+  // number of the person they are erasing. A rejection is harmless and needs
+  // no such gate.
+  const isErase = target?.action === 'COMPLETED';
+  const phoneMatches = (typedPhone || '').trim() === (target?.request?.contact_phone || '');
+  const canSubmit = !!target && (!isErase || phoneMatches) && !busyId;
 
+  const submitResolve = async () => {
+    if (!canSubmit) return;
+
+    const { request, action } = target;
     setBusyId(request.id);
     setError('');
     try {
-      await schoolAdminService.resolveAccountDeletionRequest(request.id, action, note);
+      await schoolAdminService.resolveAccountDeletionRequest(request.id, action, note.trim());
+      setTarget(null);
+      setTypedPhone('');
+      setNote('');
       await load();
     } catch (e) {
       setError(e?.message || 'Could not update the request.');
@@ -186,7 +203,7 @@ export default function AccountDeletionRequests() {
                         variant="outline"
                         className="h-7 text-[11px]"
                         disabled={busyId === r.id}
-                        onClick={() => resolve(r, 'REJECTED')}
+                        onClick={() => openResolve(r, 'REJECTED')}
                       >
                         Reject
                       </Button>
@@ -194,7 +211,7 @@ export default function AccountDeletionRequests() {
                         size="sm"
                         className="h-7 text-[11px] bg-rose-600 hover:bg-rose-700 text-white"
                         disabled={busyId === r.id}
-                        onClick={() => resolve(r, 'COMPLETED')}
+                        onClick={() => openResolve(r, 'COMPLETED')}
                       >
                         {busyId === r.id ? 'Working…' : 'Erase account'}
                       </Button>
@@ -210,6 +227,92 @@ export default function AccountDeletionRequests() {
           </TableBody>
         </Table>
       </div>
+
+      <Dialog
+        isOpen={!!target}
+        onClose={closeResolve}
+        closeOnBackdropClick={false}
+        maxWidth="max-w-md"
+        title={isErase ? 'Erase this account' : 'Reject this request'}
+        description={
+          isErase
+            ? 'This permanently removes the person\u2019s sign-in details. It cannot be undone.'
+            : 'The account stays active and the person is told the request was declined.'
+        }
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={closeResolve} disabled={!!busyId}>
+              Cancel
+            </Button>
+            <Button
+              onClick={submitResolve}
+              disabled={!canSubmit}
+              className={isErase ? 'bg-rose-600 hover:bg-rose-700 text-white disabled:opacity-50' : ''}
+            >
+              {busyId ? 'Working\u2026' : isErase ? 'Erase account' : 'Reject request'}
+            </Button>
+          </div>
+        }
+      >
+        {target && (
+          <div className="space-y-4 text-sm">
+            <div className="rounded-md border border-border bg-zinc-50 dark:bg-zinc-900/50 p-3">
+              <div className="font-semibold text-text-primary">{target.request.contact_name}</div>
+              <div className="text-text-secondary tabular-nums">{target.request.contact_phone}</div>
+              {target.request.reason && (
+                <div className="text-xs text-text-secondary mt-2 italic">
+                  &ldquo;{target.request.reason}&rdquo;
+                </div>
+              )}
+            </div>
+
+            {isErase && (
+              <>
+                <div className="text-xs text-text-secondary space-y-1">
+                  <p className="font-semibold text-rose-600">This removes, permanently:</p>
+                  <p>their name, mobile number, email and password, and their notification devices.</p>
+                  <p className="font-semibold text-text-primary pt-1">This is kept:</p>
+                  <p>attendance, fee and exam records stay in the school&rsquo;s history.</p>
+                </div>
+
+                <div>
+                  <label htmlFor="confirm-phone" className="block text-xs font-semibold text-text-primary mb-1">
+                    Type <span className="tabular-nums">{target.request.contact_phone}</span> to confirm
+                  </label>
+                  <Input
+                    id="confirm-phone"
+                    value={typedPhone}
+                    onChange={(e) => setTypedPhone(e.target.value)}
+                    placeholder="Mobile number"
+                    autoComplete="off"
+                    className="tabular-nums"
+                  />
+                  {typedPhone && !phoneMatches && (
+                    <p className="text-[11px] text-rose-600 mt-1">
+                      That does not match this request&rsquo;s mobile number.
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
+
+            <div>
+              <label htmlFor="resolution-note" className="block text-xs font-semibold text-text-primary mb-1">
+                {isErase ? 'Note for the record (optional)' : 'Reason for rejecting (optional)'}
+              </label>
+              <Input
+                id="resolution-note"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder={isErase ? 'e.g. verified with parent by phone' : 'e.g. please contact the office first'}
+                maxLength={500}
+              />
+            </div>
+
+            {error && <p className="text-xs text-rose-600">{error}</p>}
+          </div>
+        )}
+      </Dialog>
     </Card>
   );
 }
