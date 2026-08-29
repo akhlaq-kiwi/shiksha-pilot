@@ -1,8 +1,8 @@
 # secrets/
 
 Local-only signing material for the Android release build. **Nothing in here
-is in git** — `secrets/.gitignore` ignores the whole folder, and the repo root
-`.gitignore` ignores it again.
+is in git** — the repo root `.gitignore` ignores `secrets/*`, negating only
+this README so the folder's purpose survives a fresh clone.
 
 ## Contents (after running the generator)
 
