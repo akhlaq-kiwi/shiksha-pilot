@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../services/leave_service.dart';
 import '../services/auth_service.dart';
+import '../services/account_service.dart';
 import '../main.dart';
 import '../widgets/change_password_dialog.dart';
 import 'full_screen_image_screen.dart';
@@ -40,10 +41,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
   int? _selectedAcademicYearId;
   String _selectedAcademicYearName = '';
 
+  DeletionRequest? _deletionRequest;
+
   @override
   void initState() {
     super.initState();
     _loadSettingsData();
+    _loadDeletionRequest();
+  }
+
+  AccountService get _accountService => AccountService(
+        baseUrl: widget.leaveService.baseUrl,
+        token: widget.leaveService.token,
+      );
+
+  Future<void> _loadDeletionRequest() async {
+    try {
+      final request = await _accountService.getDeletionRequest();
+      if (mounted) setState(() => _deletionRequest = request);
+    } catch (_) {
+      // Non-critical: the tile still works, it just won't show pending state.
+    }
   }
 
   Future<void> _loadSettingsData() async {
@@ -533,11 +551,144 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     subtitle: 'Application version info',
                     onTap: _showAboutDialog,
                   ),
+                  const Divider(height: 1, indent: 56),
+                  _buildSettingsTile(
+                    icon: Icons.person_remove_outlined,
+                    title: 'Delete my account',
+                    subtitle: _deletionRequest?.isPending == true
+                        ? 'Request pending with your school'
+                        : 'Request removal of your account',
+                    onTap: _showDeleteAccountSheet,
+                    danger: true,
+                  ),
                 ],
               ),
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  /// Entry point for PF-04. Shows the pending state if one exists, otherwise
+  /// walks the user through confirming.
+  Future<void> _showDeleteAccountSheet() async {
+    final pending = _deletionRequest?.isPending == true ? _deletionRequest : null;
+
+    if (pending != null) {
+      final withdraw = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Deletion request pending'),
+          content: const Text(
+            'Your school administrator has your request and will action it. '
+            'Your account still works until they do.\n\n'
+            'Do you want to withdraw the request?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Keep request'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Withdraw'),
+            ),
+          ],
+        ),
+      );
+
+      if (withdraw != true) return;
+
+      try {
+        await _accountService.cancelDeletion(pending.id);
+        if (!mounted) return;
+        setState(() => _deletionRequest = null);
+        _toast('Deletion request withdrawn.');
+      } catch (e) {
+        if (mounted) _toast(e.toString().replaceFirst('Exception: ', ''), error: true);
+      }
+      return;
+    }
+
+    final reasonController = TextEditingController();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete my account'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'This sends a request to your school administrator. When they action it:',
+                style: TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                '\u2022 your name, mobile number and password are permanently removed\n'
+                '\u2022 you will no longer be able to sign in\n'
+                '\u2022 attendance, fee and exam records stay with your school',
+                style: TextStyle(fontSize: 13, height: 1.5),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'This cannot be undone once actioned.',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: reasonController,
+                maxLines: 3,
+                maxLength: 500,
+                decoration: const InputDecoration(
+                  labelText: 'Reason (optional)',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red.shade700),
+            child: const Text('Request deletion'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) {
+      reasonController.dispose();
+      return;
+    }
+
+    final reason = reasonController.text.trim();
+    reasonController.dispose();
+
+    try {
+      await _accountService.requestDeletion(reason: reason.isEmpty ? null : reason);
+      await _loadDeletionRequest();
+      if (!mounted) return;
+      _toast('Request sent to your school administrator.');
+    } catch (e) {
+      if (mounted) _toast(e.toString().replaceFirst('Exception: ', ''), error: true);
+    }
+  }
+
+  void _toast(String message, {bool error = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: error ? Colors.red.shade700 : null,
       ),
     );
   }
@@ -548,17 +699,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required String subtitle,
     Widget? trailing,
     VoidCallback? onTap,
+    bool danger = false,
   }) {
+    final accent = danger ? Colors.red.shade700 : Colors.indigo;
     return ListTile(
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: Colors.indigo.shade50.withOpacity(0.5),
+          color: (danger ? Colors.red.shade50 : Colors.indigo.shade50).withOpacity(0.5),
           shape: BoxShape.circle,
         ),
-        child: Icon(icon, color: Colors.indigo, size: 20),
+        child: Icon(icon, color: accent, size: 20),
       ),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+      title: Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: danger ? accent : null)),
       subtitle: Text(subtitle, style: const TextStyle(color: Colors.grey, fontSize: 11)),
       trailing: trailing ?? const Icon(Icons.chevron_right_rounded, color: Colors.grey),
       onTap: onTap,

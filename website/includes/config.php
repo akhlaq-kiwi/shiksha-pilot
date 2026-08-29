@@ -86,5 +86,6 @@ function site_pages() {
         ['path' => '/contact',      'label' => 'Book a Demo', 'file' => 'contact.php',    'priority' => '0.7', 'changefreq' => 'monthly'],
         ['path' => '/privacy-policy', 'label' => 'Privacy Policy', 'file' => 'privacy-policy.php', 'priority' => '0.3', 'changefreq' => 'yearly'],
         ['path' => '/terms',        'label' => 'Terms of Use', 'file' => 'terms.php',      'priority' => '0.3', 'changefreq' => 'yearly'],
+        ['path' => '/delete-account', 'label' => 'Delete Account', 'file' => 'delete-account.php', 'priority' => '0.3', 'changefreq' => 'yearly'],
     ];
 }

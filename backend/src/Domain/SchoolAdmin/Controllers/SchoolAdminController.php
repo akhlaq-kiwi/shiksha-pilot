@@ -2101,4 +2101,41 @@ class SchoolAdminController extends BaseController
 
         return $this->success($response, ['data_url' => $dataUrl]);
     }
+
+    // ---------------------------------------------------------------------
+    // Account deletion requests (PF-04)
+    // ---------------------------------------------------------------------
+
+    public function getAccountDeletionRequests(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $data = $this->service->getAccountDeletionRequests($user, $request->getQueryParams());
+
+        return $this->success($response, $data);
+    }
+
+    public function resolveAccountDeletionRequest(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body   = (array)($request->getParsedBody() ?? []);
+        $action = (string)($body['action'] ?? '');
+        $note   = trim((string)($body['note'] ?? ''));
+
+        $data = $this->service->resolveAccountDeletionRequest(
+            $user,
+            (int)$args['id'],
+            $action,
+            $note !== '' ? $note : null
+        );
+
+        $message = $data['status'] === 'COMPLETED'
+            ? 'Account erased and the request closed.'
+            : 'Request rejected.';
+
+        return $this->success($response, $data, $message);
+    }
 }

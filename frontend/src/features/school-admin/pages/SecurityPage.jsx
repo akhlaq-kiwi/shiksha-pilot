@@ -5,6 +5,7 @@ import { Input } from '../../../common/ui/input';
 import { Select } from '../../../common/ui/select';
 import { Button } from '../../../common/ui/button';
 import { schoolAdminService } from '../../../common/services/schoolAdminService';
+import AccountDeletionRequests from '../components/AccountDeletionRequests';
 import { Search, ChevronLeft, ChevronRight, SlidersHorizontal, ShieldAlert, CheckCircle2, RefreshCw } from 'lucide-react';
 
 const statusBadge = (status) => {
@@ -119,13 +120,16 @@ export default function SecurityPage() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Security</h2>
-          <p className="text-text-secondary text-sm mt-1">Audit logs, login history, and access control.</p>
+          <p className="text-text-secondary text-sm mt-1">Audit logs, login history, deletion requests, and access control.</p>
         </div>
         <Button variant="outline" size="sm" onClick={() => { fetchAuditLogs(); fetchLoginHistory(); }} className="gap-2">
           <RefreshCw className="h-4 w-4" />
           Refresh
         </Button>
       </div>
+
+      {/* Deletion requests first — this is a worklist, the rest is history. */}
+      <AccountDeletionRequests />
 
       {/* Audit Logs Card */}
       <Card className="overflow-hidden">

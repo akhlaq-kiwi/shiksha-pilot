@@ -70,4 +70,74 @@ class AuthRepository extends BaseRepository
             'force_password_change' => 0,
         ]);
     }
+
+    // ---------------------------------------------------------------------
+    // Account deletion requests (PF-04)
+    // ---------------------------------------------------------------------
+
+    /** The user's most recent request, whatever its status, or null. */
+    public function findLatestDeletionRequest(int $userId): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT id, status, reason, resolution_note, created_at, resolved_at
+               FROM account_deletion_requests
+              WHERE user_id = :uid
+           ORDER BY id DESC
+              LIMIT 1"
+        );
+        $stmt->execute(['uid' => $userId]);
+        $row = $stmt->fetch();
+
+        return $row ?: null;
+    }
+
+    public function findPendingDeletionRequest(int $userId): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT id, status, reason, created_at
+               FROM account_deletion_requests
+              WHERE user_id = :uid AND status = 'PENDING'
+           ORDER BY id DESC
+              LIMIT 1"
+        );
+        $stmt->execute(['uid' => $userId]);
+        $row = $stmt->fetch();
+
+        return $row ?: null;
+    }
+
+    /**
+     * Record a new request. Name and phone are copied from the user row on
+     * purpose: completing the request anonymises that row, and without a copy
+     * there would be no way to contact the requester or audit the decision.
+     */
+    public function createDeletionRequest(array $user, ?string $reason): int
+    {
+        $stmt = $this->pdo->prepare(
+            "INSERT INTO account_deletion_requests
+                    (user_id, school_id, contact_phone, contact_name, reason)
+             VALUES (:uid, :sid, :phone, :name, :reason)"
+        );
+        $stmt->execute([
+            'uid'    => (int)$user['id'],
+            'sid'    => $user['school_id'] !== null ? (int)$user['school_id'] : null,
+            'phone'  => (string)($user['phone'] ?? ''),
+            'name'   => (string)($user['name'] ?? ''),
+            'reason' => ($reason === null || $reason === '') ? null : $reason,
+        ]);
+
+        return (int)$this->pdo->lastInsertId();
+    }
+
+    public function cancelDeletionRequest(int $userId, int $requestId): bool
+    {
+        $stmt = $this->pdo->prepare(
+            "UPDATE account_deletion_requests
+                SET status = 'CANCELLED', resolved_at = NOW()
+              WHERE id = :id AND user_id = :uid AND status = 'PENDING'"
+        );
+        $stmt->execute(['id' => $requestId, 'uid' => $userId]);
+
+        return $stmt->rowCount() > 0;
+    }
 }

@@ -251,4 +251,15 @@ export const schoolAdminService = {
   async generateCredentials(role, id, password) {
     return apiClient.post('/api/school/credentials/generate', { role, id, password });
   },
+
+  // Account Deletion Requests (PF-04)
+  async getAccountDeletionRequests(params = {}) {
+    const query = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== '' && v != null)
+    ).toString();
+    return apiClient.get(`/api/school/account-deletion-requests${query ? `?${query}` : ''}`);
+  },
+  async resolveAccountDeletionRequest(id, action, note) {
+    return apiClient.post(`/api/school/account-deletion-requests/${id}/resolve`, { action, note });
+  },
 };

@@ -110,4 +110,49 @@ class AuthController extends BaseController
 
         return $this->success($response, $profile, 'Profile fetched successfully.');
     }
+
+    // ---------------------------------------------------------------------
+    // Account deletion requests (PF-04)
+    // ---------------------------------------------------------------------
+
+    /** Current deletion state, so the app can show the right thing in Settings. */
+    public function getAccountDeletionRequest(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+
+        return $this->success($response, [
+            'request' => $this->authService->getDeletionRequest((int)$user['id']),
+        ]);
+    }
+
+    public function requestAccountDeletion(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $body = (array)($request->getParsedBody() ?? []);
+
+        $reason = trim((string)($body['reason'] ?? ''));
+        if (mb_strlen($reason) > 2000) {
+            $reason = mb_substr($reason, 0, 2000);
+        }
+
+        $result = $this->authService->requestDeletion((int)$user['id'], $reason);
+
+        $message = $result['already_pending']
+            ? 'A deletion request is already being processed for this account.'
+            : 'Deletion request received.';
+
+        return $this->success($response, $result, $message);
+    }
+
+    public function cancelAccountDeletion(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+
+        $cancelled = $this->authService->cancelDeletionRequest((int)$user['id'], (int)$args['id']);
+        if (!$cancelled) {
+            return $this->error($response, 'No pending deletion request to withdraw.', 404);
+        }
+
+        return $this->success($response, null, 'Deletion request withdrawn.');
+    }
 }
