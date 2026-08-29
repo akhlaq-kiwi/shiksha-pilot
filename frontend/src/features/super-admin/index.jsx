@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Building2, CreditCard, Settings, AlertCircle, Inbox } from 'lucide-react';
+import { LayoutDashboard, Building2, CreditCard, Settings, AlertCircle, Inbox, Smartphone } from 'lucide-react';
 import { platformService } from '../../common/services/platformService';
 import AppSidebar from '../../common/components/AppSidebar';
 import { useToast } from '../../common/components/Toast';
@@ -14,6 +14,7 @@ import SchoolStudentsPage from './pages/SchoolStudentsPage';
 import SchoolHistoryPage from './pages/SchoolHistoryPage';
 import ReportCardTemplatesPage from './pages/ReportCardTemplatesPage';
 import WebsiteLeadsPage from './pages/WebsiteLeadsPage';
+import EarlyAccessPage from './pages/EarlyAccessPage';
 import CreateSchoolDialog from './components/CreateSchoolDialog';
 
 const NAV = [
@@ -22,6 +23,7 @@ const NAV = [
   { path: '/super-admin/plans',    label: 'Manage Plans',   icon: CreditCard },
   { path: '/super-admin/report-card-templates', label: 'Report Cards', icon: Settings },
   { path: '/super-admin/website-leads', label: 'Website Leads', icon: Inbox },
+  { path: '/super-admin/early-access', label: 'Early Access', icon: Smartphone },
 ];
 
 export default function SuperAdminPortal() {
@@ -248,6 +250,9 @@ export default function SuperAdminPortal() {
           } />
           <Route path="website-leads" element={
             <WebsiteLeadsPage />
+          } />
+          <Route path="early-access" element={
+            <EarlyAccessPage />
           } />
           <Route path="*" element={<Navigate to="/super-admin" replace />} />
         </Routes>

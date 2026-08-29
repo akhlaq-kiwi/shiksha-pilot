@@ -46,6 +46,37 @@ function save_website_lead(array $data) {
     ]);
 }
 
+/**
+ * Record an early-access sign-up for the Android app.
+ *
+ * Idempotent on email: someone submitting twice updates their details rather
+ * than adding a second row for an admin to wade through. A row already marked
+ * INVITED keeps that status — re-submitting must not quietly send someone back
+ * to the bottom of the queue.
+ *
+ * @param array{email:string,name:string,school:string} $data
+ * @throws PDOException on connection/insert failure — the caller decides what
+ *         the visitor sees.
+ */
+function save_early_access_request(array $data) {
+    $pdo = get_db_connection();
+    $stmt = $pdo->prepare(
+        'INSERT INTO early_access_requests (email, name, school, ip_address, user_agent)
+         VALUES (:email, :name, :school, :ip_address, :user_agent)
+         ON DUPLICATE KEY UPDATE
+            name       = COALESCE(NULLIF(VALUES(name), \'\'), name),
+            school     = COALESCE(NULLIF(VALUES(school), \'\'), school),
+            updated_at = CURRENT_TIMESTAMP'
+    );
+    $stmt->execute([
+        ':email'      => strtolower($data['email']),
+        ':name'       => $data['name'] !== '' ? $data['name'] : null,
+        ':school'     => $data['school'] !== '' ? $data['school'] : null,
+        ':ip_address' => $_SERVER['REMOTE_ADDR'] ?? null,
+        ':user_agent' => substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255),
+    ]);
+}
+
 // ---------------------------------------------------------------------------
 // School directory (public SEO pages: schools.php, schools-in.php).
 // "district" in the table is shown to visitors as "city" — see

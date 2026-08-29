@@ -20,6 +20,7 @@ use App\Domain\Auth\Controllers\AuthController;
 use App\Domain\Platform\Repositories\SchoolRepository;
 use App\Domain\Platform\Repositories\AuditLogRepository;
 use App\Domain\Platform\Repositories\PlansRepository;
+use App\Domain\Platform\Repositories\EarlyAccessRequestRepository;
 use App\Domain\Platform\Repositories\WebsiteLeadRepository;
 use App\Domain\Platform\Services\PlatformService;
 use App\Domain\Platform\Controllers\PlatformController;
@@ -189,6 +190,10 @@ class App
                 return new PlansRepository($c->get(Connection::class)->getPdo());
             },
 
+            EarlyAccessRequestRepository::class => function ($c) {
+                return new EarlyAccessRequestRepository($c->get(Connection::class)->getPdo());
+            },
+
             WebsiteLeadRepository::class => function ($c) {
                 return new WebsiteLeadRepository($c->get(Connection::class)->getPdo());
             },
@@ -200,6 +205,7 @@ class App
                     $c->get(AuthRepository::class),
                     $c->get(PlansRepository::class),
                     $c->get(WebsiteLeadRepository::class),
+                    $c->get(EarlyAccessRequestRepository::class),
                 );
             },
 

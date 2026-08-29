@@ -1,5 +1,44 @@
 <?php
+session_start();
 require_once __DIR__ . '/includes/config.php';
+
+// --- Early-access sign-up -------------------------------------------------
+// Play internal testing has no self-serve join: a person can only install
+// once their Google account is on the tester list, which is a manual step in
+// the Play Console. This form is the queue for that step.
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
+$eaErrors  = [];
+$eaSuccess = false;
+$eaValues  = ['email' => '', 'name' => '', 'school' => ''];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'early_access') {
+    $eaValues['email']  = trim($_POST['email'] ?? '');
+    $eaValues['name']   = trim($_POST['name'] ?? '');
+    $eaValues['school'] = trim($_POST['school'] ?? '');
+    $honeypot           = trim($_POST['website'] ?? ''); // hidden — real users never fill this in
+    $submittedToken     = $_POST['csrf_token'] ?? '';
+
+    if (!hash_equals($_SESSION['csrf_token'], $submittedToken)) {
+        $eaErrors['form'] = 'Your session expired — please try again.';
+    } elseif ($honeypot !== '') {
+        // Silently succeed without storing anything — don't tip off bots.
+        $eaSuccess = true;
+    } elseif ($eaValues['email'] === '' || !filter_var($eaValues['email'], FILTER_VALIDATE_EMAIL)) {
+        $eaErrors['email'] = 'Please enter a valid email address.';
+    } else {
+        try {
+            save_early_access_request($eaValues);
+            $eaSuccess = true;
+            unset($_SESSION['csrf_token']);
+        } catch (PDOException $e) {
+            error_log('early_access_requests insert failed: ' . $e->getMessage());
+            $eaErrors['form'] = 'Something went wrong saving your request — please try again, or email us at ' . CONTACT_EMAIL . '.';
+        }
+    }
+}
 
 $pageTitle       = 'Android App — Attendance, Fees & Report Cards on the Go';
 $pageDescription = 'The Shiksha Pilot Android app lets teachers mark attendance from the classroom and parents track fees, leave requests and report cards from their phone.';
@@ -39,9 +78,7 @@ require_once __DIR__ . '/includes/header.php';
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 3.5v17l12-8.5-12-8.5z" fill="#fff"/><path d="M4 3.5l12 8.5-4 2.9L4 3.5z" fill="#4fc3ff"/><path d="M4 20.5l8-5.6 4 2.9-12 2.7z" fill="#ff6b4a"/><path d="M12 12l4-2.9 3.4 2.9-3.4 2.9z" fill="#ffc531"/></svg>
           <span class="s-txt"><span class="s-small"><?php echo PLAY_APP_IS_TESTING ? 'Early access on' : 'Get it on'; ?></span><span class="s-big">Google Play</span></span>
         </a>
-        <span class="store-note"><?php echo PLAY_APP_IS_TESTING
-                ? 'internal testing &middot; invited testers only'
-                : 'free download &middot; Android 8 and up'; ?></span>
+        <?php if (!PLAY_APP_IS_TESTING): ?><span class="store-note">free download &middot; Android 8 and up</span><?php endif; ?>
       </div>
     </div>
     <div class="phone-wrap reveal">
@@ -106,6 +143,54 @@ require_once __DIR__ . '/includes/header.php';
       <h3 style="font-size:18px; margin-top:22px; margin-bottom:6px;"><?php echo htmlspecialchars($f['q'], ENT_QUOTES); ?></h3>
       <p><?php echo htmlspecialchars($f['a'], ENT_QUOTES); ?></p>
     <?php endforeach; ?>
+  </div>
+</section>
+
+<section id="early-access">
+  <div class="wrap content-block">
+    <span class="tag">early access</span>
+    <h2>Want to try the app now?</h2>
+    <p>The Android app is in <strong>invite-only testing</strong> while we finish it off. Leave your email and we'll add you to the tester list &mdash; you'll get a Play Store link once you're in.</p>
+
+    <?php if ($eaSuccess): ?>
+      <div class="form-card" role="status">
+        <h3 style="margin-top:0">You're on the list.</h3>
+        <p style="margin-bottom:0">We'll add you to the tester list and email you the Play Store link. It usually takes a day or two &mdash; there's a manual step on our side.</p>
+      </div>
+    <?php else: ?>
+      <form class="form-card" method="post" action="<?php echo PAGE_BASE; ?>/mobile-app#early-access" novalidate>
+        <input type="hidden" name="form" value="early_access">
+        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES); ?>">
+
+        <?php if (!empty($eaErrors['form'])): ?>
+          <p class="form-error" role="alert"><?php echo htmlspecialchars($eaErrors['form'], ENT_QUOTES); ?></p>
+        <?php endif; ?>
+
+        <div style="position:absolute; left:-9999px;" aria-hidden="true">
+          <label for="ea-website">Leave this field blank</label>
+          <input type="text" id="ea-website" name="website" tabindex="-1" autocomplete="off">
+        </div>
+
+        <div class="form-row">
+          <label for="ea-email">Google account email</label>
+          <input type="email" id="ea-email" name="email" value="<?php echo htmlspecialchars($eaValues['email'], ENT_QUOTES); ?>" required autocomplete="email" placeholder="you@gmail.com" aria-describedby="ea-email-hint ea-email-err">
+          <p id="ea-email-hint" style="font-size:.85rem; opacity:.75; margin:.4rem 0 0;">Play testing only works with a Google account &mdash; give us the one you use on your Android phone, or we won't be able to add you.</p>
+          <?php if (!empty($eaErrors['email'])): ?><p class="form-error" id="ea-email-err"><?php echo htmlspecialchars($eaErrors['email'], ENT_QUOTES); ?></p><?php endif; ?>
+        </div>
+
+        <div class="form-row">
+          <label for="ea-name">Your name <span style="font-weight:400;">(optional)</span></label>
+          <input type="text" id="ea-name" name="name" value="<?php echo htmlspecialchars($eaValues['name'], ENT_QUOTES); ?>" autocomplete="name">
+        </div>
+
+        <div class="form-row">
+          <label for="ea-school">Your school <span style="font-weight:400;">(optional)</span></label>
+          <input type="text" id="ea-school" name="school" value="<?php echo htmlspecialchars($eaValues['school'], ENT_QUOTES); ?>" autocomplete="organization">
+        </div>
+
+        <button class="btn btn-coral" type="submit">Request early access</button>
+      </form>
+    <?php endif; ?>
   </div>
 </section>
 
