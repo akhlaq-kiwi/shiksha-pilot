@@ -75,7 +75,14 @@ jobs:
           AAB=build/app/outputs/bundle/release/app-release.aab
           test -f "$AAB"
           SIGNER=$(keytool -printcert -jarfile "$AAB" | grep -m1 'Owner:' || true)
-          echo "Signed by: $SIGNER"
+          echo "Signed by: ${SIGNER:-<none>}"
+          # An empty result means keytool could not read the signature at all.
+          # Treated as a failure rather than a pass, so the guard cannot be
+          # defeated by the check itself breaking.
+          if [ -z "$SIGNER" ]; then
+            echo "::error::Could not read the bundle's signing certificate — refusing to publish an unverified artifact."
+            exit 1
+          fi
           if echo "$SIGNER" | grep -q 'CN=Android Debug'; then
             echo "::error::Bundle is signed with the debug key — check that key.properties was written."
             exit 1
