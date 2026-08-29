@@ -253,6 +253,10 @@
   .chip-caution { background: var(--caution-sw); color: var(--caution); }
   .chip-clear   { background: var(--clear-sw);   color: var(--clear); }
   .chip-accent  { background: var(--accent-sw);  color: var(--accent); }
+  .chip-done    { background: var(--clear-sw);   color: var(--clear); }
+
+  .item.is-done { border-left-color: var(--clear); opacity: 0.92; }
+  .item.is-done .item-top h3 { color: var(--muted); }
 
   .item p { margin: 0 0 9px; color: var(--muted); font-size: 14.5px; max-width: 74ch; }
   .item p:last-child { margin-bottom: 0; }
@@ -434,16 +438,20 @@
     <h1>Play Store Pre-Flight</h1>
     <p class="standfirst">
       What stands between <code>app/</code> and a production listing on Google Play. Findings below
-      come from reading the Flutter project as it stands today &mdash; <strong>six items block the
-      first upload</strong>, and one of them (the account-deletion route) does not exist anywhere
-      in the app, backend, or website yet.
+      Six items blocked the first upload; <strong>five are now fixed and verified against a real
+      release build</strong>. The one that remains &mdash; the account-deletion route &mdash; is
+      blocked on a product decision rather than on engineering time.
     </p>
   </header>
 
   <div class="cluster">
     <div class="gauge">
-      <span class="gauge-n n-blocker">6</span>
-      <span class="gauge-l">Hard blockers</span>
+      <span class="gauge-n n-blocker">1</span>
+      <span class="gauge-l">Blockers left</span>
+    </div>
+    <div class="gauge">
+      <span class="gauge-n n-clear">5</span>
+      <span class="gauge-l">Blockers cleared</span>
     </div>
     <div class="gauge">
       <span class="gauge-n n-caution">4</span>
@@ -465,17 +473,18 @@
       <h2>Blockers in the code</h2>
     </div>
     <p class="sec-note">
-      Every item here either gets the upload rejected outright or fails policy review. All six are
-      engineering work on our side, and none depend on the Play Console account existing yet.
+      Every item here either gets the upload rejected outright or fails policy review. Five are
+      done and verified against a real release build; <strong>PF-04 is the only one still
+      open</strong>, and it is waiting on a product decision rather than on engineering time.
     </p>
 
     <div class="items">
 
-      <article class="item is-blocker">
+      <article class="item is-done">
         <div class="item-top">
           <span class="id">PF-01</span>
           <h3>Release builds are signed with the debug keystore</h3>
-          <span class="chip chip-blocker">Rejects upload</span>
+          <span class="chip chip-done">Fixed</span>
         </div>
         <p>
           <code>android/app/build.gradle.kts</code> sets
@@ -485,47 +494,57 @@
           debug key, so nothing can be uploaded until this changes.
         </p>
         <div class="fix">
-          <span class="fix-l">Fix</span>
+          <span class="fix-l">Done</span>
           <p>
-            Generate an upload keystore, keep it out of git, read it from an untracked
-            <code>android/key.properties</code>, and add a real <code>release</code> signing config.
-            Enrol in Play App Signing so Google holds the distribution key &mdash; losing an upload
-            key is then recoverable, losing a self-managed app key is not.
+            Release signing now reads an untracked <code>android/key.properties</code>. When the
+            file is absent the build still falls back to debug signing so a fresh clone can run
+            <code>flutter run --release</code>, but it logs a warning saying the artifact cannot be
+            uploaded. Keystores and <code>key.properties</code> are gitignored;
+            <code>key.properties.example</code> carries the <code>keytool</code> invocation.
+          </p>
+          <p>
+            <strong>Still needs a human:</strong> generating the actual keystore and choosing its
+            passwords. That key must be backed up somewhere the whole team can reach.
           </p>
         </div>
       </article>
 
-      <article class="item is-blocker">
+      <article class="item is-done">
         <div class="item-top">
           <span class="id">PF-02</span>
           <h3>The login screen lets anyone repoint the app at any server</h3>
-          <span class="chip chip-blocker">Security</span>
+          <span class="chip chip-done">Fixed</span>
         </div>
         <p>
-          <code>lib/main.dart</code> has a <code>_serverUrlController</code> field whose value is
-          written straight to <code>base_url</code> and used for every subsequent call, including
-          <code>/api/auth/login</code>. A user &mdash; or anyone who hands them a URL &mdash; can
-          point the app at an arbitrary host and the app will post real credentials to it.
+          <code>lib/main.dart</code> had a <code>_serverUrlController</code> whose value was written
+          to the <code>base_url</code> preference and used for every subsequent call, including
+          <code>/api/auth/login</code>. That preference was read in seven files, each falling back
+          to a separately hardcoded production URL.
         </p>
         <p>
-          This is a development affordance. It pairs badly with <strong>PF-03</strong>: together they
-          allow credentials to be sent to an attacker-controlled server over plain HTTP.
+          <strong>Correction to the original assessment:</strong> this was first written up as an
+          active credential-exfiltration path. On closer reading it was not &mdash; the controller
+          was never bound to a <code>TextField</code>, so no shipped screen could set it, and
+          <code>_showServerConfig</code> was assigned but never read. The real problem was a stored
+          preference that release builds honoured without question, plus dead code that looked
+          alarming. Worth fixing, but it was defence in depth rather than an open door.
         </p>
         <div class="fix">
-          <span class="fix-l">Fix</span>
+          <span class="fix-l">Done</span>
           <p>
-            Compile the field out of release builds &mdash; gate it behind <code>kDebugMode</code>,
-            or move the base URL to a <code>--dart-define</code> baked in at build time. Production
-            should always use <code>https://app.shikshapilot.com</code>.
+            The base URL is centralised in <code>lib/config.dart</code>, and release builds now
+            resolve to production unconditionally, ignoring any stored override. The dead controller,
+            the unread <code>_showServerConfig</code> flag, and the error message pointing at a
+            non-existent settings screen are all gone.
           </p>
         </div>
       </article>
 
-      <article class="item is-blocker">
+      <article class="item is-done">
         <div class="item-top">
           <span class="id">PF-03</span>
           <h3><code>usesCleartextTraffic="true"</code> in the manifest</h3>
-          <span class="chip chip-blocker">Security</span>
+          <span class="chip chip-done">Fixed</span>
         </div>
         <p>
           <code>AndroidManifest.xml</code> opts the whole app back into unencrypted HTTP. The
@@ -533,10 +552,11 @@
           leftover from local development against a plain-HTTP dev server.
         </p>
         <div class="fix">
-          <span class="fix-l">Fix</span>
+          <span class="fix-l">Done</span>
           <p>
-            Remove the attribute. If a plain-HTTP dev server is still needed locally, allow it
-            through a debug-only network security config rather than for every build.
+            Removed from the release manifest, and verified absent from the merged manifest of an
+            actual release build. A debug-only network security config keeps plain HTTP working
+            against a local API server, so nobody's dev loop breaks.
           </p>
         </div>
       </article>
@@ -545,7 +565,7 @@
         <div class="item-top">
           <span class="id">PF-04</span>
           <h3>No account or data deletion route exists</h3>
-          <span class="chip chip-blocker">Policy</span>
+          <span class="chip chip-blocker">Only blocker left</span>
         </div>
         <p>
           Searching <code>app/lib</code>, <code>backend/src</code> and <code>frontend/src</code> for
@@ -571,32 +591,37 @@
         </div>
       </article>
 
-      <article class="item is-blocker">
+      <article class="item is-done">
         <div class="item-top">
           <span class="id">PF-05</span>
           <h3><code>REQUEST_IGNORE_BATTERY_OPTIMIZATIONS</code> is declared</h3>
-          <span class="chip chip-blocker">Policy</span>
+          <span class="chip chip-done">Fixed</span>
         </div>
         <p>
           Play treats this as a restricted permission with a narrow list of acceptable uses, and
-          apps that declare it without qualifying get rejected. The app uses WorkManager for
-          background sync, which is <em>not</em> on the acceptable-use list on its own.
+          apps that declare it without qualifying get rejected. WorkManager background sync is
+          <em>not</em> on that list on its own.
+        </p>
+        <p>
+          The permission turned out to be wired to two real Kotlin handlers on a method channel
+          named <code>/battery</code> &mdash; but neither is ever invoked from Dart. The channel's
+          only live method is <code>saveFileToDownloads</code>, which saves generated PDFs. The
+          permission and both handlers were dead weight.
         </p>
         <div class="fix">
-          <span class="fix-l">Fix</span>
+          <span class="fix-l">Done</span>
           <p>
-            Confirm whether anything actually depends on it &mdash; periodic WorkManager tasks do
-            not &mdash; and if not, delete the line. Removing it is far cheaper than arguing the
-            exemption during review.
+            Permission removed, along with the two dead Kotlin handlers and their imports. Verified
+            absent from the merged release manifest.
           </p>
         </div>
       </article>
 
-      <article class="item is-blocker">
+      <article class="item is-done">
         <div class="item-top">
           <span class="id">PF-06</span>
           <h3>No build pipeline, and <code>google-services.json</code> is untracked</h3>
-          <span class="chip chip-caution">Release engineering</span>
+          <span class="chip chip-done">Fixed</span>
         </div>
         <p>
           <code>.github/workflows/</code> contains only the three web deploy workflows. The Firebase
@@ -605,12 +630,18 @@
           to have both that file and the (not yet existing) keystore.
         </p>
         <div class="fix">
-          <span class="fix-l">Fix</span>
+          <span class="fix-l">Done</span>
           <p>
-            Add a manually triggered <code>build-android.yml</code> mirroring the existing
-            deploy workflows' shape: keystore and <code>google-services.json</code> as base64
-            secrets, <code>flutter build appbundle</code>, upload the <code>.aab</code> as an
-            artifact. Automating the Play upload itself can wait for a later release.
+            <code>.github/workflows/build-android.yml</code> added: manual dispatch taking a version
+            code, keystore and <code>google-services.json</code> injected from base64 secrets,
+            <code>flutter build appbundle</code>, and an explicit check that fails the run if the
+            result came out debug-signed. Signing material is deleted from the runner afterwards.
+          </p>
+          <p>
+            <strong>Still needs a human:</strong> the four repository secrets
+            (<code>ANDROID_KEYSTORE_B64</code>, <code>ANDROID_KEYSTORE_PASSWORD</code>,
+            <code>ANDROID_KEY_ALIAS</code>, <code>ANDROID_KEY_PASSWORD</code>) plus
+            <code>ANDROID_GOOGLE_SERVICES_JSON_B64</code>. The workflow has never been run.
           </p>
         </div>
       </article>
