@@ -36,6 +36,14 @@ define('PAGE_BASE', $currentHost);
 
 define('CONTACT_EMAIL', 'hello@shikshapilot.com');
 
+// Play Store opt-in link for the Android app. This is currently an *internal
+// testing* track: it only opens for Google accounts on the tester list, and
+// everyone else sees "not available". Swap this for the public listing URL
+// once the app is live, and the copy around the buttons can lose the
+// early-access wording at the same time.
+define('PLAY_APP_URL', 'https://play.google.com/apps/internaltest/4701142568490055991');
+define('PLAY_APP_IS_TESTING', true);
+
 /**
  * Database credentials. Local/Docker gets DB_HOST etc. directly from
  * docker-compose environment variables. Production has no equivalent

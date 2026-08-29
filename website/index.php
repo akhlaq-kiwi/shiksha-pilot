@@ -183,11 +183,13 @@ require_once __DIR__ . '/includes/header.php';
         <li><span class="a-dot">&#10003;</span> Download report cards and salary slips as PDFs</li>
       </ul>
       <div class="store-row">
-        <a class="store-btn" href="<?php echo PAGE_BASE; ?>/mobile-app">
+        <a class="store-btn" href="<?php echo PLAY_APP_URL; ?>" rel="nofollow noopener" target="_blank">
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 3.5v17l12-8.5-12-8.5z" fill="#fff"/><path d="M4 3.5l12 8.5-4 2.9L4 3.5z" fill="#4fc3ff"/><path d="M4 20.5l8-5.6 4 2.9-12 2.7z" fill="#ff6b4a"/><path d="M12 12l4-2.9 3.4 2.9-3.4 2.9z" fill="#ffc531"/></svg>
-          <span class="s-txt"><span class="s-small">Get it on</span><span class="s-big">Google Play</span></span>
+          <span class="s-txt"><span class="s-small"><?php echo PLAY_APP_IS_TESTING ? 'Early access on' : 'Get it on'; ?></span><span class="s-big">Google Play</span></span>
         </a>
-        <span class="store-note">free download &middot; works on Android 8 and up</span>
+        <span class="store-note"><?php echo PLAY_APP_IS_TESTING
+                ? 'internal testing &middot; invited testers only'
+                : 'free download &middot; works on Android 8 and up'; ?></span>
       </div>
     </div>
     <div class="phone-wrap reveal">
