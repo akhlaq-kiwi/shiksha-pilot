@@ -1509,7 +1509,7 @@ class SchoolAdminService extends BaseService
             $data['parent_phone'] ?? null
         ]);
 
-        $this->checkTeacherStudentPhoneConflict($pdo, $schoolId, [$parentPhone, $fatherPhone, $data['student_mobile'] ?? null], null, null);
+        $this->checkTeacherStudentPhoneConflict($pdo, $schoolId, [$parentPhone, $fatherPhone, $data['student_mobile'] ?? null], null, 0);
 
         if (strcasecmp($status, 'ACTIVE') === 0 || strcasecmp($status, 'Active') === 0) {
             $this->checkActiveStudentPhoneConflictInOtherSchools($pdo, $schoolId, [$parentPhone, $fatherPhone, $data['student_mobile'] ?? null]);
@@ -2655,7 +2655,7 @@ class SchoolAdminService extends BaseService
         // 3. Status Mapping
         $status = !empty($data['exit_date']) ? 'Inactive' : ($data['status'] ?? 'ACTIVE');
 
-        $this->checkTeacherStudentPhoneConflict($pdo, $schoolId, $data['phone'], null, null);
+        $this->checkTeacherStudentPhoneConflict($pdo, $schoolId, $data['phone'], 0, null);
 
         if (strcasecmp($status, 'ACTIVE') === 0) {
             $this->checkActiveStaffPhoneConflictInOtherSchools($pdo, $schoolId, $data['phone']);
@@ -3325,7 +3325,7 @@ class SchoolAdminService extends BaseService
 
         foreach ($validPhones as $phone) {
             // Check if phone matches any ACTIVE Student in the same school (when checking staff addition/update)
-            if ($excludeStaffId !== null || $excludeStudentId === null) {
+            if ($excludeStaffId !== null) {
                 $stmtStudent = $pdo->prepare("
                     SELECT id, TRIM(CONCAT(first_name, ' ', COALESCE(last_name, ''))) AS student_name 
                     FROM students 
@@ -3369,7 +3369,7 @@ class SchoolAdminService extends BaseService
             }
 
             // Check if phone matches any ACTIVE Teacher/Staff in the same school (when checking student addition/update)
-            if ($excludeStudentId !== null || $excludeStaffId === null) {
+            if ($excludeStudentId !== null) {
                 $stmtStaff = $pdo->prepare("
                     SELECT id, name, role 
                     FROM staff 
