@@ -1989,4 +1989,30 @@ class StudentService extends BaseService
 
         return ['status' => 'success', 'success' => true];
     }
+
+    private function formatShortClassName(string $className): string
+    {
+        $trimmed = trim($className);
+
+        if (preg_match('/\(([^)]+)\)/', $trimmed, $matches)) {
+            return trim($matches[1]);
+        }
+
+        $lower = strtolower($trimmed);
+        if (strpos($lower, 'lower kindergarten') !== false) {
+            return 'LKG';
+        }
+        if (strpos($lower, 'upper kindergarten') !== false) {
+            return 'UKG';
+        }
+        if (strpos($lower, 'playgroup') !== false || strpos($lower, 'play group') !== false) {
+            return 'PG';
+        }
+        if (strpos($lower, 'pre nursery') !== false || strpos($lower, 'pre-nursery') !== false) {
+            return 'Pre-Nur';
+        }
+
+        return $trimmed;
+    }
 }
+
