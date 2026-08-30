@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../services/leave_service.dart';
@@ -42,12 +43,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _selectedAcademicYearName = '';
 
   DeletionRequest? _deletionRequest;
+  String _appVersion = '';
 
   @override
   void initState() {
     super.initState();
     _loadSettingsData();
     _loadDeletionRequest();
+    _loadAppVersion();
+  }
+
+  /// Read the version out of the build rather than hardcoding it — a literal
+  /// here is wrong the moment a new build ships, and it is the sort of thing
+  /// users quote back in bug reports.
+  Future<void> _loadAppVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (mounted) {
+        setState(() => _appVersion = '${info.version} (${info.buildNumber})');
+      }
+    } catch (_) {
+      // Leave it blank rather than showing something untrue.
+    }
   }
 
   AccountService get _accountService => AccountService(
@@ -436,12 +453,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text('Shiksha Pilot School Hub', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              SizedBox(height: 4),
-              Text('Version: 1.0.0 (Production-Build)', style: TextStyle(color: Colors.grey, fontSize: 12)),
-              SizedBox(height: 12),
-              Text('A unified school portals platform designed for parents, teachers, and administrators.'),
+            children: [
+              const Text('Shiksha Pilot', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 4),
+              Text(
+                _appVersion.isEmpty ? 'Version unavailable' : 'Version $_appVersion',
+                style: const TextStyle(color: Colors.grey, fontSize: 12),
+              ),
+              const SizedBox(height: 12),
+              const Text('Attendance, fees, results, timetables and notices for teachers, parents and school staff.'),
             ],
           ),
         ),

@@ -491,7 +491,7 @@ class NotificationHelper {
 
   static Future<void> showNotification(dynamic notif, {int? badgeCount}) async {
     final prefs = await SharedPreferences.getInstance();
-    final schoolName = prefs.getString('school_name') ?? 'Shiksha Pilot School Hub';
+    final schoolName = prefs.getString('school_name') ?? 'Shiksha Pilot';
 
     final rawTitle = (notif['title'] ?? '').toString().trim();
     final title = rawTitle.isNotEmpty ? rawTitle : schoolName;

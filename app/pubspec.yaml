@@ -1,5 +1,5 @@
 name: school_hub
-description: "A new Flutter project."
+description: "Shiksha Pilot for Android — attendance, fees, results, timetables and notices for teachers, parents and school staff."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: "none" # Remove this line if you wish to publish to pub.dev
@@ -49,6 +49,9 @@ dependencies:
   printing: ^5.15.0
   path_provider: ^2.1.6
   cached_network_image: ^3.4.1
+  # Reads the real versionName/versionCode out of the build, so the About
+  # dialog cannot drift from what was actually shipped.
+  package_info_plus: ^8.1.1
 
 dev_dependencies:
   flutter_test:
