@@ -59,15 +59,26 @@ export function DropdownMenu({ trigger, children, align = 'right' }) {
 
   return (
     <div className="relative inline-block text-left font-sans" ref={containerRef}>
-      <button
-        type="button"
-        onClick={toggle}
-        aria-haspopup="menu"
-        aria-expanded={isOpen}
-        className="flex items-center justify-center rounded-lg p-1.5 text-text-muted transition-colors hover:bg-secondary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-      >
-        {trigger || <MoreVertical className="h-4 w-4" />}
-      </button>
+      {React.isValidElement(trigger) && trigger.type === 'button' ? (
+        React.cloneElement(trigger, {
+          onClick: (e) => {
+            if (trigger.props.onClick) trigger.props.onClick(e);
+            toggle(e);
+          },
+          'aria-haspopup': 'menu',
+          'aria-expanded': isOpen
+        })
+      ) : (
+        <button
+          type="button"
+          onClick={toggle}
+          aria-haspopup="menu"
+          aria-expanded={isOpen}
+          className="flex items-center justify-center rounded-lg p-1.5 text-text-muted transition-colors hover:bg-secondary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+        >
+          {trigger || <MoreVertical className="h-4 w-4" />}
+        </button>
+      )}
 
       {isOpen && createPortal(
         <div
