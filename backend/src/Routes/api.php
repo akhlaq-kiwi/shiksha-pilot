@@ -141,6 +141,15 @@ return function (App $app) {
     $app->get('/api/school/attendance', [SchoolAdminController::class, 'getAttendance']);
     $app->post('/api/school/attendance', [SchoolAdminController::class, 'markAttendance']);
     $app->get('/api/school/attendance/leaderboard', [SchoolAdminController::class, 'getAttendanceLeaderboard']);
+
+    // Teacher Attendance Admin Routes
+    $app->get('/api/school/teacher-attendance', [SchoolAdminController::class, 'getTeacherAttendance']);
+    $app->post('/api/school/teacher-attendance', [SchoolAdminController::class, 'markTeacherAttendance']);
+    $app->get('/api/school/teacher-attendance/report', [SchoolAdminController::class, 'getTeacherAttendanceReport']);
+    $app->get('/api/school/teacher-attendance/settings', [SchoolAdminController::class, 'getTeacherAttendanceSettings']);
+    $app->post('/api/school/teacher-attendance/settings', [SchoolAdminController::class, 'saveTeacherAttendanceSettings']);
+    $app->get('/api/school/teacher-attendance/qr-token', [SchoolAdminController::class, 'getTeacherAttendanceQrToken']);
+    $app->post('/api/school/teacher-attendance/qr-token/refresh', [SchoolAdminController::class, 'refreshTeacherAttendanceQrToken']);
     $app->get('/api/school/holidays', [SchoolAdminController::class, 'getHolidays']);
     $app->post('/api/school/holidays', [SchoolAdminController::class, 'createHoliday']);
     $app->put('/api/school/holidays/{id}', [SchoolAdminController::class, 'updateHoliday']);
@@ -287,6 +296,8 @@ return function (App $app) {
     $app->get('/api/teacher/outstanding', [TeacherController::class, 'getOutstanding']);
     $app->post('/api/teacher/attendance', [TeacherController::class, 'markAttendance']);
     $app->get('/api/teacher/attendance', [TeacherController::class, 'getAttendanceHistory']);
+    $app->post('/api/teacher/attendance/scan-qr', [TeacherController::class, 'scanTeacherAttendanceQr']);
+    $app->get('/api/teacher/attendance/my-history', [TeacherController::class, 'getMyTeacherAttendanceHistory']);
     $app->get('/api/teacher/assignments', [TeacherController::class, 'getAssignments']);
     $app->post('/api/teacher/assignments', [TeacherController::class, 'createAssignment']);
     $app->get('/api/teacher/materials', [TeacherController::class, 'getMaterials']);

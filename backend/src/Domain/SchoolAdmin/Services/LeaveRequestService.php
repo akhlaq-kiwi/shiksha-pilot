@@ -251,6 +251,51 @@ class LeaveRequestService extends BaseService
             if ($newStatus === 'APPROVED') {
                 $updateData['approved_by'] = (int)$user['id'];
                 $updateData['approved_at'] = date('Y-m-d H:i:s');
+
+                // Automatically update attendance status to 'Leave' for approved leave dates
+                $from = new \DateTime($leave['from_date']);
+                $to = new \DateTime($leave['to_date']);
+                $toForPeriod = (clone $to)->modify('+1 day');
+                $interval = new \DateInterval('P1D');
+                $period = new \DatePeriod($from, $interval, $toForPeriod);
+
+                if (($leave['applicant_role'] ?? '') === 'TEACHER' && !empty($leave['teacher_id'])) {
+                    $stmtAttUpsert = $pdo->prepare("
+                        INSERT INTO teacher_attendance (school_id, academic_year_id, staff_id, date, status, reach_time)
+                        VALUES (:sid, :ayid, :staff_id, :date, 'Leave', NULL)
+                        ON DUPLICATE KEY UPDATE status = 'Leave', updated_at = NOW()
+                    ");
+                    foreach ($period as $dt) {
+                        $dateStr = $dt->format('Y-m-d');
+                        $stmtAttUpsert->execute([
+                            ':sid' => $schoolId,
+                            ':ayid' => (int)$leave['academic_year_id'],
+                            ':staff_id' => (int)$leave['teacher_id'],
+                            ':date' => $dateStr
+                        ]);
+                    }
+                } elseif (($leave['applicant_role'] ?? '') === 'STUDENT' && !empty($leave['student_id'])) {
+                    $studentId = (int)$leave['student_id'];
+                    $stmtClass = $pdo->prepare("SELECT class_id FROM students WHERE id = :st_id LIMIT 1");
+                    $stmtClass->execute([':st_id' => $studentId]);
+                    $classId = (int)($stmtClass->fetchColumn() ?: 0);
+
+                    $stmtStAttUpsert = $pdo->prepare("
+                        INSERT INTO attendance (school_id, academic_year_id, class_id, student_id, date, status, created_at, updated_at)
+                        VALUES (:sid, :ayid, :cid, :student_id, :date, 'LEAVE', NOW(), NOW())
+                        ON DUPLICATE KEY UPDATE status = 'LEAVE', updated_at = NOW()
+                    ");
+                    foreach ($period as $dt) {
+                        $dateStr = $dt->format('Y-m-d');
+                        $stmtStAttUpsert->execute([
+                            ':sid' => $schoolId,
+                            ':ayid' => (int)$leave['academic_year_id'],
+                            ':cid' => $classId,
+                            ':student_id' => $studentId,
+                            ':date' => $dateStr
+                        ]);
+                    }
+                }
             } else {
                 $updateData['rejected_by'] = (int)$user['id'];
                 $updateData['rejected_at'] = date('Y-m-d H:i:s');

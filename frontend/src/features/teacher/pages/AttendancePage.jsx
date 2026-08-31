@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
-  CheckCircle2, X, Send, Search, Loader2, AlertTriangle, Clock, FileCheck, Info,
+  CheckCircle2, X, Send, Search, Loader2, AlertTriangle, Clock, FileCheck, Info, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Input } from '../../../common/ui/input';
@@ -48,6 +48,24 @@ export default function AttendancePage({ classes, allStudents }) {
 
   const [query, setQuery] = useState('');
   const [absentOnly, setAbsentOnly] = useState(false);
+
+  const handleShiftDate = (days) => {
+    if (!date) return;
+    const parts = date.split('-');
+    if (parts.length !== 3) return;
+    const dt = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    dt.setDate(dt.getDate() + days);
+
+    const year = dt.getFullYear();
+    const month = String(dt.getMonth() + 1).padStart(2, '0');
+    const day = String(dt.getDate()).padStart(2, '0');
+    const newDateStr = `${year}-${month}-${day}`;
+
+    const maxDate = today();
+    if (days > 0 && maxDate && newDateStr > maxDate) return;
+
+    setDate(newDateStr);
+  };
 
   const students = allStudents[selectedClass] || [];
   const isFuture = date > today();
@@ -184,16 +202,39 @@ export default function AttendancePage({ classes, allStudents }) {
                     ))}
                   </FormSelect>
                 </div>
-                <div className="flex-1 min-w-[160px]">
+                <div className="flex-1 min-w-[200px]">
                   <Label htmlFor="att-date">Date</Label>
-                  <Input
-                    id="att-date"
-                    type="date"
-                    value={date}
-                    max={today()}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="h-9"
-                  />
+                  <div className="flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleShiftDate(-1)}
+                      className="h-9 w-9 shrink-0 bg-background border-border hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                      title="Previous Day"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Input
+                      id="att-date"
+                      type="date"
+                      value={date}
+                      max={today()}
+                      onChange={(e) => setDate(e.target.value)}
+                      className="h-9 bg-background"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleShiftDate(1)}
+                      disabled={date >= today()}
+                      className="h-9 w-9 shrink-0 bg-background border-border hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40"
+                      title="Next Day"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
                 <div className="flex items-center gap-3 text-sm flex-wrap">
                   {STATUS_ORDER.map((k) => (

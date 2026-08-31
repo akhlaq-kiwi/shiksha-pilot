@@ -38,6 +38,7 @@ use App\Domain\SchoolAdmin\Repositories\LeaveRequestRepository;
 use App\Domain\SchoolAdmin\Services\LeaveRequestService;
 use App\Domain\SchoolAdmin\Controllers\LeaveRequestController;
 use App\Domain\SchoolAdmin\Services\SchoolAdminService;
+use App\Domain\SchoolAdmin\Services\TeacherAttendanceService;
 use App\Domain\SchoolAdmin\Controllers\SchoolAdminController;
 
 // ── Domain: Teacher ───────────────────────────────────────────────────────────
@@ -265,10 +266,15 @@ class App
                 );
             },
 
+            TeacherAttendanceService::class => function ($c) {
+                return new TeacherAttendanceService($c->get(Connection::class)->getPdo());
+            },
+
             SchoolAdminController::class => function ($c) {
                 return new SchoolAdminController(
                     $c->get(TokenService::class),
                     $c->get(SchoolAdminService::class),
+                    $c->get(TeacherAttendanceService::class),
                 );
             },
 
@@ -319,6 +325,7 @@ class App
                 return new TeacherController(
                     $c->get(TokenService::class),
                     $c->get(TeacherService::class),
+                    $c->get(TeacherAttendanceService::class),
                 );
             },
 

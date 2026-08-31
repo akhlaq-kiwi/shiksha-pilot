@@ -19,13 +19,17 @@ bool get kServerOverrideAllowed => kDebugMode;
 /// Release builds ignore any stored override and always return production, so a
 /// value written by an older build cannot outlive the debug session it came
 /// from.
+const String kLocalBaseUrl = 'http://10.73.20.71:8000';
+
 String resolveBaseUrlFrom(SharedPreferences prefs) {
   if (!kServerOverrideAllowed) {
     return kProductionBaseUrl;
   }
   final saved = prefs.getString(kBaseUrlPrefKey);
-
-  return (saved != null && saved.isNotEmpty) ? saved : kProductionBaseUrl;
+  if (saved != null && saved.isNotEmpty && saved != kProductionBaseUrl) {
+    return saved;
+  }
+  return kLocalBaseUrl;
 }
 
 /// Base URL for API calls, loading preferences as needed.

@@ -28,7 +28,8 @@ export default function LeaveRequestsPage() {
   const [holidays, setHolidays] = useState([]);
   const [loadingHolidays, setLoadingHolidays] = useState(false);
   const [newLeaveTitle, setNewLeaveTitle] = useState('');
-  const [newLeaveDate, setNewLeaveDate] = useState('');
+  const [newLeaveStartDate, setNewLeaveStartDate] = useState('');
+  const [newLeaveEndDate, setNewLeaveEndDate] = useState('');
   const [holidayFormError, setHolidayFormError] = useState('');
   const [savingHoliday, setSavingHoliday] = useState(false);
 
@@ -162,17 +163,24 @@ export default function LeaveRequestsPage() {
     e.preventDefault();
     setHolidayFormError('');
     if (!newLeaveTitle.trim()) {
-      setHolidayFormError('Holiday title is required.');
+      setHolidayFormError('Leave title is required.');
       return;
     }
-    if (!newLeaveDate) {
-      setHolidayFormError('Holiday date is required.');
+    if (!newLeaveStartDate) {
+      setHolidayFormError('Start date is required.');
+      return;
+    }
+
+    const endDate = newLeaveEndDate || newLeaveStartDate;
+
+    if (endDate < newLeaveStartDate) {
+      setHolidayFormError('End date cannot be before start date.');
       return;
     }
 
     if (currentYear) {
-      if (newLeaveDate < currentYear.start_date || newLeaveDate > currentYear.end_date) {
-        setHolidayFormError(`Holiday date must be within the active Academic Year (${currentYear.start_date} to ${currentYear.end_date}).`);
+      if (newLeaveStartDate < currentYear.start_date || endDate > currentYear.end_date) {
+        setHolidayFormError(`Leave dates must be within the active Academic Year (${currentYear.start_date} to ${currentYear.end_date}).`);
         return;
       }
     }
@@ -181,11 +189,14 @@ export default function LeaveRequestsPage() {
     try {
       await schoolService.createHoliday({
         name: newLeaveTitle.trim(),
-        date: newLeaveDate
+        start_date: newLeaveStartDate,
+        end_date: endDate,
+        date: newLeaveStartDate
       });
-      toast.success('Holiday created successfully.', 'Success');
+      toast.success('Official holiday(s) created successfully.', 'Success');
       setNewLeaveTitle('');
-      setNewLeaveDate('');
+      setNewLeaveStartDate('');
+      setNewLeaveEndDate('');
       loadHolidays();
     } catch (err) {
       console.error(err);
@@ -406,35 +417,49 @@ export default function LeaveRequestsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-4">
-              <form onSubmit={handleCreateHoliday} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                <div className="space-y-1.5">
+              <form onSubmit={handleCreateHoliday} className="grid grid-cols-1 md:grid-cols-7 gap-4 items-end">
+                <div className="md:col-span-3 space-y-1.5">
                   <label htmlFor="leave-title" className="text-xs font-bold text-text-secondary uppercase">Leave Title</label>
                   <Input id="leave-title"
                     type="text"
-                    placeholder="e.g. Republic Day"
+                    placeholder="e.g. Diwali Holidays"
                     value={newLeaveTitle}
                     onChange={e => setNewLeaveTitle(e.target.value)}
                     className="h-9"
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-text-secondary uppercase">Leave Date</label>
+                <div className="md:col-span-2 space-y-1.5">
+                  <label className="text-xs font-bold text-text-secondary uppercase">Start Date</label>
                   <Input
                     type="date"
-                    value={newLeaveDate}
-                    onChange={e => setNewLeaveDate(e.target.value)}
+                    value={newLeaveStartDate}
+                    onChange={e => {
+                      setNewLeaveStartDate(e.target.value);
+                      if (!newLeaveEndDate) setNewLeaveEndDate(e.target.value);
+                    }}
                     min={currentYear?.start_date || ''}
                     max={currentYear?.end_date || ''}
                     className="h-9"
                   />
                 </div>
-                <div>
-                  <Button type="submit" className="w-full h-9 font-semibold" disabled={savingHoliday}>
+                <div className="md:col-span-2 space-y-1.5">
+                  <label className="text-xs font-bold text-text-secondary uppercase">End Date (Optional)</label>
+                  <Input
+                    type="date"
+                    value={newLeaveEndDate}
+                    onChange={e => setNewLeaveEndDate(e.target.value)}
+                    min={newLeaveStartDate || currentYear?.start_date || ''}
+                    max={currentYear?.end_date || ''}
+                    className="h-9"
+                  />
+                </div>
+                <div className="md:col-span-7 flex justify-end pt-1">
+                  <Button type="submit" className="h-9 px-8 font-semibold" disabled={savingHoliday}>
                     {savingHoliday ? 'Saving...' : 'Save'}
                   </Button>
                 </div>
                 {holidayFormError && (
-                  <div className="col-span-1 md:col-span-3">
+                  <div className="md:col-span-7">
                     <p className="text-xs font-bold text-red-500 flex items-center gap-1">
                       <AlertCircle className="h-3 w-3" /> {holidayFormError}
                     </p>

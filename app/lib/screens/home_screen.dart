@@ -30,6 +30,8 @@ import 'package:school_hub/screens/outstanding_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:school_hub/screens/user_profile_screen.dart';
 import 'package:school_hub/widgets/change_password_dialog.dart';
+import 'package:school_hub/screens/teacher_qr_scanner_screen.dart';
+import 'package:school_hub/screens/teacher_attendance_history_screen.dart';
 
 class LauncherFeature {
   final String name;
@@ -103,6 +105,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       icon: Icons.payments_rounded,
       color: Colors.green,
       allowedRoles: ['PARENT', 'SCHOOL_ADMIN', 'PRINCIPAL', 'STUDENT'],
+      isAvailable: true,
+    ),
+    LauncherFeature(
+      name: 'Mark Attendance',
+      icon: Icons.qr_code_scanner_rounded,
+      color: Colors.indigo,
+      allowedRoles: ['TEACHER'],
       isAvailable: true,
     ),
     LauncherFeature(
@@ -750,6 +759,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
         ).then((_) => _fetchUnreadNotificationsCount());
+      } else if (feature.name == 'Mark Attendance' || feature.name == 'Teacher Attendance') {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => TeacherAttendanceHistoryScreen(
+              baseUrl: widget.leaveService.baseUrl,
+              token: widget.leaveService.token,
+            ),
+          ),
+        );
       } else if (feature.name == 'Salary' || feature.name == 'Staff Salary' || feature.name == 'Salaries') {
         final prefs = await SharedPreferences.getInstance();
         final token = prefs.getString('auth_token') ?? widget.leaveService.token;

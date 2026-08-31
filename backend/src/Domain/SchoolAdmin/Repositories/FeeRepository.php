@@ -63,7 +63,7 @@ class FeeRepository extends BaseRepository
                 SELECT COALESCE(SUM(fp.amount_paid), 0) 
                 FROM fee_payments fp
                 JOIN students s ON fp.student_id = s.id
-                WHERE fp.school_id = :sid AND fp.status = 'PAID'
+                WHERE fp.school_id = :sid AND fp.status IN ('PAID', 'Partial')
                   AND (
                     s.academic_year_id = :ayid
                     OR (
@@ -80,11 +80,11 @@ class FeeRepository extends BaseRepository
             $monthlyCollected = (float)$stmt->fetchColumn();
 
             $stmtAdd = $this->pdo->prepare("
-                SELECT COALESCE(SUM(afp.amount), 0) 
+                SELECT COALESCE(SUM(afp.amount_paid), 0) 
                 FROM additional_fee_payments afp
                 JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
                 JOIN students s ON afp.student_id = s.id
-                WHERE afp.school_id = :sid AND LOWER(afp.status) = 'paid'
+                WHERE afp.school_id = :sid AND LOWER(afp.status) IN ('paid', 'partial')
                   AND (
                     aft.academic_year_id = :ayid
                     OR (
@@ -103,15 +103,15 @@ class FeeRepository extends BaseRepository
             $stmt = $this->pdo->prepare("
                 SELECT COALESCE(SUM(amount_paid), 0) 
                 FROM fee_payments 
-                WHERE school_id = :sid AND status = 'PAID'
+                WHERE school_id = :sid AND status IN ('PAID', 'Partial')
             ");
             $stmt->execute([':sid' => $schoolId]);
             $monthlyCollected = (float)$stmt->fetchColumn();
 
             $stmtAdd = $this->pdo->prepare("
-                SELECT COALESCE(SUM(amount), 0) 
+                SELECT COALESCE(SUM(amount_paid), 0) 
                 FROM additional_fee_payments 
-                WHERE school_id = :sid AND status = 'Paid'
+                WHERE school_id = :sid AND LOWER(status) IN ('paid', 'partial')
             ");
             $stmtAdd->execute([':sid' => $schoolId]);
             $additionalCollected = (float)$stmtAdd->fetchColumn();

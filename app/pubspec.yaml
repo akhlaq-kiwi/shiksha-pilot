@@ -38,6 +38,7 @@ dependencies:
   path: ^1.9.1
   http: ^1.6.0
   shared_preferences: ^2.5.5
+  mobile_scanner: ^5.2.3
   flutter_local_notifications: ^22.0.1
   # Explicit rather than relying on flutter_local_notifications' transitive
   # copy — zonedSchedule needs tz.local set, so we import it directly.

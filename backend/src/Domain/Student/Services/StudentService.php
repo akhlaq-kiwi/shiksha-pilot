@@ -916,9 +916,14 @@ class StudentService extends BaseService
             $stmtPay->execute([':sid' => $schoolId, ':stid' => $studentId]);
         }
         $payments = $stmtPay->fetchAll();
-        $paymentsMap = [];
+        $paidAmountByMonth = [];
+        $latestPaymentByMonth = [];
         foreach ($payments as $p) {
-            $paymentsMap[$p['fee_month']] = $p;
+            $mName = $p['fee_month'];
+            if ($mName) {
+                $paidAmountByMonth[$mName] = ($paidAmountByMonth[$mName] ?? 0.0) + (float)$p['amount_paid'];
+                $latestPaymentByMonth[$mName] = $p;
+            }
         }
 
         // Generate months structure
@@ -936,28 +941,32 @@ class StudentService extends BaseService
             $monthIdx = array_search($month, $allAcademicMonths, true);
             $isFuture = $monthIdx > $currentMonthIdx;
 
-            if (isset($paymentsMap[$month])) {
-                $monthlyFees[] = [
-                    'id' => (int)$paymentsMap[$month]['id'],
-                    'month' => $month,
-                    'amount' => (int)round((float)$paymentsMap[$month]['amount_paid']),
-                    'payment_date' => $paymentsMap[$month]['payment_date'],
-                    'status' => 'Paid',
-                    'receipt_no' => $paymentsMap[$month]['receipt_no']
-                ];
+            $paidSoFar = $paidAmountByMonth[$month] ?? 0.0;
+            $remaining = max(0.0, $monthAmount - $paidSoFar);
+            $latestP = $latestPaymentByMonth[$month] ?? null;
+
+            if ($paidSoFar >= $monthAmount - 0.01 && $monthAmount > 0) {
+                $statusStr = 'Paid';
+            } elseif ($paidSoFar > 0) {
+                $statusStr = 'Partially Paid';
             } else {
-                $monthlyFees[] = [
-                    'id' => 0,
-                    'month' => $month,
-                    'amount' => (int)round($monthAmount),
-                    'payment_date' => null,
-                    'status' => 'Unpaid',
-                    'receipt_no' => null
-                ];
-                if (!$isFuture) {
-                    $monthlyDue += $monthAmount;
-                }
+                $statusStr = 'Unpaid';
             }
+
+            if (!$isFuture) {
+                $monthlyDue += $remaining;
+            }
+
+            $monthlyFees[] = [
+                'id' => $latestP ? (int)$latestP['id'] : 0,
+                'month' => $month,
+                'amount' => (int)round($monthAmount),
+                'paid_amount' => (int)round($paidSoFar),
+                'remaining_amount' => (int)round($remaining),
+                'payment_date' => $latestP ? $latestP['payment_date'] : null,
+                'status' => $statusStr,
+                'receipt_no' => $latestP ? $latestP['receipt_no'] : null
+            ];
         }
 
         // 4. Fetch additional fee payments for current academic year (or Previous Year Dues)
@@ -983,9 +992,19 @@ class StudentService extends BaseService
         $additionalFees = [];
         $additionalDue = 0.0;
         foreach ($additionalPayments as $row) {
-            $amt = (float)$row['amount'];
-            $isPaid = strtolower($row['status']) === 'paid';
-            
+            $totalAmt = (float)$row['amount'];
+            $paidAmt = isset($row['amount_paid']) ? (float)$row['amount_paid'] : (strtolower($row['status']) === 'paid' ? $totalAmt : 0.0);
+            $remAmt = max(0.0, $totalAmt - $paidAmt);
+
+            $rawStatus = strtolower($row['status']);
+            if ($rawStatus === 'paid' || $paidAmt >= $totalAmt - 0.01) {
+                $statusStr = 'Paid';
+            } elseif ($paidAmt > 0 || $rawStatus === 'partial') {
+                $statusStr = 'Partially Paid';
+            } else {
+                $statusStr = 'Pending';
+            }
+
             $dueDate = $row['type_due_date'];
             if ($row['fee_name'] === 'Transport Fees' && !empty($row['fee_month'])) {
                 try {
@@ -1000,14 +1019,14 @@ class StudentService extends BaseService
                 'id' => (int)$row['id'],
                 'description' => $row['fee_name'] === 'Transport Fees' ? 'Transport Fee' : $row['fee_name'],
                 'custom_description' => $row['description'] ?? '',
-                'amount' => (int)round($amt),
+                'amount' => (int)round($totalAmt),
+                'paid_amount' => (int)round($paidAmt),
+                'remaining_amount' => (int)round($remAmt),
                 'payment_date' => $row['payment_date'],
                 'due_date' => $dueDate,
-                'status' => $isPaid ? 'Paid' : 'Pending'
+                'status' => $statusStr
             ];
-            if (!$isPaid) {
-                $additionalDue += $amt;
-            }
+            $additionalDue += $remAmt;
         }
 
         $totalOutstanding = $monthlyDue + $additionalDue;
@@ -1050,7 +1069,7 @@ class StudentService extends BaseService
                 $title = $payment['fee_name'];
             }
             $billingItem = "Item: " . $title;
-            $receiptNo = "AFP-" . str_pad((string)$payment['id'], 5, '0', STR_PAD_LEFT);
+            $receiptNo = !empty($payment['receipt_no']) ? $payment['receipt_no'] : ("AFP-" . str_pad((string)$payment['id'], 5, '0', STR_PAD_LEFT));
             $monthTitle = $title;
         } else {
             $stmt = $pdo->prepare("
@@ -1109,14 +1128,16 @@ class StudentService extends BaseService
         $academicYear = str_replace(['–', '—'], '-', $rawAcademicYear);
 
         $feeMonthDisplay = '';
+        $totalDiscountAmount = 0.0;
         if (!$isAdditional) {
-            $stmtGrp = $pdo->prepare("SELECT fee_month, amount_paid FROM fee_payments WHERE receipt_no = :receipt_no AND school_id = :sid");
+            $stmtGrp = $pdo->prepare("SELECT fee_month, amount_paid, COALESCE(discount_amount, 0) AS discount_amount FROM fee_payments WHERE receipt_no = :receipt_no AND school_id = :sid");
             $stmtGrp->execute([':receipt_no' => $receiptNo, ':sid' => $schoolId]);
             $groupPayments = $stmtGrp->fetchAll(PDO::FETCH_ASSOC) ?: [];
             
             if (empty($groupPayments)) {
                 $feeMonthDisplay = !empty($payment['fee_month']) ? $payment['fee_month'] : 'April';
                 $totalAmountPaid = (float)($payment['amount_paid'] ?? 0.0);
+                $totalDiscountAmount = (float)($payment['discount_amount'] ?? 0.0);
                 $billingItemLabel = "Month: ";
             } else {
                 $academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
@@ -1156,15 +1177,19 @@ class StudentService extends BaseService
                     $feeMonthDisplay = implode(', ', $monthsList);
                 }
                 $totalAmountPaid = array_sum(array_column($groupPayments, 'amount_paid'));
+                $totalDiscountAmount = array_sum(array_column($groupPayments, 'discount_amount'));
                 $billingItemLabel = count($monthsList) > 1 ? "Months: " : "Month: ";
             }
             $amountPaidFormatted = "Rs " . number_format((float)$totalAmountPaid, 0);
         } else {
             $feeMonthDisplay = !empty($payment['fee_name']) ? $payment['fee_name'] : (!empty($payment['fee_month']) ? $payment['fee_month'] : 'Additional Fee');
-            $totalAmountPaid = (float)($payment['amount'] ?? 0.0);
+            $totalAmountPaid = (float)($payment['amount_paid'] ?? $payment['amount'] ?? 0.0);
+            $totalDiscountAmount = (float)($payment['discount_amount'] ?? 0.0);
             $amountPaidFormatted = "Rs " . number_format((float)$totalAmountPaid, 0);
             $billingItemLabel = "Description: ";
         }
+
+        $totalPayableAmount = $totalAmountPaid + $totalDiscountAmount;
 
         $lines = [
             "FEE PAYMENT RECEIPT",
@@ -1179,12 +1204,18 @@ class StudentService extends BaseService
             "Payment Date: " . $paymentDateFormatted,
             "---",
             $billingItemLabel . $feeMonthDisplay,
-            "Total Amount: " . $amountPaidFormatted,
-            "---",
-            "Status: PAID",
-            "---",
-            "This is an automated system generated receipt. Thank you for your payment."
         ];
+
+        if ($totalDiscountAmount > 0) {
+            $lines[] = "Payable Amount: Rs " . number_format($totalPayableAmount, 0);
+            $lines[] = "Discount: Rs " . number_format($totalDiscountAmount, 0);
+        }
+
+        $lines[] = "Total Amount: " . $amountPaidFormatted;
+        $lines[] = "---";
+        $lines[] = "Status: PAID";
+        $lines[] = "---";
+        $lines[] = "This is an automated system generated receipt. Thank you for your payment.";
 
         $pdf = new \App\Shared\Pdf\SimplePdf();
         $pdfData = $pdf->render(strtoupper($payment['school_name']), $lines);

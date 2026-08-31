@@ -15,7 +15,7 @@ class StaffRepository extends BaseRepository
     {
         if ($academicYearId > 0) {
             $stmt = $this->pdo->prepare(
-                "SELECT * FROM staff WHERE school_id = :sid AND academic_year_id = :ayid ORDER BY id DESC"
+                "SELECT * FROM staff WHERE school_id = :sid AND (academic_year_id = :ayid OR academic_year_id IS NULL OR academic_year_id = 0) ORDER BY id DESC"
             );
             $stmt->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
         } else {
@@ -32,7 +32,7 @@ class StaffRepository extends BaseRepository
     {
         if ($academicYearId > 0) {
             $stmt = $this->pdo->prepare(
-                "SELECT COUNT(*) FROM staff WHERE school_id = :sid AND status = :status AND academic_year_id = :ayid"
+                "SELECT COUNT(*) FROM staff WHERE school_id = :sid AND status = :status AND (academic_year_id = :ayid OR academic_year_id IS NULL OR academic_year_id = 0)"
             );
             $stmt->execute([':sid' => $schoolId, ':status' => $status, ':ayid' => $academicYearId]);
         } else {

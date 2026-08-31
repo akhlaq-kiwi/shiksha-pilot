@@ -105,6 +105,34 @@ export const schoolService = {
     return apiClient.post('/api/school/attendance', attendanceData);
   },
 
+  getTeacherAttendance(params = {}) {
+    return apiClient.get(buildUrl('/api/school/teacher-attendance', params));
+  },
+
+  markTeacherAttendance(data) {
+    return apiClient.post('/api/school/teacher-attendance', data);
+  },
+
+  getTeacherAttendanceReport(params = {}) {
+    return apiClient.get(buildUrl('/api/school/teacher-attendance/report', params));
+  },
+
+  getTeacherAttendanceSettings() {
+    return apiClient.get('/api/school/teacher-attendance/settings');
+  },
+
+  saveTeacherAttendanceSettings(data) {
+    return apiClient.post('/api/school/teacher-attendance/settings', data);
+  },
+
+  getTeacherAttendanceQrToken() {
+    return apiClient.get('/api/school/teacher-attendance/qr-token');
+  },
+
+  refreshTeacherAttendanceQrToken() {
+    return apiClient.post('/api/school/teacher-attendance/qr-token/refresh');
+  },
+
   getHolidays() {
     return apiClient.get('/api/school/holidays');
   },

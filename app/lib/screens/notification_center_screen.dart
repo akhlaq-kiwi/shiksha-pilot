@@ -12,6 +12,8 @@ import 'fees_card_screen.dart';
 import 'salary_card_screen.dart';
 import 'homework_list_screen.dart';
 import 'achievements_screen.dart';
+import 'attendance_screen.dart';
+import '../services/attendance_service.dart';
 
 class NotificationCenterScreen extends StatefulWidget {
   final String baseUrl;
@@ -75,8 +77,9 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
       _notifications = [];
     });
     try {
-      final isStaff = widget.studentId == null;
-      final endpoint = isStaff ? '/api/school/notifications' : '/api/student/notifications';
+      final role = (widget.userRole ?? '').toUpperCase();
+      final isStudentOrParent = role == 'STUDENT' || role == 'PARENT' || widget.studentId != null;
+      final endpoint = isStudentOrParent ? '/api/student/notifications' : '/api/school/notifications';
       final uri = Uri.parse('${widget.baseUrl}$endpoint?limit=$_limit&offset=0');
       final response = await http.get(
         uri,
@@ -124,8 +127,9 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
     });
 
     try {
-      final isStaff = widget.studentId == null;
-      final endpoint = isStaff ? '/api/school/notifications' : '/api/student/notifications';
+      final role = (widget.userRole ?? '').toUpperCase();
+      final isStudentOrParent = role == 'STUDENT' || role == 'PARENT' || widget.studentId != null;
+      final endpoint = isStudentOrParent ? '/api/student/notifications' : '/api/school/notifications';
       final uri = Uri.parse('${widget.baseUrl}$endpoint?limit=$_limit&offset=$_offset');
       final response = await http.get(
         uri,
@@ -654,6 +658,24 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                       baseUrl: widget.baseUrl,
                                       token: widget.token,
                                       studentId: widget.studentId,
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+
+                              final isAttendanceNotif = linkStr.contains('attendance') ||
+                                  titleLower.contains('absent') ||
+                                  msgLower.contains('absent') ||
+                                  (notif['event_key'] ?? '').toString().toUpperCase() == 'ATTENDANCE_MARKED_ABSENT';
+                              if (isAttendanceNotif) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => AttendanceScreen(
+                                      attendanceService: AttendanceService(baseUrl: widget.baseUrl, token: widget.token),
+                                      userRole: widget.userRole ?? (widget.studentId != null ? 'PARENT' : 'STUDENT'),
+                                      selectedStudentId: widget.studentId,
                                     ),
                                   ),
                                 );

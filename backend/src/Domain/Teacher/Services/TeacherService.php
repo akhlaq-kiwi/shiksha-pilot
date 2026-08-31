@@ -543,12 +543,17 @@ class TeacherService extends BaseService
             }
 
             $pdo->beginTransaction();
+            $absentStudentIds = [];
             try {
                 foreach ($records as $item) {
                     $stId = (int)($item['student_id'] ?? $item['id'] ?? 0);
                     if (!$stId) continue;
                     $stStatus = $item['status'] ?? 'Present';
                     $stClassId = isset($item['class_id']) ? (int)$item['class_id'] : $classId;
+
+                    if (strtolower((string)$stStatus) === 'absent') {
+                        $absentStudentIds[] = $stId;
+                    }
 
                     $this->attendanceRepo->upsert([
                         ':school_id'  => $schoolId,
@@ -560,6 +565,9 @@ class TeacherService extends BaseService
                     ]);
                 }
                 $pdo->commit();
+
+                $this->dispatchAbsentNotifications($pdo, $schoolId, $absentStudentIds);
+
                 return ['success' => true, 'date' => $date, 'count' => count($records)];
             } catch (\Throwable $e) {
                 if ($pdo->inTransaction()) {
@@ -619,7 +627,54 @@ class TeacherService extends BaseService
             ':marked_by'  => (int) $user['id'],
         ]);
 
+        if (strtolower((string)$status) === 'absent') {
+            $this->dispatchAbsentNotifications($pdo, $schoolId, [$studentId]);
+        }
+
         return ['success' => true, 'date' => $date, 'status' => $status];
+    }
+
+    private function dispatchAbsentNotifications(PDO $pdo, int $schoolId, array $absentStudentIds): void
+    {
+        if (empty($absentStudentIds)) return;
+        try {
+            $inPlaceholders = implode(',', array_fill(0, count($absentStudentIds), '?'));
+            $stmtUsers = $pdo->prepare("
+                SELECT DISTINCT u.id AS user_id, u.role
+                FROM students s
+                JOIN users u ON u.school_id = s.school_id AND (
+                    u.phone = s.student_mobile OR 
+                    u.phone = s.parent_phone OR 
+                    u.phone = s.father_phone OR 
+                    u.phone = s.mother_phone OR 
+                    u.phone = s.guardian_phone OR 
+                    (u.email IS NOT NULL AND u.email = s.email AND u.email != '')
+                )
+                WHERE s.id IN ($inPlaceholders) 
+                  AND s.school_id = ? 
+                  AND u.role IN ('STUDENT', 'PARENT')
+            ");
+            $params = array_merge($absentStudentIds, [$schoolId]);
+            $stmtUsers->execute($params);
+            $recipients = $stmtUsers->fetchAll(PDO::FETCH_ASSOC);
+
+            if (!empty($recipients)) {
+                $dispatcher = new \App\Shared\Notifications\PushDispatcher(
+                    $pdo,
+                    new \App\Shared\Notifications\FcmClient($pdo)
+                );
+                $dispatcher->toUsers(
+                    $schoolId,
+                    $recipients,
+                    'ATTENDANCE_MARKED_ABSENT',
+                    'You are absent today.',
+                    'Attendance has been marked for today, You can check the attendance.',
+                    '/attendance'
+                );
+            }
+        } catch (\Throwable $ne) {
+            // Suppress notification errors so attendance commit is preserved
+        }
     }
 
     public function getAttendanceHistory(int $teacherId, array $filters = [], array $user = []): array
@@ -857,6 +912,19 @@ class TeacherService extends BaseService
         }
         $currAcademicMonths = array_slice($allAcademicMonths, $startMonthIndex);
 
+        // Fetch allowed leaves configuration for this school
+        $stmtSett = $pdo->prepare("SELECT allowed_leaves FROM teacher_attendance_settings WHERE school_id = :sid LIMIT 1");
+        $stmtSett->execute([':sid' => $schoolId]);
+        $allowedLeavesRaw = $stmtSett->fetchColumn();
+        $allowedLeaves = ($allowedLeavesRaw !== false && $allowedLeavesRaw !== null && $allowedLeavesRaw !== '') ? (int)$allowedLeavesRaw : 0;
+
+        $monthMapNums = [
+            'January' => '01', 'February' => '02', 'March' => '03',
+            'April' => '04', 'May' => '05', 'June' => '06',
+            'July' => '07', 'August' => '08', 'September' => '09',
+            'October' => '10', 'November' => '11', 'December' => '12'
+        ];
+
         $currentPayments = [];
         foreach ($currAcademicMonths as $month) {
             if (isset($paymentsMap[$month])) {
@@ -868,21 +936,8 @@ class TeacherService extends BaseService
                     'status' => 'Paid'
                 ];
             } else {
-                $monthSalary = $currSalary;
-                if (!empty($currStaff['joining_date'])) {
-                    try {
-                        $joiningMonthName = date('F', strtotime($currStaff['joining_date']));
-                        if ($month === $joiningMonthName) {
-                            $joiningDateObj = new \DateTime($currStaff['joining_date']);
-                            $daysInMonth = (int)$joiningDateObj->format('t');
-                            $dayNum = (int)$joiningDateObj->format('d');
-                            $workedDays = ($daysInMonth - $dayNum) + 1;
-                            if ($workedDays < $daysInMonth && $workedDays > 0) {
-                                $monthSalary = round(($workedDays / $daysInMonth) * $currSalary);
-                            }
-                        }
-                    } catch (\Exception $e) {}
-                }
+                $staffIdForCalc = !empty($currStaff['id']) ? (int)$currStaff['id'] : 0;
+                $monthSalary = $this->calculateStaffMonthlySalary($pdo, $schoolId, $staffIdForCalc, $currSalary, $month, $workingYear ?: []);
 
                 $currentPayments[] = [
                     'id' => 0,
@@ -1005,19 +1060,134 @@ class TeacherService extends BaseService
             }
         }
 
+        $prevSalary = $prevStaff ? (float)($prevStaff['salary'] ?? 0.0) : $currSalary;
+
         return [
+            'academic_year' => $workingYear ? $workingYear['name'] : '—',
+            'base_salary' => $currSalary,
+            'allowed_leaves' => $allowedLeaves,
+            'payments' => $currentPayments,
             'current_year' => [
-                'academic_year_name' => $currYearName,
+                'academic_year_name' => $workingYear ? $workingYear['name'] : '—',
                 'salary' => $currSalary,
                 'payments' => $currentPayments
             ],
             'previous_year' => [
                 'academic_year_name' => $prevYearName,
-                'salary' => isset($prevSalary) ? $prevSalary : 0.0,
+                'salary' => $prevSalary,
                 'has_unpaid' => $hasUnpaidPrev,
                 'payments' => $prevPayments
-            ]
+            ],
+            'previous_year_pending' => $hasUnpaidPrev ? [
+                'academic_year_id' => $prevYear ? (int)$prevYear['id'] : 0,
+                'academic_year_name' => $prevYearName,
+                'salary' => $prevSalary,
+                'pending_months' => array_values(array_filter($prevAcademicMonths ?? [], fn($m) => !isset($oldPaidMonthsMap[$m]))),
+                'valid_months' => $prevAcademicMonths ?? [],
+                'joining_month_proration' => $joiningProrationData ?? null
+            ] : null
         ];
+    }
+
+    private function calculateStaffMonthlySalary(PDO $pdo, int $schoolId, int $staffId, float $baseSalary, string $monthName, array $workingYear): float
+    {
+        $monthMapNums = [
+            'January' => '01', 'February' => '02', 'March' => '03',
+            'April' => '04', 'May' => '05', 'June' => '06',
+            'July' => '07', 'August' => '08', 'September' => '09',
+            'October' => '10', 'November' => '11', 'December' => '12'
+        ];
+        $allAcademicMonths = [
+            'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'
+        ];
+        $ayStartYear = !empty($workingYear['start_date']) ? (int)date('Y', strtotime($workingYear['start_date'])) : (int)date('Y');
+
+        $mNum = $monthMapNums[$monthName] ?? '01';
+        $mYearIndex = array_search($monthName, $allAcademicMonths);
+        $mYear = ($mYearIndex !== false && $mYearIndex >= 9) ? ($ayStartYear + 1) : $ayStartYear;
+        $ymPrefix = sprintf("%04d-%02d", $mYear, (int)$mNum);
+
+        $startDate = "{$ymPrefix}-01";
+        $totalDaysInMonth = (int)date('t', strtotime($startDate));
+        $endDate = sprintf("%04d-%02d-%02d", $mYear, (int)$mNum, $totalDaysInMonth);
+
+        $currentDate = date('Y-m-d');
+        if ($currentDate <= $endDate) {
+            // Month is currently in progress or in the future -> Return base salary (or joining month prorated salary)
+            $stmtStaff = $pdo->prepare("SELECT joining_date FROM staff WHERE id = :st_id LIMIT 1");
+            $stmtStaff->execute([':st_id' => $staffId]);
+            $joiningDateStr = $stmtStaff->fetchColumn();
+
+            if (!empty($joiningDateStr)) {
+                try {
+                    $joiningMonthName = date('F', strtotime((string)$joiningDateStr));
+                    if ($monthName === $joiningMonthName) {
+                        $joiningDateObj = new \DateTime((string)$joiningDateStr);
+                        $daysInMonth = (int)$joiningDateObj->format('t');
+                        $dayNum = (int)$joiningDateObj->format('d');
+                        $workedDays = ($daysInMonth - $dayNum) + 1;
+                        if ($workedDays < $daysInMonth && $workedDays > 0) {
+                            return round(($workedDays / $daysInMonth) * $baseSalary);
+                        }
+                    }
+                } catch (\Exception $e) {}
+            }
+            return $baseSalary;
+        }
+
+        // 1. Fetch Allowed Leaves
+        $stmtSett = $pdo->prepare("SELECT allowed_leaves FROM teacher_attendance_settings WHERE school_id = :sid LIMIT 1");
+        $stmtSett->execute([':sid' => $schoolId]);
+        $allowedLeavesRaw = $stmtSett->fetchColumn();
+        $allowedLeaves = ($allowedLeavesRaw !== false && $allowedLeavesRaw !== null && $allowedLeavesRaw !== '') ? (int)$allowedLeavesRaw : 0;
+
+        // 2. Count Present days in month
+        $stmtPres = $pdo->prepare("
+            SELECT COUNT(*) FROM teacher_attendance 
+            WHERE school_id = :sid AND staff_id = :st_id AND date >= :sdate AND date <= :edate AND status = 'Present'
+        ");
+        $stmtPres->execute([':sid' => $schoolId, ':st_id' => $staffId, ':sdate' => $startDate, ':edate' => $endDate]);
+        $presentCount = (int)$stmtPres->fetchColumn();
+
+        // 3. Count Leave days in month
+        $stmtLeave = $pdo->prepare("
+            SELECT COUNT(*) FROM teacher_attendance 
+            WHERE school_id = :sid AND staff_id = :st_id AND date >= :sdate AND date <= :edate AND status = 'Leave'
+        ");
+        $stmtLeave->execute([':sid' => $schoolId, ':st_id' => $staffId, ':sdate' => $startDate, ':edate' => $endDate]);
+        $leaveCount = (int)$stmtLeave->fetchColumn();
+
+        // 4. Count Sundays in month
+        $sundayCount = 0;
+        for ($d = 1; $d <= $totalDaysInMonth; $d++) {
+            $dtStr = sprintf("%04d-%02d-%02d", $mYear, (int)$mNum, $d);
+            if (date('N', strtotime($dtStr)) == 7) {
+                $sundayCount++;
+            }
+        }
+
+        // 5. Count Holidays in month (excluding Sundays)
+        $stmtHol = $pdo->prepare("
+            SELECT date FROM holidays 
+            WHERE school_id = :sid AND date >= :sdate AND date <= :edate
+        ");
+        $stmtHol->execute([':sid' => $schoolId, ':sdate' => $startDate, ':edate' => $endDate]);
+        $holidays = $stmtHol->fetchAll(PDO::FETCH_COLUMN);
+        $holidayCount = 0;
+        foreach ($holidays as $hDate) {
+            if (date('N', strtotime($hDate)) != 7) {
+                $holidayCount++;
+            }
+        }
+
+        $paidLeaveDays = min($leaveCount, $allowedLeaves);
+        $paidDays = $presentCount + $paidLeaveDays + $sundayCount + $holidayCount;
+
+        if ($paidDays >= $totalDaysInMonth) {
+            return $baseSalary;
+        }
+
+        return round(($paidDays / $totalDaysInMonth) * $baseSalary);
     }
 
     public function getSalarySlip(int $userId, int $schoolId, int $paymentId): array

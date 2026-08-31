@@ -233,12 +233,15 @@ try {
                     s.roll_no, 
                     'Tuition Fee' AS fee_type, 
                     fp.fee_month AS months_covered, 
-                    fp.amount_paid AS amount
+                    fp.amount_paid AS amount,
+                    COALESCE(u.phone, '') AS collector_phone,
+                    COALESCE(fp.collected_by, 'School Admin') AS collected_by
                 FROM fee_payments fp
                 JOIN students s ON fp.student_id = s.id
                 LEFT JOIN classes c ON s.class_id = c.id
+                LEFT JOIN users u ON (u.name = fp.collected_by AND u.school_id = fp.school_id)
                 WHERE fp.school_id = :sid 
-                  AND fp.status = 'PAID'
+                  AND LOWER(fp.status) IN ('paid', 'partial')
                   AND fp.created_at {$operator} :from_ts 
                   AND fp.created_at <= :to_ts
             ");
@@ -255,13 +258,16 @@ try {
                     s.roll_no, 
                     aft.name AS fee_type, 
                     'N/A' AS months_covered, 
-                    afp.amount
+                    COALESCE(afp.amount_paid, afp.amount) AS amount,
+                    COALESCE(u.phone, '') AS collector_phone,
+                    COALESCE(afp.collected_by, 'School Admin') AS collected_by
                 FROM additional_fee_payments afp
                 JOIN students s ON afp.student_id = s.id
                 LEFT JOIN classes c ON s.class_id = c.id
                 JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+                LEFT JOIN users u ON (u.name = afp.collected_by AND u.school_id = afp.school_id)
                 WHERE afp.school_id = :sid 
-                  AND afp.status = 'Paid'
+                  AND LOWER(afp.status) IN ('paid', 'partial')
                   AND afp.updated_at {$operator} :from_ts 
                   AND afp.updated_at <= :to_ts
             ");

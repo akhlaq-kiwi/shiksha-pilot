@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, Users, Check, AlertCircle, Edit2, Save, FileText, CheckCircle2, Trash2, Plus, MoreVertical, Lock } from 'lucide-react';
+import { Calendar, Users, Check, AlertCircle, Edit2, Save, FileText, CheckCircle2, Trash2, Plus, MoreVertical, Lock, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
@@ -11,6 +11,7 @@ import { schoolService } from '../../../common/services/schoolService';
 import { useToast } from '../../../common/components/Toast';
 import { DropdownMenu, DropdownItem } from '../../../common/ui/DropdownMenu';
 import { Dialog } from '../../../common/ui/dialog';
+import { TeacherAttendanceView } from '../components/TeacherAttendanceView';
 
 const getTodayLocalDateString = () => {
   const d = new Date();
@@ -25,6 +26,7 @@ export default function AttendancePage() {
   const toast = useToast();
   const navigate = useNavigate();
 
+  const [userType, setUserType] = useState('Teacher'); // 'Teacher' by default
   const [activeTab, setActiveTab] = useState('daily'); // 'daily', 'report', or 'leave'
 
   // Common data
@@ -61,8 +63,11 @@ export default function AttendancePage() {
         setClasses(data || []);
         if (data && data.length > 0) {
           const names = Array.from(new Set(data.map(c => c.name)));
-          setSelectedClassName(names[0] || '');
-          setSelectedSection(''); // Always default to Select Section placeholder ('')
+          const firstClassName = names[0] || '';
+          setSelectedClassName(firstClassName);
+          const matchingSections = data.filter(c => c.name === firstClassName).map(c => c.section || '');
+          const firstSection = matchingSections[0] || '';
+          setSelectedSection(firstSection);
         }
       })
       .catch(() => {
@@ -76,7 +81,9 @@ export default function AttendancePage() {
   const handleClassChange = (e) => {
     const className = e.target.value;
     setSelectedClassName(className);
-    setSelectedSection(''); // Always reset section selection on class change
+    const matchingSections = classes.filter(c => c.name === className).map(c => c.section || '');
+    const firstSection = matchingSections[0] || '';
+    setSelectedSection(firstSection);
     setStudents([]);
     setAttendanceRecords([]);
     setAttendanceMap({});
@@ -107,9 +114,36 @@ export default function AttendancePage() {
     setSelectedDate(val);
   };
 
+  const handleShiftDate = (days) => {
+    if (!selectedDate) return;
+    const parts = selectedDate.split('-');
+    if (parts.length !== 3) return;
+    const dt = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    dt.setDate(dt.getDate() + days);
+
+    const year = dt.getFullYear();
+    const month = String(dt.getMonth() + 1).padStart(2, '0');
+    const day = String(dt.getDate()).padStart(2, '0');
+    const newDateStr = `${year}-${month}-${day}`;
+
+    const minDate = currentYear?.start_date || '';
+    const todayStr = getTodayLocalDateString();
+
+    if (days < 0 && minDate && newDateStr < minDate) {
+      toast.warning(`Cannot select a date before the academic year started (${minDate}).`);
+      return;
+    }
+    if (days > 0 && newDateStr > todayStr) {
+      toast.warning("Cannot select a future date.");
+      return;
+    }
+
+    setSelectedDate(newDateStr);
+  };
+
   const activeClass = classes.find(c => 
     c.name === selectedClassName && 
-    ((c.section || '') === selectedSection || (!c.section && !selectedSection))
+    ((c.section || '') === selectedSection || !selectedSection)
   );
 
   // Load daily attendance and students
@@ -342,17 +376,45 @@ export default function AttendancePage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Attendance</h2>
-          <p className="text-text-secondary text-sm mt-1">Mark student daily attendance and review reports.</p>
+          <p className="text-text-secondary text-sm mt-1">
+            {userType === 'Student' 
+              ? 'Mark student daily attendance and review reports.' 
+              : 'Manage teacher daily attendance, QR code generation, and monthly reports.'}
+          </p>
         </div>
-        {isReadOnly && (
-          <Button
-            onClick={() => navigate('/school-admin/attendance/leaderboard')}
-            className="h-10 px-5 font-bold text-xs bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white rounded-xl shadow-lg shadow-amber-500/25 border-0 hover:scale-[1.03] active:scale-[0.98] transition-all flex items-center gap-2 tracking-wide uppercase"
-          >
-            🏆 Attendance Leaderboard
-          </Button>
-        )}
+
+        <div className="flex items-center gap-3">
+          <div className="relative flex items-center gap-2.5 bg-surface border border-zinc-300 dark:border-zinc-700 px-4 py-2 rounded-xl shadow-2xs hover:border-primary/60 transition-all cursor-pointer">
+            <span className="text-xs font-bold text-text-secondary uppercase tracking-wider">Switch User</span>
+            <span className="text-sm font-bold text-primary flex items-center gap-1">
+              {userType} <ChevronDown className="w-4 h-4 text-primary" />
+            </span>
+            <select
+              value={userType}
+              onChange={(e) => setUserType(e.target.value)}
+              className="absolute inset-0 opacity-0 w-full h-full cursor-pointer font-bold"
+            >
+              <option value="Teacher">Teacher</option>
+              <option value="Student">Student</option>
+            </select>
+          </div>
+
+          {userType === 'Student' && isReadOnly && (
+            <Button
+              onClick={() => navigate('/school-admin/attendance/leaderboard')}
+              className="h-10 px-5 font-bold text-xs bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white rounded-xl shadow-lg shadow-amber-500/25 border-0 hover:scale-[1.03] active:scale-[0.98] transition-all flex items-center gap-2 tracking-wide uppercase"
+            >
+              🏆 Attendance Leaderboard
+            </Button>
+          )}
+        </div>
       </div>
+
+      {/* Render Teacher Attendance View when userType === 'Teacher' */}
+      {userType === 'Teacher' ? (
+        <TeacherAttendanceView />
+      ) : (
+        <>
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-border">
@@ -412,16 +474,39 @@ export default function AttendancePage() {
             )}
 
             {activeTab === 'daily' && (
-              <div className="flex-1 min-w-[150px] space-y-1.5">
+              <div className="flex-1 min-w-[200px] space-y-1.5">
                 <label className="text-xs font-bold text-text-secondary uppercase">Date</label>
-                <Input 
-                  type="date" 
-                  value={selectedDate} 
-                  onChange={handleDateChange} 
-                  min={currentYear?.start_date || ''}
-                  max={getTodayLocalDateString()}
-                  className="h-9" 
-                />
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => handleShiftDate(-1)}
+                    className="h-9 w-9 shrink-0 bg-background border-border hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                    title="Previous Day"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Input 
+                    type="date" 
+                    value={selectedDate} 
+                    onChange={handleDateChange} 
+                    min={currentYear?.start_date || ''}
+                    max={getTodayLocalDateString()}
+                    className="h-9 bg-background" 
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => handleShiftDate(1)}
+                    disabled={selectedDate >= getTodayLocalDateString()}
+                    className="h-9 w-9 shrink-0 bg-background border-border hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40"
+                    title="Next Day"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             )}
 
@@ -696,6 +781,8 @@ export default function AttendancePage() {
             </Table>
           </Card>
         )
+      )}
+        </>
       )}
     </div>
   );
