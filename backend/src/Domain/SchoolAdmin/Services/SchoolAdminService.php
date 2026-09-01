@@ -7466,7 +7466,7 @@ class SchoolAdminService extends BaseService
                 afp.payment_method,
                 afp.amount AS amount,
                 afp.amount AS amount_paid,
-                COALESCE(afp.discount_amount, 0) AS discount_amount,
+                0 AS discount_amount,
                 aft.name AS fee_month,
                 afp.payment_date,
                 afp.created_at,
