@@ -966,17 +966,30 @@ class SchoolAdminService extends BaseService
 
         if ($isAdditional) {
             $stmt = $pdo->prepare("
-                SELECT afp.*, s.first_name, s.last_name, s.roll_no, s.sr_no, c.name AS class_name, c.section, sch.name AS school_name, sch.logo_path, aft.name AS fee_name, ay.name AS academic_year_name
+                SELECT 
+                    afph.id AS history_id,
+                    afp.id,
+                    COALESCE(afph.receipt_no, afp.receipt_no) AS receipt_no,
+                    COALESCE(afph.amount_paid, afp.amount_paid, afp.amount) AS amount_paid,
+                    COALESCE(afph.discount_amount, afp.discount_amount, 0) AS discount_amount,
+                    COALESCE(afph.payment_method, afp.payment_method) AS payment_method,
+                    COALESCE(afph.collected_by, afp.collected_by) AS collected_by,
+                    COALESCE(afph.payment_date, afp.payment_date) AS payment_date,
+                    s.first_name, s.last_name, s.roll_no, s.sr_no, c.name AS class_name, c.section, sch.name AS school_name, sch.logo_path, aft.name AS fee_name, ay.name AS academic_year_name
                 FROM additional_fee_payments afp
+                LEFT JOIN additional_fee_payment_history afph ON afph.payment_id = afp.id
                 JOIN students s ON afp.student_id = s.id
                 LEFT JOIN classes c ON s.class_id = c.id
                 JOIN schools sch ON afp.school_id = sch.id
                 JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
                 LEFT JOIN academic_years ay ON s.academic_year_id = ay.id
-                WHERE afp.id = :id AND afp.student_id = :student_id AND afp.school_id = :sid
+                WHERE (afph.id = :id OR afp.id = :id OR afph.receipt_no = :rno OR afp.receipt_no = :rno) 
+                  AND afp.student_id = :student_id 
+                  AND afp.school_id = :sid
+                ORDER BY afph.id DESC
                 LIMIT 1
             ");
-            $stmt->execute([':id' => $paymentId, ':student_id' => $studentId, ':sid' => $schoolId]);
+            $stmt->execute([':id' => $paymentId, ':rno' => (string)$paymentId, ':student_id' => $studentId, ':sid' => $schoolId]);
             $payment = $stmt->fetch(PDO::FETCH_ASSOC);
             if (!$payment) {
                 throw new NotFoundException('Additional fee payment record not found');
@@ -990,8 +1003,9 @@ class SchoolAdminService extends BaseService
             $feeMonthDisplay = $title;
             $receiptNo = !empty($payment['receipt_no']) ? $payment['receipt_no'] : ("AFP-" . str_pad((string)$payment['id'], 5, '0', STR_PAD_LEFT));
             $monthTitle = $title;
-            $totalAmountPaid = (float)($payment['amount_paid'] ?? $payment['amount'] ?? 0.0);
+            $totalAmountPaid = (float)($payment['amount_paid'] ?? 0.0);
             $totalDiscountAmount = (float)($payment['discount_amount'] ?? 0.0);
+            $totalPayableAmount = $totalAmountPaid + $totalDiscountAmount;
             $amountPaidFormatted = "Rs " . number_format((float)$totalAmountPaid, 0);
         } else {
             $stmt = $pdo->prepare("
@@ -7392,8 +7406,12 @@ class SchoolAdminService extends BaseService
         } catch (\Throwable $e) {}
 
         try {
-            $pdo->exec("ALTER TABLE `additional_fee_payments` ADD COLUMN `amount_paid` DECIMAL(12,2) DEFAULT NULL AFTER `discount_amount`");
-        } catch (\Throwable $e) {}
+            $pdo->exec("ALTER TABLE `additional_fee_payments` ADD COLUMN `amount_paid` DECIMAL(12,2) DEFAULT 0.00 AFTER `discount_amount`");
+        } catch (\Throwable $e) {
+            try {
+                $pdo->exec("ALTER TABLE `additional_fee_payments` MODIFY COLUMN `amount_paid` DECIMAL(12,2) DEFAULT 0.00");
+            } catch (\Throwable $e) {}
+        }
 
         try {
             $pdo->exec("ALTER TABLE `additional_fee_payments` MODIFY COLUMN `status` ENUM('Pending','Paid','Partial') NOT NULL DEFAULT 'Pending'");
@@ -12270,12 +12288,17 @@ Only approve the settlement after reviewing all financial records.
             $pay['id'] = (int)$pay['id'];
             $pay['student_id'] = (int)$pay['student_id'];
             $pay['fee_type_id'] = (int)$pay['fee_type_id'];
-            $pay['amount'] = (float)$pay['amount'];
-            $pay['amount_paid'] = isset($pay['amount_paid']) && $pay['amount_paid'] !== null ? (float)$pay['amount_paid'] : (float)$pay['amount'];
-            $pay['discount_amount'] = (float)($pay['discount_amount'] ?? 0.0);
+            $pay['amount'] = (float)($newDeposit + $newDiscount);
+            $pay['amount_paid'] = (float)$newDeposit;
+            $pay['discount_amount'] = (float)$newDiscount;
+            $pay['receipt_no'] = $receiptNo;
+            $pay['payment_date'] = $paymentDate;
+            $pay['payment_method'] = $paymentMethod;
+            $pay['collected_by'] = $collectedBy;
+            $pay['is_additional'] = true;
 
             $feeName = $pay['fee_name'] ?? 'Fee';
-            $amtStr = "₹" . number_format($depositAmount, 0);
+            $amtStr = "₹" . number_format((float)$newDeposit, 0);
             $this->sendStudentNotification($pdo, $schoolId, $pay['student_id'], "Fee Deposited", "Your {$feeName} payment of {$amtStr} has been successfully recorded.");
             $this->syncFollowUpStatus($pdo, $pay['student_id'], $schoolId);
         }
@@ -12331,7 +12354,7 @@ Only approve the settlement after reviewing all financial records.
 
         $stmtUpdate = $pdo->prepare("
             UPDATE additional_fee_payments 
-            SET status = 'Pending', payment_date = NULL, receipt_no = NULL, discount_amount = 0.00, amount_paid = NULL 
+            SET status = 'Pending', payment_date = NULL, receipt_no = NULL, discount_amount = 0.00, amount_paid = 0.00 
             WHERE id = :id AND school_id = :sid
         ");
         $stmtUpdate->execute([
