@@ -9116,35 +9116,20 @@ class SchoolAdminService extends BaseService
         }
 
         if ($existing) {
-            $mergedMonthlyFees = [];
-            foreach ($academicMonths as $m) {
-                $mergedMonthlyFees[$m] = isset($monthlyFees[$m]) ? (float)$monthlyFees[$m] : 0.0;
-            }
-            $jsonFees = json_encode($mergedMonthlyFees);
-            $monthlyFees = $mergedMonthlyFees;
+            throw new ValidationException([
+                'class_id' => 'Fee configuration for this class is already saved and locked for this academic year.'
+            ], 'Fee configuration for this class is already saved and locked for this academic year.');
+        }
 
-            $stmtUpdate = $pdo->prepare("
-                UPDATE class_fee_configurations 
-                SET mode = :mode, monthly_fees = :monthly_fees 
-                WHERE school_id = :school_id AND class_id = :class_id AND academic_year_id = :academic_year_id
-            ");
-            $stmtUpdate->execute([
-                ':mode' => $mode,
-                ':monthly_fees' => $jsonFees,
-                ':school_id' => $schoolId,
-                ':class_id' => $classId,
-                ':academic_year_id' => $academicYearId
-            ]);
-        } else {
-            $jsonFees = json_encode($monthlyFees);
-            $stmtInsert = $pdo->prepare("
-                INSERT INTO class_fee_configurations (school_id, class_id, academic_year_id, mode, monthly_fees, is_locked)
-                VALUES (:school_id, :class_id, :academic_year_id, :mode, :monthly_fees, 0)
-            ");
-            $stmtInsert->execute([
-                ':school_id' => $schoolId,
-                ':class_id' => $classId,
-                ':academic_year_id' => $academicYearId,
+        $jsonFees = json_encode($monthlyFees);
+        $stmtInsert = $pdo->prepare("
+            INSERT INTO class_fee_configurations (school_id, class_id, academic_year_id, mode, monthly_fees, is_locked)
+            VALUES (:school_id, :class_id, :academic_year_id, :mode, :monthly_fees, 0)
+        ");
+        $stmtInsert->execute([
+            ':school_id' => $schoolId,
+            ':class_id' => $classId,
+            ':academic_year_id' => $academicYearId,
                 ':mode' => $mode,
                 ':monthly_fees' => $jsonFees
             ]);

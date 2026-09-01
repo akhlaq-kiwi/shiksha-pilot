@@ -757,6 +757,12 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
     };
   }, [selectedClassId, currentYear?.id]);
 
+  const isClassConfigured = useMemo(() => {
+    if (!selectedClassId) return false;
+    const selectedGroup = uniqueClassGroups.find(g => g.allIds.includes(String(selectedClassId)));
+    return selectedGroup ? selectedGroup.isConfigured : false;
+  }, [selectedClassId, uniqueClassGroups]);
+
   const isCourseClassConfigured = useMemo(() => {
     if (!courseSelectedClassId) return false;
     const selectedGroup = uniqueCourseClassGroups.find(g => g.allIds.includes(String(courseSelectedClassId)));
@@ -1807,14 +1813,14 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                 placeholder="e.g. 1500"
                 value={sameFeeAmount}
                 onChange={e => setSameFeeAmount(e.target.value)}
-                disabled={!selectedClassId || isConfigLocked}
+                disabled={!selectedClassId || isReadOnly || isClassConfigured || isConfigLocked}
                 className="pl-7 text-xs font-semibold w-full"
               />
             </div>
             <p className="text-[11px] text-text-muted">This amount will be applied to all 12 academic months automatically.</p>
           </div>
 
-          {selectedClassId && (isConfigLocked || isReadOnly) ? (
+          {selectedClassId && (isClassConfigured || isConfigLocked || isReadOnly) ? (
             <div className="mt-6 p-4 bg-zinc-100 border border-zinc-200 dark:bg-zinc-900/50 dark:border-zinc-800 rounded-xl flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center">
@@ -1822,7 +1828,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                 </div>
                 <div>
                   <p className="text-xs font-bold text-text-primary font-display">Fee Configuration Locked</p>
-                  <p className="text-[11px] text-text-muted mt-0.5">{isReadOnly ? 'Fee configuration cannot be modified in an archived academic year.' : 'This configuration is permanently locked for the active year.'}</p>
+                  <p className="text-[11px] text-text-muted mt-0.5">{isReadOnly ? 'Fee configuration cannot be modified in an archived academic year.' : 'This class fee configuration is permanently saved and locked for this academic year.'}</p>
                 </div>
               </div>
               <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-zinc-200 text-zinc-600 border border-zinc-300">
@@ -1833,10 +1839,10 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
             <div className="mt-6 flex justify-end">
               <Button 
                 onClick={handleConfirmSaveConfig}
-                disabled={!selectedClassId}
+                disabled={!selectedClassId || isReadOnly || isClassConfigured || isConfigLocked || feeSaving}
                 className="font-bold flex items-center gap-1.5 shadow-sm bg-primary"
               >
-                Save Fee Configuration
+                {feeSaving ? 'Saving...' : isClassConfigured ? 'Fee Configured' : 'Save Fee Configuration'}
               </Button>
             </div>
           )}
