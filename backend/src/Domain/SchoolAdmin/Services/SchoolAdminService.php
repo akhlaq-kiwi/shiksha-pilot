@@ -589,7 +589,7 @@ class SchoolAdminService extends BaseService
 
             // Query 2: Additional fee payments for this academic year (grouped by deposit payment_date)
             $stmtAddFeeChart = $pdo->prepare("
-                SELECT afp.payment_date, afp.created_at, COALESCE(afp.amount_paid, afp.amount) AS amount
+                SELECT afp.payment_date, afp.created_at, afp.amount AS amount
                 FROM additional_fee_payments afp
                 JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
                 WHERE afp.school_id = :school_id 
@@ -7567,8 +7567,8 @@ class SchoolAdminService extends BaseService
                 COALESCE(u.phone, '') AS collector_phone,
                 COALESCE(u.role, '') AS collector_role,
                 afp.payment_method,
-                COALESCE(afp.amount_paid, afp.amount) AS amount,
-                COALESCE(afp.amount_paid, afp.amount) AS amount_paid,
+                afp.amount AS amount,
+                afp.amount AS amount_paid,
                 COALESCE(afp.discount_amount, 0) AS discount_amount,
                 aft.name AS fee_month,
                 afp.payment_date,
@@ -9860,7 +9860,7 @@ class SchoolAdminService extends BaseService
 
         // 2. Total Additional Paid Fees within report period
         $stmtAddFees = $pdo->prepare("
-            SELECT COALESCE(SUM(COALESCE(afp.amount_paid, afp.amount)), 0) 
+            SELECT COALESCE(SUM(afp.amount), 0) 
             FROM additional_fee_payments afp
             JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
             JOIN students s ON afp.student_id = s.id
@@ -10003,7 +10003,7 @@ class SchoolAdminService extends BaseService
                 $tuition = (float)$stmtFees->fetchColumn();
 
                 $stmtAddFees = $pdo->prepare("
-                    SELECT COALESCE(SUM(COALESCE(afp.amount_paid, afp.amount)), 0) 
+                    SELECT COALESCE(SUM(afp.amount), 0) 
                     FROM additional_fee_payments afp
                     JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
                     WHERE afp.school_id = :sid AND LOWER(afp.status) IN ('paid', 'partial')
@@ -10287,7 +10287,7 @@ class SchoolAdminService extends BaseService
                 s.roll_no, 
                 aft.name AS fee_type, 
                 'N/A' AS months_covered, 
-                COALESCE(afp.amount_paid, afp.amount) AS amount,
+                afp.amount AS amount,
                 aft.academic_year_id,
                 s.academic_year_id AS student_academic_year_id,
                 COALESCE(u.phone, '') AS collector_phone,
@@ -10662,7 +10662,7 @@ Only approve the settlement after reviewing all financial records.
                 s.roll_no, 
                 aft.name AS fee_type, 
                 'N/A' AS months_covered, 
-                COALESCE(afp.amount_paid, afp.amount) AS amount,
+                afp.amount AS amount,
                 aft.academic_year_id,
                 s.academic_year_id AS student_academic_year_id,
                 COALESCE(u.phone, '') AS collector_phone,
@@ -10872,7 +10872,7 @@ Only approve the settlement after reviewing all financial records.
                 s.roll_no, 
                 aft.name AS fee_type, 
                 'N/A' AS months_covered, 
-                COALESCE(afp.amount_paid, afp.amount) AS amount,
+                afp.amount AS amount,
                 aft.academic_year_id,
                 s.academic_year_id AS student_academic_year_id,
                 COALESCE(u.phone, '') AS collector_phone,

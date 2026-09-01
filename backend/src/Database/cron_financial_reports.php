@@ -258,7 +258,7 @@ try {
                     s.roll_no, 
                     aft.name AS fee_type, 
                     'N/A' AS months_covered, 
-                    COALESCE(afp.amount_paid, afp.amount) AS amount,
+                    afp.amount AS amount,
                     COALESCE(u.phone, '') AS collector_phone,
                     COALESCE(afp.collected_by, 'School Admin') AS collected_by
                 FROM additional_fee_payments afp
