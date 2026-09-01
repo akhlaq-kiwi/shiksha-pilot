@@ -381,17 +381,27 @@ class TeacherService extends BaseService
             $monthlyFees = json_decode($cfgRow['monthly_fees'], true) ?: [];
         }
 
+        // Fetch paid amounts per month for this student in this academic year (including partial payments)
         $stmtPaid = $pdo->prepare("
-            SELECT fee_month FROM fee_payments 
-            WHERE student_id = :student_id AND school_id = :school_id AND UPPER(status) = 'PAID' AND academic_year_id = :academic_year_id
+            SELECT fee_month, COALESCE(SUM(amount_paid), 0) AS total_paid 
+            FROM fee_payments 
+            WHERE student_id = :student_id 
+              AND school_id = :school_id 
+              AND (academic_year_id = :academic_year_id OR academic_year_id IS NULL)
+              AND UPPER(status) IN ('PAID', 'PARTIAL', 'COMPLETED')
+            GROUP BY fee_month
         ");
         $stmtPaid->execute([
             ':student_id' => $studentId,
             ':school_id' => $schoolId,
             ':academic_year_id' => $academicYearId
         ]);
-        $paidMonths = $stmtPaid->fetchAll(\PDO::FETCH_COLUMN) ?: [];
-        $paidMonthsUpper = array_map('strtoupper', array_map('trim', $paidMonths));
+        $paidRows = $stmtPaid->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        $paidByMonth = [];
+        foreach ($paidRows as $pRow) {
+            $mKey = strtoupper(trim((string)$pRow['fee_month']));
+            $paidByMonth[$mKey] = (float)$pRow['total_paid'];
+        }
 
         $monthsToEvaluate = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
         $stmtAY = $pdo->prepare("SELECT start_date, end_date, status FROM academic_years WHERE id = :ayid AND school_id = :sid LIMIT 1");
@@ -403,9 +413,11 @@ class TeacherService extends BaseService
 
         $outstanding = 0.0;
         foreach ($monthsToEvaluate as $m) {
-            if (!in_array(strtoupper(trim($m)), $paidMonthsUpper, true)) {
-                $outstanding += isset($monthlyFees[$m]) ? (float)$monthlyFees[$m] : 0.0;
-            }
+            $mUpper = strtoupper(trim($m));
+            $totalConfiguredFee = isset($monthlyFees[$m]) ? (float)$monthlyFees[$m] : 0.0;
+            $alreadyPaidForMonth = $paidByMonth[$mUpper] ?? 0.0;
+            $remForMonth = max(0.0, round($totalConfiguredFee - $alreadyPaidForMonth, 2));
+            $outstanding += $remForMonth;
         }
 
         $stmtAddPending = $pdo->prepare("
