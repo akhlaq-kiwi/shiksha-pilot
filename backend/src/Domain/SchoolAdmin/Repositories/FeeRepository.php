@@ -109,7 +109,7 @@ class FeeRepository extends BaseRepository
             $monthlyCollected = (float)$stmt->fetchColumn();
 
             $stmtAdd = $this->pdo->prepare("
-                SELECT COALESCE(SUM(amount_paid), 0) 
+                SELECT COALESCE(SUM(amount), 0) 
                 FROM additional_fee_payments 
                 WHERE school_id = :sid AND LOWER(status) IN ('paid', 'partial')
             ");
