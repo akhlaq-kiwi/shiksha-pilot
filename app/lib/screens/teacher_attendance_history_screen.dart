@@ -212,6 +212,7 @@ class _TeacherAttendanceHistoryScreenState extends State<TeacherAttendanceHistor
   void _openRealtimeCameraScanner() {
     bool isScanned = false;
     _manualQrController.clear();
+    final MobileScannerController scannerController = MobileScannerController();
 
     showModalBottomSheet(
       context: context,
@@ -261,6 +262,37 @@ class _TeacherAttendanceHistoryScreenState extends State<TeacherAttendanceHistor
                     alignment: Alignment.center,
                     children: [
                       MobileScanner(
+                        controller: scannerController,
+                        errorBuilder: (context, error, child) {
+                          return Container(
+                            color: Colors.black,
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.camera_alt_outlined, color: Colors.amber, size: 42),
+                                const SizedBox(height: 10),
+                                const Text(
+                                  "Camera permission required or failed to load camera",
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                                ),
+                                const SizedBox(height: 12),
+                                ElevatedButton.icon(
+                                  onPressed: () {
+                                    scannerController.start();
+                                  },
+                                  icon: const Icon(Icons.refresh, size: 18),
+                                  label: const Text("Retry Camera"),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.indigo,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
                         onDetect: (capture) {
                           if (isScanned) return;
                           final List<Barcode> barcodes = capture.barcodes;
@@ -305,7 +337,11 @@ class _TeacherAttendanceHistoryScreenState extends State<TeacherAttendanceHistor
           ),
         );
       },
-    );
+    ).then((_) {
+      try {
+        scannerController.dispose();
+      } catch (_) {}
+    });
   }
 
   void _showResultDialog({

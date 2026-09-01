@@ -181,10 +181,12 @@ class TeacherAttendanceService
         $stmtStaff = $this->pdo->prepare("
             SELECT id, name, phone, email, role, department, photo_path, joining_date
             FROM staff
-            WHERE school_id = :sid AND status = 'ACTIVE' AND (joining_date IS NULL OR joining_date <= :date)
+            WHERE school_id = :sid AND status = 'ACTIVE' 
+              AND (academic_year_id = :ayid OR academic_year_id IS NULL OR academic_year_id = 0)
+              AND (joining_date IS NULL OR joining_date <= :date)
             ORDER BY name ASC
         ");
-        $stmtStaff->execute([':sid' => $schoolId, ':date' => $date]);
+        $stmtStaff->execute([':sid' => $schoolId, ':ayid' => $ay['id'], ':date' => $date]);
         $staffList = $stmtStaff->fetchAll(PDO::FETCH_ASSOC);
 
         // Fetch saved attendance for this date & academic year
@@ -390,10 +392,12 @@ class TeacherAttendanceService
         $stmtStaff = $this->pdo->prepare("
             SELECT id, name, phone, role, department, joining_date
             FROM staff
-            WHERE school_id = :sid AND status = 'ACTIVE' AND (joining_date IS NULL OR joining_date <= :edate)
+            WHERE school_id = :sid AND status = 'ACTIVE' 
+              AND (academic_year_id = :ayid OR academic_year_id IS NULL OR academic_year_id = 0)
+              AND (joining_date IS NULL OR joining_date <= :edate)
             ORDER BY name ASC
         ");
-        $stmtStaff->execute([':sid' => $schoolId, ':edate' => $endDate]);
+        $stmtStaff->execute([':sid' => $schoolId, ':ayid' => $ay['id'], ':edate' => $endDate]);
         $staffList = $stmtStaff->fetchAll(PDO::FETCH_ASSOC);
 
         // Fetch all attendance for this month
@@ -599,6 +603,8 @@ class TeacherAttendanceService
             }
         }
 
+        $ay = $this->getWorkingAcademicYear($schoolId);
+
         // Server-side Teacher Identity Validation: Find matching staff record for logged-in user
         $stmtStaff = $this->pdo->prepare("
             SELECT id, school_id, name, phone, role, status 
@@ -606,13 +612,16 @@ class TeacherAttendanceService
             WHERE school_id = :sid 
               AND (phone = :phone OR phone = :clean_phone)
               AND status = 'ACTIVE'
+              AND (academic_year_id = :ayid OR academic_year_id IS NULL OR academic_year_id = 0)
+            ORDER BY id DESC
             LIMIT 1
         ");
         $cleanPhone = preg_replace('/[^0-9]/', '', $userPhone);
         $stmtStaff->execute([
             ':sid' => $schoolId,
             ':phone' => $userPhone,
-            ':clean_phone' => $cleanPhone
+            ':clean_phone' => $cleanPhone,
+            ':ayid' => $ay['id']
         ]);
         $staff = $stmtStaff->fetch(PDO::FETCH_ASSOC);
 
@@ -622,9 +631,11 @@ class TeacherAttendanceService
                 SELECT id, school_id, name, phone, role, status 
                 FROM staff 
                 WHERE school_id = :sid AND status = 'ACTIVE' AND name = :name
+                  AND (academic_year_id = :ayid OR academic_year_id IS NULL OR academic_year_id = 0)
+                ORDER BY id DESC
                 LIMIT 1
             ");
-            $stmtStaff2->execute([':sid' => $schoolId, ':name' => $user['name'] ?? '']);
+            $stmtStaff2->execute([':sid' => $schoolId, ':name' => $user['name'] ?? '', ':ayid' => $ay['id']]);
             $staff = $stmtStaff2->fetch(PDO::FETCH_ASSOC);
         }
 
@@ -750,6 +761,8 @@ class TeacherAttendanceService
         $userPhone = $user['phone'] ?? '';
         $cleanPhone = preg_replace('/[^0-9]/', '', $userPhone);
 
+        $ay = $this->getWorkingAcademicYear($schoolId);
+
         // Server-side Teacher Identity Lookup
         $stmtStaff = $this->pdo->prepare("
             SELECT id, name, phone, role, joining_date, created_at 
@@ -757,12 +770,15 @@ class TeacherAttendanceService
             WHERE school_id = :sid 
               AND (phone = :phone OR phone = :clean_phone)
               AND status = 'ACTIVE'
+              AND (academic_year_id = :ayid OR academic_year_id IS NULL OR academic_year_id = 0)
+            ORDER BY id DESC
             LIMIT 1
         ");
         $stmtStaff->execute([
             ':sid' => $schoolId,
             ':phone' => $userPhone,
-            ':clean_phone' => $cleanPhone
+            ':clean_phone' => $cleanPhone,
+            ':ayid' => $ay['id']
         ]);
         $staff = $stmtStaff->fetch(PDO::FETCH_ASSOC);
 
@@ -771,22 +787,25 @@ class TeacherAttendanceService
                 SELECT id, name, phone, role, joining_date, created_at 
                 FROM staff 
                 WHERE school_id = :sid AND status = 'ACTIVE' AND name = :name
+                  AND (academic_year_id = :ayid OR academic_year_id IS NULL OR academic_year_id = 0)
+                ORDER BY id DESC
                 LIMIT 1
             ");
-            $stmtStaff2->execute([':sid' => $schoolId, ':name' => $user['name'] ?? '']);
+            $stmtStaff2->execute([':sid' => $schoolId, ':name' => $user['name'] ?? '', ':ayid' => $ay['id']]);
             $staff = $stmtStaff2->fetch(PDO::FETCH_ASSOC);
         }
 
         if (!$staff) {
-            // Fallback: Pick the first active teacher in the school
+            // Fallback: Pick the first active teacher in the school for current academic year
             $stmtStaff3 = $this->pdo->prepare("
                 SELECT id, name, phone, role, joining_date, created_at 
                 FROM staff 
                 WHERE school_id = :sid AND status = 'ACTIVE'
-                ORDER BY id ASC
+                  AND (academic_year_id = :ayid OR academic_year_id IS NULL OR academic_year_id = 0)
+                ORDER BY id DESC
                 LIMIT 1
             ");
-            $stmtStaff3->execute([':sid' => $schoolId]);
+            $stmtStaff3->execute([':sid' => $schoolId, ':ayid' => $ay['id']]);
             $staff = $stmtStaff3->fetch(PDO::FETCH_ASSOC);
         }
 
