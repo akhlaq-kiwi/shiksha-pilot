@@ -9912,26 +9912,26 @@ class SchoolAdminService extends BaseService
         ]);
         $tuitionCollected = (float)$stmtFees->fetchColumn();
 
-        // 2. Total Additional Paid Fees within report period
+        // 2. Total Additional Paid Fees within report period (from payment history)
         $stmtAddFees = $pdo->prepare("
-            SELECT COALESCE(SUM(afp.amount), 0) 
-            FROM additional_fee_payments afp
+            SELECT COALESCE(SUM(afph.amount_paid), 0) 
+            FROM additional_fee_payment_history afph
+            JOIN additional_fee_payments afp ON afph.payment_id = afp.id
             JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
             JOIN students s ON afp.student_id = s.id
             WHERE afp.school_id = :sid 
-              AND LOWER(afp.status) IN ('paid', 'partial')
               AND (
                 s.academic_year_id = :ayid_stu
                 OR aft.academic_year_id = :ayid_fee
                 OR aft.academic_year_id IS NULL
                 OR (
-                  afp.updated_at >= (SELECT created_at FROM academic_years WHERE id = :ayid_2 LIMIT 1)
+                  afph.created_at >= (SELECT created_at FROM academic_years WHERE id = :ayid_2 LIMIT 1)
                   AND (s.status = 'Inactive' OR s.status = 'Alumni' OR s.status = 'Archived')
                 )
               )
               AND (
-                (afp.payment_date IS NOT NULL AND afp.payment_date >= :from_date AND afp.payment_date <= :to_date)
-                OR (afp.payment_date IS NULL AND afp.created_at >= :from_ts AND afp.created_at <= :to_ts)
+                (afph.payment_date IS NOT NULL AND afph.payment_date >= :from_date AND afph.payment_date <= :to_date)
+                OR (afph.payment_date IS NULL AND afph.created_at >= :from_ts AND afph.created_at <= :to_ts)
               )
         ");
         $stmtAddFees->execute([
@@ -10057,12 +10057,16 @@ class SchoolAdminService extends BaseService
                 $tuition = (float)$stmtFees->fetchColumn();
 
                 $stmtAddFees = $pdo->prepare("
-                    SELECT COALESCE(SUM(afp.amount), 0) 
-                    FROM additional_fee_payments afp
+                    SELECT COALESCE(SUM(afph.amount_paid), 0) 
+                    FROM additional_fee_payment_history afph
+                    JOIN additional_fee_payments afp ON afph.payment_id = afp.id
                     JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
-                    WHERE afp.school_id = :sid AND LOWER(afp.status) IN ('paid', 'partial')
+                    WHERE afp.school_id = :sid 
                       AND aft.academic_year_id = :ayid
-                      AND DATE(afp.updated_at) >= :fdate AND DATE(afp.updated_at) <= :tdate
+                      AND (
+                        (afph.payment_date IS NOT NULL AND afph.payment_date >= :fdate AND afph.payment_date <= :tdate)
+                        OR (afph.payment_date IS NULL AND DATE(afph.created_at) >= :fdate AND DATE(afph.created_at) <= :tdate)
+                      )
                 ");
                 $stmtAddFees->execute([
                     ':sid' => $schoolId,
@@ -10333,7 +10337,7 @@ class SchoolAdminService extends BaseService
 
         $stmtAddFeeList = $pdo->prepare("
             SELECT 
-                afp.updated_at AS deposit_time, 
+                afph.created_at AS deposit_time, 
                 s.name AS student_name, 
                 c.name AS class_name, 
                 c.section AS class_section,
@@ -10341,20 +10345,20 @@ class SchoolAdminService extends BaseService
                 s.roll_no, 
                 aft.name AS fee_type, 
                 'N/A' AS months_covered, 
-                afp.amount AS amount,
+                afph.amount_paid AS amount,
                 aft.academic_year_id,
                 s.academic_year_id AS student_academic_year_id,
                 COALESCE(u.phone, '') AS collector_phone,
-                COALESCE(afp.collected_by, 'School Admin') AS collected_by
-            FROM additional_fee_payments afp
+                COALESCE(afph.collected_by, afp.collected_by, 'School Admin') AS collected_by
+            FROM additional_fee_payment_history afph
+            JOIN additional_fee_payments afp ON afph.payment_id = afp.id
             JOIN students s ON afp.student_id = s.id
             LEFT JOIN classes c ON s.class_id = c.id
             JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
-            LEFT JOIN users u ON (u.name = afp.collected_by AND u.school_id = afp.school_id)
+            LEFT JOIN users u ON (u.name = afph.collected_by AND u.school_id = afp.school_id)
             WHERE afp.school_id = :sid 
-              AND afp.status = 'Paid'
-              AND afp.updated_at {$operator} :from_ts 
-              AND afp.updated_at <= :to_ts
+              AND afph.created_at {$operator} :from_ts 
+              AND afph.created_at <= :to_ts
         ");
         $stmtAddFeeList->execute([':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts]);
         $addPayments = $stmtAddFeeList->fetchAll(PDO::FETCH_ASSOC);
@@ -10708,7 +10712,7 @@ Only approve the settlement after reviewing all financial records.
 
         $stmtAddFeeList = $pdo->prepare("
             SELECT 
-                afp.updated_at AS deposit_time, 
+                afph.created_at AS deposit_time, 
                 s.name AS student_name, 
                 c.name AS class_name, 
                 c.section AS class_section,
@@ -10716,20 +10720,20 @@ Only approve the settlement after reviewing all financial records.
                 s.roll_no, 
                 aft.name AS fee_type, 
                 'N/A' AS months_covered, 
-                afp.amount AS amount,
+                afph.amount_paid AS amount,
                 aft.academic_year_id,
                 s.academic_year_id AS student_academic_year_id,
                 COALESCE(u.phone, '') AS collector_phone,
-                COALESCE(afp.collected_by, 'School Admin') AS collected_by
-            FROM additional_fee_payments afp
+                COALESCE(afph.collected_by, afp.collected_by, 'School Admin') AS collected_by
+            FROM additional_fee_payment_history afph
+            JOIN additional_fee_payments afp ON afph.payment_id = afp.id
             JOIN students s ON afp.student_id = s.id
             LEFT JOIN classes c ON s.class_id = c.id
             JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
-            LEFT JOIN users u ON (u.name = afp.collected_by AND u.school_id = afp.school_id)
+            LEFT JOIN users u ON (u.name = afph.collected_by AND u.school_id = afp.school_id)
             WHERE afp.school_id = :sid 
-              AND afp.status = 'Paid'
-              AND afp.updated_at {$operator} :from_ts 
-              AND afp.updated_at <= :to_ts
+              AND afph.created_at {$operator} :from_ts 
+              AND afph.created_at <= :to_ts
         ");
         $stmtAddFeeList->execute([':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts]);
         $addPayments = $stmtAddFeeList->fetchAll(PDO::FETCH_ASSOC);
