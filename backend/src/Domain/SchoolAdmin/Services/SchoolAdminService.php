@@ -9130,10 +9130,9 @@ class SchoolAdminService extends BaseService
             ':school_id' => $schoolId,
             ':class_id' => $classId,
             ':academic_year_id' => $academicYearId,
-                ':mode' => $mode,
-                ':monthly_fees' => $jsonFees
-            ]);
-        }
+            ':mode' => $mode,
+            ':monthly_fees' => $jsonFees
+        ]);
 
         return [
             'school_id' => $schoolId,
