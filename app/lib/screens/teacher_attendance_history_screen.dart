@@ -823,6 +823,8 @@ class _TeacherQrScannerModalWidgetState extends State<_TeacherQrScannerModalWidg
   late MobileScannerController _scannerController;
   bool _isScanned = false;
   bool _isTorchOn = false;
+  bool _showManualInput = false;
+  final TextEditingController _manualInputController = TextEditingController();
 
   @override
   void initState() {
@@ -832,6 +834,7 @@ class _TeacherQrScannerModalWidgetState extends State<_TeacherQrScannerModalWidg
       detectionSpeed: DetectionSpeed.normal,
       facing: CameraFacing.back,
       torchEnabled: false,
+      formats: const [BarcodeFormat.qrCode],
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -842,6 +845,7 @@ class _TeacherQrScannerModalWidgetState extends State<_TeacherQrScannerModalWidg
 
   @override
   void dispose() {
+    _manualInputController.dispose();
     _scannerController.dispose();
     super.dispose();
   }
@@ -858,6 +862,14 @@ class _TeacherQrScannerModalWidgetState extends State<_TeacherQrScannerModalWidg
         break;
       }
     }
+  }
+
+  void _submitManualPayload() {
+    final text = _manualInputController.text.trim();
+    if (text.isEmpty) return;
+    _isScanned = true;
+    Navigator.pop(context);
+    widget.onScanned(text);
   }
 
   @override
@@ -938,26 +950,31 @@ class _TeacherQrScannerModalWidgetState extends State<_TeacherQrScannerModalWidg
                             const Icon(Icons.camera_alt_outlined, color: Colors.amber, size: 40),
                             const SizedBox(height: 10),
                             Text(
-                              "Camera status ($errCode):\n${errDetail ?? 'Tap retry to restart camera stream'}",
+                              "Camera initialization ($errCode):\n${errDetail ?? 'Tap retry to restart camera stream'}",
                               textAlign: TextAlign.center,
                               style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
                             ),
                             const SizedBox(height: 14),
-                            ElevatedButton.icon(
-                              onPressed: () async {
-                                try {
-                                  await _scannerController.stop();
-                                } catch (_) {}
-                                if (mounted) {
-                                  _scannerController.start();
-                                }
-                              },
-                              icon: const Icon(Icons.refresh, size: 18),
-                              label: const Text("Retry Camera"),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.indigo,
-                                foregroundColor: Colors.white,
-                              ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                ElevatedButton.icon(
+                                  onPressed: () async {
+                                    try {
+                                      await _scannerController.stop();
+                                    } catch (_) {}
+                                    if (mounted) {
+                                      _scannerController.start();
+                                    }
+                                  },
+                                  icon: const Icon(Icons.refresh, size: 18),
+                                  label: const Text("Retry Camera"),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.indigo,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -991,6 +1008,46 @@ class _TeacherQrScannerModalWidgetState extends State<_TeacherQrScannerModalWidg
               ),
             ),
           ),
+          const SizedBox(height: 12),
+          TextButton.icon(
+            onPressed: () {
+              setState(() {
+                _showManualInput = !_showManualInput;
+              });
+            },
+            icon: Icon(_showManualInput ? Icons.keyboard_hide : Icons.keyboard, color: Colors.indigo),
+            label: Text(
+              _showManualInput ? "Hide Manual Entry" : "Enter QR Code Manually",
+              style: const TextStyle(color: Colors.indigo, fontWeight: FontWeight.bold),
+            ),
+          ),
+          if (_showManualInput) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _manualInputController,
+                    decoration: const InputDecoration(
+                      hintText: "Paste or enter QR Payload...",
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: _submitManualPayload,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.indigo,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  ),
+                  child: const Text("Submit"),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
