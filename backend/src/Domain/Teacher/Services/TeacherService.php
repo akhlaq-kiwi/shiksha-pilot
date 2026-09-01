@@ -383,7 +383,7 @@ class TeacherService extends BaseService
 
         // Fetch paid amounts per month for this student in this academic year (including partial payments)
         $stmtPaid = $pdo->prepare("
-            SELECT fee_month, COALESCE(SUM(amount_paid), 0) AS total_paid 
+            SELECT fee_month, COALESCE(SUM(amount_paid + COALESCE(discount_amount, 0)), 0) AS total_paid 
             FROM fee_payments 
             WHERE student_id = :student_id 
               AND school_id = :school_id 
