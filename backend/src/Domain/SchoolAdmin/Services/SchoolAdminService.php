@@ -1007,7 +1007,7 @@ class SchoolAdminService extends BaseService
             $receiptNo = $payment['receipt_no'];
             $monthTitle = $payment['fee_month'];
 
-            $stmtGrp = $pdo->prepare("SELECT fee_month, amount_paid, COALESCE(discount_amount, 0) AS discount_amount FROM fee_payments WHERE receipt_no = :receipt_no AND school_id = :sid");
+            $stmtGrp = $pdo->prepare("SELECT fee_month, amount_paid, 0 AS discount_amount FROM fee_payments WHERE receipt_no = :receipt_no AND school_id = :sid");
             $stmtGrp->execute([':receipt_no' => $receiptNo, ':sid' => $schoolId]);
             $groupPayments = $stmtGrp->fetchAll(PDO::FETCH_ASSOC) ?: [];
             
@@ -7215,7 +7215,7 @@ class SchoolAdminService extends BaseService
 
         // 4. Pre-fetch existing paid amounts per month for this student and academic year
         $stmtExistingPaid = $pdo->prepare("
-            SELECT fee_month, COALESCE(SUM(amount_paid + COALESCE(discount_amount, 0)), 0) AS total_paid 
+            SELECT fee_month, COALESCE(SUM(amount_paid), 0) AS total_paid 
             FROM fee_payments 
             WHERE student_id = :student_id 
               AND (academic_year_id = :ayid OR academic_year_id IS NULL)
@@ -7336,7 +7336,6 @@ class SchoolAdminService extends BaseService
                 'student_id'       => $studentId,
                 'fee_structure_id' => $feeStructureId,
                 'amount_paid'      => $monthAmount,
-                'discount_amount'  => $monthDiscount,
                 'payment_date'     => date('Y-m-d'),
                 'receipt_no'       => $receiptNo,
                 'status'           => $status,
@@ -7412,7 +7411,7 @@ class SchoolAdminService extends BaseService
                 fp.payment_method,
                 fp.amount_paid AS amount,
                 fp.amount_paid AS amount_paid,
-                COALESCE(fp.discount_amount, 0) AS discount_amount,
+                0 AS discount_amount,
                 fp.fee_month AS fee_month,
                 fp.payment_date,
                 fp.created_at,

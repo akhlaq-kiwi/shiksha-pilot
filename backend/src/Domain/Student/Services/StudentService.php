@@ -1130,7 +1130,7 @@ class StudentService extends BaseService
         $feeMonthDisplay = '';
         $totalDiscountAmount = 0.0;
         if (!$isAdditional) {
-            $stmtGrp = $pdo->prepare("SELECT fee_month, amount_paid, COALESCE(discount_amount, 0) AS discount_amount FROM fee_payments WHERE receipt_no = :receipt_no AND school_id = :sid");
+            $stmtGrp = $pdo->prepare("SELECT fee_month, amount_paid, 0 AS discount_amount FROM fee_payments WHERE receipt_no = :receipt_no AND school_id = :sid");
             $stmtGrp->execute([':receipt_no' => $receiptNo, ':sid' => $schoolId]);
             $groupPayments = $stmtGrp->fetchAll(PDO::FETCH_ASSOC) ?: [];
             
