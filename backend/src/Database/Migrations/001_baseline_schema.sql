@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS `additional_fee_payments` (
   `amount` decimal(12,2) NOT NULL,
   `discount_amount` decimal(12,2) NOT NULL DEFAULT '0.00',
   `amount_paid` decimal(12,2) DEFAULT NULL,
-  `status` enum('Pending','Paid') NOT NULL DEFAULT 'Pending',
+  `status` enum('Pending','Paid','Partial') NOT NULL DEFAULT 'Pending',
   `payment_date` date DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

@@ -486,7 +486,7 @@ class SchoolAdminService extends BaseService
 
             // Query 2: Additional fee payments for this academic year (grouped by deposit payment_date)
             $stmtAddFeeChart = $pdo->prepare("
-                SELECT afp.payment_date, afp.created_at, afp.amount AS amount
+                SELECT afp.payment_date, afp.created_at, COALESCE(afp.amount_paid, afp.amount) AS amount
                 FROM additional_fee_payments afp
                 JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
                 WHERE afp.school_id = :school_id 
@@ -12039,7 +12039,14 @@ Only approve the settlement after reviewing all financial records.
         }
 
         $totalSettled = $depositAmount + $discountAmount;
-        $newStatus = ($alreadyPaid + $totalSettled >= $totalAmount - 0.01) ? 'Paid' : 'Pending';
+        $totalPaidSoFar = $alreadyPaid + $totalSettled;
+        if ($totalPaidSoFar >= $totalAmount - 0.01) {
+            $newStatus = 'Paid';
+        } elseif ($totalPaidSoFar > 0.01) {
+            $newStatus = 'Partial';
+        } else {
+            $newStatus = 'Pending';
+        }
         $paymentDate = date('Y-m-d');
         $paymentMethod = !empty($data['payment_method']) ? trim($data['payment_method']) : (!empty($data['payment_mode']) ? trim($data['payment_mode']) : 'Cash');
         $userId = (int) ($user['id'] ?? 0);
