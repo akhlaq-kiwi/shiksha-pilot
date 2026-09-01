@@ -317,6 +317,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
   const [showLockConfirm, setShowLockConfirm] = useState(false);
   const [feeError, setFeeError] = useState('');
   const [feeSuccess, setFeeSuccess] = useState('');
+  const [feeSaving, setFeeSaving] = useState(false);
   const [isSwitchingClass, setIsSwitchingClass] = useState(false);
 
   useEffect(() => {
@@ -1213,9 +1214,13 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
     setShowLockConfirm(false);
     setFeeError('');
     setFeeSuccess('');
+    setFeeSaving(true);
 
     const activeYear = currentYear || academicYears.find(y => y.is_current);
-    if (!activeYear) return;
+    if (!activeYear) {
+      setFeeSaving(false);
+      return;
+    }
 
     const feesMap = {};
     const academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
@@ -1247,6 +1252,8 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
     } catch (err) {
       console.error(err);
       setFeeError(err.message || 'Failed to save fee configuration.');
+    } finally {
+      setFeeSaving(false);
     }
   };
 
