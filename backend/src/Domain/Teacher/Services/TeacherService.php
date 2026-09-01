@@ -421,12 +421,12 @@ class TeacherService extends BaseService
         }
 
         $stmtAddPending = $pdo->prepare("
-            SELECT COALESCE(SUM(afp.amount), 0)
+            SELECT COALESCE(SUM(afp.amount - (COALESCE(afp.amount_paid, 0) + COALESCE(afp.discount_amount, 0))), 0)
             FROM additional_fee_payments afp
             JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
             WHERE afp.student_id = :student_id
               AND afp.school_id = :school_id
-              AND afp.status = 'Pending'
+              AND LOWER(afp.status) IN ('pending', 'partial')
               AND (aft.academic_year_id = :academic_year_id OR aft.academic_year_id IS NULL OR aft.name = 'Previous Year Dues')
         ");
         $stmtAddPending->execute([

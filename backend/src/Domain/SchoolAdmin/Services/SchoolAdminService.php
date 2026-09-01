@@ -408,6 +408,7 @@ class SchoolAdminService extends BaseService
         
         // 1. Fetch current active or draft academic year
         $activeYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+        $this->ensureDiscountAndPartialSchema($pdo);
 
         $pendingFeesTotal = 0.0;
         if ($activeYear) {
@@ -4720,12 +4721,12 @@ class SchoolAdminService extends BaseService
         }
 
         $stmtAddPending = $pdo->prepare("
-            SELECT COALESCE(SUM(afp.amount), 0)
+            SELECT COALESCE(SUM(afp.amount - (COALESCE(afp.amount_paid, 0) + COALESCE(afp.discount_amount, 0))), 0)
             FROM additional_fee_payments afp
             JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
             WHERE afp.student_id = :student_id
               AND afp.school_id = :school_id
-              AND LOWER(afp.status) = 'pending'
+              AND LOWER(afp.status) IN ('pending', 'partial')
               AND (aft.academic_year_id = :academic_year_id OR aft.academic_year_id IS NULL OR aft.name = 'Previous Year Dues')
         ");
         $stmtAddPending->execute([
