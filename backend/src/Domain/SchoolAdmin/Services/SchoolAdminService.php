@@ -443,114 +443,11 @@ class SchoolAdminService extends BaseService
                 }
 
                 if (!empty($activeStudents)) {
-                    // Fetch all class configurations for this year
-                    $stmtConfigs = $pdo->prepare("
-                        SELECT class_id, monthly_fees 
-                        FROM class_fee_configurations 
-                        WHERE school_id = :sid AND academic_year_id = :ayid
-                    ");
-                    $stmtConfigs->execute([
-                        ':sid' => $schoolId,
-                        ':ayid' => $activeYear['id']
-                    ]);
-                    $configs = $stmtConfigs->fetchAll(\PDO::FETCH_ASSOC);
-
-                    $classConfigs = [];
-                    foreach ($configs as $cfg) {
-                        $classConfigs[$cfg['class_id']] = json_decode($cfg['monthly_fees'], true);
-                    }
-
-                    // Fetch all payments for current active year students
-                    $studentIds = array_column($activeStudents, 'id');
-                    $studentIdsStr = implode(',', array_map('intval', $studentIds));
-                    
-                    $stmtPayments = $pdo->prepare("
-                        SELECT student_id, fee_month, COALESCE(SUM(amount_paid + COALESCE(discount_amount, 0)), 0) AS paid_amount 
-                        FROM fee_payments 
-                        WHERE school_id = :sid AND status IN ('PAID', 'Partial') AND student_id IN ($studentIdsStr)
-                        GROUP BY student_id, fee_month
-                    ");
-                    $stmtPayments->execute([':sid' => $schoolId]);
-                    $payments = $stmtPayments->fetchAll(\PDO::FETCH_ASSOC);
-
-                    $studentPaidAmounts = [];
-                    foreach ($payments as $pay) {
-                        $sId = (int)$pay['student_id'];
-                        $mName = $pay['fee_month'];
-                        $studentPaidAmounts[$sId][$mName] = (float)$pay['paid_amount'];
-                    }
-
                     foreach ($activeStudents as $student) {
-                        $classId = $student['class_id'];
-                        if (empty($classId) || !isset($classConfigs[$classId])) {
-                            continue;
-                        }
-
-                        $monthlyFees = $classConfigs[$classId];
-                        $sId = (int)$student['id'];
-
-                        foreach ($monthsDue as $m) {
-                            $totalFeeForMonth = isset($monthlyFees[$m]) ? (float)$monthlyFees[$m] : 0.0;
-                            $alreadyPaidForMonth = $studentPaidAmounts[$sId][$m] ?? 0.0;
-                            $remForMonth = max(0.0, round($totalFeeForMonth - $alreadyPaidForMonth, 2));
-                            $pendingFeesTotal += $remForMonth;
-                        }
+                        $pendingFeesTotal += $this->getStudentCurrentOutstandingBalance($pdo, (int)$student['id'], $schoolId, (int)$activeYear['id']);
                     }
                 }
             }
-
-            // Calculate pending additional fees that are due
-            $today = date('Y-m-d');
-            if ($activeYear['status'] === 'Archived') {
-                $stmtAddPending = $pdo->prepare("
-                    SELECT afp.amount, 0 AS amount_paid, 0 AS discount_amount, afp.student_id
-                    FROM additional_fee_payments afp
-                    JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
-                    WHERE afp.school_id = :sid
-                      AND afp.status IN ('Pending', 'Partial')
-                      AND aft.academic_year_id = :ayid_fee
-                      AND (aft.due_date <= :today OR aft.due_date IS NULL OR aft.name = 'Previous Year Dues')
-                ");
-                $stmtAddPending->execute([
-                    ':sid' => $schoolId,
-                    ':ayid_fee' => $activeYear['id'],
-                    ':today' => $today
-                ]);
-                $addPayments = $stmtAddPending->fetchAll(PDO::FETCH_ASSOC) ?: [];
-                $pendingAddFees = 0.0;
-                foreach ($addPayments as $p) {
-                    if (!$this->isStudentPromoted($pdo, (int)$p['student_id'], $schoolId)) {
-                        $rem = max(0.0, (float)$p['amount'] - ((float)$p['amount_paid'] + (float)$p['discount_amount']));
-                        $pendingAddFees += $rem;
-                    }
-                }
-            } else {
-                $stmtAddPending = $pdo->prepare("
-                    SELECT afp.amount, 0 AS amount_paid, 0 AS discount_amount
-                    FROM additional_fee_payments afp
-                    JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
-                    JOIN students s ON afp.student_id = s.id
-                    WHERE afp.school_id = :sid
-                      AND afp.status IN ('Pending', 'Partial')
-                      AND s.status = 'ACTIVE'
-                      AND s.academic_year_id = :ayid_stu
-                      AND aft.academic_year_id = :ayid_fee
-                      AND (aft.due_date <= :today OR aft.due_date IS NULL OR aft.name = 'Previous Year Dues')
-                ");
-                $stmtAddPending->execute([
-                    ':sid' => $schoolId,
-                    ':ayid_stu' => $activeYear['id'],
-                    ':ayid_fee' => $activeYear['id'],
-                    ':today' => $today
-                ]);
-                $addPayments = $stmtAddPending->fetchAll(PDO::FETCH_ASSOC) ?: [];
-                $pendingAddFees = 0.0;
-                foreach ($addPayments as $p) {
-                    $rem = max(0.0, (float)$p['amount'] - ((float)$p['amount_paid'] + (float)$p['discount_amount']));
-                    $pendingAddFees += $rem;
-                }
-            }
-            $pendingFeesTotal += $pendingAddFees;
         }
 
         $feeCollectionChart = [];
@@ -12087,7 +11984,7 @@ Only approve the settlement after reviewing all financial records.
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->staffRepo->getPdo();
 
-        $stmtCheck = $pdo->prepare("SELECT id, amount, COALESCE(amount_paid, 0) AS amount_paid, COALESCE(discount_amount, 0) AS discount_amount, status FROM additional_fee_payments WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtCheck = $pdo->prepare("SELECT id, amount, status FROM additional_fee_payments WHERE id = :id AND school_id = :sid LIMIT 1");
         $stmtCheck->execute([':id' => $id, ':sid' => $schoolId]);
         $currentRec = $stmtCheck->fetch(PDO::FETCH_ASSOC);
         if ($currentRec === false) {
@@ -12095,9 +11992,8 @@ Only approve the settlement after reviewing all financial records.
         }
 
         $totalAmount = (float)$currentRec['amount'];
-        $alreadyPaid = (float)$currentRec['amount_paid'];
-        $alreadyDiscounted = (float)$currentRec['discount_amount'];
-        $remainingAmount = max(0.0, round($totalAmount - ($alreadyPaid + $alreadyDiscounted), 2));
+        $alreadyPaid = ($currentRec['status'] === 'Paid') ? $totalAmount : 0.0;
+        $remainingAmount = max(0.0, round($totalAmount - $alreadyPaid, 2));
 
         if ($remainingAmount <= 0.01) {
             throw new ValidationException(['fields' => 'This fee has already been fully paid.']);
@@ -12125,7 +12021,6 @@ Only approve the settlement after reviewing all financial records.
             }
         }
 
-        // Determine deposit amount and discount amount
         $depositAmount = $remainingAmount;
         if (isset($data['amount_paid']) && is_numeric($data['amount_paid'])) {
             $depositAmount = (float)$data['amount_paid'];
@@ -12135,22 +12030,7 @@ Only approve the settlement after reviewing all financial records.
             $depositAmount = (float)$data['amount'];
         }
 
-        $discountAmount = max(0.0, (float)($data['discount_amount'] ?? 0));
-        $totalSettled = $depositAmount + $discountAmount;
-
-        if ($depositAmount < 0 || floor($depositAmount) != $depositAmount) {
-            throw new ValidationException(['fields' => 'Amount to deposit must be a positive whole number (no decimals or negative values allowed).']);
-        }
-
-        if ($totalSettled > $remainingAmount + 0.01) {
-            $formattedRem = number_format($remainingAmount, 0);
-            throw new ValidationException(['fields' => "Amount + Discount cannot exceed the remaining fee of ₹{$formattedRem}."]);
-        }
-
-        $newAmountPaid = round($alreadyPaid + $depositAmount, 2);
-        $newDiscountAmount = round($alreadyDiscounted + $discountAmount, 2);
-        $newStatus = (($newAmountPaid + $newDiscountAmount) >= ($totalAmount - 0.01)) ? 'Paid' : 'Partial';
-
+        $newStatus = 'Paid';
         $paymentDate = date('Y-m-d');
         $paymentMethod = !empty($data['payment_method']) ? trim($data['payment_method']) : (!empty($data['payment_mode']) ? trim($data['payment_mode']) : 'Cash');
         $userId = (int) ($user['id'] ?? 0);
@@ -12167,14 +12047,12 @@ Only approve the settlement after reviewing all financial records.
 
         $stmtUpdate = $pdo->prepare("
             UPDATE additional_fee_payments 
-            SET amount_paid = :amount_paid, discount_amount = :discount_amount, status = :status, payment_date = :pdate, payment_method = :pmethod, collected_by = :collected_by, receipt_no = :receipt_no
+            SET status = :status, payment_date = :pdate, payment_method = :pmethod, collected_by = :collected_by, receipt_no = :receipt_no
             WHERE id = :id AND school_id = :sid
         ");
         $stmtUpdate->execute([
             ':id' => $id,
             ':sid' => $schoolId,
-            ':amount_paid' => $newAmountPaid,
-            ':discount_amount' => $newDiscountAmount,
             ':status' => $newStatus,
             ':pdate' => $paymentDate,
             ':pmethod' => $paymentMethod,
@@ -12200,16 +12078,11 @@ Only approve the settlement after reviewing all financial records.
             $pay['student_id'] = (int)$pay['student_id'];
             $pay['fee_type_id'] = (int)$pay['fee_type_id'];
             $pay['amount'] = (float)$pay['amount'];
-            $pay['amount_paid'] = (float)$pay['amount_paid'];
+            $pay['amount_paid'] = (float)$pay['amount'];
 
             $feeName = $pay['fee_name'] ?? 'Fee';
             $amtStr = "₹" . number_format($depositAmount, 0);
-            if ($newStatus === 'Paid') {
-                $this->sendStudentNotification($pdo, $schoolId, $pay['student_id'], "Fee Deposited", "Your {$feeName} payment of {$amtStr} has been successfully recorded.");
-            } else {
-                $remStr = "₹" . number_format(max(0.0, $totalAmount - $newAmountPaid), 0);
-                $this->sendStudentNotification($pdo, $schoolId, $pay['student_id'], "Partial Fee Deposited", "Your partial payment of {$amtStr} for {$feeName} has been recorded. Remaining: {$remStr}.");
-            }
+            $this->sendStudentNotification($pdo, $schoolId, $pay['student_id'], "Fee Deposited", "Your {$feeName} payment of {$amtStr} has been successfully recorded.");
             $this->syncFollowUpStatus($pdo, $pay['student_id'], $schoolId);
         }
 
@@ -12264,9 +12137,13 @@ Only approve the settlement after reviewing all financial records.
 
         $stmtUpdate = $pdo->prepare("
             UPDATE additional_fee_payments 
-            SET amount_paid = 0.00, discount_amount = 0.00, status = 'Pending', payment_date = NULL 
+            SET status = 'Pending', payment_date = NULL, receipt_no = NULL 
             WHERE id = :id AND school_id = :sid
         ");
+        $stmtUpdate->execute([
+            ':id' => $id,
+            ':sid' => $schoolId
+        ]);
         $stmtUpdate->execute([
             ':id' => $id,
             ':sid' => $schoolId
