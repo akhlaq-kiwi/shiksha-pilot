@@ -7409,6 +7409,16 @@ class SchoolAdminService extends BaseService
                   AND `status` = 'Pending'
             ");
         } catch (\Throwable $e) {}
+
+        try {
+            $pdo->exec("
+                UPDATE `additional_fee_payments` 
+                SET `status` = 'Paid' 
+                WHERE (`amount_paid` + COALESCE(`discount_amount`, 0)) >= `amount` - 0.01 
+                  AND `amount_paid` IS NOT NULL
+                  AND `status` != 'Paid'
+            ");
+        } catch (\Throwable $e) {}
     }
 
     public function getCollectionHistory(array $user, array $params = []): array
@@ -16298,14 +16308,14 @@ Only approve the settlement after reviewing all financial records.
             $outstanding += $remForMonth;
         }
 
-        // Fetch all pending additional fees
+        // Fetch all pending and partial additional fees
         $stmtAddPending = $pdo->prepare("
-            SELECT COALESCE(SUM(afp.amount), 0)
+            SELECT COALESCE(SUM(afp.amount - (COALESCE(afp.amount_paid, 0) + COALESCE(afp.discount_amount, 0))), 0)
             FROM additional_fee_payments afp
             JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
             WHERE afp.student_id = :student_id
               AND afp.school_id = :school_id
-              AND afp.status = 'Pending'
+              AND LOWER(afp.status) IN ('pending', 'partial')
               AND (aft.academic_year_id = :academic_year_id OR aft.academic_year_id IS NULL OR aft.name = 'Previous Year Dues')
         ");
         $stmtAddPending->execute([
