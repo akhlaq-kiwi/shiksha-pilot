@@ -7413,6 +7413,17 @@ class SchoolAdminService extends BaseService
         try {
             $pdo->exec("
                 UPDATE `additional_fee_payments` 
+                SET `amount_paid` = round(`amount` - COALESCE(`discount_amount`, 0), 2),
+                    `status` = 'Paid' 
+                WHERE `discount_amount` > 0 
+                  AND (`amount_paid` + `discount_amount`) < `amount` - 0.01
+                  AND `amount_paid` IS NOT NULL
+            ");
+        } catch (\Throwable $e) {}
+
+        try {
+            $pdo->exec("
+                UPDATE `additional_fee_payments` 
                 SET `status` = 'Paid' 
                 WHERE (`amount_paid` + COALESCE(`discount_amount`, 0)) >= `amount` - 0.01 
                   AND `amount_paid` IS NOT NULL
@@ -12039,7 +12050,7 @@ Only approve the settlement after reviewing all financial records.
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->staffRepo->getPdo();
 
-        $stmtCheck = $pdo->prepare("SELECT id, amount, status FROM additional_fee_payments WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtCheck = $pdo->prepare("SELECT id, amount, amount_paid, discount_amount, status FROM additional_fee_payments WHERE id = :id AND school_id = :sid LIMIT 1");
         $stmtCheck->execute([':id' => $id, ':sid' => $schoolId]);
         $currentRec = $stmtCheck->fetch(PDO::FETCH_ASSOC);
         if ($currentRec === false) {
@@ -12047,10 +12058,12 @@ Only approve the settlement after reviewing all financial records.
         }
 
         $totalAmount = (float)$currentRec['amount'];
-        $alreadyPaid = ($currentRec['status'] === 'Paid') ? $totalAmount : 0.0;
-        $remainingAmount = max(0.0, round($totalAmount - $alreadyPaid, 2));
+        $alreadyPaid = (float)($currentRec['amount_paid'] ?? 0.0);
+        $alreadyDiscount = (float)($currentRec['discount_amount'] ?? 0.0);
+        $alreadyCleared = $alreadyPaid + $alreadyDiscount;
+        $remainingAmount = max(0.0, round($totalAmount - $alreadyCleared, 2));
 
-        if ($remainingAmount <= 0.01) {
+        if ($remainingAmount <= 0.01 || $currentRec['status'] === 'Paid') {
             throw new ValidationException(['fields' => 'This fee has already been fully paid.']);
         }
 
@@ -12076,22 +12089,22 @@ Only approve the settlement after reviewing all financial records.
             }
         }
 
-        $discountAmount = 0.0;
+        $newDiscount = 0.0;
         if (isset($data['discount_amount']) && is_numeric($data['discount_amount'])) {
-            $discountAmount = max(0.0, (float)$data['discount_amount']);
+            $newDiscount = max(0.0, (float)$data['discount_amount']);
         }
 
-        $depositAmount = max(0.0, round($remainingAmount - $discountAmount, 2));
+        $newDeposit = max(0.0, round($remainingAmount - $newDiscount, 2));
         if (isset($data['amount_paid']) && is_numeric($data['amount_paid'])) {
-            $depositAmount = (float)$data['amount_paid'];
+            $newDeposit = (float)$data['amount_paid'];
         } elseif (isset($data['deposit_amount']) && is_numeric($data['deposit_amount'])) {
-            $depositAmount = (float)$data['deposit_amount'];
-        } elseif (isset($data['amount']) && is_numeric($data['amount'])) {
-            $depositAmount = (float)$data['amount'];
+            $newDeposit = (float)$data['deposit_amount'];
         }
 
-        $totalSettled = $depositAmount + $discountAmount;
-        $totalPaidSoFar = $alreadyPaid + $totalSettled;
+        $updatedAmountPaid = $alreadyPaid + $newDeposit;
+        $updatedDiscountAmount = $alreadyDiscount + $newDiscount;
+        $totalPaidSoFar = $updatedAmountPaid + $updatedDiscountAmount;
+
         if ($totalPaidSoFar >= $totalAmount - 0.01) {
             $newStatus = 'Paid';
         } elseif ($totalPaidSoFar > 0.01) {
@@ -12099,6 +12112,7 @@ Only approve the settlement after reviewing all financial records.
         } else {
             $newStatus = 'Pending';
         }
+
         $paymentDate = date('Y-m-d');
         $paymentMethod = !empty($data['payment_method']) ? trim($data['payment_method']) : (!empty($data['payment_mode']) ? trim($data['payment_mode']) : 'Cash');
         $userId = (int) ($user['id'] ?? 0);
@@ -12126,8 +12140,8 @@ Only approve the settlement after reviewing all financial records.
             ':pmethod' => $paymentMethod,
             ':collected_by' => $collectedBy,
             ':receipt_no' => $receiptNo,
-            ':discount_amount' => $discountAmount,
-            ':amount_paid' => $depositAmount
+            ':discount_amount' => $updatedDiscountAmount,
+            ':amount_paid' => $updatedAmountPaid
         ]);
 
         // Fetch updated payment detail
