@@ -24,7 +24,11 @@ CREATE TABLE IF NOT EXISTS `teacher_attendance_settings` (
   `academic_year_id` INT NOT NULL,
   `entry_time` VARCHAR(20) NOT NULL DEFAULT '08:30 AM',
   `allowed_leaves` INT NULL DEFAULT NULL,
+  `qr_payload` TEXT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY `unique_school_ay_teacher_settings` (`school_id`, `academic_year_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Ensure column exists for existing tables created before qr_payload column was added
+ALTER TABLE `teacher_attendance_settings` ADD COLUMN `qr_payload` TEXT NULL;
