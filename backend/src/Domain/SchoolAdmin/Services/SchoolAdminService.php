@@ -902,7 +902,7 @@ class SchoolAdminService extends BaseService
             $ap['student_id'] = (int)$ap['student_id'];
             $ap['fee_type_id'] = (int)$ap['fee_type_id'];
             $ap['amount'] = (float)$ap['amount'];
-            $ap['amount_paid'] = isset($ap['amount_paid']) && $ap['amount_paid'] !== null ? (float)$ap['amount_paid'] : (float)$ap['amount'];
+            $ap['amount_paid'] = isset($ap['amount_paid']) && $ap['amount_paid'] !== null ? (float)$ap['amount_paid'] : ($ap['status'] === 'Paid' ? (float)$ap['amount'] : 0.0);
             $ap['discount_amount'] = (float)($ap['discount_amount'] ?? 0.0);
             return $ap;
         }, $additionalPayments);
@@ -12089,7 +12089,8 @@ Only approve the settlement after reviewing all financial records.
             $pay['student_id'] = (int)$pay['student_id'];
             $pay['fee_type_id'] = (int)$pay['fee_type_id'];
             $pay['amount'] = (float)$pay['amount'];
-            $pay['amount_paid'] = (float)$pay['amount'];
+            $pay['amount_paid'] = isset($pay['amount_paid']) && $pay['amount_paid'] !== null ? (float)$pay['amount_paid'] : (float)$pay['amount'];
+            $pay['discount_amount'] = (float)($pay['discount_amount'] ?? 0.0);
 
             $feeName = $pay['fee_name'] ?? 'Fee';
             $amtStr = "₹" . number_format($depositAmount, 0);
