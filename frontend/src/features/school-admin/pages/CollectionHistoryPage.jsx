@@ -494,7 +494,8 @@ export default function CollectionHistoryPage() {
           receipt={{
             ...viewingReceipt,
             is_additional: viewingReceipt.type === 'additional',
-            amount_paid: viewingReceipt.amount
+            amount_paid: viewingReceipt.amount_paid !== undefined ? viewingReceipt.amount_paid : viewingReceipt.amount,
+            discount_amount: viewingReceipt.discount_amount || 0
           }} 
           student={{
             id: viewingReceipt.student_id,
@@ -509,7 +510,8 @@ export default function CollectionHistoryPage() {
           allPayments={transactions.map(t => ({
             ...t,
             is_additional: t.type === 'additional',
-            amount_paid: t.amount
+            amount_paid: t.amount_paid !== undefined ? t.amount_paid : t.amount,
+            discount_amount: t.discount_amount || 0
           }))}
           onClose={() => setViewingReceipt(null)} 
         />

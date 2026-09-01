@@ -682,15 +682,18 @@ function AdditionalDepositModal({ student, unpaidFees, initialSelectedIds = [], 
     setError('');
     try {
       const discApplied = getDiscAmount();
+      const discPerFee = selectedIds.length > 0 ? (discApplied / selectedIds.length) : 0;
+
       await Promise.all(selectedIds.map(id => {
         const fee = unpaidFees.find(f => f.id === id);
         const remaining = getFeeRemaining(fee);
         const userTypedAmt = isSingleFee ? (parseFloat(depositAmounts[id]) || remaining) : remaining;
-        const netCashPaid = Math.max(0, userTypedAmt - discApplied);
+        const feeDisc = isSingleFee ? discApplied : discPerFee;
+        const netCashPaid = Math.max(0, userTypedAmt - feeDisc);
         return schoolService.collectAdditionalFeePayment(id, { 
           payment_method: paymentMethod,
           amount_paid: netCashPaid,
-          discount_amount: discApplied
+          discount_amount: feeDisc
         });
       }));
       window.dispatchEvent(new Event('fee-payment-updated'));

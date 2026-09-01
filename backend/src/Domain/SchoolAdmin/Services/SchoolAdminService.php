@@ -902,6 +902,8 @@ class SchoolAdminService extends BaseService
             $ap['student_id'] = (int)$ap['student_id'];
             $ap['fee_type_id'] = (int)$ap['fee_type_id'];
             $ap['amount'] = (float)$ap['amount'];
+            $ap['amount_paid'] = isset($ap['amount_paid']) && $ap['amount_paid'] !== null ? (float)$ap['amount_paid'] : (float)$ap['amount'];
+            $ap['discount_amount'] = (float)($ap['discount_amount'] ?? 0.0);
             return $ap;
         }, $additionalPayments);
 
@@ -1007,7 +1009,7 @@ class SchoolAdminService extends BaseService
             $receiptNo = $payment['receipt_no'];
             $monthTitle = $payment['fee_month'];
 
-            $stmtGrp = $pdo->prepare("SELECT fee_month, amount_paid, 0 AS discount_amount FROM fee_payments WHERE receipt_no = :receipt_no AND school_id = :sid");
+            $stmtGrp = $pdo->prepare("SELECT fee_month, amount_paid, COALESCE(discount_amount, 0) AS discount_amount FROM fee_payments WHERE receipt_no = :receipt_no AND school_id = :sid");
             $stmtGrp->execute([':receipt_no' => $receiptNo, ':sid' => $schoolId]);
             $groupPayments = $stmtGrp->fetchAll(PDO::FETCH_ASSOC) ?: [];
             
@@ -7336,6 +7338,7 @@ class SchoolAdminService extends BaseService
                 'student_id'       => $studentId,
                 'fee_structure_id' => $feeStructureId,
                 'amount_paid'      => $monthAmount,
+                'discount_amount'   => $monthDiscount,
                 'payment_date'     => date('Y-m-d'),
                 'receipt_no'       => $receiptNo,
                 'status'           => $status,
@@ -7411,7 +7414,7 @@ class SchoolAdminService extends BaseService
                 fp.payment_method,
                 fp.amount_paid AS amount,
                 fp.amount_paid AS amount_paid,
-                0 AS discount_amount,
+                COALESCE(fp.discount_amount, 0) AS discount_amount,
                 fp.fee_month AS fee_month,
                 fp.payment_date,
                 fp.created_at,
@@ -7463,9 +7466,9 @@ class SchoolAdminService extends BaseService
                 COALESCE(u.phone, '') AS collector_phone,
                 COALESCE(u.role, '') AS collector_role,
                 afp.payment_method,
-                afp.amount AS amount,
-                afp.amount AS amount_paid,
-                0 AS discount_amount,
+                COALESCE(afp.amount_paid, afp.amount) AS amount,
+                COALESCE(afp.amount_paid, afp.amount) AS amount_paid,
+                COALESCE(afp.discount_amount, 0) AS discount_amount,
                 aft.name AS fee_month,
                 afp.payment_date,
                 afp.created_at,
@@ -7597,6 +7600,7 @@ class SchoolAdminService extends BaseService
                 // Add to amount and amount_paid
                 $groups[$rNo]['amount'] += (float)$t['amount'];
                 $groups[$rNo]['amount_paid'] += (float)$t['amount_paid'];
+                $groups[$rNo]['discount_amount'] = (float)($groups[$rNo]['discount_amount'] ?? 0.0) + (float)($t['discount_amount'] ?? 0.0);
                 if ($t['type'] === 'monthly' && !empty($t['fee_month'])) {
                     $groups[$rNo]['months_list'][] = $t['fee_month'];
                 }
@@ -12020,7 +12024,12 @@ Only approve the settlement after reviewing all financial records.
             }
         }
 
-        $depositAmount = $remainingAmount;
+        $discountAmount = 0.0;
+        if (isset($data['discount_amount']) && is_numeric($data['discount_amount'])) {
+            $discountAmount = max(0.0, (float)$data['discount_amount']);
+        }
+
+        $depositAmount = max(0.0, round($remainingAmount - $discountAmount, 2));
         if (isset($data['amount_paid']) && is_numeric($data['amount_paid'])) {
             $depositAmount = (float)$data['amount_paid'];
         } elseif (isset($data['deposit_amount']) && is_numeric($data['deposit_amount'])) {
@@ -12029,7 +12038,8 @@ Only approve the settlement after reviewing all financial records.
             $depositAmount = (float)$data['amount'];
         }
 
-        $newStatus = 'Paid';
+        $totalSettled = $depositAmount + $discountAmount;
+        $newStatus = ($alreadyPaid + $totalSettled >= $totalAmount - 0.01) ? 'Paid' : 'Pending';
         $paymentDate = date('Y-m-d');
         $paymentMethod = !empty($data['payment_method']) ? trim($data['payment_method']) : (!empty($data['payment_mode']) ? trim($data['payment_mode']) : 'Cash');
         $userId = (int) ($user['id'] ?? 0);
@@ -12046,7 +12056,7 @@ Only approve the settlement after reviewing all financial records.
 
         $stmtUpdate = $pdo->prepare("
             UPDATE additional_fee_payments 
-            SET status = :status, payment_date = :pdate, payment_method = :pmethod, collected_by = :collected_by, receipt_no = :receipt_no
+            SET status = :status, payment_date = :pdate, payment_method = :pmethod, collected_by = :collected_by, receipt_no = :receipt_no, discount_amount = :discount_amount, amount_paid = :amount_paid
             WHERE id = :id AND school_id = :sid
         ");
         $stmtUpdate->execute([
@@ -12056,7 +12066,9 @@ Only approve the settlement after reviewing all financial records.
             ':pdate' => $paymentDate,
             ':pmethod' => $paymentMethod,
             ':collected_by' => $collectedBy,
-            ':receipt_no' => $receiptNo
+            ':receipt_no' => $receiptNo,
+            ':discount_amount' => $discountAmount,
+            ':amount_paid' => $depositAmount
         ]);
 
         // Fetch updated payment detail
@@ -12136,13 +12148,9 @@ Only approve the settlement after reviewing all financial records.
 
         $stmtUpdate = $pdo->prepare("
             UPDATE additional_fee_payments 
-            SET status = 'Pending', payment_date = NULL, receipt_no = NULL 
+            SET status = 'Pending', payment_date = NULL, receipt_no = NULL, discount_amount = 0.00, amount_paid = NULL 
             WHERE id = :id AND school_id = :sid
         ");
-        $stmtUpdate->execute([
-            ':id' => $id,
-            ':sid' => $schoolId
-        ]);
         $stmtUpdate->execute([
             ':id' => $id,
             ':sid' => $schoolId
