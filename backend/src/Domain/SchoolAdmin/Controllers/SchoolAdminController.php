@@ -238,7 +238,8 @@ class SchoolAdminController extends BaseController
         $user = $this->authenticate($request);
         $this->requireRole($user, ['SCHOOL_ADMIN']);
 
-        $data = $this->service->getClasses($user);
+        $params = $request->getQueryParams();
+        $data = $this->service->getClasses($user, $params);
 
         return $this->success($response, $data);
     }

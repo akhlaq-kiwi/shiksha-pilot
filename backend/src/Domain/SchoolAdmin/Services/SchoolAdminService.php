@@ -503,7 +503,7 @@ class SchoolAdminService extends BaseService
             $today = date('Y-m-d');
             if ($activeYear['status'] === 'Archived') {
                 $stmtAddPending = $pdo->prepare("
-                    SELECT afp.amount, COALESCE(afp.amount_paid, 0) AS amount_paid, COALESCE(afp.discount_amount, 0) AS discount_amount, afp.student_id
+                    SELECT afp.amount, 0 AS amount_paid, 0 AS discount_amount, afp.student_id
                     FROM additional_fee_payments afp
                     JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
                     WHERE afp.school_id = :sid
@@ -526,7 +526,7 @@ class SchoolAdminService extends BaseService
                 }
             } else {
                 $stmtAddPending = $pdo->prepare("
-                    SELECT afp.amount, COALESCE(afp.amount_paid, 0) AS amount_paid, COALESCE(afp.discount_amount, 0) AS discount_amount
+                    SELECT afp.amount, 0 AS amount_paid, 0 AS discount_amount
                     FROM additional_fee_payments afp
                     JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
                     JOIN students s ON afp.student_id = s.id
@@ -3640,12 +3640,20 @@ class SchoolAdminService extends BaseService
         return null;
     }
 
-    public function getClasses(array $user): array
+    public function getClasses(array $user, array $params = []): array
     {
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->classRepo->getPdo();
-        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
-        return $this->classRepo->findBySchool($schoolId, $workingYear ? (int)$workingYear['id'] : null);
+        
+        $academicYearId = null;
+        if (!empty($params['academic_year_id'])) {
+            $academicYearId = (int)$params['academic_year_id'];
+        } else {
+            $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+            $academicYearId = $workingYear ? (int)$workingYear['id'] : null;
+        }
+        
+        return $this->classRepo->findBySchool($schoolId, $academicYearId);
     }
 
     public function createClass(array $user, array $data): array
@@ -3668,9 +3676,13 @@ class SchoolAdminService extends BaseService
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->classRepo->getPdo();
 
-        // Get currently active or draft academic year
-        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
-        $academicYearId = $workingYear ? (int)$workingYear['id'] : null;
+        // Get target academic year (explicit or active working year)
+        if (!empty($data['academic_year_id'])) {
+            $academicYearId = (int)$data['academic_year_id'];
+        } else {
+            $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+            $academicYearId = $workingYear ? (int)$workingYear['id'] : null;
+        }
 
         // Parse and validate sections against Master Sections catalog
         $rawSections = [];
@@ -4265,23 +4277,14 @@ class SchoolAdminService extends BaseService
                                     $newClassId = (int)$pdo->lastInsertId();
                                 }
                             }
-
-                            // Fallback if promotion name matching failed: maintain student in target class of new AY
-                            if ($newClassId === null && !empty($currentClassName)) {
-                                $fId = $this->findClassByNameAndSection($pdo, $schoolId, $newYearId, $currentClassName, null, $stuInfo['stream'] ?? null);
-                                if ($fId !== null) {
-                                    $newClassId = $fId;
-                                } else {
-                                    $stmtCreateC = $pdo->prepare("INSERT INTO classes (school_id, name, section, stream, academic_year_id) VALUES (:sid, :name, NULL, :stream, :new_ay_id)");
-                                    $stmtCreateC->execute([
-                                        ':sid' => $schoolId,
-                                        ':name' => trim($currentClassName),
-                                        ':stream' => $stuInfo['stream'] ?? null,
-                                        ':new_ay_id' => $newYearId
-                                    ]);
-                                    $newClassId = (int)$pdo->lastInsertId();
-                                }
-                            }
+                        } elseif ($action === 'graduate_alumni' || $action === 'graduate') {
+                            $studentsGraduatedCount++;
+                            $stmtUpdateStudent = $pdo->prepare("UPDATE students SET status = 'Alumni' WHERE id = :id AND school_id = :sid");
+                            $stmtUpdateStudent->execute([
+                                ':id' => $studentId,
+                                ':sid' => $schoolId
+                            ]);
+                            continue;
                         } elseif ($action === 'repeat') {
                             $studentsRepeatedCount++;
 

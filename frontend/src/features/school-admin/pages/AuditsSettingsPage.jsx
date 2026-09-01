@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Plus, CheckCircle2, ChevronRight, UserCog, Users, ShieldAlert, Award, FileSpreadsheet, ArrowLeft, RefreshCw, Check, Lock, Save, Trash2, Loader2, AlertTriangle, X, Download } from 'lucide-react';
+import { Plus, CheckCircle2, ChevronRight, UserCog, Users, ShieldAlert, Award, FileSpreadsheet, ArrowLeft, RefreshCw, Check, Lock, Save, Trash2, Loader2, AlertTriangle, X, Download, GraduationCap } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
@@ -11,7 +11,7 @@ import { schoolAdminService } from '../../../common/services/schoolAdminService'
 import { authService } from '../../../common/services/authService';
 import { apiClient } from '../../../common/services/apiClient';
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
-import { getClassIndex } from '../../../common/constants/predefinedClasses';
+import { getClassIndex, PREDEFINED_CLASSES } from '../../../common/constants/predefinedClasses';
 import { jsPDF } from 'jspdf';
 
 export default function AuditsSettingsPage({ onYearsUpdated }) {
@@ -45,6 +45,12 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
   const [replacePrevTeacherName, setReplacePrevTeacherName] = useState('');
   const [replaceNewTeacherId, setReplaceNewTeacherId] = useState('');
   const [replaceNewTeacherName, setReplaceNewTeacherName] = useState('');
+
+  // --- Draft Academic Year Migration Class States ---
+  const [draftClasses, setDraftClasses] = useState([]);
+  const [showHighestClassToggleCard, setShowHighestClassToggleCard] = useState(false);
+  const [draftWarningInfo, setDraftWarningInfo] = useState(null);
+  const [promoteHighestClassToggle, setPromoteHighestClassToggle] = useState(false);
 
   // Auto-clear success message for Class Teacher assignment after 5 seconds
   useEffect(() => {
@@ -1349,6 +1355,25 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
     return 'Next Class';
   };
 
+  const handleHighestClassToggleChange = (checked) => {
+    setPromoteHighestClassToggle(checked);
+    if (!draftWarningInfo) return;
+
+    const targetAction = checked ? 'promote' : 'graduate_alumni';
+    
+    setStudentActions(prevActions => {
+      const newActions = { ...prevActions };
+      (students || []).filter(s => s.status === 'ACTIVE').forEach(s => {
+        const sClass = (classes || []).find(c => c.id === s.class_id);
+        const cIdx = sClass ? getClassIndex(sClass.name) : -1;
+        if (cIdx === draftWarningInfo.highestIdx) {
+          newActions[s.id] = targetAction;
+        }
+      });
+      return newActions;
+    });
+  };
+
   // Open activation wizard for a Draft Academic Year
   const startActivation = async (year) => {
     setFormError('');
@@ -1356,50 +1381,85 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
     setWizardStep(1); // 1: Teachers, 2: Students, 3: Review
 
     try {
-      const [staffList, studentList, classList, subjectList] = await Promise.all([
+      const [staffList, studentList, classList, subjectList, draftClassList] = await Promise.all([
         schoolService.getStaff(),
         schoolService.getStudents(),
         schoolService.getClasses(),
         schoolService.getSubjects(),
+        schoolService.getClasses({ academic_year_id: year.id }),
       ]);
 
       setStaff(staffList || []);
       setStudents(studentList || []);
       setClasses(classList || []);
       setSubjects(subjectList || []);
+      setDraftClasses(draftClassList || []);
 
       // Default selections
       // 1. Teachers: All active teachers selected by default
       const teacherMap = {};
-      staffList
+      (staffList || [])
         .filter(s => (s.role === 'TEACHER' || s.role === 'Teacher') && s.status === 'ACTIVE')
         .forEach(t => {
           teacherMap[t.id] = true;
         });
       setSelectedTeachers(teacherMap);
 
-      // 2. Students: Determine default actions for active students
-      const studentMap = {};
-      
-      // Calculate highest configured class numeric level
-      let highestNum = 0;
-      classList.forEach(c => {
-        const match = (c.name || '').match(/\d+/);
-        if (match) {
-          const num = parseInt(match[0], 10);
-          if (num > highestNum) highestNum = num;
+      // Find highest class in current active academic year
+      let highestIdx = -1;
+      let highestClassName = '';
+      (classList || []).forEach(c => {
+        const idx = getClassIndex(c.name);
+        if (idx > highestIdx) {
+          highestIdx = idx;
+          highestClassName = c.name;
         }
       });
 
-      studentList
+      const class12Idx = getClassIndex('Class 12');
+      const isClass12 = highestIdx >= class12Idx;
+
+      let nextClassName = null;
+      let hasNextClassInDraft = false;
+
+      if (!isClass12 && highestIdx >= 0 && highestIdx + 1 < PREDEFINED_CLASSES.length) {
+        nextClassName = PREDEFINED_CLASSES[highestIdx + 1].name;
+        hasNextClassInDraft = (draftClassList || []).some(dc => getClassIndex(dc.name) === highestIdx + 1 || (dc.name || '').trim().toLowerCase() === nextClassName.toLowerCase());
+      }
+
+      if (!isClass12 && highestIdx >= 0) {
+        setShowHighestClassToggleCard(true);
+        setDraftWarningInfo({
+          highestClassName,
+          highestIdx,
+          nextClassName
+        });
+        setPromoteHighestClassToggle(hasNextClassInDraft);
+      } else {
+        setShowHighestClassToggleCard(false);
+        setDraftWarningInfo(null);
+        setPromoteHighestClassToggle(false);
+      }
+
+      // 2. Students: Determine default actions for active students
+      const initialToggleState = !isClass12 && highestIdx >= 0 ? hasNextClassInDraft : false;
+      const studentMap = {};
+      (studentList || [])
         .filter(s => s.status === 'ACTIVE')
         .forEach(s => {
-          const sClass = classList.find(c => c.id === s.class_id);
-          const matchC = sClass ? (sClass.name || '').match(/\d+/) : null;
-          const cNum = matchC ? parseInt(matchC[0], 10) : 0;
-          const isHighest = cNum === highestNum && highestNum > 0;
-          
-          studentMap[s.id] = isHighest ? 'graduate_alumni' : 'promote';
+          const sClass = (classList || []).find(c => c.id === s.class_id);
+          const cIdx = sClass ? getClassIndex(sClass.name) : -1;
+          const isHighest = cIdx === highestIdx;
+
+          if (isHighest) {
+            if (isClass12 || !initialToggleState) {
+              studentMap[s.id] = 'graduate_alumni';
+            } else {
+              studentMap[s.id] = 'promote';
+            }
+          } else {
+            studentMap[s.id] = 'promote';
+          }
         });
       setStudentActions(studentMap);
 
@@ -2395,15 +2455,6 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
           {wizardStep === 2 && (() => {
             const inactiveStudents = students.filter(s => s.status !== 'ACTIVE');
             
-            let highestNum = 0;
-            classes.forEach(cls => {
-              const match = (cls.name || '').match(/\d+/);
-              if (match) {
-                const num = parseInt(match[0], 10);
-                if (num > highestNum) highestNum = num;
-              }
-            });
-
             return (
               <div className="space-y-4 animate-in fade-in duration-200">
                 <div className="flex items-center justify-between">
@@ -2419,6 +2470,31 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                   )}
                 </div>
                 
+                {showHighestClassToggleCard && draftWarningInfo && (
+                  <div className="p-4 bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl space-y-3 shadow-3xs">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 font-bold text-amber-950 dark:text-amber-100 text-xs">
+                          <GraduationCap className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                          <span>Promote {draftWarningInfo.highestClassName} Students to {draftWarningInfo.nextClassName}</span>
+                        </div>
+                        <p className="text-[11px] text-amber-900 dark:text-amber-200 leading-relaxed">
+                          Do you want to promote students of your highest active class (<strong>{draftWarningInfo.highestClassName}</strong>) to the next class (<strong>{draftWarningInfo.nextClassName}</strong>) in the new academic session (<strong>{targetYear?.name}</strong>)? If enabled, <strong>{draftWarningInfo.nextClassName}</strong> will be automatically created in the new academic year upon migration, and students will be promoted into it. If disabled, all <strong>{draftWarningInfo.highestClassName}</strong> students will be graduated as <strong>Alumni</strong>.
+                        </p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-0.5 select-none">
+                        <input
+                          type="checkbox"
+                          checked={promoteHighestClassToggle}
+                          onChange={(e) => handleHighestClassToggleChange(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-zinc-300 peer-focus:outline-none rounded-full peer dark:bg-zinc-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-zinc-600 peer-checked:bg-amber-600"></div>
+                      </label>
+                    </div>
+                  </div>
+                )}
+
                 <div className="max-h-[280px] overflow-y-auto border border-border rounded-xl p-3 space-y-4 bg-zinc-50/50 dark:bg-zinc-950/20">
                   {classes.length === 0 ? (
                     <p className="text-center py-6 text-xs text-text-muted">No classes defined to promote students.</p>
@@ -2433,12 +2509,27 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                       }
                       return (a.section || '').localeCompare(b.section || '', undefined, { numeric: true, sensitivity: 'base' });
                     }).map(c => {
-                      const classStudents = students.filter(s => s.class_id === c.id && s.status === 'ACTIVE');
+                      const classStudents = students
+                        .filter(s => s.class_id === c.id && s.status === 'ACTIVE')
+                        .sort((a, b) => {
+                          const rollA = parseInt(a.roll_no || a.roll_number || 0, 10);
+                          const rollB = parseInt(b.roll_no || b.roll_number || 0, 10);
+                          if (rollA && rollB) return rollA - rollB;
+                          return (a.name || a.first_name || '').localeCompare(b.name || b.first_name || '');
+                        });
                       if (classStudents.length === 0) return null;
 
-                      const matchC = (c.name || '').match(/\d+/);
-                      const cNum = matchC ? parseInt(matchC[0], 10) : 0;
-                      const isHighest = cNum === highestNum && highestNum > 0;
+                      const cIdx = getClassIndex(c.name);
+                      const isHighestClass = draftWarningInfo ? cIdx === draftWarningInfo.highestIdx : false;
+                      const isClass12 = cIdx >= getClassIndex('Class 12');
+                      const nextClassLabel = getNextClassLabel(c.name);
+
+                      // Radio visibility flags:
+                      // 1. Promote option: Available for regular classes, or highest class ONLY when toggle is ON
+                      const showPromoteOption = !isClass12 && (!isHighestClass || promoteHighestClassToggle);
+                      
+                      // 2. Graduate (Alumni) option: Available for Class 12, or highest class ONLY when toggle is OFF
+                      const showGraduateOption = isClass12 || (isHighestClass && !promoteHighestClassToggle);
 
                       return (
                         <div key={c.id} className="space-y-2 border-b border-border/40 pb-3 last:border-b-0">
@@ -2449,27 +2540,51 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                           
                           <div className="space-y-2 pl-2">
                             {classStudents.map(student => {
-                              const act = studentActions[student.id] || (isHighest ? 'graduate_alumni' : 'promote');
-                              const nextClassLabel = getNextClassLabel(c.name);
-                              const promoActionVal = isHighest ? 'graduate_alumni' : 'promote';
-                              const promoteText = isHighest ? `Graduate` : `Promote ${nextClassLabel}`;
+                              const act = studentActions[student.id] || (showPromoteOption ? 'promote' : 'graduate_alumni');
+                              const promoteText = `Promote ${nextClassLabel}`;
+                              
+                              const rawName = (student.name && student.name.trim() !== '') 
+                                ? student.name 
+                                : (student.student_name || student.full_name || [student.first_name, student.middle_name, student.last_name].filter(Boolean).join(' ') || `Student #${student.id}`);
+                              
+                              const rollNoRaw = student.roll_no ?? student.roll_number ?? student.rollNo;
+                              const rollNoStr = (rollNoRaw !== null && rollNoRaw !== undefined && String(rollNoRaw).trim() !== '')
+                                ? ` (${String(rollNoRaw).trim().padStart(2, '0')})`
+                                : '';
+
+                              const studentDisplayName = `${rawName}${rollNoStr}`;
 
                               return (
                                 <div key={student.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs py-2 border-b border-border/20 last:border-b-0">
-                                  <span className="font-semibold text-text-secondary">{student.name}</span>
+                                  <span className="font-semibold text-text-secondary">{studentDisplayName}</span>
                                   
-                                  <div className="flex items-center gap-6">
-                                    <label className="flex items-center gap-1.5 font-bold uppercase text-[11px] tracking-wide cursor-pointer select-none">
-                                      <input
-                                        type="radio"
-                                        name={`student-action-${student.id}`}
-                                        value={promoActionVal}
-                                        checked={act === promoActionVal}
-                                        onChange={() => setStudentActions(p => ({ ...p, [student.id]: promoActionVal }))}
-                                        className="rounded-full border-zinc-300 text-primary focus:ring-primary h-3.5 w-3.5"
-                                      />
-                                      {promoteText}
-                                    </label>
+                                  <div className="flex items-center gap-4">
+                                    {showPromoteOption && (
+                                      <label className="flex items-center gap-1.5 font-bold uppercase text-[11px] tracking-wide cursor-pointer select-none">
+                                        <input
+                                          type="radio"
+                                          name={`student-action-${student.id}`}
+                                          value="promote"
+                                          checked={act === 'promote'}
+                                          onChange={() => setStudentActions(p => ({ ...p, [student.id]: 'promote' }))}
+                                          className="rounded-full border-zinc-300 text-primary focus:ring-primary h-3.5 w-3.5"
+                                        />
+                                        {promoteText}
+                                      </label>
+                                    )}
+                                    {showGraduateOption && (
+                                      <label className="flex items-center gap-1.5 font-bold uppercase text-[11px] tracking-wide cursor-pointer select-none">
+                                        <input
+                                          type="radio"
+                                          name={`student-action-${student.id}`}
+                                          value="graduate_alumni"
+                                          checked={act === 'graduate_alumni'}
+                                          onChange={() => setStudentActions(p => ({ ...p, [student.id]: 'graduate_alumni' }))}
+                                          className="rounded-full border-zinc-300 text-primary focus:ring-primary h-3.5 w-3.5"
+                                        />
+                                        Graduate (Alumni)
+                                      </label>
+                                    )}
                                     <label className="flex items-center gap-1.5 font-bold uppercase text-[11px] tracking-wide cursor-pointer select-none">
                                       <input
                                         type="radio"
