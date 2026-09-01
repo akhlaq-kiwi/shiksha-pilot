@@ -781,6 +781,8 @@ class SchoolAdminService extends BaseService
             $student['class_name'] = $student['class_name'] . $sectionStr;
         }
 
+        $this->ensureDiscountAndPartialSchema($pdo);
+
         $isLedgerLocked = false;
         $ledgerLockedMessage = '';
         if ($this->isStudentPromoted($pdo, $id, $schoolId)) {
@@ -7370,10 +7372,49 @@ class SchoolAdminService extends BaseService
         return $lastPayment;
     }
 
+    private function ensureDiscountAndPartialSchema(PDO $pdo): void
+    {
+        static $schemaEnsured = false;
+        if ($schemaEnsured) return;
+        $schemaEnsured = true;
+
+        try {
+            $pdo->exec("ALTER TABLE `fee_payments` ADD COLUMN `discount_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER `amount_paid` shadow");
+        } catch (\Throwable $e) {
+            try {
+                $pdo->exec("ALTER TABLE `fee_payments` ADD COLUMN `discount_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER `amount_paid`");
+            } catch (\Throwable $e) {}
+        }
+
+        try {
+            $pdo->exec("ALTER TABLE `additional_fee_payments` ADD COLUMN `discount_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER `amount`");
+        } catch (\Throwable $e) {}
+
+        try {
+            $pdo->exec("ALTER TABLE `additional_fee_payments` ADD COLUMN `amount_paid` DECIMAL(12,2) DEFAULT NULL AFTER `discount_amount`");
+        } catch (\Throwable $e) {}
+
+        try {
+            $pdo->exec("ALTER TABLE `additional_fee_payments` MODIFY COLUMN `status` ENUM('Pending','Paid','Partial') NOT NULL DEFAULT 'Pending'");
+        } catch (\Throwable $e) {}
+
+        try {
+            $pdo->exec("
+                UPDATE `additional_fee_payments` 
+                SET `status` = 'Partial' 
+                WHERE `amount_paid` IS NOT NULL 
+                  AND `amount_paid` > 0 
+                  AND (`amount_paid` + COALESCE(`discount_amount`, 0)) < `amount` 
+                  AND `status` = 'Pending'
+            ");
+        } catch (\Throwable $e) {}
+    }
+
     public function getCollectionHistory(array $user, array $params = []): array
     {
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->feeRepo->getPdo();
+        $this->ensureDiscountAndPartialSchema($pdo);
 
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
         $workingYearId = $workingYear ? (int)$workingYear['id'] : 0;
