@@ -210,138 +210,16 @@ class _TeacherAttendanceHistoryScreenState extends State<TeacherAttendanceHistor
   }
 
   void _openRealtimeCameraScanner() {
-    bool isScanned = false;
-    _manualQrController.clear();
-    final MobileScannerController scannerController = MobileScannerController();
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          padding: EdgeInsets.only(
-            top: 20,
-            left: 20,
-            right: 20,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.camera_alt_rounded, color: Colors.indigo, size: 24),
-                      SizedBox(width: 10),
-                      Text(
-                        "Scan Attendance QR",
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: SizedBox(
-                  height: 280,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      MobileScanner(
-                        controller: scannerController,
-                        errorBuilder: (context, error, child) {
-                          return Container(
-                            color: Colors.black,
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.camera_alt_outlined, color: Colors.amber, size: 42),
-                                const SizedBox(height: 10),
-                                const Text(
-                                  "Camera permission required or failed to load camera",
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-                                ),
-                                const SizedBox(height: 12),
-                                ElevatedButton.icon(
-                                  onPressed: () {
-                                    scannerController.start();
-                                  },
-                                  icon: const Icon(Icons.refresh, size: 18),
-                                  label: const Text("Retry Camera"),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.indigo,
-                                    foregroundColor: Colors.white,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                        onDetect: (capture) {
-                          if (isScanned) return;
-                          final List<Barcode> barcodes = capture.barcodes;
-                          for (final barcode in barcodes) {
-                            final String? rawValue = barcode.rawValue;
-                            if (rawValue != null && rawValue.trim().isNotEmpty) {
-                              isScanned = true;
-                              Navigator.pop(context);
-                              _processQrPayload(rawValue);
-                              break;
-                            }
-                          }
-                        },
-                      ),
-                      Container(
-                        width: 200,
-                        height: 200,
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.indigo, width: 3),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      Positioned(
-                        bottom: 12,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.7),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Text(
-                            "Point camera at School Attendance QR Code",
-                            style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    ).then((_) {
-      try {
-        scannerController.dispose();
-      } catch (_) {}
-    });
+      builder: (context) => _TeacherQrScannerModalWidget(
+        onScanned: (rawValue) {
+          _processQrPayload(rawValue);
+        },
+      ),
+    );
   }
 
   void _showResultDialog({
@@ -928,6 +806,182 @@ class _TeacherAttendanceHistoryScreenState extends State<TeacherAttendanceHistor
                 ],
               ),
             ),
+    );
+  }
+}
+
+class _TeacherQrScannerModalWidget extends StatefulWidget {
+  final Function(String) onScanned;
+
+  const _TeacherQrScannerModalWidget({Key? key, required this.onScanned}) : super(key: key);
+
+  @override
+  State<_TeacherQrScannerModalWidget> createState() => _TeacherQrScannerModalWidgetState();
+}
+
+class _TeacherQrScannerModalWidgetState extends State<_TeacherQrScannerModalWidget> {
+  late MobileScannerController _scannerController;
+  bool _isScanned = false;
+  bool _isTorchOn = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scannerController = MobileScannerController(
+      detectionSpeed: DetectionSpeed.normal,
+      facing: CameraFacing.back,
+      torchEnabled: false,
+    );
+  }
+
+  @override
+  void dispose() {
+    _scannerController.dispose();
+    super.dispose();
+  }
+
+  void _handleDetect(BarcodeCapture capture) {
+    if (_isScanned) return;
+    final List<Barcode> barcodes = capture.barcodes;
+    for (final barcode in barcodes) {
+      final String? rawValue = barcode.rawValue;
+      if (rawValue != null && rawValue.trim().isNotEmpty) {
+        _isScanned = true;
+        Navigator.pop(context);
+        widget.onScanned(rawValue);
+        break;
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.only(
+        top: 20,
+        left: 20,
+        right: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.camera_alt_rounded, color: Colors.indigo, size: 24),
+                  SizedBox(width: 10),
+                  Text(
+                    "Scan Attendance QR",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      _isTorchOn ? Icons.flash_on : Icons.flash_off,
+                      color: _isTorchOn ? Colors.amber : Colors.grey,
+                    ),
+                    onPressed: () async {
+                      try {
+                        await _scannerController.toggleTorch();
+                        if (mounted) {
+                          setState(() {
+                            _isTorchOn = !_isTorchOn;
+                          });
+                        }
+                      } catch (_) {}
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: SizedBox(
+              height: 280,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  MobileScanner(
+                    controller: _scannerController,
+                    errorBuilder: (context, error, child) {
+                      final String errCode = error.errorCode.name;
+                      final String? errDetail = error.errorDetails?.message;
+                      return Container(
+                        color: Colors.black,
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.camera_alt_outlined, color: Colors.amber, size: 40),
+                            const SizedBox(height: 10),
+                            Text(
+                              "Camera status ($errCode):\n${errDetail ?? 'Tap retry to restart camera stream'}",
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
+                            ),
+                            const SizedBox(height: 14),
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                _scannerController.start();
+                              },
+                              icon: const Icon(Icons.refresh, size: 18),
+                              label: const Text("Retry Camera"),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.indigo,
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    onDetect: _handleDetect,
+                  ),
+                  Container(
+                    width: 200,
+                    height: 200,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.indigo, width: 3),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.7),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        "Point camera at School Attendance QR Code",
+                        style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
