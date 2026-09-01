@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS `additional_fee_payment_history` (
   KEY `school_id` (`school_id`),
   KEY `student_id` (`student_id`),
   CONSTRAINT `additional_fee_payment_history_ibfk_1` FOREIGN KEY (`payment_id`) REFERENCES `additional_fee_payments` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `additional_fee_types` (
   `id` int NOT NULL AUTO_INCREMENT,

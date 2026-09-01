@@ -7417,8 +7417,12 @@ class SchoolAdminService extends BaseService
                   KEY `school_id` (`school_id`),
                   KEY `student_id` (`student_id`),
                   CONSTRAINT `additional_fee_payment_history_ibfk_1` FOREIGN KEY (`payment_id`) REFERENCES `additional_fee_payments` (`id`) ON DELETE CASCADE
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
             ");
+        } catch (\Throwable $e) {}
+
+        try {
+            $pdo->exec("ALTER TABLE `additional_fee_payment_history` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
         } catch (\Throwable $e) {}
 
         try {
@@ -7630,7 +7634,7 @@ class SchoolAdminService extends BaseService
             JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
             LEFT JOIN academic_years say ON s.academic_year_id = say.id
             LEFT JOIN academic_years pay_ay ON aft.academic_year_id = pay_ay.id
-            LEFT JOIN users u ON (u.name = afph.collected_by AND u.school_id = afp.school_id)
+            LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = afph.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = afp.school_id)
             WHERE afp.school_id = :school_id
               AND (
                 s.academic_year_id = :ayid_stu 
