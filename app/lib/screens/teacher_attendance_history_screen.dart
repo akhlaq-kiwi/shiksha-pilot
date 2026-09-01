@@ -823,8 +823,6 @@ class _TeacherQrScannerModalWidgetState extends State<_TeacherQrScannerModalWidg
   late MobileScannerController _scannerController;
   bool _isScanned = false;
   bool _isTorchOn = false;
-  bool _showManualInput = false;
-  final TextEditingController _manualInputController = TextEditingController();
 
   @override
   void initState() {
@@ -845,7 +843,6 @@ class _TeacherQrScannerModalWidgetState extends State<_TeacherQrScannerModalWidg
 
   @override
   void dispose() {
-    _manualInputController.dispose();
     _scannerController.dispose();
     super.dispose();
   }
@@ -862,14 +859,6 @@ class _TeacherQrScannerModalWidgetState extends State<_TeacherQrScannerModalWidg
         break;
       }
     }
-  }
-
-  void _submitManualPayload() {
-    final text = _manualInputController.text.trim();
-    if (text.isEmpty) return;
-    _isScanned = true;
-    Navigator.pop(context);
-    widget.onScanned(text);
   }
 
   @override
@@ -1008,46 +997,6 @@ class _TeacherQrScannerModalWidgetState extends State<_TeacherQrScannerModalWidg
               ),
             ),
           ),
-          const SizedBox(height: 12),
-          TextButton.icon(
-            onPressed: () {
-              setState(() {
-                _showManualInput = !_showManualInput;
-              });
-            },
-            icon: Icon(_showManualInput ? Icons.keyboard_hide : Icons.keyboard, color: Colors.indigo),
-            label: Text(
-              _showManualInput ? "Hide Manual Entry" : "Enter QR Code Manually",
-              style: const TextStyle(color: Colors.indigo, fontWeight: FontWeight.bold),
-            ),
-          ),
-          if (_showManualInput) ...[
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _manualInputController,
-                    decoration: const InputDecoration(
-                      hintText: "Paste or enter QR Payload...",
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: _submitManualPayload,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.indigo,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  ),
-                  child: const Text("Submit"),
-                ),
-              ],
-            ),
-          ],
         ],
       ),
     );
