@@ -828,10 +828,16 @@ class _TeacherQrScannerModalWidgetState extends State<_TeacherQrScannerModalWidg
   void initState() {
     super.initState();
     _scannerController = MobileScannerController(
+      autoStart: false,
       detectionSpeed: DetectionSpeed.normal,
       facing: CameraFacing.back,
       torchEnabled: false,
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _scannerController.start();
+      }
+    });
   }
 
   @override
@@ -938,8 +944,13 @@ class _TeacherQrScannerModalWidgetState extends State<_TeacherQrScannerModalWidg
                             ),
                             const SizedBox(height: 14),
                             ElevatedButton.icon(
-                              onPressed: () {
-                                _scannerController.start();
+                              onPressed: () async {
+                                try {
+                                  await _scannerController.stop();
+                                } catch (_) {}
+                                if (mounted) {
+                                  _scannerController.start();
+                                }
                               },
                               icon: const Icon(Icons.refresh, size: 18),
                               label: const Text("Retry Camera"),
