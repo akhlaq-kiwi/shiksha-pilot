@@ -42,8 +42,8 @@ class ExcelGenerator
 
         $totalFee = 0.0;
         foreach ($feeCollections as $row) {
-            $amt = (float)($row['amount'] ?? 0);
-            $totalFee += $amt;
+            $amt = round((float)($row['amount'] ?? 0), 2);
+            $totalFee = round($totalFee + $amt, 2);
 
             $depTime = '';
             if (!empty($row['deposit_time'])) {
@@ -105,8 +105,8 @@ class ExcelGenerator
 
         $totalExp = 0.0;
         foreach ($expenses as $row) {
-            $amt = (float)($row['amount'] ?? 0);
-            $totalExp += $amt;
+            $amt = round((float)($row['amount'] ?? 0), 2);
+            $totalExp = round($totalExp + $amt, 2);
 
             $expDate = '';
             if (!empty($row['expense_date'])) {
@@ -142,9 +142,9 @@ class ExcelGenerator
 
     private static function buildSummarySheet(array $summary): array
     {
-        $revenue = (float)($summary['revenue'] ?? 0);
-        $expenses = (float)($summary['expenses'] ?? 0);
-        $diff = $revenue - $expenses;
+        $revenue = round((float)($summary['revenue'] ?? 0), 2);
+        $expenses = round((float)($summary['expenses'] ?? 0), 2);
+        $diff = round($revenue - $expenses, 2);
 
         $rows = [];
 
@@ -279,7 +279,9 @@ class ExcelGenerator
                     $cellRef = "{$colLetter}{$rowNum}";
 
                     if (is_numeric($val) && !self::isStringWithLeadingZero((string)$val)) {
-                        $sheetXml .= "      <c r=\"{$cellRef}\"{$styleAttr}><v>{$val}</v></c>\n";
+                        $numVal = round((float)$val, 2);
+                        $displayVal = (floor($numVal) == $numVal) ? (string)(int)$numVal : (string)$numVal;
+                        $sheetXml .= "      <c r=\"{$cellRef}\"{$styleAttr}><v>{$displayVal}</v></c>\n";
                     } else {
                         $escaped = htmlspecialchars((string)$val, ENT_QUOTES | ENT_XML1);
                         $sheetXml .= "      <c r=\"{$cellRef}\" t=\"inlineStr\"{$styleAttr}><is><t>{$escaped}</t></is></c>\n";
