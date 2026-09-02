@@ -7458,7 +7458,7 @@ class SchoolAdminService extends BaseService
             LEFT JOIN classes c ON s.class_id = c.id
             LEFT JOIN academic_years say ON s.academic_year_id = say.id
             LEFT JOIN academic_years pay_ay ON fp.academic_year_id = pay_ay.id
-            LEFT JOIN users u ON (u.name = fp.collected_by AND u.school_id = fp.school_id)
+            LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = fp.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = fp.school_id)
             WHERE fp.school_id = :school_id AND fp.status IN ('PAID', 'Partial')
               AND (
                 s.academic_year_id = :ayid 
@@ -10192,7 +10192,7 @@ class SchoolAdminService extends BaseService
             FROM fee_payments fp
             JOIN students s ON fp.student_id = s.id
             LEFT JOIN classes c ON s.class_id = c.id
-            LEFT JOIN users u ON (u.name = fp.collected_by AND u.school_id = fp.school_id)
+            LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = fp.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = fp.school_id)
             WHERE fp.school_id = :sid 
               AND fp.status = 'PAID'
               AND fp.created_at {$operator} :from_ts 
@@ -10221,7 +10221,7 @@ class SchoolAdminService extends BaseService
             JOIN students s ON afp.student_id = s.id
             LEFT JOIN classes c ON s.class_id = c.id
             JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
-            LEFT JOIN users u ON (u.name = afph.collected_by AND u.school_id = afp.school_id)
+            LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = afph.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = afp.school_id)
             WHERE afp.school_id = :sid 
               AND afph.created_at {$operator} :from_ts 
               AND afph.created_at <= :to_ts
@@ -10567,7 +10567,7 @@ Only approve the settlement after reviewing all financial records.
             FROM fee_payments fp
             JOIN students s ON fp.student_id = s.id
             LEFT JOIN classes c ON s.class_id = c.id
-            LEFT JOIN users u ON (u.name = fp.collected_by AND u.school_id = fp.school_id)
+            LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = fp.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = fp.school_id)
             WHERE fp.school_id = :sid 
               AND fp.status = 'PAID'
               AND fp.created_at {$operator} :from_ts 
@@ -10596,7 +10596,7 @@ Only approve the settlement after reviewing all financial records.
             JOIN students s ON afp.student_id = s.id
             LEFT JOIN classes c ON s.class_id = c.id
             JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
-            LEFT JOIN users u ON (u.name = afph.collected_by AND u.school_id = afp.school_id)
+            LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = afph.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = afp.school_id)
             WHERE afp.school_id = :sid 
               AND afph.created_at {$operator} :from_ts 
               AND afph.created_at <= :to_ts
@@ -10760,7 +10760,7 @@ Only approve the settlement after reviewing all financial records.
             FROM fee_payments fp
             JOIN students s ON fp.student_id = s.id
             LEFT JOIN classes c ON s.class_id = c.id
-            LEFT JOIN users u ON (u.name = fp.collected_by AND u.school_id = fp.school_id)
+            LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = fp.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = fp.school_id)
             WHERE fp.school_id = :sid 
               AND LOWER(fp.status) IN ('paid', 'partial')
               AND (
@@ -10805,7 +10805,7 @@ Only approve the settlement after reviewing all financial records.
             JOIN students s ON afp.student_id = s.id
             LEFT JOIN classes c ON s.class_id = c.id
             JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
-            LEFT JOIN users u ON (u.name = afp.collected_by AND u.school_id = afp.school_id)
+            LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = afp.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = afp.school_id)
             WHERE afp.school_id = :sid 
               AND LOWER(afp.status) IN ('paid', 'partial')
               AND (
