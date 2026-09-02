@@ -727,11 +727,11 @@ class PlatformService extends BaseService
         $cleanName = strtolower(trim((string)$plan['name']));
         $stmtCheck = $pdo->prepare("
             SELECT (
-                (SELECT COUNT(*) FROM subscriptions WHERE LOWER(TRIM(plan_name)) = :name) +
-                (SELECT COUNT(*) FROM schools WHERE LOWER(TRIM(plan)) = :name)
+                (SELECT COUNT(*) FROM subscriptions WHERE LOWER(TRIM(plan_name)) = :name1) +
+                (SELECT COUNT(*) FROM schools WHERE LOWER(TRIM(plan)) = :name2)
             ) AS cnt
         ");
-        $stmtCheck->execute([':name' => $cleanName]);
+        $stmtCheck->execute([':name1' => $cleanName, ':name2' => $cleanName]);
         $cnt = (int)$stmtCheck->fetchColumn();
 
         if ($cnt > 0) {
@@ -1255,11 +1255,11 @@ class PlatformService extends BaseService
         $cleanName = strtolower(trim((string)$plan['name']));
         $stmtCheck = $pdo->prepare("
             SELECT (
-                (SELECT COUNT(*) FROM subscriptions WHERE LOWER(TRIM(plan_name)) = :name) +
-                (SELECT COUNT(*) FROM schools WHERE LOWER(TRIM(plan)) = :name)
+                (SELECT COUNT(*) FROM subscriptions WHERE LOWER(TRIM(plan_name)) = :name1) +
+                (SELECT COUNT(*) FROM schools WHERE LOWER(TRIM(plan)) = :name2)
             ) AS cnt
         ");
-        $stmtCheck->execute([':name' => $cleanName]);
+        $stmtCheck->execute([':name1' => $cleanName, ':name2' => $cleanName]);
         $cnt = (int)$stmtCheck->fetchColumn();
 
         if ($cnt > 0) {
