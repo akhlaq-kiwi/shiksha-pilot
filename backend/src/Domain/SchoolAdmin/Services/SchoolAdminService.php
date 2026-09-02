@@ -375,25 +375,11 @@ class SchoolAdminService extends BaseService
 
     private function generateUniqueRefNo(PDO $pdo): string
     {
-        do {
-            $ref = sprintf('%010d%02d', time(), rand(10, 99));
-            
-            // Check if any digit repeats more than 2 times consecutively (e.g. 222 or 000)
-            $hasThree = preg_match('/(\d)\1\1/', $ref) === 1;
-            if ($hasThree) {
-                continue;
-            }
-            
-            $stmt1 = $pdo->prepare("SELECT COUNT(*) FROM fee_payments WHERE receipt_no = :ref");
-            $stmt1->execute([':ref' => $ref]);
-            $c1 = (int)$stmt1->fetchColumn();
-            
-            $stmt2 = $pdo->prepare("SELECT COUNT(*) FROM additional_fee_payments WHERE receipt_no = :ref");
-            $stmt2->execute([':ref' => $ref]);
-            $c2 = (int)$stmt2->fetchColumn();
-        } while ($hasThree || $c1 > 0 || $c2 > 0);
-        
-        return $ref;
+        $micro = microtime(true);
+        $sec = (int)$micro;
+        $milli = sprintf('%03d', (int)(($micro - $sec) * 1000));
+        $rnd = sprintf('%02d', rand(10, 99));
+        return $sec . $milli . $rnd;
     }
 
     // -------------------------------------------------------------------------
@@ -7389,152 +7375,8 @@ class SchoolAdminService extends BaseService
 
     private function ensureDiscountAndPartialSchema(PDO $pdo): void
     {
-        static $schemaEnsured = false;
-        if ($schemaEnsured) return;
-        $schemaEnsured = true;
-
-        try {
-            $pdo->exec("ALTER TABLE `fee_payments` ADD COLUMN `discount_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER `amount_paid` shadow");
-        } catch (\Throwable $e) {
-            try {
-                $pdo->exec("ALTER TABLE `fee_payments` ADD COLUMN `discount_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER `amount_paid`");
-            } catch (\Throwable $e) {}
-        }
-
-        try {
-            $pdo->exec("ALTER TABLE `additional_fee_payments` ADD COLUMN `discount_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER `amount`");
-        } catch (\Throwable $e) {}
-
-        try {
-            $pdo->exec("ALTER TABLE `additional_fee_payments` ADD COLUMN `amount_paid` DECIMAL(12,2) DEFAULT 0.00 AFTER `discount_amount`");
-        } catch (\Throwable $e) {
-            try {
-                $pdo->exec("ALTER TABLE `additional_fee_payments` MODIFY COLUMN `amount_paid` DECIMAL(12,2) DEFAULT 0.00");
-            } catch (\Throwable $e) {}
-        }
-
-        try {
-            $pdo->exec("ALTER TABLE `additional_fee_payments` MODIFY COLUMN `status` ENUM('Pending','Paid','Partial') NOT NULL DEFAULT 'Pending'");
-        } catch (\Throwable $e) {}
-
-        try {
-            $pdo->exec("
-                CREATE TABLE IF NOT EXISTS `additional_fee_payment_history` (
-                  `id` INT AUTO_INCREMENT PRIMARY KEY,
-                  `payment_id` INT NOT NULL,
-                  `school_id` INT NOT NULL,
-                  `student_id` INT NOT NULL,
-                  `amount_paid` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
-                  `discount_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
-                  `payment_method` VARCHAR(50) NOT NULL DEFAULT 'Cash',
-                  `collected_by` VARCHAR(100) NOT NULL DEFAULT 'School Admin',
-                  `receipt_no` VARCHAR(100) DEFAULT NULL,
-                  `payment_date` DATE DEFAULT NULL,
-                  `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
-                  KEY `payment_id` (`payment_id`),
-                  KEY `school_id` (`school_id`),
-                  KEY `student_id` (`student_id`),
-                  CONSTRAINT `additional_fee_payment_history_ibfk_1` FOREIGN KEY (`payment_id`) REFERENCES `additional_fee_payments` (`id`) ON DELETE CASCADE
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-            ");
-        } catch (\Throwable $e) {}
-
-        try {
-            $pdo->exec("ALTER TABLE `additional_fee_payment_history` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-        } catch (\Throwable $e) {}
-
-        try {
-            $pdo->exec("
-                UPDATE `additional_fee_payments` 
-                SET `status` = 'Partial' 
-                WHERE `amount_paid` IS NOT NULL 
-                  AND `amount_paid` > 0 
-                  AND (`amount_paid` + COALESCE(`discount_amount`, 0)) < `amount` 
-                  AND `status` = 'Pending'
-            ");
-        } catch (\Throwable $e) {}
-
-        try {
-            $pdo->exec("
-                UPDATE `additional_fee_payments` 
-                SET `amount_paid` = round(`amount` - COALESCE(`discount_amount`, 0), 2),
-                    `status` = 'Paid' 
-                WHERE `discount_amount` > 0 
-                  AND (`amount_paid` + `discount_amount`) < `amount` - 0.01
-                  AND `amount_paid` IS NOT NULL
-            ");
-        } catch (\Throwable $e) {}
-
-        try {
-            $pdo->exec("
-                UPDATE `additional_fee_payments` 
-                SET `status` = 'Paid' 
-                WHERE (`amount_paid` + COALESCE(`discount_amount`, 0)) >= `amount` - 0.01 
-                  AND `amount_paid` IS NOT NULL
-                  AND `status` != 'Paid'
-            ");
-        } catch (\Throwable $e) {}
-
-        try {
-            $stmtMissing = $pdo->query("
-                SELECT afp.* 
-                FROM additional_fee_payments afp 
-                LEFT JOIN additional_fee_payment_history afph ON afp.id = afph.payment_id 
-                WHERE afph.id IS NULL AND (afp.amount_paid > 0 OR afp.discount_amount > 0 OR afp.status IN ('Paid', 'Partial'))
-            ");
-            $missingRecs = $stmtMissing ? $stmtMissing->fetchAll(PDO::FETCH_ASSOC) : [];
-            if (!empty($missingRecs)) {
-                $stmtInsHist = $pdo->prepare("
-                    INSERT INTO additional_fee_payment_history 
-                    (payment_id, school_id, student_id, amount_paid, discount_amount, payment_method, collected_by, receipt_no, payment_date, created_at)
-                    VALUES 
-                    (:pid, :sid, :stid, :amt, :disc, :pmethod, :cby, :rno, :pdate, :cat)
-                ");
-                foreach ($missingRecs as $r) {
-                    if ((float)$r['amount'] == 1000.00 && (float)$r['amount_paid'] == 625.00 && (float)$r['discount_amount'] == 375.00) {
-                        $baseCat = $r['created_at'] ?? date('Y-m-d H:i:s');
-                        $cat1 = date('Y-m-d H:i:s', strtotime($baseCat . ' - 8 minutes'));
-                        $stmtInsHist->execute([
-                            ':pid' => $r['id'],
-                            ':sid' => $r['school_id'],
-                            ':stid' => $r['student_id'],
-                            ':amt' => 500.00,
-                            ':disc' => 0.00,
-                            ':pmethod' => $r['payment_method'] ?? 'Cash',
-                            ':cby' => $r['collected_by'] ?? 'School Admin',
-                            ':rno' => ($r['receipt_no'] ? $r['receipt_no'] . '-1' : $this->generateUniqueRefNo($pdo)),
-                            ':pdate' => $r['payment_date'] ?? date('Y-m-d'),
-                            ':cat' => $cat1
-                        ]);
-                        $stmtInsHist->execute([
-                            ':pid' => $r['id'],
-                            ':sid' => $r['school_id'],
-                            ':stid' => $r['student_id'],
-                            ':amt' => 125.00,
-                            ':disc' => 375.00,
-                            ':pmethod' => $r['payment_method'] ?? 'Cash',
-                            ':cby' => $r['collected_by'] ?? 'School Admin',
-                            ':rno' => $r['receipt_no'] ?? $this->generateUniqueRefNo($pdo),
-                            ':pdate' => $r['payment_date'] ?? date('Y-m-d'),
-                            ':cat' => $baseCat
-                        ]);
-                    } else {
-                        $stmtInsHist->execute([
-                            ':pid' => $r['id'],
-                            ':sid' => $r['school_id'],
-                            ':stid' => $r['student_id'],
-                            ':amt' => (float)($r['amount_paid'] ?? $r['amount']),
-                            ':disc' => (float)($r['discount_amount'] ?? 0.0),
-                            ':pmethod' => $r['payment_method'] ?? 'Cash',
-                            ':cby' => $r['collected_by'] ?? 'School Admin',
-                            ':rno' => $r['receipt_no'] ?? $this->generateUniqueRefNo($pdo),
-                            ':pdate' => $r['payment_date'] ?? date('Y-m-d'),
-                            ':cat' => $r['created_at'] ?? date('Y-m-d H:i:s')
-                        ]);
-                    }
-                }
-            }
-        } catch (\Throwable $e) {}
+        // Schema and historical data self-healing is performed in database migrations (020 & 021)
+        return;
     }
 
     public function getCollectionHistory(array $user, array $params = []): array
