@@ -10318,10 +10318,22 @@ class SchoolAdminService extends BaseService
             return strcmp($a['expense_date'] ?? '', $b['expense_date'] ?? '');
         });
 
-        // Profit / Loss Summary
+        // Profit / Loss Summary - calculate exact sum from itemized collections and expenses
+        $calculatedRevenue = 0.0;
+        foreach ($feeCollections as $fc) {
+            $calculatedRevenue += round((float)($fc['amount'] ?? 0), 2);
+        }
+        $calculatedRevenue = round($calculatedRevenue, 2);
+
+        $calculatedExpenses = 0.0;
+        foreach ($expenses as $ex) {
+            $calculatedExpenses += round((float)($ex['amount'] ?? 0), 2);
+        }
+        $calculatedExpenses = round($calculatedExpenses, 2);
+
         $summary = [
-            'revenue' => (float)$report['fees_collected'],
-            'expenses' => (float)$report['salary_paid'],
+            'revenue' => $calculatedRevenue,
+            'expenses' => $calculatedExpenses,
         ];
 
         // Excel file generation
@@ -10696,10 +10708,22 @@ Only approve the settlement after reviewing all financial records.
             return strcmp($a['expense_date'] ?? '', $b['expense_date'] ?? '');
         });
 
-        // Profit / Loss Summary
+        // Profit / Loss Summary - calculate exact sum from itemized collections and expenses
+        $calculatedRevenue = 0.0;
+        foreach ($feeCollections as $fc) {
+            $calculatedRevenue += round((float)($fc['amount'] ?? 0), 2);
+        }
+        $calculatedRevenue = round($calculatedRevenue, 2);
+
+        $calculatedExpenses = 0.0;
+        foreach ($expenses as $ex) {
+            $calculatedExpenses += round((float)($ex['amount'] ?? 0), 2);
+        }
+        $calculatedExpenses = round($calculatedExpenses, 2);
+
         $summary = [
-            'revenue' => (float)$report['fees_collected'],
-            'expenses' => (float)$report['salary_paid'],
+            'revenue' => $calculatedRevenue,
+            'expenses' => $calculatedExpenses,
         ];
 
         // Format filename
