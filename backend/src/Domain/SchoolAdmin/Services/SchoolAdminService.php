@@ -7224,9 +7224,9 @@ class SchoolAdminService extends BaseService
         $calculatedDeposits = [];
         $batchPaidTracker = $existingPaidByMonth;
 
-        // Determine discount amount if provided
-        $totalDiscountInput = max(0.0, (float)($data['discount_amount'] ?? 0));
-        $discountPerMonth = count($monthsToPay) > 0 ? round($totalDiscountInput / count($monthsToPay), 2) : 0.0;
+        // Determine discount amount if provided (sequential whole integer allocation - no division decimals)
+        $totalDiscountInput = (int)round(max(0.0, (float)($data['discount_amount'] ?? 0)));
+        $remainingDiscountToApply = $totalDiscountInput;
 
         foreach ($monthsToPay as $m) {
             $idx = array_search($m, $academicMonths, true);
@@ -7234,35 +7234,40 @@ class SchoolAdminService extends BaseService
                 throw new ValidationException(['months' => "Invalid month: $m"]);
             }
 
-            $totalConfiguredFee = $getConfiguredFeeForMonth($m);
-            $alreadyPaidForMonth = $existingPaidByMonth[$m] ?? 0.0;
-            $remainingForMonth = max(0.0, round($totalConfiguredFee - $alreadyPaidForMonth, 2));
+            $totalConfiguredFee = (int)round($getConfiguredFeeForMonth($m));
+            $alreadyPaidForMonth = (int)round($existingPaidByMonth[$m] ?? 0.0);
+            $remainingForMonth = max(0, $totalConfiguredFee - $alreadyPaidForMonth);
 
-            if ($remainingForMonth <= 0.01) {
+            if ($remainingForMonth <= 0) {
                 throw new ValidationException(['months' => "Fee for $m has already been paid."]);
             }
 
             // Sequence check: All prior months in academic calendar must be fully paid (including batch deposits)
             for ($j = 0; $j < $idx; $j++) {
                 $prevMonth = $academicMonths[$j];
-                $prevConfigured = $getConfiguredFeeForMonth($prevMonth);
-                $prevPaidSoFar = $batchPaidTracker[$prevMonth] ?? 0.0;
+                $prevConfigured = (int)round($getConfiguredFeeForMonth($prevMonth));
+                $prevPaidSoFar = (int)round($batchPaidTracker[$prevMonth] ?? 0.0);
 
-                if ($prevPaidSoFar < $prevConfigured - 0.01) {
+                if ($prevPaidSoFar < $prevConfigured) {
                     throw new ValidationException(['months' => 'Cannot collect fees for a future month until all previous pending months have been paid.']);
                 }
             }
 
-            // Determine discount and deposit amount for this month
+            // Determine discount and deposit amount for this month (sequential integer allocation)
             if (count($monthsToPay) === 1) {
-                $monthDiscount = min($totalDiscountInput, $remainingForMonth);
+                $monthDiscount = min($remainingDiscountToApply, $remainingForMonth);
                 $depositAmount = $remainingForMonth;
                 if (isset($monthAmountsInput[$m]) && is_numeric($monthAmountsInput[$m])) {
-                    $depositAmount = (float)$monthAmountsInput[$m];
+                    $depositAmount = (int)round((float)$monthAmountsInput[$m]);
                 }
             } else {
-                $monthDiscount = min($discountPerMonth, $remainingForMonth);
-                $depositAmount = max(0.0, round($remainingForMonth - $monthDiscount, 2));
+                if ($remainingDiscountToApply > 0) {
+                    $monthDiscount = min($remainingDiscountToApply, $remainingForMonth);
+                    $remainingDiscountToApply -= $monthDiscount;
+                } else {
+                    $monthDiscount = 0;
+                }
+                $depositAmount = max(0, $remainingForMonth - $monthDiscount);
             }
 
             if (count($monthsToPay) > 1 && abs(($depositAmount + $monthDiscount) - $remainingForMonth) > 0.01) {
@@ -7418,6 +7423,7 @@ class SchoolAdminService extends BaseService
             WHERE fp.school_id = :school_id AND fp.status IN ('PAID', 'Partial')
               AND (
                 s.academic_year_id = :ayid 
+                OR fp.academic_year_id = :ayid
                 OR (
                   :is_curr1 = 1 
                   AND (s.status = 'Inactive' OR s.status = 'Alumni' OR s.status = 'Archived')
