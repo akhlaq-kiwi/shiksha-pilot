@@ -95,7 +95,9 @@ export function FeeReceiptModal({ receipt, student, schoolName, schoolLogoUrl, a
     return idxA - idxB;
   });
 
-  const totalAmountPaid = sortedGroup.reduce((sum, p) => sum + parseFloat(p.amount_paid || p.amount || 0), 0);
+  const totalAmountPaid = sortedGroup.reduce((sum, p) => sum + parseFloat(p.amount_paid !== undefined && p.amount_paid !== null ? p.amount_paid : (p.amount || 0)), 0);
+  const totalDiscount = sortedGroup.reduce((sum, p) => sum + parseFloat(p.discount_amount || 0), 0);
+  const totalPayable = totalAmountPaid + totalDiscount;
   const displaySchoolName = schoolName || 'SHIKSHA PILOT SCHOOL';
 
   const currentYearName = student?.academic_year_name || student?.academic_year || '2027–2028';
@@ -169,29 +171,42 @@ export function FeeReceiptModal({ receipt, student, schoolName, schoolLogoUrl, a
                   })()}
                 </p>
               </div>
-              <div className="text-right">
-                <p className="text-[11px] text-text-muted font-bold uppercase tracking-wider">
-                  {sortedGroup.length > 1 ? 'Total Amount' : 'Amount Paid'}
-                </p>
-                <p className="text-lg font-bold text-primary mt-0.5">
-                  Rs {totalAmountPaid.toLocaleString()}
-                </p>
+              <div className="text-right space-y-1">
+                {totalDiscount > 0 ? (
+                  <div className="space-y-1">
+                    <div className="text-[11px] text-text-muted flex justify-between gap-3">
+                      <span>Payable Amount:</span>
+                      <span className="font-bold">Rs {totalPayable.toLocaleString()}</span>
+                    </div>
+                    <div className="text-[11px] text-emerald-600 font-bold flex justify-between gap-3">
+                      <span>Discount:</span>
+                      <span>- Rs {totalDiscount.toLocaleString()}</span>
+                    </div>
+                    <div className="pt-1 border-t border-border/60">
+                      <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">
+                        Total Amount Paid
+                      </p>
+                      <p className="text-lg font-bold text-primary">
+                        Rs {totalAmountPaid.toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-[11px] text-text-muted font-bold uppercase tracking-wider">
+                      {sortedGroup.length > 1 ? 'Total Amount' : 'Amount Paid'}
+                    </p>
+                    <p className="text-lg font-bold text-primary mt-0.5">
+                      Rs {totalAmountPaid.toLocaleString()}
+                    </p>
+                  </>
+                )}
               </div>
             </div>
-            {receipt.fee_name === 'Previous Year Dues' && (
-              <div className="border border-border p-4 rounded-xl text-xs space-y-2 bg-zinc-50/50 dark:bg-zinc-900/10">
-                <div className="flex justify-between">
-                  <span className="text-text-muted font-semibold">Fee Type:</span>
-                  <span className="font-bold text-text-primary">Previous Year Dues</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-text-muted font-semibold">Collected For:</span>
-                  <span className="font-bold text-text-primary">{previousYearName || 'Previous Academic Year'} Outstanding</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-text-muted font-semibold">Collected In:</span>
-                  <span className="font-bold text-text-primary">{currentYearName || 'Current Academic Year'}</span>
-                </div>
+            {(receipt.status === 'Partial' || receipt.status === 'Partially Paid') && (
+              <div className="border border-amber-500/20 bg-amber-500/10 p-3 rounded-xl text-xs flex justify-between items-center text-amber-700 dark:text-amber-400 font-bold">
+                <span>Payment Status:</span>
+                <span className="uppercase">Partially Paid</span>
               </div>
             )}
           </div>

@@ -192,10 +192,10 @@ final class NotificationCatalog
         'ATTENDANCE_MARKED_ABSENT' => [
             'category' => self::CAT_ATTENDANCE,
             'delivery' => self::DELIVERY_PUSH,
-            'audience' => ['PARENT'],
+            'audience' => ['STUDENT', 'PARENT'],
             'priority' => 'high',
             'link'     => '/attendance',
-            'label'    => 'Your child was marked absent today',
+            'label'    => 'You were marked absent today',
         ],
         'ATTENDANCE_NOT_MARKED_REMINDER' => [
             'category' => self::CAT_ATTENDANCE,

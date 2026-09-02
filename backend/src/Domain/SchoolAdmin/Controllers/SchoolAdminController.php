@@ -11,11 +11,14 @@ use App\Shared\Http\RequestParser;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 
+use App\Domain\SchoolAdmin\Services\TeacherAttendanceService;
+
 class SchoolAdminController extends BaseController
 {
     public function __construct(
         TokenService $tokenService,
         private readonly SchoolAdminService $service,
+        private readonly TeacherAttendanceService $teacherAttendanceService,
     ) {
         parent::__construct($tokenService);
     }
@@ -235,7 +238,8 @@ class SchoolAdminController extends BaseController
         $user = $this->authenticate($request);
         $this->requireRole($user, ['SCHOOL_ADMIN']);
 
-        $data = $this->service->getClasses($user);
+        $params = $request->getQueryParams();
+        $data = $this->service->getClasses($user, $params);
 
         return $this->success($response, $data);
     }
@@ -2137,5 +2141,88 @@ class SchoolAdminController extends BaseController
             : 'Request rejected.';
 
         return $this->success($response, $data, $message);
+    }
+
+    // ---------------------------------------------------------------------
+    // Teacher Attendance
+    // ---------------------------------------------------------------------
+
+    public function getTeacherAttendance(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $params = $request->getQueryParams();
+        $date = $params['date'] ?? date('Y-m-d');
+
+        $data = $this->teacherAttendanceService->getDailyAttendance($user, $date);
+
+        return $this->success($response, $data);
+    }
+
+    public function markTeacherAttendance(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body = RequestParser::body($request);
+        $data = $this->teacherAttendanceService->markTeacherAttendanceByAdmin($user, $body);
+
+        return $this->success($response, $data, 'Teacher attendance updated successfully');
+    }
+
+    public function getTeacherAttendanceReport(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $params = $request->getQueryParams();
+        $month = isset($params['month']) ? (int)$params['month'] : (int)date('n');
+        $year = isset($params['year']) ? (int)$params['year'] : (int)date('Y');
+
+        $data = $this->teacherAttendanceService->getMonthlyReport($user, $month, $year);
+
+        return $this->success($response, $data);
+    }
+
+    public function getTeacherAttendanceSettings(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $data = $this->teacherAttendanceService->getSettings($user);
+
+        return $this->success($response, $data);
+    }
+
+    public function saveTeacherAttendanceSettings(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body = RequestParser::body($request);
+        $data = $this->teacherAttendanceService->saveSettings($user, $body);
+
+        return $this->success($response, $data, 'Teacher attendance settings saved successfully');
+    }
+
+    public function getTeacherAttendanceQrToken(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $data = $this->teacherAttendanceService->getQrToken($user);
+
+        return $this->success($response, $data);
+    }
+
+    public function refreshTeacherAttendanceQrToken(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $data = $this->teacherAttendanceService->refreshQrToken($user);
+
+        return $this->success($response, $data, 'QR code regenerated successfully');
     }
 }

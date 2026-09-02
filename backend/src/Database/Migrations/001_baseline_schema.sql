@@ -62,7 +62,9 @@ CREATE TABLE IF NOT EXISTS `additional_fee_payments` (
   `student_id` int NOT NULL,
   `fee_type_id` int NOT NULL,
   `amount` decimal(12,2) NOT NULL,
-  `status` enum('Pending','Paid') NOT NULL DEFAULT 'Pending',
+  `discount_amount` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `amount_paid` decimal(12,2) DEFAULT NULL,
+  `status` enum('Pending','Paid','Partial') NOT NULL DEFAULT 'Pending',
   `payment_date` date DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -81,6 +83,25 @@ CREATE TABLE IF NOT EXISTS `additional_fee_payments` (
   CONSTRAINT `additional_fee_payments_ibfk_2` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE,
   CONSTRAINT `additional_fee_payments_ibfk_3` FOREIGN KEY (`fee_type_id`) REFERENCES `additional_fee_types` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS `additional_fee_payment_history` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `payment_id` INT NOT NULL,
+  `school_id` INT NOT NULL,
+  `student_id` INT NOT NULL,
+  `amount_paid` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  `discount_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  `payment_method` VARCHAR(50) NOT NULL DEFAULT 'Cash',
+  `collected_by` VARCHAR(100) NOT NULL DEFAULT 'School Admin',
+  `receipt_no` VARCHAR(100) DEFAULT NULL,
+  `payment_date` DATE DEFAULT NULL,
+  `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY `payment_id` (`payment_id`),
+  KEY `school_id` (`school_id`),
+  KEY `student_id` (`student_id`),
+  CONSTRAINT `additional_fee_payment_history_ibfk_1` FOREIGN KEY (`payment_id`) REFERENCES `additional_fee_payments` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `additional_fee_types` (
   `id` int NOT NULL AUTO_INCREMENT,
   `school_id` int NOT NULL,
@@ -441,6 +462,7 @@ CREATE TABLE IF NOT EXISTS `fee_payments` (
   `student_id` int NOT NULL,
   `fee_structure_id` int DEFAULT NULL,
   `amount_paid` decimal(12,2) NOT NULL,
+  `discount_amount` decimal(12,2) NOT NULL DEFAULT '0.00',
   `payment_date` date NOT NULL,
   `receipt_no` varchar(100) DEFAULT NULL,
   `status` enum('PAID','Partial','Pending','Overdue') NOT NULL DEFAULT 'PAID',

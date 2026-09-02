@@ -19,3 +19,17 @@
 -keep class io.flutter.provider.** { *; }
 -keep class io.flutter.embedding.** { *; }
 -keep class com.shikshapilot.app.** { *; }
+
+# MobileScanner, CameraX & MLKit ProGuard / R8 Keep Rules
+-keep class dev.flutter.plugins.mobile_scanner.** { *; }
+-keep class androidx.camera.** { *; }
+-keep class * extends androidx.camera.core.UseCase { *; }
+-keep class * extends androidx.camera.core.CameraXConfig$Provider { *; }
+-keep class com.google.mlkit.** { *; }
+-keep class com.google.android.gms.vision.** { *; }
+-keep class com.google.android.gms.internal.mlkit_vision_barcode.** { *; }
+-keep class com.google.android.gms.internal.mlkit_vision_barcode_bundled.** { *; }
+-dontwarn androidx.camera.**
+-dontwarn com.google.mlkit.**
+-dontwarn dev.flutter.plugins.mobile_scanner.**
+

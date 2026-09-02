@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// The only server a release build will ever talk to.
-const String kProductionBaseUrl = 'https://app.shikshapilot.com';
+const String kProductionBaseUrl = 'https://qa.shikshapilot.com';
 
 /// Key under which a debug-time server override is stored.
 const String kBaseUrlPrefKey = 'base_url';
@@ -19,13 +19,17 @@ bool get kServerOverrideAllowed => kDebugMode;
 /// Release builds ignore any stored override and always return production, so a
 /// value written by an older build cannot outlive the debug session it came
 /// from.
+const String kLocalBaseUrl = 'http://10.73.20.71:8000';
+
 String resolveBaseUrlFrom(SharedPreferences prefs) {
   if (!kServerOverrideAllowed) {
     return kProductionBaseUrl;
   }
   final saved = prefs.getString(kBaseUrlPrefKey);
-
-  return (saved != null && saved.isNotEmpty) ? saved : kProductionBaseUrl;
+  if (saved != null && saved.isNotEmpty && saved != kProductionBaseUrl) {
+    return saved;
+  }
+  return kLocalBaseUrl;
 }
 
 /// Base URL for API calls, loading preferences as needed.

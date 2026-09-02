@@ -372,11 +372,7 @@ export default function FinancialReportsPage() {
               <CardTitle className="text-sm font-bold text-text-primary uppercase tracking-wider">Financial Statement Preview</CardTitle>
               {previewData && (
                 <DropdownMenu
-                  trigger={
-                    <button className="p-1 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-text-muted hover:text-text-primary transition-colors cursor-pointer">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </button>
-                  }
+                  trigger={<MoreHorizontal className="h-4 w-4" />}
                 >
                   <DropdownItem onClick={handleExportPreviewReport}>
                     <Download className="h-3.5 w-3.5 mr-2 inline" /> Export Report

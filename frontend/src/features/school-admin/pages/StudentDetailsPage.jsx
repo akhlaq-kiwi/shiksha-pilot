@@ -114,75 +114,219 @@ function DocumentViewerModal({ docName, docPath, onClose }) {
   );
 }
 
-// Deposit Modal Component (Supports consecutive payments selection)
-function DepositModal({ student, availableMonths, paidMonths, classFeeConfig, onSave, onClose }) {
+// Deposit Modal Component (Supports partial payment & consecutive sequence)
+function DepositModal({ student, payments = [], classFeeConfig, onSave, onClose }) {
   const [selectedMonths, setSelectedMonths] = useState([]);
+  const [depositAmounts, setDepositAmounts] = useState({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
 
   const academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
 
-  const getMonthAmount = (m) => {
+  // Total configured fee for month m
+  const getMonthlyFee = (m) => {
     if (classFeeConfig && classFeeConfig.monthly_fees && classFeeConfig.monthly_fees[m]) {
       return parseFloat(classFeeConfig.monthly_fees[m]);
     }
-    const paymentsList = student?.payments || [];
-    const firstPaidAmount = paymentsList[0]?.amount_paid ? parseFloat(paymentsList[0].amount_paid) : 0;
+    const firstPaidAmount = payments[0]?.amount_paid ? parseFloat(payments[0].amount_paid) : 0;
     return firstPaidAmount;
   };
 
-  // Resolve the earliest unpaid month in the academic cycle
-  const getEarliestUnpaid = () => {
-    return academicMonths.find(m => !paidMonths.includes(m));
+  // Amount already paid for month m (including discount)
+  const getPaidSoFar = (m) => {
+    return payments
+      .filter(p => p.fee_month === m)
+      .reduce((sum, p) => sum + parseFloat(p.amount_paid || 0) + parseFloat(p.discount_amount || 0), 0);
   };
 
-  const handleMonthToggle = (month) => {
-    const earliestUnpaid = getEarliestUnpaid();
-    const idxOfToggle = academicMonths.indexOf(month);
+  // Remaining fee for month m
+  const getRemainingFee = (m) => {
+    return Math.max(0, getMonthlyFee(m) - getPaidSoFar(m));
+  };
 
-    // If month is already checked, unchecking it should also uncheck all subsequent months
-    if (selectedMonths.includes(month)) {
-      setSelectedMonths(prev => {
-        const next = prev.filter(m => academicMonths.indexOf(m) < idxOfToggle);
-        return next;
-      });
+  // Is month fully paid
+  const isMonthFullyPaid = (m) => {
+    const totalFee = getMonthlyFee(m);
+    if (totalFee === 0) return false;
+    return getRemainingFee(m) <= 0.01;
+  };
+
+  // Earliest unpaid month in sequence
+  const getEarliestUnpaid = () => {
+    return academicMonths.find(m => !isMonthFullyPaid(m));
+  };
+
+  // Check if there is any partially paid month in academicMonths (where paid > 0 && remaining > 0.01)
+  const partialMonth = academicMonths.find(m => !isMonthFullyPaid(m) && getPaidSoFar(m) > 0 && getRemainingFee(m) > 0.01);
+
+  const handleMonthToggle = (month) => {
+    if (isMonthFullyPaid(month)) return;
+
+    // If a partially paid month exists, it MUST be deposited separately!
+    if (partialMonth) {
+      if (month !== partialMonth) {
+        setError(`Month ${partialMonth} has a remaining balance of ₹${getRemainingFee(partialMonth).toLocaleString()} and must be deposited separately first.`);
+        return;
+      }
+      if (selectedMonths.includes(partialMonth)) {
+        setSelectedMonths([]);
+        setDepositAmounts({});
+      } else {
+        setSelectedMonths([partialMonth]);
+        setDepositAmounts({ [partialMonth]: getRemainingFee(partialMonth) });
+      }
       setError('');
       return;
     }
 
-    // Checking a month: must ensure all months between earliestUnpaid and this month are checked
+    const earliestUnpaid = getEarliestUnpaid();
+    const idxOfToggle = academicMonths.indexOf(month);
     const idxOfEarliest = academicMonths.indexOf(earliestUnpaid);
-    
-    if (idxOfToggle > idxOfEarliest) {
-      // Check if all intermediate months are selected. If not, we fill the gap automatically to enforce sequential order!
-      const nextSelection = [];
-      for (let i = idxOfEarliest; i <= idxOfToggle; i++) {
-        nextSelection.push(academicMonths[i]);
-      }
+
+    if (selectedMonths.includes(month)) {
+      // Unchecking month: also uncheck subsequent months
+      const nextSelection = selectedMonths.filter(m => academicMonths.indexOf(m) < idxOfToggle);
       setSelectedMonths(nextSelection);
-      setError('');
-    } else if (month === earliestUnpaid) {
-      setSelectedMonths([month]);
+
+      const newAmounts = { ...depositAmounts };
+      academicMonths.forEach((m, idx) => {
+        if (idx >= idxOfToggle) {
+          delete newAmounts[m];
+        }
+      });
+      // If multiple months remain, reset all to full remaining fees
+      if (nextSelection.length > 1) {
+        nextSelection.forEach(mName => {
+          newAmounts[mName] = getRemainingFee(mName);
+        });
+      }
+      setDepositAmounts(newAmounts);
       setError('');
     } else {
-      // Chronological validation block
-      setError('Cannot collect fees for a future month until all previous pending months have been paid.');
+      // Checking month: ensure all months from earliestUnpaid to month are checked
+      if (idxOfToggle < idxOfEarliest) {
+        setError('Invalid month selection.');
+        return;
+      }
+
+      const nextSelection = [];
+      const newAmounts = { ...depositAmounts };
+
+      for (let i = idxOfEarliest; i <= idxOfToggle; i++) {
+        const mName = academicMonths[i];
+        if (!isMonthFullyPaid(mName)) {
+          nextSelection.push(mName);
+          newAmounts[mName] = getRemainingFee(mName);
+        }
+      }
+      setSelectedMonths(nextSelection);
+      setDepositAmounts(newAmounts);
+      setError('');
     }
   };
 
-  const handleSave = async () => {
+  const handleAmountChange = (m, value) => {
+    // Only positive whole numbers allowed (no decimals, no negative numbers)
+    const sanitized = value.replace(/[^0-9]/g, '');
+    const num = sanitized === '' ? '' : parseInt(sanitized, 10);
+    setDepositAmounts(prev => ({
+      ...prev,
+      [m]: num
+    }));
+    setError('');
+  };
+
+  const [applyDiscount, setApplyDiscount] = useState(false);
+  const [discountAmount, setDiscountAmount] = useState('');
+
+  const handleToggleApplyDiscount = (checked) => {
+    setApplyDiscount(checked);
+    if (!checked) {
+      setDiscountAmount('');
+    }
+    setError('');
+    const newAmounts = {};
+    selectedMonths.forEach(m => {
+      newAmounts[m] = getRemainingFee(m);
+    });
+    setDepositAmounts(newAmounts);
+  };
+
+  const getDiscAmount = () => {
+    return applyDiscount && discountAmount !== '' && discountAmount !== null ? (parseFloat(discountAmount) || 0) : 0;
+  };
+
+  const calculateGrossTotal = () => {
+    return selectedMonths.reduce((sum, m) => {
+      const amt = selectedMonths.length === 1 ? (parseFloat(depositAmounts[m]) || getRemainingFee(m)) : getRemainingFee(m);
+      return sum + (isNaN(amt) ? 0 : amt);
+    }, 0);
+  };
+
+  const calculateTotalDeposit = () => {
+    const gross = calculateGrossTotal();
+    const disc = getDiscAmount();
+    return Math.max(0, gross - disc);
+  };
+
+  // Live validation
+  const validateForm = () => {
     if (selectedMonths.length === 0) {
-      setError('Please select at least one month.');
+      return 'Please select at least one month.';
+    }
+    const gross = calculateGrossTotal();
+    const disc = getDiscAmount();
+
+    if (applyDiscount && discountAmount !== '' && discountAmount !== null) {
+      if (isNaN(disc) || disc < 0 || !Number.isInteger(disc)) {
+        return 'Please enter a valid positive whole number for discount amount.';
+      }
+      if (disc >= gross) {
+        return `Discount amount (₹${disc}) must be less than payable fee (₹${gross.toLocaleString()}).`;
+      }
+    }
+    if (selectedMonths.length === 1) {
+      const m = selectedMonths[0];
+      const remaining = getRemainingFee(m);
+      const val = depositAmounts[m];
+      const amt = parseFloat(val);
+      if (val === '' || val === null || isNaN(amt) || amt <= 0 || !Number.isInteger(amt)) {
+        return `Please enter a valid positive whole number for ${m}.`;
+      }
+      if (amt > remaining + 0.01) {
+        return `Amount cannot exceed the remaining fee of ₹${remaining.toLocaleString()} for ${m}.`;
+      }
+    }
+    return null;
+  };
+
+  const handleSave = async () => {
+    const valErr = validateForm();
+    if (valErr) {
+      setError(valErr);
       return;
     }
 
     setSaving(true);
     setError('');
     try {
+      const monthAmountsPayload = {};
+      const isSingleMonth = selectedMonths.length === 1;
+      const discApplied = getDiscAmount();
+
+      selectedMonths.forEach(m => {
+        const val = depositAmounts[m];
+        const userTypedAmt = isSingleMonth ? (parseFloat(val) || getRemainingFee(m)) : getRemainingFee(m);
+        const netCashPaid = Math.max(0, userTypedAmt - discApplied);
+        monthAmountsPayload[m] = netCashPaid;
+      });
+
       await schoolService.createFeePayment({
         student_id: student.id,
         months: selectedMonths,
+        month_amounts: monthAmountsPayload,
+        discount_amount: discApplied,
         payment_method: paymentMethod
       });
       window.dispatchEvent(new Event('fee-payment-updated'));
@@ -190,12 +334,14 @@ function DepositModal({ student, availableMonths, paidMonths, classFeeConfig, on
     } catch (err) {
       console.error(err);
       const errRes = err.data || err.response?.data;
-      const msg = errRes?.errors?.fee_structure || errRes?.errors?.class_id || errRes?.message || err.message || 'Failed to deposit fees.';
+      const msg = errRes?.errors?.months || errRes?.errors?.fee_structure || errRes?.errors?.class_id || errRes?.message || err.message || 'Failed to deposit fees.';
       setError(msg);
     } finally {
       setSaving(false);
     }
   };
+
+  const isSingleMonth = selectedMonths.length === 1;
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
@@ -208,11 +354,43 @@ function DepositModal({ student, availableMonths, paidMonths, classFeeConfig, on
           </button>
         </div>
 
-        <div className="p-6 space-y-4">
-          <p className="text-xs text-text-secondary">
-            Select the months to deposit for <strong className="text-text-primary uppercase">{student.name}</strong>.
-            Payments must follow the academic sequence chronologically.
-          </p>
+        <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+          {/* Apply Discount Toggle Row */}
+          <div className="flex items-center justify-between gap-3 p-3 bg-zinc-50 dark:bg-zinc-900/40 rounded-xl border border-border">
+            <label className="flex items-center gap-2.5 cursor-pointer select-none">
+              <input 
+                type="checkbox"
+                checked={applyDiscount}
+                onChange={(e) => handleToggleApplyDiscount(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-9 h-5 bg-zinc-300 peer-focus:outline-none rounded-full peer dark:bg-zinc-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-zinc-600 peer-checked:bg-primary relative"></div>
+              <span className="text-xs font-bold text-text-primary uppercase tracking-wider">Apply Discount</span>
+            </label>
+
+            {applyDiscount && (
+              <div className="relative flex-1 max-w-[160px]">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-text-muted">₹</span>
+                <input 
+                  type="number"
+                  min="0"
+                  placeholder="Discount Amount"
+                  value={discountAmount}
+                  onKeyDown={(e) => {
+                    if (['.', '-', 'e', '+', ','].includes(e.key)) {
+                      e.preventDefault();
+                    }
+                  }}
+                  onChange={(e) => {
+                    const sanitized = e.target.value.replace(/[^0-9]/g, '');
+                    setDiscountAmount(sanitized === '' ? '' : parseInt(sanitized, 10));
+                    setError('');
+                  }}
+                  className="w-full rounded-lg border border-border bg-surface text-text-primary pl-7 pr-3 py-1.5 text-xs font-bold outline-none focus:border-primary focus:ring-primary"
+                />
+              </div>
+            )}
+          </div>
 
           {/* Payment Method Selector */}
           <div className="space-y-1.5">
@@ -230,41 +408,99 @@ function DepositModal({ student, availableMonths, paidMonths, classFeeConfig, on
           </div>
 
           {error && (
-            <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-lg text-[11px] font-semibold leading-relaxed flex items-start gap-2">
+            <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl text-[11px] font-semibold leading-relaxed flex items-start gap-2">
               <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
           )}
 
           {/* Month Checkboxes list */}
-          <div className="space-y-2.5 max-h-[250px] overflow-y-auto pr-1 border border-border rounded-xl p-3 bg-zinc-50/50 dark:bg-zinc-900/10">
+          <div className="space-y-2.5 border border-border rounded-xl p-3 bg-zinc-50/50 dark:bg-zinc-900/10">
             {academicMonths.map(m => {
-              const isPaid = paidMonths.includes(m);
+              const totalFee = getMonthlyFee(m);
+              const paidSoFar = getPaidSoFar(m);
+              const remaining = getRemainingFee(m);
+              const isPaid = isMonthFullyPaid(m);
+              const isPartial = paidSoFar > 0 && remaining > 0;
               const isChecked = selectedMonths.includes(m);
-              const earliestUnpaid = getEarliestUnpaid();
-              
-              // Allowed to toggle if it is the earliest unpaid OR if it is already checked
-              const canSelect = !isPaid && (m === earliestUnpaid || selectedMonths.includes(m) || academicMonths.indexOf(m) <= academicMonths.indexOf(earliestUnpaid) + selectedMonths.length);
+              const shouldExpand = isSingleMonth && isChecked && !isPaid && !applyDiscount;
+
+              const currentAmt = depositAmounts[m] !== undefined ? depositAmounts[m] : remaining;
+              const numAmt = parseFloat(currentAmt) || 0;
+              const disc = getDiscAmount();
+              const remAfter = Math.max(0, remaining - (numAmt + disc));
+              const isOver = numAmt > remaining + 0.01;
 
               return (
-                <div key={m} className={`flex items-center justify-between p-2.5 rounded-lg border text-xs ${isPaid ? 'bg-zinc-100 border-zinc-200 dark:bg-zinc-900/50 text-text-muted' : 'bg-surface border-border hover:bg-zinc-50/50'}`}>
-                  <label className="flex items-center gap-2.5 font-bold uppercase select-none cursor-pointer w-full text-text-primary">
-                    <input 
-                      type="checkbox"
-                      disabled={isPaid}
-                      checked={isPaid || isChecked}
-                      onChange={() => handleMonthToggle(m)}
-                      className="rounded border-zinc-300 text-primary focus:ring-primary h-4 w-4 disabled:opacity-50"
-                    />
-                    <span>{m} <span className="text-[11px] text-text-muted font-normal lowercase">(₹{getMonthAmount(m).toLocaleString()})</span></span>
-                  </label>
-                  <div>
-                    {isPaid ? (
-                      <span className="text-[11px] font-bold bg-green-500/10 text-green-600 px-2 py-0.5 rounded uppercase">Paid</span>
-                    ) : (
-                      <span className="text-[11px] font-bold text-text-muted">Pending</span>
-                    )}
+                <div 
+                  key={m} 
+                  className={`border transition-colors ${
+                    isPaid 
+                      ? 'bg-zinc-100 border-zinc-200 dark:bg-zinc-900/50 text-text-muted p-2.5 rounded-lg flex items-center justify-between text-xs' 
+                      : shouldExpand 
+                        ? 'bg-surface border-primary/50 shadow-2xs p-3 space-y-3 rounded-xl' 
+                        : 'bg-surface border-border hover:bg-zinc-50/50 p-2.5 rounded-lg flex items-center justify-between text-xs'
+                  }`}
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <label className="flex items-center gap-2.5 font-bold uppercase select-none cursor-pointer text-text-primary text-xs w-full">
+                      <input 
+                        type="checkbox"
+                        disabled={isPaid || (partialMonth !== undefined && m !== partialMonth)}
+                        checked={isPaid || isChecked}
+                        onChange={() => handleMonthToggle(m)}
+                        className="rounded border-zinc-300 text-primary focus:ring-primary h-4 w-4 disabled:opacity-50"
+                      />
+                      <span>
+                        {m} <span className="text-[11px] text-text-muted font-normal lowercase">(₹{totalFee.toLocaleString()}{isPartial ? ` | Remaining ₹${remaining.toLocaleString()}` : ''})</span>
+                      </span>
+                    </label>
+                    <div className="flex-shrink-0">
+                      {isPaid ? (
+                        <span className="text-[11px] font-bold bg-green-500/10 text-green-600 px-2 py-0.5 rounded uppercase">Paid</span>
+                      ) : isPartial ? (
+                        <span className="text-[11px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded uppercase">Partially Paid</span>
+                      ) : (
+                        <span className="text-[11px] font-bold text-text-muted">Pending</span>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Input field shown ONLY when exactly 1 month is checked */}
+                  {shouldExpand && (
+                    <div className="pt-2 border-t border-border space-y-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <label className="text-[11px] font-bold text-text-muted uppercase tracking-wider whitespace-nowrap">
+                          Amount to Deposit
+                        </label>
+                        <div className="relative flex-1 max-w-[160px]">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-text-muted">₹</span>
+                          <input 
+                            type="number"
+                            min="1"
+                            step="1"
+                            max={remaining}
+                            value={currentAmt}
+                            onKeyDown={(e) => {
+                              if (['.', '-', 'e', '+', ','].includes(e.key)) {
+                                e.preventDefault();
+                              }
+                            }}
+                            onChange={(e) => handleAmountChange(m, e.target.value)}
+                            className={`w-full rounded-lg border bg-surface text-text-primary pl-7 pr-3 py-1.5 text-xs font-bold outline-none ${isOver ? 'border-red-500 focus:ring-red-500' : 'border-border focus:border-primary focus:ring-primary'}`}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between items-center text-[11px] text-text-muted">
+                        <span>Remaining after payment:</span>
+                        <span className={`font-bold ${remAfter > 0 ? 'text-amber-600' : 'text-green-600'}`}>₹{remAfter.toLocaleString()}</span>
+                      </div>
+                      {isOver && (
+                        <p className="text-[11px] font-bold text-red-600">Amount cannot exceed remaining fee of ₹{remaining.toLocaleString()}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -274,8 +510,12 @@ function DepositModal({ student, availableMonths, paidMonths, classFeeConfig, on
         {/* Footer controls */}
         <div className="px-6 py-4 border-t border-border bg-surface flex justify-end gap-3">
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button className="font-bold animate-pulse" disabled={saving || selectedMonths.length === 0} onClick={handleSave}>
-            {saving ? 'Depositing...' : `Deposit ${selectedMonths.length > 0 ? `(₹${selectedMonths.reduce((sum, m) => sum + getMonthAmount(m), 0).toLocaleString()})` : ''}`}
+          <Button 
+            className="font-bold" 
+            disabled={saving || selectedMonths.length === 0 || validateForm() !== null} 
+            onClick={handleSave}
+          >
+            {saving ? 'Depositing...' : `Deposit ${selectedMonths.length > 0 ? `(₹${calculateTotalDeposit().toLocaleString()})` : ''}`}
           </Button>
         </div>
       </div>
@@ -286,30 +526,182 @@ function DepositModal({ student, availableMonths, paidMonths, classFeeConfig, on
 // Additional Fees Deposit Modal (Matches design guidelines of tuition DepositModal)
 function AdditionalDepositModal({ student, unpaidFees, initialSelectedIds = [], onSave, onClose }) {
   const [selectedIds, setSelectedIds] = useState(initialSelectedIds);
+  const [depositAmounts, setDepositAmounts] = useState({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
 
+  const getFeeTotal = (fee) => parseFloat(fee.amount || 0);
+  const getFeePaid = (fee) => parseFloat(fee.amount_paid || 0) + parseFloat(fee.discount_amount || 0);
+  const getFeeRemaining = (fee) => Math.max(0, getFeeTotal(fee) - getFeePaid(fee));
+
+  const isFeePartial = (fee) => {
+    const paid = getFeePaid(fee);
+    const rem = getFeeRemaining(fee);
+    return paid > 0 && rem > 0.01;
+  };
+
+  const selectedPartialId = selectedIds.find(id => {
+    const f = unpaidFees.find(x => x.id === id);
+    return f && isFeePartial(f);
+  });
+
+  const isSingleFee = selectedIds.length === 1;
+
   const handleToggle = (id) => {
-    setSelectedIds(prev => 
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
+    const targetFee = unpaidFees.find(x => x.id === id);
+    if (!targetFee) return;
+
+    if (isFeePartial(targetFee)) {
+      // Partial fee MUST be deposited separately!
+      if (selectedIds.includes(id)) {
+        setSelectedIds([]);
+        setDepositAmounts({});
+      } else {
+        setSelectedIds([id]);
+        setDepositAmounts({ [id]: getFeeRemaining(targetFee) });
+      }
+      setError('');
+      return;
+    }
+
+    // Target fee is a fresh unpaid fee
+    setSelectedIds(prev => {
+      let baseSelection = prev;
+      if (selectedPartialId) {
+        baseSelection = [];
+      }
+      const next = baseSelection.includes(id) ? baseSelection.filter(x => x !== id) : [...baseSelection, id];
+      const newAmounts = { ...depositAmounts };
+      if (next.length > 1) {
+        next.forEach(fId => {
+          const f = unpaidFees.find(item => item.id === fId);
+          if (f) newAmounts[fId] = getFeeRemaining(f);
+        });
+      } else if (next.length === 1) {
+        const fId = next[0];
+        const f = unpaidFees.find(item => item.id === fId);
+        if (f && newAmounts[fId] === undefined) {
+          newAmounts[fId] = getFeeRemaining(f);
+        }
+      }
+      setDepositAmounts(newAmounts);
+      return next;
+    });
+    setError('');
+  };
+
+  const handleAmountChange = (id, value) => {
+    const sanitized = value.replace(/[^0-9]/g, '');
+    const num = sanitized === '' ? '' : parseInt(sanitized, 10);
+    setDepositAmounts(prev => ({
+      ...prev,
+      [id]: num
+    }));
+    setError('');
+  };
+
+  const [applyDiscount, setApplyDiscount] = useState(false);
+  const [discountAmount, setDiscountAmount] = useState('');
+
+  const handleToggleApplyDiscount = (checked) => {
+    setApplyDiscount(checked);
+    if (!checked) {
+      setDiscountAmount('');
+    }
+    setError('');
+    const newAmounts = {};
+    selectedIds.forEach(id => {
+      const fee = unpaidFees.find(f => f.id === id);
+      if (fee) newAmounts[id] = getFeeRemaining(fee);
+    });
+    setDepositAmounts(newAmounts);
+  };
+
+  const getDiscAmount = () => {
+    return applyDiscount && discountAmount !== '' && discountAmount !== null ? (parseFloat(discountAmount) || 0) : 0;
+  };
+
+  const calculateGrossTotal = () => {
+    return selectedIds.reduce((sum, id) => {
+      const fee = unpaidFees.find(f => f.id === id);
+      if (!fee) return sum;
+      const remaining = getFeeRemaining(fee);
+      const amt = isSingleFee ? (depositAmounts[id] !== undefined ? depositAmounts[id] : remaining) : remaining;
+      return sum + (isNaN(amt) ? 0 : amt);
+    }, 0);
+  };
+
+  const calculateTotalDeposit = () => {
+    const gross = calculateGrossTotal();
+    const disc = getDiscAmount();
+    return Math.max(0, gross - disc);
+  };
+
+  const validateForm = () => {
+    if (selectedIds.length === 0) {
+      return 'Please select at least one fee.';
+    }
+    const gross = calculateGrossTotal();
+    const disc = getDiscAmount();
+
+    if (applyDiscount && discountAmount !== '' && discountAmount !== null) {
+      if (isNaN(disc) || disc < 0 || !Number.isInteger(disc)) {
+        return 'Please enter a valid positive whole number for discount amount.';
+      }
+      if (disc >= gross) {
+        return `Discount amount (₹${disc}) must be less than payable fee (₹${gross.toLocaleString()}).`;
+      }
+    }
+    if (isSingleFee) {
+      const id = selectedIds[0];
+      const fee = unpaidFees.find(f => f.id === id);
+      if (fee) {
+        const remaining = getFeeRemaining(fee);
+        const val = depositAmounts[id];
+        const amt = parseFloat(val);
+        if (val === '' || val === null || isNaN(amt) || amt <= 0 || !Number.isInteger(amt)) {
+          return `Please enter a valid positive whole number for ${fee.fee_name}.`;
+        }
+        if (amt > remaining + 0.01) {
+          return `Amount cannot exceed the remaining fee of ₹${remaining.toLocaleString()} for ${fee.fee_name}.`;
+        }
+      }
+    }
+    return null;
   };
 
   const handleSave = async () => {
-    if (selectedIds.length === 0) {
-      setError('Please select at least one fee.');
+    const valErr = validateForm();
+    if (valErr) {
+      setError(valErr);
       return;
     }
+
     setSaving(true);
     setError('');
     try {
-      await Promise.all(selectedIds.map(id => schoolService.collectAdditionalFeePayment(id, { payment_method: paymentMethod })));
+      const discApplied = getDiscAmount();
+      const discPerFee = selectedIds.length > 0 ? (discApplied / selectedIds.length) : 0;
+
+      await Promise.all(selectedIds.map(id => {
+        const fee = unpaidFees.find(f => f.id === id);
+        const remaining = getFeeRemaining(fee);
+        const userTypedAmt = isSingleFee ? (parseFloat(depositAmounts[id]) || remaining) : remaining;
+        const feeDisc = isSingleFee ? discApplied : discPerFee;
+        const netCashPaid = Math.max(0, userTypedAmt - feeDisc);
+        return schoolService.collectAdditionalFeePayment(id, { 
+          payment_method: paymentMethod,
+          amount_paid: netCashPaid,
+          discount_amount: feeDisc
+        });
+      }));
       window.dispatchEvent(new Event('fee-payment-updated'));
       onSave();
     } catch (err) {
       console.error(err);
-      setError(err.message || 'Failed to deposit fees.');
+      const msg = err.data?.message || err.response?.data?.message || err.message || 'Failed to deposit fees.';
+      setError(msg);
     } finally {
       setSaving(false);
     }
@@ -326,10 +718,43 @@ function AdditionalDepositModal({ student, unpaidFees, initialSelectedIds = [], 
           </button>
         </div>
 
-        <div className="p-6 space-y-4">
-          <p className="text-xs text-text-secondary leading-relaxed">
-            Select the Additional Fee(s) to deposit for <strong className="text-text-primary uppercase">{student.name}</strong>. Only unpaid Additional Fees are shown below.
-          </p>
+        <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+          {/* Apply Discount Toggle Row */}
+          <div className="flex items-center justify-between gap-3 p-3 bg-zinc-50 dark:bg-zinc-900/40 rounded-xl border border-border">
+            <label className="flex items-center gap-2.5 cursor-pointer select-none">
+              <input 
+                type="checkbox"
+                checked={applyDiscount}
+                onChange={(e) => handleToggleApplyDiscount(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-9 h-5 bg-zinc-300 peer-focus:outline-none rounded-full peer dark:bg-zinc-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-zinc-600 peer-checked:bg-primary relative"></div>
+              <span className="text-xs font-bold text-text-primary uppercase tracking-wider">Apply Discount</span>
+            </label>
+
+            {applyDiscount && (
+              <div className="relative flex-1 max-w-[160px]">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-text-muted">₹</span>
+                <input 
+                  type="number"
+                  min="0"
+                  placeholder="Discount Amount"
+                  value={discountAmount}
+                  onKeyDown={(e) => {
+                    if (['.', '-', 'e', '+', ','].includes(e.key)) {
+                      e.preventDefault();
+                    }
+                  }}
+                  onChange={(e) => {
+                    const sanitized = e.target.value.replace(/[^0-9]/g, '');
+                    setDiscountAmount(sanitized === '' ? '' : parseInt(sanitized, 10));
+                    setError('');
+                  }}
+                  className="w-full rounded-lg border border-border bg-surface text-text-primary pl-7 pr-3 py-1.5 text-xs font-bold outline-none focus:border-primary focus:ring-primary"
+                />
+              </div>
+            )}
+          </div>
 
           {/* Payment Method Selector */}
           <div className="space-y-1.5">
@@ -347,34 +772,97 @@ function AdditionalDepositModal({ student, unpaidFees, initialSelectedIds = [], 
           </div>
 
           {error && (
-            <div className="p-2.5 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl text-xs font-semibold">
-              {error}
+            <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl text-[11px] font-semibold leading-relaxed flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+              <span>{error}</span>
             </div>
           )}
 
-          <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
+          <div className="space-y-2.5 border border-border rounded-xl p-3 bg-zinc-50/50 dark:bg-zinc-900/10">
             {unpaidFees.map(fee => {
               const isSelected = selectedIds.includes(fee.id);
+              const totalFee = getFeeTotal(fee);
+              const paidSoFar = getFeePaid(fee);
+              const remaining = getFeeRemaining(fee);
+              const isPartial = isFeePartial(fee);
+              const isOtherFeeDisabled = (selectedPartialId && fee.id !== selectedPartialId) || (selectedIds.length > 0 && !selectedIds.includes(fee.id) && isPartial);
+              const shouldExpand = isSingleFee && isSelected && !applyDiscount;
+
+              const currentAmt = depositAmounts[fee.id] !== undefined ? depositAmounts[fee.id] : remaining;
+              const numAmt = parseFloat(currentAmt) || 0;
+              const disc = getDiscAmount();
+              const remAfter = Math.max(0, remaining - (numAmt + disc));
+              const isOver = numAmt > remaining + 0.01;
+
               return (
-                <label 
+                <div 
                   key={fee.id}
-                  className={`flex items-center justify-between p-3 rounded-xl border text-xs font-semibold cursor-pointer transition-all select-none ${
-                    isSelected 
-                      ? 'border-primary bg-primary/5 text-text-primary font-bold' 
-                      : 'border-border bg-surface text-text-secondary hover:border-zinc-300'
+                  className={`border transition-colors ${
+                    shouldExpand
+                      ? 'bg-surface border-primary/50 shadow-2xs p-3 space-y-3 rounded-xl'
+                      : isSelected
+                        ? 'border-primary bg-primary/5 text-text-primary font-bold p-2.5 rounded-lg flex items-center justify-between text-xs'
+                        : 'border-border bg-surface text-text-secondary hover:border-zinc-300 p-2.5 rounded-lg flex items-center justify-between text-xs'
                   }`}
                 >
-                  <div className="flex items-center gap-2.5">
-                    <input 
-                      type="checkbox" 
-                      checked={isSelected}
-                      onChange={() => handleToggle(fee.id)}
-                      className="rounded border-border text-primary focus:ring-primary cursor-pointer h-4 w-4"
-                    />
-                    <span className="font-bold uppercase tracking-wide">{fee.fee_name}</span>
+                  <div className="flex items-center justify-between w-full">
+                    <label className="flex items-center gap-2.5 font-bold uppercase select-none cursor-pointer text-text-primary text-xs w-full">
+                      <input 
+                        type="checkbox" 
+                        disabled={isOtherFeeDisabled}
+                        checked={isSelected}
+                        onChange={() => handleToggle(fee.id)}
+                        className="rounded border-border text-primary focus:ring-primary cursor-pointer h-4 w-4 disabled:opacity-50"
+                      />
+                      <span>
+                        {fee.fee_name} <span className="text-[11px] text-text-muted font-normal lowercase">(₹{totalFee.toLocaleString()}{isPartial ? ` | Remaining ₹${remaining.toLocaleString()}` : ''})</span>
+                      </span>
+                    </label>
+                    <div className="flex-shrink-0 font-bold font-sans">
+                      {isPartial ? (
+                        <span className="text-[11px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded uppercase">Partially Paid</span>
+                      ) : (
+                        `₹${remaining.toLocaleString()}`
+                      )}
+                    </div>
                   </div>
-                  <span className="font-bold font-sans">₹{parseFloat(fee.amount).toLocaleString()}</span>
-                </label>
+
+                  {/* Input field shown ONLY when exactly 1 additional fee is checked */}
+                  {shouldExpand && (
+                    <div className="pt-2 border-t border-border space-y-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <label className="text-[11px] font-bold text-text-muted uppercase tracking-wider whitespace-nowrap">
+                          Amount to Deposit
+                        </label>
+                        <div className="relative flex-1 max-w-[160px]">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-text-muted">₹</span>
+                          <input 
+                            type="number"
+                            min="1"
+                            step="1"
+                            max={remaining}
+                            value={currentAmt}
+                            onKeyDown={(e) => {
+                              if (['.', '-', 'e', '+', ','].includes(e.key)) {
+                                e.preventDefault();
+                              }
+                            }}
+                            onChange={(e) => handleAmountChange(fee.id, e.target.value)}
+                            className={`w-full rounded-lg border bg-surface text-text-primary pl-7 pr-3 py-1.5 text-xs font-bold outline-none ${isOver ? 'border-red-500 focus:ring-red-500' : 'border-border focus:border-primary focus:ring-primary'}`}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between items-center text-[11px] text-text-muted">
+                        <span>Remaining after payment:</span>
+                        <span className={`font-bold ${remAfter > 0 ? 'text-amber-600' : 'text-green-600'}`}>₹{remAfter.toLocaleString()}</span>
+                      </div>
+                      {isOver && (
+                        <p className="text-[11px] font-bold text-red-600">Amount cannot exceed remaining fee of ₹{remaining.toLocaleString()}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
@@ -386,9 +874,9 @@ function AdditionalDepositModal({ student, unpaidFees, initialSelectedIds = [], 
           <Button 
             className="flex items-center gap-1.5 font-bold" 
             onClick={handleSave} 
-            disabled={saving || selectedIds.length === 0}
+            disabled={saving || selectedIds.length === 0 || validateForm() !== null}
           >
-            {saving ? 'Processing...' : 'Deposit'}
+            {saving ? 'Depositing...' : `Deposit ${selectedIds.length > 0 ? `(₹${calculateTotalDeposit().toLocaleString()})` : ''}`}
           </Button>
         </div>
       </div>
@@ -592,30 +1080,26 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
     setRevertConfirmOpen(true);
   };
 
-  const handleCollectAdditionalPayment = async (item) => {
+  const handleCollectAdditionalPayment = (item) => {
     const today = new Date();
     const yyyy = today.getFullYear();
     const mm = String(today.getMonth() + 1).padStart(2, '0');
     const dd = String(today.getDate()).padStart(2, '0');
     const todayStr = `${yyyy}-${mm}-${dd}`;
     const unpaidDueFees = (data?.additional_fee_payments || [])
-      .filter(p => p.status === 'Pending' && (p.due_date <= todayStr || !p.due_date || p.fee_name === 'Previous Year Dues'));
+      .filter(p => {
+        const tot = parseFloat(p.amount || 0);
+        const pd = parseFloat(p.amount_paid || 0);
+        const disc = parseFloat(p.discount_amount || 0);
+        const rem = Math.max(0, tot - (pd + disc));
+        return rem > 0.01 && (p.due_date <= todayStr || !p.due_date || p.fee_name === 'Previous Year Dues');
+      });
 
     if (unpaidDueFees.length === 0) return;
 
-    if (unpaidDueFees.length === 1) {
-      try {
-        await schoolService.collectAdditionalFeePayment(unpaidDueFees[0].id);
-        await loadDetails();
-      } catch (err) {
-        console.error(err);
-        alert(err.message || 'Failed to collect payment.');
-      }
-    } else {
-      setUnpaidAdditionalFeesList(unpaidDueFees);
-      setPreselectedAdditionalIds(item && item.id ? [item.id] : []);
-      setShowAdditionalDepositModal(true);
-    }
+    setUnpaidAdditionalFeesList(unpaidDueFees);
+    setPreselectedAdditionalIds([]);
+    setShowAdditionalDepositModal(true);
   };
 
   const handleRevertAdditionalPayment = (item) => {
@@ -670,12 +1154,17 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
   };
 
   const handleViewAdditionalReceipt = (item) => {
+    const paidAmt = item.amount_paid !== undefined && item.amount_paid !== null ? parseFloat(item.amount_paid) : (item.status === 'Paid' ? parseFloat(item.amount) : 0);
+    const discAmt = parseFloat(item.discount_amount || 0);
+
     setViewingReceipt({
       id: item.id,
-      receipt_no: `AFP-${String(item.id).padStart(5, '0')}`,
+      receipt_no: item.receipt_no || `AFP-${String(item.id).padStart(5, '0')}`,
       payment_date: item.payment_date,
       fee_month: item.fee_name || 'Additional Fee',
-      amount_paid: item.amount,
+      amount_paid: paidAmt,
+      discount_amount: discAmt,
+      amount: item.amount,
       is_additional: true,
       fee_name: item.fee_name
     });
@@ -698,33 +1187,57 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
     const academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
 
     const paymentsList = fee_summary.payments || [];
-    const paidMonths = paymentsList.map(p => p.fee_month);
+    const paidByMonth = {};
+    const latestReceiptByMonth = {};
+
+    paymentsList.forEach(p => {
+      const m = p.fee_month;
+      if (m) {
+        paidByMonth[m] = (paidByMonth[m] || 0) + parseFloat(p.amount_paid || 0) + parseFloat(p.discount_amount || 0);
+        latestReceiptByMonth[m] = p;
+      }
+    });
 
     return academicMonths.map((m) => {
-      const isPaid = paidMonths.includes(m);
-      const receipt = paymentsList.find(p => p.fee_month === m);
-      
-      const status = isPaid ? 'PAID' : 'UNPAID';
-      const statusClass = isPaid 
-        ? 'bg-green-500/10 text-green-600 border-green-500/20'
-        : 'bg-red-500/10 text-red-600 border-red-500/20';
-
-      let amount = 0;
-      if (isPaid && receipt) {
-        amount = parseFloat(receipt.amount_paid);
-      } else if (data && data.class_fee_config && data.class_fee_config.monthly_fees && data.class_fee_config.monthly_fees[m]) {
-        amount = parseFloat(data.class_fee_config.monthly_fees[m]);
+      let totalFee = 0;
+      if (data && data.class_fee_config && data.class_fee_config.monthly_fees && data.class_fee_config.monthly_fees[m]) {
+        totalFee = parseFloat(data.class_fee_config.monthly_fees[m]);
       } else {
         const firstPaid = paymentsList[0]?.amount_paid ? parseFloat(paymentsList[0].amount_paid) : 0;
-        amount = firstPaid;
+        totalFee = firstPaid;
+      }
+
+      const totalPaid = paidByMonth[m] || 0;
+      const remaining = Math.max(0, totalFee - totalPaid);
+      const receipt = latestReceiptByMonth[m];
+
+      let status = 'UNPAID';
+      let statusText = 'Pending';
+      let statusClass = 'bg-red-500/10 text-red-600 border-red-500/20';
+
+      if (totalPaid >= totalFee - 0.01 && totalFee > 0) {
+        status = 'PAID';
+        statusText = 'Paid';
+        statusClass = 'bg-green-500/10 text-green-600 border-green-500/20';
+      } else if (totalPaid > 0) {
+        status = 'PARTIAL';
+        statusText = 'Partially';
+        statusClass = 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20';
+      } else {
+        status = 'UNPAID';
+        statusText = 'Pending';
+        statusClass = 'bg-red-500/10 text-red-600 border-red-500/20';
       }
 
       return {
         month: m,
         status,
+        statusText,
         statusClass,
         receipt,
-        amount
+        amount: totalFee,
+        totalPaid,
+        remaining
       };
     });
   };
@@ -1096,20 +1609,11 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                     const currentAcademicIdx = monthMapping[calendarMonth] !== undefined ? monthMapping[calendarMonth] : 2;
                     const pastAndCurrentMonths = academicMonths.slice(0, currentAcademicIdx + 1);
 
-                    const paymentsList = fee_summary.payments || [];
-                    const paidMonths = paymentsList.map(p => p.fee_month);
-
                     let monthlyFeeDue = 0;
                     pastAndCurrentMonths.forEach(m => {
-                      if (!paidMonths.includes(m)) {
-                        let amount = 0;
-                        if (data && data.class_fee_config && data.class_fee_config.monthly_fees && data.class_fee_config.monthly_fees[m]) {
-                          amount = parseFloat(data.class_fee_config.monthly_fees[m]);
-                        } else {
-                          const firstPaid = paymentsList[0]?.amount_paid ? parseFloat(paymentsList[0].amount_paid) : 0;
-                          amount = firstPaid;
-                        }
-                        monthlyFeeDue += amount;
+                      const mw = monthWiseList.find(x => x.month === m);
+                      if (mw) {
+                        monthlyFeeDue += mw.remaining;
                       }
                     });
 
@@ -1119,8 +1623,13 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                     const dd = String(today.getDate()).padStart(2, '0');
                     const todayStr = `${yyyy}-${mm}-${dd}`;
                     const additionalFeeDue = (data.additional_fee_payments || [])
-                      .filter(p => p.status === 'Pending' && (p.due_date <= todayStr || p.fee_name === 'Previous Year Dues' || !p.due_date))
-                      .reduce((sum, p) => sum + parseFloat(p.amount), 0);
+                      .filter(p => (p.status === 'Pending' || p.status === 'Partial') && (p.due_date <= todayStr || p.fee_name === 'Previous Year Dues' || !p.due_date))
+                      .reduce((sum, p) => {
+                        const tot = parseFloat(p.amount || 0);
+                        const pd = parseFloat(p.amount_paid || 0);
+                        const disc = parseFloat(p.discount_amount || 0);
+                        return sum + Math.max(0, tot - (pd + disc));
+                      }, 0);
 
                     return (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
@@ -1184,17 +1693,22 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                             {monthWiseList.map(mw => (
                               <TableRow key={mw.month}>
                                 <TableCell className="font-bold text-text-primary text-xs uppercase tracking-wider">
-                                  {mw.month}
+                                  <div>{mw.month}</div>
+                                  {mw.status === 'PARTIAL' && (
+                                    <span className="block text-[10px] text-amber-600 font-bold lowercase">
+                                      (₹{mw.remaining.toLocaleString()} remaining)
+                                    </span>
+                                  )}
                                 </TableCell>
-                                <TableCell className="text-xs text-text-primary">
+                                <TableCell className="text-xs text-text-primary font-bold">
                                   ₹{mw.amount.toLocaleString()}
                                 </TableCell>
                                 <TableCell className="text-xs text-text-secondary whitespace-nowrap">
-                                  {mw.status === 'PAID' && mw.receipt?.payment_date ? formatDate(mw.receipt.payment_date) : '—'}
+                                  {mw.receipt?.payment_date ? formatDate(mw.receipt.payment_date) : '—'}
                                 </TableCell>
                                 <TableCell>
                                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase border ${mw.statusClass}`}>
-                                    {mw.status}
+                                    {mw.statusText}
                                   </span>
                                 </TableCell>
                                 <TableCell className="text-right">
@@ -1218,16 +1732,36 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                                        </Button>
                                     </div>
                                   ) : (
-                                    !data?.is_ledger_locked ? (
-                                      <Button 
-                                        className="h-7 w-20 text-[11px] px-0 font-bold"
-                                        onClick={() => setShowDepositModal(true)}
-                                      >
-                                        Deposit
-                                      </Button>
-                                    ) : (
-                                      <span className="text-[11px] text-text-muted font-bold">—</span>
-                                    )
+                                    <div className="flex justify-end gap-2">
+                                      {mw.receipt && (
+                                        <>
+                                          {!data?.is_ledger_locked && !isReadOnly && (
+                                            <Button 
+                                              variant="secondary" 
+                                              className="h-7 w-20 text-[11px] px-0 font-bold"
+                                              onClick={() => handleRevertPayment(mw.receipt)}
+                                            >
+                                              Revert
+                                            </Button>
+                                          )}
+                                          <Button 
+                                            variant="secondary" 
+                                            className="h-7 w-20 text-[11px] px-0 font-bold"
+                                            onClick={() => setViewingReceipt(mw.receipt)}
+                                          >
+                                            Receipt
+                                          </Button>
+                                        </>
+                                      )}
+                                      {!data?.is_ledger_locked && (
+                                        <Button 
+                                          className="h-7 w-20 text-[11px] px-0 font-bold"
+                                          onClick={() => setShowDepositModal(true)}
+                                        >
+                                          Deposit
+                                        </Button>
+                                      )}
+                                    </div>
                                   )}
                                 </TableCell>
                               </TableRow>
@@ -1251,69 +1785,106 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {data.additional_fee_payments.map(af => (
-                                <TableRow key={af.id}>
-                                  <TableCell className="font-bold text-text-primary text-xs uppercase tracking-wider">
-                                    <div>{af.fee_name}</div>
-                                    {af.description && <div className="text-[11px] text-text-muted normal-case mt-0.5 font-semibold">{af.description}</div>}
-                                  </TableCell>
-                                  <TableCell className="text-xs text-text-primary font-bold">
-                                    ₹{parseFloat(af.amount || 0).toLocaleString()}
-                                  </TableCell>
-                                  <TableCell className="text-xs text-text-secondary whitespace-nowrap">
-                                    {af.status === 'Paid' && af.payment_date ? formatDate(af.payment_date) : '—'}
-                                  </TableCell>
-                                  <TableCell>
-                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase border ${
-                                      af.status === 'Paid'
-                                        ? 'bg-green-500/10 text-green-600 border-green-500/20'
-                                        : 'bg-red-500/10 text-red-600 border-red-500/20'
-                                    }`}>
-                                      {af.status}
-                                    </span>
-                                  </TableCell>
-                                  <TableCell className="text-right">
-                                    {af.status === 'Paid' ? (
-                                      <div className="flex justify-end gap-2">
-                                        {!data?.is_ledger_locked && !isReadOnly && (
+                              {data.additional_fee_payments.map(af => {
+                                const totalAmt = parseFloat(af.amount || 0);
+                                const paidAmt = parseFloat(af.amount_paid !== undefined ? af.amount_paid : (af.status === 'Paid' ? totalAmt : 0));
+                                const discountAmt = parseFloat(af.discount_amount || 0);
+                                const clearedAmt = paidAmt + discountAmt;
+                                const remAmt = Math.max(0, totalAmt - clearedAmt);
+                                const isPaid = af.status === 'Paid' || remAmt <= 0.01;
+                                const isPartial = clearedAmt > 0 && remAmt > 0.01;
+
+                                return (
+                                  <TableRow key={af.id}>
+                                    <TableCell className="font-bold text-text-primary text-xs uppercase tracking-wider">
+                                      <div>{af.fee_name}</div>
+                                      {af.description && <div className="text-[11px] text-text-muted normal-case mt-0.5 font-semibold">{af.description}</div>}
+                                      {isPartial && (
+                                        <span className="block text-[10px] text-amber-600 font-bold lowercase mt-0.5">
+                                          (₹{remAmt.toLocaleString()} remaining)
+                                        </span>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="text-xs text-text-primary font-bold">
+                                      ₹{totalAmt.toLocaleString()}
+                                    </TableCell>
+                                    <TableCell className="text-xs text-text-secondary whitespace-nowrap">
+                                      {af.payment_date ? formatDate(af.payment_date) : '—'}
+                                    </TableCell>
+                                    <TableCell>
+                                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase border ${
+                                        isPaid
+                                          ? 'bg-green-500/10 text-green-600 border-green-500/20'
+                                          : isPartial
+                                            ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+                                            : 'bg-red-500/10 text-red-600 border-red-500/20'
+                                      }`}>
+                                        {isPaid ? 'Paid' : isPartial ? 'Partially' : 'Pending'}
+                                      </span>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      {isPaid ? (
+                                        <div className="flex justify-end gap-2">
+                                          {!data?.is_ledger_locked && !isReadOnly && (
+                                            <Button 
+                                              variant="secondary" 
+                                              className="h-7 w-20 text-[11px] px-0 font-bold"
+                                              onClick={() => handleRevertAdditionalPayment(af)}
+                                            >
+                                              Revert
+                                            </Button>
+                                          )}
                                           <Button 
                                             variant="secondary" 
                                             className="h-7 w-20 text-[11px] px-0 font-bold"
-                                            onClick={() => handleRevertAdditionalPayment(af)}
+                                            onClick={() => handleViewAdditionalReceipt(af)}
                                           >
-                                            Revert
+                                            Receipt
                                           </Button>
-                                        )}
-                                        <Button 
-                                          variant="secondary" 
-                                          className="h-7 w-20 text-[11px] px-0 font-bold"
-                                          onClick={() => handleViewAdditionalReceipt(af)}
-                                        >
-                                          Receipt
-                                        </Button>
-                                      </div>
-                                    ) : (
-                                      ((() => {
-                                        const today = new Date();
-                                        const yyyy = today.getFullYear();
-                                        const mm = String(today.getMonth() + 1).padStart(2, '0');
-                                        const dd = String(today.getDate()).padStart(2, '0');
-                                        const todayStr = `${yyyy}-${mm}-${dd}`;
-                                        return !af.due_date || af.due_date <= todayStr || af.fee_name === 'Previous Year Dues';
-                                      })() && !data?.is_ledger_locked) ? (
-                                        <Button 
-                                          className="h-7 w-20 text-[11px] px-0 font-bold"
-                                          onClick={() => handleCollectAdditionalPayment(af)}
-                                        >
-                                          Deposit
-                                        </Button>
+                                        </div>
                                       ) : (
-                                        <span className="text-[11px] text-text-muted font-bold">—</span>
-                                      )
-                                    )}
-                                  </TableCell>
-                                </TableRow>
-                              ))}
+                                        <div className="flex justify-end gap-2">
+                                          {(paidAmt > 0 || clearedAmt > 0) && (
+                                            <>
+                                              {!data?.is_ledger_locked && !isReadOnly && (
+                                                <Button 
+                                                  variant="secondary" 
+                                                  className="h-7 w-20 text-[11px] px-0 font-bold"
+                                                  onClick={() => handleRevertAdditionalPayment(af)}
+                                                >
+                                                  Revert
+                                                </Button>
+                                              )}
+                                              <Button 
+                                                variant="secondary" 
+                                                className="h-7 w-20 text-[11px] px-0 font-bold"
+                                                onClick={() => handleViewAdditionalReceipt(af)}
+                                              >
+                                                Receipt
+                                              </Button>
+                                            </>
+                                          )}
+                                          {((() => {
+                                            const today = new Date();
+                                            const yyyy = today.getFullYear();
+                                            const mm = String(today.getMonth() + 1).padStart(2, '0');
+                                            const dd = String(today.getDate()).padStart(2, '0');
+                                            const todayStr = `${yyyy}-${mm}-${dd}`;
+                                            return !af.due_date || af.due_date <= todayStr || af.fee_name === 'Previous Year Dues';
+                                          })() && !data?.is_ledger_locked) && (
+                                            <Button 
+                                              className="h-7 w-20 text-[11px] px-0 font-bold"
+                                              onClick={() => handleCollectAdditionalPayment(af)}
+                                            >
+                                              Deposit
+                                            </Button>
+                                          )}
+                                        </div>
+                                      )}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
                             </TableBody>
                           </Table>
                         )
@@ -1356,7 +1927,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
       {showDepositModal && (
         <DepositModal 
           student={student} 
-          paidMonths={paidMonthsList} 
+          payments={fee_summary.payments || []} 
           classFeeConfig={data?.class_fee_config}
           onSave={async () => {
             setShowDepositModal(false);

@@ -430,6 +430,77 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
     );
   }
 
+  void _showPartiallyPaidDialog(Map<String, dynamic> item, String title) {
+    final amount = (item['amount'] ?? 0).round();
+    final paidAmount = (item['paid_amount'] ?? 0).round();
+    final discountAmount = (item['discount_amount'] ?? 0).round();
+    final remainingAmount = (item['remaining_amount'] ?? 0).round();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.pie_chart_outline, color: Colors.amber.shade800),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildDetailRow('Payable Amount', '₹$amount', isBold: true),
+            const Divider(height: 16),
+            _buildDetailRow('Partially Paid Amount', '₹$paidAmount', valueColor: Colors.green.shade700),
+            if (discountAmount > 0)
+              _buildDetailRow('Discount Amount', '- ₹$discountAmount', valueColor: Colors.indigo.shade700),
+            const Divider(height: 16),
+            _buildDetailRow('Remaining Amount', '₹$remainingAmount', valueColor: Colors.red.shade700, isBold: true),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Close', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.indigo)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value, {Color? valueColor, bool isBold = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey.shade700,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: isBold ? FontWeight.w900 : FontWeight.bold,
+              color: valueColor ?? Colors.black87,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildMonthWiseCard() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -457,7 +528,9 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
                   separatorBuilder: (ctx, idx) => Divider(color: Colors.grey.shade100, height: 1),
                   itemBuilder: (ctx, idx) {
                     final item = _monthlyFees[idx];
-                    final isPaid = item['status'] == 'Paid';
+                    final status = (item['status'] ?? '').toString();
+                    final isPaid = status == 'Paid';
+                    final isPartiallyPaid = !isPaid && (status == 'Partially Paid' || ((item['paid_amount'] ?? 0) as num) > 0);
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       child: Row(
@@ -478,7 +551,9 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
                               Text(
                                 isPaid
                                     ? 'Paid: ${_formatDate(item['payment_date'])}'
-                                    : 'Amount: ₹${(item['amount'] ?? 0).round()}',
+                                    : isPartiallyPaid
+                                        ? 'Paid: ₹${(item['paid_amount'] ?? 0).round()}   •   Rem: ₹${(item['remaining_amount'] ?? 0).round()}'
+                                        : 'Amount: ₹${(item['amount'] ?? 0).round()}',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Colors.grey.shade600,
@@ -502,6 +577,34 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
                                     padding: const EdgeInsets.symmetric(horizontal: 12),
                                   ),
                                   child: const Text('Receipt'),
+                                )
+                              else if (isPartiallyPaid)
+                                InkWell(
+                                  onTap: () => _showPartiallyPaidDialog(item, '${item['month']} Fee Details'),
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.amber.shade50,
+                                      border: Border.all(color: Colors.amber.shade300),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          'PARTIALLY PAID',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.amber.shade900,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 2),
+                                        Icon(Icons.info_outline, size: 12, color: Colors.amber.shade900),
+                                      ],
+                                    ),
+                                  ),
                                 )
                               else
                                 Container(
@@ -568,7 +671,9 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
                         separatorBuilder: (ctx, idx) => Divider(color: Colors.grey.shade100, height: 1),
                         itemBuilder: (ctx, idx) {
                           final item = _additionalFees[idx];
-                          final isPaid = item['status'] == 'Paid';
+                          final status = (item['status'] ?? '').toString();
+                          final isPaid = status == 'Paid';
+                          final isPartiallyPaid = !isPaid && (status == 'Partially Paid' || ((item['paid_amount'] ?? 0) as num) > 0);
                           return Padding(
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             child: Row(
@@ -603,7 +708,9 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
                                       Text(
                                         isPaid
                                             ? 'Paid: ${_formatDate(item['payment_date'])}'
-                                            : 'Amount: ₹${(item['amount'] ?? 0).round()}${item['due_date'] != null && item['due_date'].toString().isNotEmpty ? '   •   Due: ${_formatDate(item['due_date'])}' : ''}',
+                                            : isPartiallyPaid
+                                                ? 'Paid: ₹${(item['paid_amount'] ?? 0).round()}   •   Rem: ₹${(item['remaining_amount'] ?? 0).round()}'
+                                                : 'Amount: ₹${(item['amount'] ?? 0).round()}${item['due_date'] != null && item['due_date'].toString().isNotEmpty ? '   •   Due: ${_formatDate(item['due_date'])}' : ''}',
                                         style: TextStyle(
                                           fontSize: 12,
                                           color: Colors.grey.shade600,
@@ -613,7 +720,7 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
                                     ],
                                   ),
                                 ),
-                                 Row(
+                                Row(
                                   children: [
                                     if (isPaid)
                                       OutlinedButton(
@@ -628,6 +735,34 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
                                           padding: const EdgeInsets.symmetric(horizontal: 12),
                                         ),
                                         child: const Text('Receipt'),
+                                      )
+                                    else if (isPartiallyPaid)
+                                      InkWell(
+                                        onTap: () => _showPartiallyPaidDialog(item, '${item['description']} Details'),
+                                        borderRadius: BorderRadius.circular(6),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.amber.shade50,
+                                            border: Border.all(color: Colors.amber.shade300),
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                'PARTIALLY PAID',
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.amber.shade900,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 2),
+                                              Icon(Icons.info_outline, size: 12, color: Colors.amber.shade900),
+                                            ],
+                                          ),
+                                        ),
                                       )
                                     else
                                       Container(

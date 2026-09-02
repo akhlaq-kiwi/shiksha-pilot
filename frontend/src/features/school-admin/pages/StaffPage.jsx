@@ -1212,12 +1212,17 @@ export default function StaffPage() {
                       let isProrated = false;
                       if (isPaid) {
                         salaryAmount = payment.amount_paid;
-                        isProrated = !!payment.proration_details;
+                        isProrated = payment.is_prorated || parseFloat(payment.amount_paid) < parseFloat(t.salary || 0.0) || !!payment.proration_details;
                       } else {
                         const isJoiningMonth = t.joining_month_proration && t.joining_month_proration.month === month;
                         if (isJoiningMonth) {
                           salaryAmount = t.joining_month_proration.payable_salary;
                           isProrated = true;
+                        } else if (t.monthly_salaries && t.monthly_salaries[month] !== undefined) {
+                          salaryAmount = t.monthly_salaries[month];
+                          if (salaryAmount < (t.salary || 0.0)) {
+                            isProrated = true;
+                          }
                         }
                       }
 

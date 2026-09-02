@@ -29,6 +29,7 @@ class ExcelGenerator
         $rows[] = [
             'isHeader' => true,
             'cells' => [
+                'Deposit By',
                 'Fee Deposit Date & Time',
                 'Student Name',
                 'Class',
@@ -54,9 +55,12 @@ class ExcelGenerator
                 $className .= ' - ' . $row['class_section'];
             }
 
+            $depositBy = !empty($row['collector_phone']) ? (string)$row['collector_phone'] : (!empty($row['collected_by']) ? (string)$row['collected_by'] : '');
+
             $rows[] = [
                 'isHeader' => false,
                 'cells' => [
+                    $depositBy,
                     $depTime,
                     $row['student_name'] ?? '',
                     $className,
@@ -73,7 +77,7 @@ class ExcelGenerator
             'isHeader' => true,
             'cells' => [
                 'Total Fee Collection',
-                '', '', '', '', '',
+                '', '', '', '', '', '',
                 $totalFee
             ]
         ];

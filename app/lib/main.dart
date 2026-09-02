@@ -117,7 +117,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: navigatorKey,
-      title: 'Shiksha Pilot School Hub',
+      title: 'Shiksha Pilot',
       debugShowCheckedModeBanner: false,
       // Scholar Indigo — the same brand values as the web app's --brand-*
       // tokens, not Flutter's generic Colors.indigo swatch, so the two

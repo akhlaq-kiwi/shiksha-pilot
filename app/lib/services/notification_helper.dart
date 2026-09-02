@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:http/http.dart' as http;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -16,7 +17,8 @@ import '../screens/salary_card_screen.dart';
 import '../screens/exam_list_screen.dart';
 import '../screens/homework_list_screen.dart';
 import '../screens/achievements_screen.dart';
-import 'package:school_hub/services/http_service.dart' as http;
+import '../screens/attendance_screen.dart';
+import '../services/attendance_service.dart';
 import '../services/leave_service.dart';
 import '../services/exam_service.dart';
 import '../main.dart';
@@ -323,6 +325,12 @@ class NotificationHelper {
         userRole: userRole,
         studentId: notifStudentId ?? studentId,
       );
+    } else if (link.contains('attendance') || title.contains('absent') || message.contains('absent') || eventKey.toLowerCase().contains('absent') || eventKey.toLowerCase().contains('attendance')) {
+      targetScreen = AttendanceScreen(
+        attendanceService: AttendanceService(baseUrl: baseUrl, token: token),
+        userRole: userRole,
+        selectedStudentId: notifStudentId ?? studentId,
+      );
     } else {
       targetScreen = NotificationCenterScreen(
         baseUrl: leaveService.baseUrl,
@@ -440,8 +448,15 @@ class NotificationHelper {
           studentId: studentId,
         );
 
-      case NotificationEvent.announcementPublished:
       case NotificationEvent.attendanceMarkedAbsent:
+      case 'ATTENDANCE_ABSENT':
+        return AttendanceScreen(
+          attendanceService: AttendanceService(baseUrl: baseUrl, token: token),
+          userRole: userRole,
+          selectedStudentId: studentId,
+        );
+
+      case NotificationEvent.announcementPublished:
       case NotificationEvent.attendanceNotMarkedReminder:
       case NotificationEvent.feeFollowupDueToday:
       case NotificationEvent.feeFollowupOverdue:
@@ -491,7 +506,7 @@ class NotificationHelper {
 
   static Future<void> showNotification(dynamic notif, {int? badgeCount}) async {
     final prefs = await SharedPreferences.getInstance();
-    final schoolName = prefs.getString('school_name') ?? 'Shiksha Pilot School Hub';
+    final schoolName = prefs.getString('school_name') ?? 'Shiksha Pilot';
 
     final rawTitle = (notif['title'] ?? '').toString().trim();
     final title = rawTitle.isNotEmpty ? rawTitle : schoolName;

@@ -10,11 +10,15 @@ use App\Shared\BaseController;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 
+use App\Domain\SchoolAdmin\Services\TeacherAttendanceService;
+use App\Shared\Http\RequestParser;
+
 class TeacherController extends BaseController
 {
     public function __construct(
         TokenService    $tokenService,
         private TeacherService $service,
+        private TeacherAttendanceService $teacherAttendanceService,
     ) {
         parent::__construct($tokenService);
     }
@@ -279,6 +283,33 @@ class TeacherController extends BaseController
         $this->requireRole($user, 'TEACHER');
         $id = (int)$args['id'];
         $data = $this->service->deleteNotification($user, $id);
+        return $this->success($response, $data);
+    }
+
+    // -------------------------------------------------------------------------
+    // Teacher Attendance (Own QR Scanning & History)
+    // -------------------------------------------------------------------------
+
+    public function scanTeacherAttendanceQr(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, 'TEACHER');
+
+        $body = RequestParser::body($request);
+        $qrPayload = (string)($body['qr_payload'] ?? $body['token'] ?? '');
+
+        $data = $this->teacherAttendanceService->scanTeacherQr($user, $qrPayload);
+
+        return $this->success($response, $data, $data['message'] ?? 'Attendance processed');
+    }
+
+    public function getMyTeacherAttendanceHistory(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, 'TEACHER');
+
+        $data = $this->teacherAttendanceService->getTeacherHistory($user);
+
         return $this->success($response, $data);
     }
 }

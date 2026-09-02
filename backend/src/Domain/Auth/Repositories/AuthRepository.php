@@ -25,7 +25,50 @@ class AuthRepository extends BaseRepository
         );
         $stmt->execute(['phone' => $phone]);
         $row = $stmt->fetch(\PDO::FETCH_ASSOC);
-        return $row !== false ? $row : null;
+        if ($row !== false) {
+            return $row;
+        }
+
+        // Fallback for Student/Parent login: match phone against student profiles in students table
+        $stmtStu = $this->pdo->prepare("
+            SELECT s.school_id, s.parent_phone, s.father_phone, s.mother_phone, s.guardian_phone, s.student_mobile
+            FROM students s
+            WHERE (s.student_mobile = :p1 OR s.parent_phone = :p2 OR s.father_phone = :p3 OR s.mother_phone = :p4 OR s.guardian_phone = :p5)
+            ORDER BY s.id DESC
+            LIMIT 1
+        ");
+        $stmtStu->execute([':p1' => $phone, ':p2' => $phone, ':p3' => $phone, ':p4' => $phone, ':p5' => $phone]);
+        $stu = $stmtStu->fetch(\PDO::FETCH_ASSOC);
+
+        if ($stu) {
+            $candidatePhones = array_values(array_unique(array_filter([
+                $stu['student_mobile'] ?? null,
+                $stu['parent_phone'] ?? null,
+                $stu['father_phone'] ?? null,
+                $stu['mother_phone'] ?? null,
+                $stu['guardian_phone'] ?? null
+            ])));
+
+            if (!empty($candidatePhones)) {
+                $inPlaceholders = implode(',', array_fill(0, count($candidatePhones), '?'));
+                $stmtAlt = $this->pdo->prepare(
+                    "SELECT u.*, s.portal_theme AS school_portal_theme, s.status AS school_status, s.name AS school_name, st.photo_path AS staff_photo_path
+                       FROM users u
+                       LEFT JOIN schools s ON s.id = u.school_id
+                       LEFT JOIN staff st ON st.phone = u.phone AND st.school_id = u.school_id
+                      WHERE u.phone IN ($inPlaceholders) AND u.role IN ('STUDENT', 'PARENT')
+                      ORDER BY u.id DESC
+                      LIMIT 1"
+                );
+                $stmtAlt->execute($candidatePhones);
+                $rowAlt = $stmtAlt->fetch(\PDO::FETCH_ASSOC);
+                if ($rowAlt !== false) {
+                    return $rowAlt;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**

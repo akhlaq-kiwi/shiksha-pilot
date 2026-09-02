@@ -289,8 +289,13 @@ class SimplePdf
             $extraLinesCount = count($monthLines) - 1;
             $extraShift = $extraLinesCount * 14;
 
+            $hasDiscount = !empty($fields['Discount']);
+            $payableText = $fields['Payable Amount'] ?? null;
+            $discountText = $fields['Discount'] ?? null;
+
+            $amtBoxHeight = ($hasDiscount && $payableText && $discountText) ? 100 : 80;
             $amtBoxTop = 400 - $extraShift;
-            $amtBoxBottom = 320 - $extraShift;
+            $amtBoxBottom = $amtBoxTop - $amtBoxHeight;
 
             // Draw Amount Box background fill and border
             $stream .= "1.0 1.0 1.0 rg\n"; // White background fill
@@ -423,8 +428,46 @@ class SimplePdf
                 $currY -= 14;
             }
 
+            if ($hasDiscount && $payableText && $discountText) {
+                // Payable Amount Line
+                $pLineY = $amtBoxTop - 18;
+                $stream .= "0.4 0.4 0.4 rg\n";
+                $stream .= "/F2 8.5 Tf\n";
+                $stream .= "1 0 0 1 " . (187.64 + 15) . " " . $pLineY . " Tm\n";
+                $stream .= "(Payable Amount:) Tj\n";
+                $stream .= "/F1 8.5 Tf\n";
+                $pValStr = (str_starts_with($payableText, 'Rs') || str_starts_with($payableText, '₹')) ? $payableText : "Rs " . $payableText;
+                $stream .= "1 0 0 1 " . (407.64 - 15 - $this->getStringWidth($pValStr, 8.5)) . " " . $pLineY . " Tm\n";
+                $stream .= "(" . $this->escape($pValStr) . ") Tj\n";
+
+                // Discount Line
+                $dLineY = $amtBoxTop - 32;
+                $stream .= "0.10 0.55 0.30 rg\n"; // Emerald Green
+                $stream .= "/F2 8.5 Tf\n";
+                $stream .= "1 0 0 1 " . (187.64 + 15) . " " . $dLineY . " Tm\n";
+                $stream .= "(Discount:) Tj\n";
+                $dValStr = (str_starts_with($discountText, 'Rs') || str_starts_with($discountText, '₹')) ? "- " . $discountText : "- Rs " . $discountText;
+                $stream .= "1 0 0 1 " . (407.64 - 15 - $this->getStringWidth($dValStr, 8.5)) . " " . $dLineY . " Tm\n";
+                $stream .= "(" . $this->escape($dValStr) . ") Tj\n";
+
+                // Dashed separator line
+                $sepY = $amtBoxTop - 42;
+                $stream .= "ET\n";
+                $stream .= "0.85 0.85 0.85 RG\n";
+                $stream .= "0.5 w\n";
+                $stream .= "[2 2] 0 d\n";
+                $stream .= (187.64 + 10) . " " . $sepY . " m " . (407.64 - 10) . " " . $sepY . " l S\n";
+                $stream .= "[] 0 d\n";
+                $stream .= "BT\n";
+
+                $amtLabelY = $amtBoxTop - 58;
+                $amtValY = $amtBoxTop - 80;
+            } else {
+                $amtLabelY = 375 - $extraShift;
+                $amtValY = 345 - $extraShift;
+            }
+
             // Amount Box Text Label
-            $amtLabelY = 375 - $extraShift;
             $stream .= "0.09 0.17 0.35 rg\n";
             $stream .= "/F2 9.5 Tf\n";
             $amtLabelX = $amtX + (220 - (strlen("TOTAL AMOUNT PAID") * 5.2)) / 2;
@@ -432,7 +475,6 @@ class SimplePdf
             $stream .= "(TOTAL AMOUNT PAID) Tj\n";
 
             // Draw Amount Value text formatted as "Rs X,XXX" on one centered line
-            $amtValY = 345 - $extraShift;
             $displayText = "Rs " . $amountPaid;
             $textWidth = $this->getStringWidth($displayText, 18);
             $amtValX = $amtX + (220 - $textWidth) / 2;

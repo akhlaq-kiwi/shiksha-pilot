@@ -29,8 +29,10 @@ export default function CollectionHistoryPage() {
     pages: 1
   });
   const [availableMonths, setAvailableMonths] = useState([]);
+  const [availableCollectors, setAvailableCollectors] = useState([]);
   
   const [selectedMonth, setSelectedMonth] = useState('All Months');
+  const [selectedCollector, setSelectedCollector] = useState('All Users');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -62,6 +64,7 @@ export default function CollectionHistoryPage() {
     try {
       const response = await schoolService.getCollectionHistory({
         month: selectedMonth,
+        deposit_by: selectedCollector,
         search: debouncedSearch,
         page: isInitial ? 1 : page,
         limit: 10
@@ -97,6 +100,10 @@ export default function CollectionHistoryPage() {
       if (response.available_months && response.available_months.length > 0) {
         setAvailableMonths(response.available_months);
       }
+
+      if (response.available_collectors && response.available_collectors.length > 0) {
+        setAvailableCollectors(response.available_collectors);
+      }
       
       setHasMore(isInitial ? (newTx.length < p.total) : (page < p.pages));
     } catch (err) {
@@ -124,7 +131,7 @@ export default function CollectionHistoryPage() {
     } else {
       loadHistory(true);
     }
-  }, [selectedMonth, debouncedSearch]);
+  }, [selectedMonth, selectedCollector, debouncedSearch]);
 
   // Page index changes: fetch more records
   useEffect(() => {
@@ -174,7 +181,6 @@ export default function CollectionHistoryPage() {
     if (!timeStr) return '—';
     const date = new Date(timeStr);
     if (isNaN(date.getTime())) {
-      // Fallback if it's already a time string or a relative date format
       const match = timeStr.match(/\d{2}:\d{2}:\d{2}/);
       if (match) {
         const parts = match[0].split(':');
@@ -182,7 +188,7 @@ export default function CollectionHistoryPage() {
         const minutes = parts[1];
         const ampm = hours >= 12 ? 'PM' : 'AM';
         hours = hours % 12;
-        hours = hours ? hours : 12; // 0 should be 12
+        hours = hours ? hours : 12;
         return `${hours}:${minutes} ${ampm}`;
       }
       return timeStr;
@@ -265,7 +271,7 @@ export default function CollectionHistoryPage() {
       <div className="bg-surface border border-border rounded-2xl p-5 shadow-xs flex flex-col md:flex-row gap-4 justify-between items-center">
         
         {/* Search */}
-        <div className="relative w-full md:w-80">
+        <div className="relative w-full md:w-72">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
           <Input
             value={searchQuery}
@@ -275,25 +281,49 @@ export default function CollectionHistoryPage() {
           />
         </div>
 
-        {/* Month Selector dropdown */}
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          <label className="text-xs font-bold text-text-secondary shrink-0 flex items-center gap-1.5 uppercase tracking-wider">
-            <Calendar className="h-3.5 w-3.5 text-text-muted" /> Filter Month:
-          </label>
-          <select
-            value={selectedMonth}
-            onChange={(e) => {
-              setSelectedMonth(e.target.value);
-              setPage(1);
-            }}
-            className="w-full md:w-56 rounded-xl border border-border bg-surface text-text-primary px-3 py-2 text-xs font-bold focus:border-primary focus:ring-primary outline-none h-10 cursor-pointer"
-          >
-            {availableMonths.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
+        {/* Filter Dropdowns (Deposit By & Filter Month) */}
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+          {/* Deposit By Selector dropdown */}
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <label className="text-xs font-bold text-text-secondary shrink-0 flex items-center gap-1 uppercase tracking-wider">
+              <User className="h-3.5 w-3.5 text-text-muted" /> Deposit By:
+            </label>
+            <select
+              value={selectedCollector}
+              onChange={(e) => {
+                setSelectedCollector(e.target.value);
+                setPage(1);
+              }}
+              className="w-full sm:w-48 rounded-xl border border-border bg-surface text-text-primary px-3 py-2 text-xs font-bold focus:border-primary focus:ring-primary outline-none h-10 cursor-pointer"
+            >
+              {(availableCollectors.length > 0 ? availableCollectors : [{ name: 'All Users', label: 'All Users' }]).map((c) => (
+                <option key={c.name} value={c.name}>
+                  {c.phone || c.label || c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Month Selector dropdown */}
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <label className="text-xs font-bold text-text-secondary shrink-0 flex items-center gap-1 uppercase tracking-wider">
+              <Calendar className="h-3.5 w-3.5 text-text-muted" /> Filter Month:
+            </label>
+            <select
+              value={selectedMonth}
+              onChange={(e) => {
+                setSelectedMonth(e.target.value);
+                setPage(1);
+              }}
+              className="w-full sm:w-44 rounded-xl border border-border bg-surface text-text-primary px-3 py-2 text-xs font-bold focus:border-primary focus:ring-primary outline-none h-10 cursor-pointer"
+            >
+              {availableMonths.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -323,11 +353,11 @@ export default function CollectionHistoryPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-zinc-50/50 dark:bg-zinc-900/20">
+                    <TableHead className="font-bold text-xs whitespace-nowrap">Deposit By</TableHead>
                     <TableHead className="font-bold text-xs whitespace-nowrap">Ref No.</TableHead>
                     <TableHead className="font-bold text-xs whitespace-nowrap">Date & Time</TableHead>
                     <TableHead className="font-bold text-xs whitespace-nowrap">Name & Class</TableHead>
                     <TableHead className="font-bold text-xs whitespace-nowrap">Fee Description</TableHead>
-                    <TableHead className="font-bold text-xs text-left whitespace-nowrap">Amount (₹)</TableHead>
                     <TableHead className="font-bold text-xs text-center whitespace-nowrap">(Prev → Credit → New)</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -335,6 +365,14 @@ export default function CollectionHistoryPage() {
                   {transactions.map((t) => {
                     return (
                       <TableRow key={`${t.type}-${t.id}`}>
+                        {/* Deposit By (User Name & Phone) */}
+                        <TableCell className="text-xs whitespace-nowrap">
+                          <div className="font-bold text-text-primary uppercase tracking-wider">
+                            {t.is_admin_collector ? 'ADMIN' : (t.display_collector_name || t.collected_by || 'ADMIN')}
+                          </div>
+                          <div className="text-[11px] text-text-muted font-mono">{t.collector_phone || '—'}</div>
+                        </TableCell>
+
                         {/* Ref No. */}
                         <TableCell className="font-mono text-xs font-bold text-text-primary py-4 whitespace-nowrap">
                           {t.receipt_no}
@@ -355,11 +393,6 @@ export default function CollectionHistoryPage() {
                         {/* Fee Name */}
                         <TableCell className="text-xs font-bold text-text-secondary whitespace-nowrap">
                           {t.fee_name}
-                        </TableCell>
-
-                        {/* Amount */}
-                        <TableCell className="text-left font-mono font-bold text-emerald-600 text-sm whitespace-nowrap">
-                          + ₹{t.amount.toLocaleString('en-IN')}
                         </TableCell>
 
                         {/* Balance flow (Bank Statements Style) */}
@@ -401,6 +434,12 @@ export default function CollectionHistoryPage() {
 
                     {/* Middle Block - Student & Fee Info */}
                     <div className="text-xs space-y-1.5 bg-zinc-50/50 dark:bg-zinc-900/20 p-3 rounded-xl border border-border/80">
+                      <div className="flex justify-between">
+                        <span className="text-text-muted">Deposit By:</span>
+                        <span className="font-bold text-text-primary uppercase">
+                          {t.is_admin_collector ? 'ADMIN' : (t.display_collector_name || t.collected_by || 'ADMIN')} {t.collector_phone ? `(${t.collector_phone})` : ''}
+                        </span>
+                      </div>
                       <div className="flex justify-between">
                         <span className="text-text-muted">Name & Class:</span>
                         <span className="font-bold text-text-primary uppercase">{cleanStudentName(t.student_name)} ({t.class_name})</span>
@@ -455,7 +494,8 @@ export default function CollectionHistoryPage() {
           receipt={{
             ...viewingReceipt,
             is_additional: viewingReceipt.type === 'additional',
-            amount_paid: viewingReceipt.amount
+            amount_paid: viewingReceipt.amount_paid !== undefined ? viewingReceipt.amount_paid : viewingReceipt.amount,
+            discount_amount: viewingReceipt.discount_amount || 0
           }} 
           student={{
             id: viewingReceipt.student_id,
@@ -470,7 +510,8 @@ export default function CollectionHistoryPage() {
           allPayments={transactions.map(t => ({
             ...t,
             is_additional: t.type === 'additional',
-            amount_paid: t.amount
+            amount_paid: t.amount_paid !== undefined ? t.amount_paid : t.amount,
+            discount_amount: t.discount_amount || 0
           }))}
           onClose={() => setViewingReceipt(null)} 
         />
