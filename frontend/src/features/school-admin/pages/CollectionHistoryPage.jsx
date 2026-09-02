@@ -76,8 +76,8 @@ export default function CollectionHistoryPage() {
       } else {
         setTransactions(prev => {
           // Avoid duplicate rows sharing the same Ref No if triggered multiple times
-          const existingIds = new Set(prev.map(item => `${item.type}-${item.id}`));
-          const filteredNewTx = newTx.filter(item => !existingIds.has(`${item.type}-${item.id}`));
+          const existingIds = new Set(prev.map(item => `${item.type}-${item.history_id || item.id}`));
+          const filteredNewTx = newTx.filter(item => !existingIds.has(`${item.type}-${item.history_id || item.id}`));
           return [...prev, ...filteredNewTx];
         });
       }
@@ -362,9 +362,10 @@ export default function CollectionHistoryPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {transactions.map((t) => {
+                  {transactions.map((t, idx) => {
+                    const rowKey = `${t.type}-${t.history_id || t.id || idx}`;
                     return (
-                      <TableRow key={`${t.type}-${t.id}`}>
+                      <TableRow key={rowKey}>
                         {/* Deposit By (User Name & Phone) */}
                         <TableCell className="text-xs whitespace-nowrap">
                           <div className="font-bold text-text-primary uppercase tracking-wider">
@@ -414,9 +415,10 @@ export default function CollectionHistoryPage() {
 
             {/* Mobile Cards View */}
             <div className="block md:hidden divide-y divide-border">
-              {transactions.map((t) => {
+              {transactions.map((t, idx) => {
+                const cardKey = `${t.type}-${t.history_id || t.id || idx}`;
                 return (
-                  <div key={`${t.type}-${t.id}`} className="p-4 space-y-3.5 bg-surface">
+                  <div key={cardKey} className="p-4 space-y-3.5 bg-surface">
                     
                     {/* Top Row - Ref No & Amount */}
                     <div className="flex justify-between items-start">

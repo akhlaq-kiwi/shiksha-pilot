@@ -7443,8 +7443,9 @@ class SchoolAdminService extends BaseService
         // 3. Fetch additional fee payments (from transaction history)
         $stmtAdditional = $pdo->prepare("
             SELECT 
+                afph.id AS id,
                 afph.id AS history_id,
-                afp.id,
+                afp.id AS payment_id,
                 'additional' AS type,
                 COALESCE(afph.receipt_no, afp.receipt_no) AS receipt_no,
                 CASE 
