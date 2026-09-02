@@ -9858,8 +9858,11 @@ class SchoolAdminService extends BaseService
         ]);
         $expensesPaid = (float)$stmtExpenses->fetchColumn();
 
-        $totalExpenses = $salariesPaid + $expensesPaid;
-        $profitLoss = $totalFees - $totalExpenses;
+        $totalFees = round($tuitionCollected + $addFeesCollected, 2);
+        $salariesPaid = round($salariesPaid, 2);
+        $expensesPaid = round($expensesPaid, 2);
+        $totalExpenses = round($salariesPaid + $expensesPaid, 2);
+        $profitLoss = round($totalFees - $totalExpenses, 2);
 
         return [
             'from_date' => $from,
@@ -9941,7 +9944,7 @@ class SchoolAdminService extends BaseService
                     ':tdate2' => $monthEnd
                 ]);
                 $addFees = (float)$stmtAddFees->fetchColumn();
-                $totalRevenue = $tuition + $addFees;
+                $totalRevenue = round($tuition + $addFees, 2);
 
                 $stmtSal = $pdo->prepare("
                     SELECT COALESCE(SUM(amount_paid), 0) 
@@ -9970,9 +9973,9 @@ class SchoolAdminService extends BaseService
                     ':tdate' => $monthEnd
                 ]);
                 $expenses = (float)$stmtExp->fetchColumn();
-                $totalExpenses = $salaries + $expenses;
+                $totalExpenses = round($salaries + $expenses, 2);
 
-                $profitLoss = $totalRevenue - $totalExpenses;
+                $profitLoss = round($totalRevenue - $totalExpenses, 2);
 
                 $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM financial_reports WHERE school_id = :sid");
                 $stmtCount->execute([':sid' => $schoolId]);
@@ -10194,7 +10197,7 @@ class SchoolAdminService extends BaseService
             LEFT JOIN classes c ON s.class_id = c.id
             LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = fp.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = fp.school_id)
             WHERE fp.school_id = :sid 
-              AND fp.status = 'PAID'
+              AND fp.status IN ('PAID', 'Partial')
               AND fp.created_at {$operator} :from_ts 
               AND fp.created_at <= :to_ts
         ");
@@ -10569,7 +10572,7 @@ Only approve the settlement after reviewing all financial records.
             LEFT JOIN classes c ON s.class_id = c.id
             LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = fp.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = fp.school_id)
             WHERE fp.school_id = :sid 
-              AND fp.status = 'PAID'
+              AND fp.status IN ('PAID', 'Partial')
               AND fp.created_at {$operator} :from_ts 
               AND fp.created_at <= :to_ts
         ");
