@@ -4532,58 +4532,14 @@ class SchoolAdminService extends BaseService
                     ]);
                 }
 
-                // Automatically generate ONE Final Financial Report for the previous academic year
+                // Automatically generate monthly financial reports for the previous academic year
                 try {
-                    // Fetch previous year metadata
                     $stmtPrevYear = $pdo->prepare("SELECT * FROM academic_years WHERE id = :id AND school_id = :sid LIMIT 1");
                     $stmtPrevYear->execute([':id' => $prevYearId, ':sid' => $schoolId]);
                     $prevYearObj = $stmtPrevYear->fetch(PDO::FETCH_ASSOC);
 
                     if ($prevYearObj) {
-                        // Calculate suggested from_date (last report end date or start of previous year)
-                        $stmtLatest = $pdo->prepare("
-                            SELECT * FROM financial_reports 
-                            WHERE school_id = :sid 
-                              AND `from_date` >= :start_date 
-                              AND `to_date` <= :end_date
-                            ORDER BY id DESC LIMIT 1
-                        ");
-                        $stmtLatest->execute([
-                            ':sid' => $schoolId,
-                            ':start_date' => $prevYearObj['start_date'],
-                            ':end_date' => $prevYearObj['end_date']
-                        ]);
-                        $latestReport = $stmtLatest->fetch(PDO::FETCH_ASSOC);
-
-                        $from = $latestReport ? $latestReport['to_date'] : $prevYearObj['start_date'];
-                        $to = date('Y-m-d');
-                        if (strtotime($to) < strtotime($from)) {
-                            $to = $from;
-                        }
-
-                        // Generate financial preview
-                        $preview = $this->getFinancialPreview($user, $from, $to);
-
-                        // Generate report ID (REP-XXX)
-                        $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM financial_reports WHERE school_id = :sid");
-                        $stmtCount->execute([':sid' => $schoolId]);
-                        $count = (int)$stmtCount->fetchColumn();
-                        $reportId = 'REP-' . str_pad((string)($count + 1), 3, '0', STR_PAD_LEFT);
-
-                        // Insert report with status 'Pending'
-                        $stmtInsReport = $pdo->prepare("
-                            INSERT INTO financial_reports (school_id, report_id, `from_date`, `to_date`, fees_collected, salary_paid, profit_loss, status)
-                            VALUES (:sid, :report_id, :from_date, :to_date, :fees_collected, :salary_paid, :profit_loss, 'Pending')
-                        ");
-                        $stmtInsReport->execute([
-                            ':sid' => $schoolId,
-                            ':report_id' => $reportId,
-                            ':from_date' => $from,
-                            ':to_date' => $to,
-                            ':fees_collected' => $preview['fees_collected'],
-                            ':salary_paid' => $preview['salary_paid'],
-                            ':profit_loss' => $preview['profit_loss']
-                        ]);
+                        $this->autoGenerateCompletedMonthlyReports($pdo, $schoolId, $prevYearObj);
                     }
                 } catch (\Exception $reportEx) {
                     $this->log('Failed to automatically generate final financial report during rollover', [
@@ -9877,18 +9833,28 @@ class SchoolAdminService extends BaseService
     {
         if (!$workingYear) return;
 
+        // Clean up invalid multi-month reports spanning across different calendar months
+        $stmtBad = $pdo->prepare("
+            SELECT id FROM financial_reports 
+            WHERE school_id = :sid 
+              AND DATE_FORMAT(from_date, '%Y-%m') != DATE_FORMAT(to_date, '%Y-%m')
+        ");
+        $stmtBad->execute([':sid' => $schoolId]);
+        $badIds = $stmtBad->fetchAll(PDO::FETCH_COLUMN);
+        if (!empty($badIds)) {
+            $inClause = implode(',', array_map('intval', $badIds));
+            $pdo->exec("DELETE FROM financial_reports WHERE id IN ($inClause) AND school_id = $schoolId");
+        }
+
         $ayStart = $workingYear['start_date'];
         $ayEnd = $workingYear['end_date'];
         $today = date('Y-m-d');
 
         $currentMonthStart = date('Y-m-01', strtotime($ayStart));
         
-        while ($currentMonthStart <= $ayEnd) {
+        while ($currentMonthStart <= $ayEnd && $currentMonthStart <= $today) {
             $monthEnd = date('Y-m-t', strtotime($currentMonthStart));
-            
-            if ($today <= $monthEnd) {
-                break;
-            }
+            $targetToDate = ($today < $monthEnd) ? $today : $monthEnd;
 
             $stmtCheck = $pdo->prepare("
                 SELECT id FROM financial_reports 
@@ -9901,9 +9867,9 @@ class SchoolAdminService extends BaseService
             $stmtCheck->execute([
                 ':sid' => $schoolId,
                 ':fdate1' => $currentMonthStart,
-                ':tdate1' => $monthEnd,
+                ':tdate1' => $targetToDate,
                 ':fdate2' => $currentMonthStart,
-                ':tdate2' => $monthEnd
+                ':tdate2' => $targetToDate
             ]);
             $exists = $stmtCheck->fetchColumn() !== false;
 
@@ -9919,7 +9885,7 @@ class SchoolAdminService extends BaseService
                     ':sid' => $schoolId,
                     ':ayid' => $workingYear['id'],
                     ':fdate' => $currentMonthStart,
-                    ':tdate' => $monthEnd
+                    ':tdate' => $targetToDate
                 ]);
                 $tuition = (float)$stmtFees->fetchColumn();
 
@@ -9939,9 +9905,9 @@ class SchoolAdminService extends BaseService
                     ':sid' => $schoolId,
                     ':ayid' => $workingYear['id'],
                     ':fdate1' => $currentMonthStart,
-                    ':tdate1' => $monthEnd,
+                    ':tdate1' => $targetToDate,
                     ':fdate2' => $currentMonthStart,
-                    ':tdate2' => $monthEnd
+                    ':tdate2' => $targetToDate
                 ]);
                 $addFees = (float)$stmtAddFees->fetchColumn();
                 $totalRevenue = round($tuition + $addFees, 2);
@@ -9956,7 +9922,7 @@ class SchoolAdminService extends BaseService
                     ':sid' => $schoolId,
                     ':ayid' => $workingYear['id'],
                     ':fdate' => $currentMonthStart,
-                    ':tdate' => $monthEnd
+                    ':tdate' => $targetToDate
                 ]);
                 $salaries = (float)$stmtSal->fetchColumn();
 
@@ -9970,7 +9936,7 @@ class SchoolAdminService extends BaseService
                     ':sid' => $schoolId,
                     ':ayid' => $workingYear['id'],
                     ':fdate' => $currentMonthStart,
-                    ':tdate' => $monthEnd
+                    ':tdate' => $targetToDate
                 ]);
                 $expenses = (float)$stmtExp->fetchColumn();
                 $totalExpenses = round($salaries + $expenses, 2);
@@ -9982,7 +9948,7 @@ class SchoolAdminService extends BaseService
                 $count = (int)$stmtCount->fetchColumn();
                 $reportId = 'REP-' . str_pad((string)($count + 1), 3, '0', STR_PAD_LEFT);
 
-                $nextMonthFirst = date('Y-m-d 00:00:00', strtotime($monthEnd . ' +1 day'));
+                $nextMonthFirst = date('Y-m-d 00:00:00', strtotime($targetToDate . ' +1 day'));
                 $stmtIns = $pdo->prepare("
                     INSERT INTO financial_reports (school_id, report_id, `from_date`, `to_date`, fees_collected, salary_paid, profit_loss, status, created_at)
                     VALUES (:sid, :rid, :fdate, :tdate, :fees, :sal, :pl, 'Pending', :created_at)
@@ -9991,7 +9957,7 @@ class SchoolAdminService extends BaseService
                     ':sid' => $schoolId,
                     ':rid' => $reportId,
                     ':fdate' => $currentMonthStart,
-                    ':tdate' => $monthEnd,
+                    ':tdate' => $targetToDate,
                     ':fees' => $totalRevenue,
                     ':sal' => $totalExpenses,
                     ':pl' => $profitLoss,
@@ -10017,7 +9983,7 @@ class SchoolAdminService extends BaseService
                 SELECT * FROM financial_reports 
                 WHERE school_id = :sid 
                   AND `from_date` >= :start_date 
-                  AND `to_date` <= :end_date
+                  AND `from_date` <= :end_date
                 ORDER BY id DESC
             ");
             $stmt->execute([
@@ -10052,7 +10018,7 @@ class SchoolAdminService extends BaseService
                 SELECT * FROM financial_reports 
                 WHERE school_id = :sid 
                   AND `from_date` >= :start_date 
-                  AND `to_date` <= :end_date
+                  AND `from_date` <= :end_date
                 ORDER BY id DESC LIMIT 1
             ");
             $stmtLatest->execute([
