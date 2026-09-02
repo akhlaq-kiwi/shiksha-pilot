@@ -7422,8 +7422,8 @@ class SchoolAdminService extends BaseService
             LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = fp.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = fp.school_id)
             WHERE fp.school_id = :school_id AND fp.status IN ('PAID', 'Partial')
               AND (
-                s.academic_year_id = :ayid 
-                OR fp.academic_year_id = :ayid
+                s.academic_year_id = :ayid_stu 
+                OR fp.academic_year_id = :ayid_fee
                 OR (
                   :is_curr1 = 1 
                   AND (s.status = 'Inactive' OR s.status = 'Alumni' OR s.status = 'Archived')
@@ -7433,7 +7433,8 @@ class SchoolAdminService extends BaseService
         ");
         $stmtMonthly->execute([
             ':school_id' => $schoolId,
-            ':ayid' => $workingYearId,
+            ':ayid_stu' => $workingYearId,
+            ':ayid_fee' => $workingYearId,
             ':is_curr1' => $isCurrentAy ? 1 : 0,
             ':sid_sub' => $schoolId
         ]);
@@ -7442,8 +7443,9 @@ class SchoolAdminService extends BaseService
         // 3. Fetch additional fee payments (from transaction history)
         $stmtAdditional = $pdo->prepare("
             SELECT 
+                afph.id AS id,
                 afph.id AS history_id,
-                afp.id,
+                afp.id AS payment_id,
                 'additional' AS type,
                 COALESCE(afph.receipt_no, afp.receipt_no) AS receipt_no,
                 CASE 
