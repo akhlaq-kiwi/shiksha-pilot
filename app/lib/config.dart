@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// The only server a release build will ever talk to.
-const String kProductionBaseUrl = 'https://app.shikshapilot.com';
+const String kProductionBaseUrl = 'https://qa.shikshapilot.com';
 
 /// Key under which a debug-time server override is stored.
 const String kBaseUrlPrefKey = 'base_url';

@@ -427,7 +427,10 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
           ),
         );
       }),
-    )  void _showPartiallyPaidDialog(Map<String, dynamic> item, String title) {
+    );
+  }
+
+  void _showPartiallyPaidDialog(Map<String, dynamic> item, String title) {
     final amount = (item['amount'] ?? 0).round();
     final paidAmount = (item['paid_amount'] ?? 0).round();
     final discountAmount = (item['discount_amount'] ?? 0).round();
