@@ -7224,9 +7224,9 @@ class SchoolAdminService extends BaseService
         $calculatedDeposits = [];
         $batchPaidTracker = $existingPaidByMonth;
 
-        // Determine discount amount if provided
-        $totalDiscountInput = max(0.0, (float)($data['discount_amount'] ?? 0));
-        $discountPerMonth = count($monthsToPay) > 0 ? round($totalDiscountInput / count($monthsToPay), 2) : 0.0;
+        // Determine discount amount if provided (sequential whole integer allocation - no division decimals)
+        $totalDiscountInput = (int)round(max(0.0, (float)($data['discount_amount'] ?? 0)));
+        $remainingDiscountToApply = $totalDiscountInput;
 
         foreach ($monthsToPay as $m) {
             $idx = array_search($m, $academicMonths, true);
@@ -7234,35 +7234,40 @@ class SchoolAdminService extends BaseService
                 throw new ValidationException(['months' => "Invalid month: $m"]);
             }
 
-            $totalConfiguredFee = $getConfiguredFeeForMonth($m);
-            $alreadyPaidForMonth = $existingPaidByMonth[$m] ?? 0.0;
-            $remainingForMonth = max(0.0, round($totalConfiguredFee - $alreadyPaidForMonth, 2));
+            $totalConfiguredFee = (int)round($getConfiguredFeeForMonth($m));
+            $alreadyPaidForMonth = (int)round($existingPaidByMonth[$m] ?? 0.0);
+            $remainingForMonth = max(0, $totalConfiguredFee - $alreadyPaidForMonth);
 
-            if ($remainingForMonth <= 0.01) {
+            if ($remainingForMonth <= 0) {
                 throw new ValidationException(['months' => "Fee for $m has already been paid."]);
             }
 
             // Sequence check: All prior months in academic calendar must be fully paid (including batch deposits)
             for ($j = 0; $j < $idx; $j++) {
                 $prevMonth = $academicMonths[$j];
-                $prevConfigured = $getConfiguredFeeForMonth($prevMonth);
-                $prevPaidSoFar = $batchPaidTracker[$prevMonth] ?? 0.0;
+                $prevConfigured = (int)round($getConfiguredFeeForMonth($prevMonth));
+                $prevPaidSoFar = (int)round($batchPaidTracker[$prevMonth] ?? 0.0);
 
-                if ($prevPaidSoFar < $prevConfigured - 0.01) {
+                if ($prevPaidSoFar < $prevConfigured) {
                     throw new ValidationException(['months' => 'Cannot collect fees for a future month until all previous pending months have been paid.']);
                 }
             }
 
-            // Determine discount and deposit amount for this month
+            // Determine discount and deposit amount for this month (sequential integer allocation)
             if (count($monthsToPay) === 1) {
-                $monthDiscount = min($totalDiscountInput, $remainingForMonth);
+                $monthDiscount = min($remainingDiscountToApply, $remainingForMonth);
                 $depositAmount = $remainingForMonth;
                 if (isset($monthAmountsInput[$m]) && is_numeric($monthAmountsInput[$m])) {
-                    $depositAmount = (float)$monthAmountsInput[$m];
+                    $depositAmount = (int)round((float)$monthAmountsInput[$m]);
                 }
             } else {
-                $monthDiscount = min($discountPerMonth, $remainingForMonth);
-                $depositAmount = max(0.0, round($remainingForMonth - $monthDiscount, 2));
+                if ($remainingDiscountToApply > 0) {
+                    $monthDiscount = min($remainingDiscountToApply, $remainingForMonth);
+                    $remainingDiscountToApply -= $monthDiscount;
+                } else {
+                    $monthDiscount = 0;
+                }
+                $depositAmount = max(0, $remainingForMonth - $monthDiscount);
             }
 
             if (count($monthsToPay) > 1 && abs(($depositAmount + $monthDiscount) - $remainingForMonth) > 0.01) {
@@ -7418,6 +7423,7 @@ class SchoolAdminService extends BaseService
             WHERE fp.school_id = :school_id AND fp.status IN ('PAID', 'Partial')
               AND (
                 s.academic_year_id = :ayid 
+                OR fp.academic_year_id = :ayid
                 OR (
                   :is_curr1 = 1 
                   AND (s.status = 'Inactive' OR s.status = 'Alumni' OR s.status = 'Archived')
@@ -10143,6 +10149,18 @@ class SchoolAdminService extends BaseService
         list($from_ts, $operator, $to_ts) = $this->getReportBounds($pdo, $schoolId, $report);
 
         // Fetch Student Fee Collections
+        // Determine report's target Academic Year ID
+        $stmtRepAY = $pdo->prepare("SELECT id FROM academic_years WHERE school_id = :sid AND start_date <= :fdate AND end_date >= :tdate LIMIT 1");
+        $stmtRepAY->execute([':sid' => $schoolId, ':fdate' => $report['from_date'], ':tdate' => $report['to_date']]);
+        $targetAYId = (int)$stmtRepAY->fetchColumn();
+
+        $ayClause = "";
+        $paramsFee = [':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts];
+        if ($targetAYId > 0) {
+            $ayClause = " AND (fp.academic_year_id = :target_ayid OR s.academic_year_id = :target_ayid OR (s.status IN ('Inactive', 'Alumni', 'Archived')))";
+            $paramsFee[':target_ayid'] = $targetAYId;
+        }
+
         $stmtFeeList = $pdo->prepare("
             SELECT 
                 fp.created_at AS deposit_time, 
@@ -10166,9 +10184,17 @@ class SchoolAdminService extends BaseService
               AND fp.status IN ('PAID', 'Partial')
               AND fp.created_at {$operator} :from_ts 
               AND fp.created_at <= :to_ts
+              {$ayClause}
         ");
-        $stmtFeeList->execute([':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts]);
+        $stmtFeeList->execute($paramsFee);
         $feePayments = $stmtFeeList->fetchAll(PDO::FETCH_ASSOC);
+
+        $ayClauseAdd = "";
+        $paramsAdd = [':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts];
+        if ($targetAYId > 0) {
+            $ayClauseAdd = " AND (aft.academic_year_id = :target_ayid OR s.academic_year_id = :target_ayid OR aft.academic_year_id IS NULL OR (s.status IN ('Inactive', 'Alumni', 'Archived')))";
+            $paramsAdd[':target_ayid'] = $targetAYId;
+        }
 
         $stmtAddFeeList = $pdo->prepare("
             SELECT 
@@ -10194,8 +10220,9 @@ class SchoolAdminService extends BaseService
             WHERE afp.school_id = :sid 
               AND afph.created_at {$operator} :from_ts 
               AND afph.created_at <= :to_ts
+              {$ayClauseAdd}
         ");
-        $stmtAddFeeList->execute([':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts]);
+        $stmtAddFeeList->execute($paramsAdd);
         $addPayments = $stmtAddFeeList->fetchAll(PDO::FETCH_ASSOC);
 
         // Format previous year dues descriptions
@@ -10530,6 +10557,18 @@ Only approve the settlement after reviewing all financial records.
         list($from_ts, $operator, $to_ts) = $this->getReportBounds($pdo, $schoolId, $report);
 
         // Fetch Student Fee Collections
+        // Determine report's target Academic Year ID
+        $stmtRepAY2 = $pdo->prepare("SELECT id FROM academic_years WHERE school_id = :sid AND start_date <= :fdate AND end_date >= :tdate LIMIT 1");
+        $stmtRepAY2->execute([':sid' => $schoolId, ':fdate' => $report['from_date'], ':tdate' => $report['to_date']]);
+        $targetAYId2 = (int)$stmtRepAY2->fetchColumn();
+
+        $ayClause2 = "";
+        $paramsFee2 = [':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts];
+        if ($targetAYId2 > 0) {
+            $ayClause2 = " AND (fp.academic_year_id = :target_ayid OR s.academic_year_id = :target_ayid OR (s.status IN ('Inactive', 'Alumni', 'Archived')))";
+            $paramsFee2[':target_ayid'] = $targetAYId2;
+        }
+
         $stmtFeeList = $pdo->prepare("
             SELECT 
                 fp.created_at AS deposit_time, 
@@ -10553,9 +10592,17 @@ Only approve the settlement after reviewing all financial records.
               AND fp.status IN ('PAID', 'Partial')
               AND fp.created_at {$operator} :from_ts 
               AND fp.created_at <= :to_ts
+              {$ayClause2}
         ");
-        $stmtFeeList->execute([':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts]);
+        $stmtFeeList->execute($paramsFee2);
         $feePayments = $stmtFeeList->fetchAll(PDO::FETCH_ASSOC);
+
+        $ayClauseAdd2 = "";
+        $paramsAdd2 = [':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts];
+        if ($targetAYId2 > 0) {
+            $ayClauseAdd2 = " AND (aft.academic_year_id = :target_ayid OR s.academic_year_id = :target_ayid OR aft.academic_year_id IS NULL OR (s.status IN ('Inactive', 'Alumni', 'Archived')))";
+            $paramsAdd2[':target_ayid'] = $targetAYId2;
+        }
 
         $stmtAddFeeList = $pdo->prepare("
             SELECT 
@@ -10581,8 +10628,9 @@ Only approve the settlement after reviewing all financial records.
             WHERE afp.school_id = :sid 
               AND afph.created_at {$operator} :from_ts 
               AND afph.created_at <= :to_ts
+              {$ayClauseAdd2}
         ");
-        $stmtAddFeeList->execute([':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts]);
+        $stmtAddFeeList->execute($paramsAdd2);
         $addPayments = $stmtAddFeeList->fetchAll(PDO::FETCH_ASSOC);
 
         // Format previous year dues descriptions
