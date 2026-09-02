@@ -917,12 +917,16 @@ class StudentService extends BaseService
         }
         $payments = $stmtPay->fetchAll();
         $paidAmountByMonth = [];
+        $discountAmountByMonth = [];
         $latestPaymentByMonth = [];
         foreach ($payments as $p) {
             $mName = $p['fee_month'];
             if ($mName) {
-                $paidAmountByMonth[$mName] = ($paidAmountByMonth[$mName] ?? 0.0) + (float)$p['amount_paid'];
-                $latestPaymentByMonth[$mName] = $p;
+                $paidAmountByMonth[$mName] = ($paidAmountByMonth[$mName] ?? 0.0) + (float)($p['amount_paid'] ?? 0.0);
+                $discountAmountByMonth[$mName] = ($discountAmountByMonth[$mName] ?? 0.0) + (float)($p['discount_amount'] ?? 0.0);
+                if (!isset($latestPaymentByMonth[$mName]) || $p['id'] > $latestPaymentByMonth[$mName]['id']) {
+                    $latestPaymentByMonth[$mName] = $p;
+                }
             }
         }
 
@@ -942,12 +946,18 @@ class StudentService extends BaseService
             $isFuture = $monthIdx > $currentMonthIdx;
 
             $paidSoFar = $paidAmountByMonth[$month] ?? 0.0;
-            $remaining = max(0.0, $monthAmount - $paidSoFar);
+            $discountSoFar = $discountAmountByMonth[$month] ?? 0.0;
+            $totalSettled = $paidSoFar + $discountSoFar;
+            $remaining = max(0.0, $monthAmount - $totalSettled);
             $latestP = $latestPaymentByMonth[$month] ?? null;
 
-            if ($paidSoFar >= $monthAmount - 0.01 && $monthAmount > 0) {
+            $latestStatus = $latestP ? strtolower($latestP['status'] ?? '') : '';
+
+            if ($totalSettled >= $monthAmount - 0.01 && $monthAmount > 0) {
                 $statusStr = 'Paid';
-            } elseif ($paidSoFar > 0) {
+            } elseif ($latestStatus === 'paid') {
+                $statusStr = 'Paid';
+            } elseif ($paidSoFar > 0 || $totalSettled > 0 || $latestStatus === 'partial') {
                 $statusStr = 'Partially Paid';
             } else {
                 $statusStr = 'Unpaid';
@@ -962,6 +972,7 @@ class StudentService extends BaseService
                 'month' => $month,
                 'amount' => (int)round($monthAmount),
                 'paid_amount' => (int)round($paidSoFar),
+                'discount_amount' => (int)round($discountSoFar),
                 'remaining_amount' => (int)round($remaining),
                 'payment_date' => $latestP ? $latestP['payment_date'] : null,
                 'status' => $statusStr,
@@ -994,12 +1005,14 @@ class StudentService extends BaseService
         foreach ($additionalPayments as $row) {
             $totalAmt = (float)$row['amount'];
             $paidAmt = isset($row['amount_paid']) ? (float)$row['amount_paid'] : (strtolower($row['status']) === 'paid' ? $totalAmt : 0.0);
-            $remAmt = max(0.0, $totalAmt - $paidAmt);
+            $discAmt = (float)($row['discount_amount'] ?? 0.0);
+            $settledAmt = $paidAmt + $discAmt;
+            $remAmt = max(0.0, $totalAmt - $settledAmt);
 
             $rawStatus = strtolower($row['status']);
-            if ($rawStatus === 'paid' || $paidAmt >= $totalAmt - 0.01) {
+            if ($rawStatus === 'paid' || $settledAmt >= $totalAmt - 0.01) {
                 $statusStr = 'Paid';
-            } elseif ($paidAmt > 0 || $rawStatus === 'partial') {
+            } elseif ($settledAmt > 0 || $rawStatus === 'partial') {
                 $statusStr = 'Partially Paid';
             } else {
                 $statusStr = 'Pending';
@@ -1021,6 +1034,7 @@ class StudentService extends BaseService
                 'custom_description' => $row['description'] ?? '',
                 'amount' => (int)round($totalAmt),
                 'paid_amount' => (int)round($paidAmt),
+                'discount_amount' => (int)round($discAmt),
                 'remaining_amount' => (int)round($remAmt),
                 'payment_date' => $row['payment_date'],
                 'due_date' => $dueDate,
@@ -1049,14 +1063,19 @@ class StudentService extends BaseService
 
         if ($isAdditional) {
             $stmt = $pdo->prepare("
-                SELECT afp.*, s.first_name, s.last_name, s.roll_no, s.sr_no, c.name AS class_name, c.section, sch.name AS school_name, sch.logo_path, aft.name AS fee_name, ay.name AS academic_year_name
+                SELECT afp.*, 
+                       COALESCE(afph.amount_paid, afp.amount_paid, afp.amount) AS tx_amount_paid,
+                       COALESCE(afph.discount_amount, afp.discount_amount, 0.00) AS tx_discount_amount,
+                       s.first_name, s.last_name, s.roll_no, s.sr_no, c.name AS class_name, c.section, sch.name AS school_name, sch.logo_path, aft.name AS fee_name, ay.name AS academic_year_name
                 FROM additional_fee_payments afp
+                LEFT JOIN additional_fee_payment_history afph ON afph.payment_id = afp.id
                 JOIN students s ON afp.student_id = s.id
                 LEFT JOIN classes c ON s.class_id = c.id
                 JOIN schools sch ON afp.school_id = sch.id
                 JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
                 LEFT JOIN academic_years ay ON s.academic_year_id = ay.id
                 WHERE afp.id = :id AND afp.student_id = :student_id AND afp.school_id = :sid
+                ORDER BY afph.id DESC
                 LIMIT 1
             ");
             $stmt->execute([':id' => $paymentId, ':student_id' => $studentId, ':sid' => $schoolId]);
@@ -1183,8 +1202,8 @@ class StudentService extends BaseService
             $amountPaidFormatted = "Rs " . number_format((float)$totalAmountPaid, 0);
         } else {
             $feeMonthDisplay = !empty($payment['fee_name']) ? $payment['fee_name'] : (!empty($payment['fee_month']) ? $payment['fee_month'] : 'Additional Fee');
-            $totalAmountPaid = (float)($payment['amount_paid'] ?? $payment['amount'] ?? 0.0);
-            $totalDiscountAmount = (float)($payment['discount_amount'] ?? 0.0);
+            $totalAmountPaid = (float)($payment['tx_amount_paid'] ?? $payment['amount_paid'] ?? $payment['amount'] ?? 0.0);
+            $totalDiscountAmount = (float)($payment['tx_discount_amount'] ?? $payment['discount_amount'] ?? 0.0);
             $amountPaidFormatted = "Rs " . number_format((float)$totalAmountPaid, 0);
             $billingItemLabel = "Description: ";
         }
