@@ -1419,6 +1419,10 @@ class SchoolAdminService extends BaseService
             }
         }
 
+        if ($studentCategory === 'Existing Student' && $admissionFee !== null && $admissionFee > 0) {
+            throw new ValidationException(['admission_fee' => 'Not allowed for existing student']);
+        }
+
         $parentPhone = !empty($data['parent_phone']) ? trim((string)$data['parent_phone']) : (!empty($data['father_phone']) ? trim((string)$data['father_phone']) : (!empty($data['student_mobile']) ? trim((string)$data['student_mobile']) : null));
         $fatherPhone = !empty($data['father_phone']) ? trim((string)$data['father_phone']) : $parentPhone;
 
@@ -1860,6 +1864,10 @@ class SchoolAdminService extends BaseService
             $admFee = $data['admission_fee'] !== null && $data['admission_fee'] !== '' ? (float)$data['admission_fee'] : null;
             if ($admFee !== null && $admFee < 0) {
                 throw new ValidationException(['admission_fee' => 'Admission Fee cannot be negative.']);
+            }
+            $updatedCategoryCheck = array_key_exists('student_category', $data) ? $data['student_category'] : ($student['student_category'] ?? null);
+            if ($updatedCategoryCheck === 'Existing Student' && $admFee !== null && $admFee > 0) {
+                throw new ValidationException(['admission_fee' => 'Not allowed for existing student']);
             }
             $this->syncAdmissionFeePayment($pdo, $schoolId, $id, $academicYearId, $admFee);
         }

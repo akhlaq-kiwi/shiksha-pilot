@@ -517,19 +517,32 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
 
   const handleTextChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    const updatedForm = { ...formData, [name]: value };
+    setFormData(updatedForm);
 
-    if (name === 'student_email') {
-      const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-      if (!value || emailRegex.test(value.trim())) {
-        setErrors(prev => ({ ...prev, student_email: null }));
+    setErrors(prev => {
+      const nextErrs = { ...prev };
+      const currentCategory = name === 'student_category' ? value : updatedForm.student_category;
+      const currentFeeStr = name === 'admission_fee' ? value : updatedForm.admission_fee;
+      const feeVal = (currentFeeStr !== '' && currentFeeStr !== null && currentFeeStr !== undefined) ? parseFloat(currentFeeStr) : 0;
+
+      if (currentCategory === 'Existing Student' && feeVal > 0) {
+        nextErrs.admission_fee = 'Not allowed for existing student';
+      } else if (nextErrs.admission_fee === 'Not allowed for existing student') {
+        nextErrs.admission_fee = null;
       }
-    } else if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: null }));
-    }
+
+      if (name === 'student_email') {
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        if (!value || emailRegex.test(value.trim())) {
+          nextErrs.student_email = null;
+        }
+      } else if (name !== 'admission_fee' && nextErrs[name]) {
+        nextErrs[name] = null;
+      }
+
+      return nextErrs;
+    });
   };
 
   // Enforces numeric-only digits on text change for specified fields
@@ -737,6 +750,8 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
       }
       if (formData.admission_fee !== '' && formData.admission_fee !== null && parseFloat(formData.admission_fee) < 0) {
         errs.admission_fee = 'Admission Fee cannot be negative.';
+      } else if (formData.student_category === 'Existing Student' && formData.admission_fee !== '' && formData.admission_fee !== null && parseFloat(formData.admission_fee) > 0) {
+        errs.admission_fee = 'Not allowed for existing student';
       }
       const isFirstYearSession = (academicYears || []).length <= 1 || (formData.academic_year_id && String(formData.academic_year_id) === String(academicYears[0]?.id));
       if (isFirstYearSession && !studentId && !formData.student_category) {
