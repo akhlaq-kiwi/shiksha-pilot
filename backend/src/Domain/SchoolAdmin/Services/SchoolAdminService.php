@@ -647,6 +647,9 @@ class SchoolAdminService extends BaseService
 
             foreach ($nullStudents as $ns) {
                 $studentId = (int)$ns['id'];
+                $srNo = $ns['sr_no'] ?? '';
+                $admNo = $ns['admission_no'] ?? '';
+                $name = $ns['name'];
                 
                 $stmtPrev = $pdo->prepare("
                     SELECT s.class_id, c.name AS prev_class_name, c.stream
@@ -655,8 +658,8 @@ class SchoolAdminService extends BaseService
                     WHERE s.school_id = :sid 
                       AND s.academic_year_id != :ayid 
                       AND (
-                        (s.sr_no = :sr_no AND :sr_no != '' AND :sr_no IS NOT NULL) OR 
-                        (s.admission_no = :adm_no AND :adm_no != '' AND :adm_no IS NOT NULL) OR 
+                        (s.sr_no = :sr_no1 AND :sr_no2 != '' AND :sr_no3 IS NOT NULL) OR 
+                        (s.admission_no = :adm_no1 AND :adm_no2 != '' AND :adm_no3 IS NOT NULL) OR 
                         (s.name = :name)
                       )
                     ORDER BY s.id DESC LIMIT 1
@@ -664,9 +667,13 @@ class SchoolAdminService extends BaseService
                 $stmtPrev->execute([
                     ':sid' => $schoolId,
                     ':ayid' => $academicYearId,
-                    ':sr_no' => $ns['sr_no'] ?? '',
-                    ':adm_no' => $ns['admission_no'] ?? '',
-                    ':name' => $ns['name']
+                    ':sr_no1' => $srNo,
+                    ':sr_no2' => $srNo,
+                    ':sr_no3' => $srNo,
+                    ':adm_no1' => $admNo,
+                    ':adm_no2' => $admNo,
+                    ':adm_no3' => $admNo,
+                    ':name' => $name
                 ]);
                 $prevRec = $stmtPrev->fetch(PDO::FETCH_ASSOC);
 
@@ -969,13 +976,20 @@ class SchoolAdminService extends BaseService
                 JOIN schools sch ON afp.school_id = sch.id
                 JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
                 LEFT JOIN academic_years ay ON s.academic_year_id = ay.id
-                WHERE (afph.id = :id OR afp.id = :id OR afph.receipt_no = :rno OR afp.receipt_no = :rno) 
+                WHERE (afph.id = :id_1 OR afp.id = :id_2 OR afph.receipt_no = :rno_1 OR afp.receipt_no = :rno_2) 
                   AND afp.student_id = :student_id 
                   AND afp.school_id = :sid
                 ORDER BY afph.id DESC
                 LIMIT 1
             ");
-            $stmt->execute([':id' => $paymentId, ':rno' => (string)$paymentId, ':student_id' => $studentId, ':sid' => $schoolId]);
+            $stmt->execute([
+                ':id_1' => $paymentId,
+                ':id_2' => $paymentId,
+                ':rno_1' => (string)$paymentId,
+                ':rno_2' => (string)$paymentId,
+                ':student_id' => $studentId,
+                ':sid' => $schoolId
+            ]);
             $payment = $stmt->fetch(PDO::FETCH_ASSOC);
             if (!$payment) {
                 throw new NotFoundException('Additional fee payment record not found');
@@ -9914,15 +9928,17 @@ class SchoolAdminService extends BaseService
                     WHERE afp.school_id = :sid 
                       AND aft.academic_year_id = :ayid
                       AND (
-                        (afph.payment_date IS NOT NULL AND afph.payment_date >= :fdate AND afph.payment_date <= :tdate)
-                        OR (afph.payment_date IS NULL AND DATE(afph.created_at) >= :fdate AND DATE(afph.created_at) <= :tdate)
+                        (afph.payment_date IS NOT NULL AND afph.payment_date >= :fdate1 AND afph.payment_date <= :tdate1)
+                        OR (afph.payment_date IS NULL AND DATE(afph.created_at) >= :fdate2 AND DATE(afph.created_at) <= :tdate2)
                       )
                 ");
                 $stmtAddFees->execute([
                     ':sid' => $schoolId,
                     ':ayid' => $workingYear['id'],
-                    ':fdate' => $currentMonthStart,
-                    ':tdate' => $monthEnd
+                    ':fdate1' => $currentMonthStart,
+                    ':tdate1' => $monthEnd,
+                    ':fdate2' => $currentMonthStart,
+                    ':tdate2' => $monthEnd
                 ]);
                 $addFees = (float)$stmtAddFees->fetchColumn();
                 $totalRevenue = $tuition + $addFees;
