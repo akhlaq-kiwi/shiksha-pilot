@@ -473,27 +473,20 @@ class SchoolAdminService extends BaseService
                 }
             }
 
-            $ayStart = !empty($activeYear['start_date']) ? $activeYear['start_date'] : '1970-01-01';
-            $ayEnd = !empty($activeYear['end_date']) ? $activeYear['end_date'] : '2099-12-31';
-
             // Query 2: Additional fee payments for this academic year (grouped by deposit payment_date)
             $stmtAddFeeChart = $pdo->prepare("
                 SELECT afph.payment_date, afph.created_at, afph.amount_paid AS amount
                 FROM additional_fee_payment_history afph
                 JOIN additional_fee_payments afp ON afph.payment_id = afp.id
                 JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+                JOIN students s ON afp.student_id = s.id
                 WHERE afp.school_id = :school_id 
-                  AND (
-                    (afph.payment_date IS NOT NULL AND afph.payment_date >= :fdate AND afph.payment_date <= :tdate)
-                    OR (afph.payment_date IS NULL AND afph.created_at >= :from_ts AND afph.created_at <= :to_ts)
-                  )
+                  AND (aft.academic_year_id = :ayid1 OR s.academic_year_id = :ayid2)
             ");
             $stmtAddFeeChart->execute([
                 ':school_id' => $schoolId,
-                ':fdate' => $ayStart,
-                ':tdate' => $ayEnd,
-                ':from_ts' => $ayStart . ' 00:00:00',
-                ':to_ts' => $ayEnd . ' 23:59:59'
+                ':ayid1' => $activeYear['id'],
+                ':ayid2' => $activeYear['id']
             ]);
             while ($row = $stmtAddFeeChart->fetch(\PDO::FETCH_ASSOC)) {
                 $amt = (float)($row['amount'] ?? 0);
@@ -7474,19 +7467,11 @@ class SchoolAdminService extends BaseService
             LEFT JOIN academic_years pay_ay ON fp.academic_year_id = pay_ay.id
             LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = fp.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = fp.school_id)
             WHERE fp.school_id = :school_id AND fp.status IN ('PAID', 'Partial')
-              AND (
-                (fp.payment_date IS NOT NULL AND fp.payment_date >= :fdate1 AND fp.payment_date <= :tdate1)
-                OR (fp.payment_date IS NULL AND fp.created_at >= :from_ts1 AND fp.created_at <= :to_ts1)
-                OR fp.academic_year_id = :ayid_fee1
-              )
+              AND fp.academic_year_id = :ayid_fee
         ");
         $stmtMonthly->execute([
             ':school_id' => $schoolId,
-            ':fdate1' => $ayStart,
-            ':tdate1' => $ayEnd,
-            ':from_ts1' => $ayStartTs,
-            ':to_ts1' => $ayEndTs,
-            ':ayid_fee1' => $workingYearId
+            ':ayid_fee' => $workingYearId
         ]);
         $monthly = $stmtMonthly->fetchAll(PDO::FETCH_ASSOC);
 
@@ -7532,17 +7517,12 @@ class SchoolAdminService extends BaseService
             LEFT JOIN academic_years pay_ay ON aft.academic_year_id = pay_ay.id
             LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = afph.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = afp.school_id)
             WHERE afp.school_id = :school_id
-              AND (
-                (afph.payment_date IS NOT NULL AND afph.payment_date >= :fdate2 AND afph.payment_date <= :tdate2)
-                OR (afph.payment_date IS NULL AND afph.created_at >= :from_ts2 AND afph.created_at <= :to_ts2)
-              )
+              AND (aft.academic_year_id = :ayid_add1 OR s.academic_year_id = :ayid_add2)
         ");
         $stmtAdditional->execute([
             ':school_id' => $schoolId,
-            ':fdate2' => $ayStart,
-            ':tdate2' => $ayEnd,
-            ':from_ts2' => $ayStartTs,
-            ':to_ts2' => $ayEndTs
+            ':ayid_add1' => $workingYearId,
+            ':ayid_add2' => $workingYearId
         ]);
         $additional = $stmtAdditional->fetchAll(PDO::FETCH_ASSOC);
 
