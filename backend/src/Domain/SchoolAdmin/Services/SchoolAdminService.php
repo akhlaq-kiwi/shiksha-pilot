@@ -9751,14 +9751,7 @@ class SchoolAdminService extends BaseService
             JOIN students s ON fp.student_id = s.id
             WHERE fp.school_id = :sid 
               AND fp.status IN ('PAID', 'Partial')
-              AND (
-                fp.academic_year_id = :ayid_fp
-                OR s.academic_year_id = :ayid_stu
-                OR (
-                  fp.created_at >= (SELECT created_at FROM academic_years WHERE id = :ayid_2 LIMIT 1)
-                  AND (s.status = 'Inactive' OR s.status = 'Alumni' OR s.status = 'Archived')
-                )
-              )
+              AND fp.academic_year_id = :ayid_fp
               AND (
                 (fp.payment_date IS NOT NULL AND fp.payment_date >= :from_date AND fp.payment_date <= :to_date)
                 OR (fp.payment_date IS NULL AND fp.created_at >= :from_ts AND fp.created_at <= :to_ts)
@@ -9767,8 +9760,6 @@ class SchoolAdminService extends BaseService
         $stmtFees->execute([
             ':sid' => $schoolId,
             ':ayid_fp' => $workingYear['id'],
-            ':ayid_stu' => $workingYear['id'],
-            ':ayid_2' => $workingYear['id'],
             ':from_date' => $from,
             ':to_date' => $to,
             ':from_ts' => $fromTs,
@@ -9785,12 +9776,19 @@ class SchoolAdminService extends BaseService
             JOIN students s ON afp.student_id = s.id
             WHERE afp.school_id = :sid 
               AND (
+                afph.academic_year_id = :ayid1 
+                OR (afph.academic_year_id IS NULL AND (aft.academic_year_id = :ayid2 OR s.academic_year_id = :ayid3))
+              )
+              AND (
                 (afph.payment_date IS NOT NULL AND afph.payment_date >= :from_date AND afph.payment_date <= :to_date)
                 OR (afph.payment_date IS NULL AND afph.created_at >= :from_ts AND afph.created_at <= :to_ts)
               )
         ");
         $stmtAddFees->execute([
             ':sid' => $schoolId,
+            ':ayid1' => $workingYear['id'],
+            ':ayid2' => $workingYear['id'],
+            ':ayid3' => $workingYear['id'],
             ':from_date' => $from,
             ':to_date' => $to,
             ':from_ts' => $fromTs,
@@ -9956,13 +9954,12 @@ class SchoolAdminService extends BaseService
                     FROM fee_payments fp
                     JOIN students s ON fp.student_id = s.id
                     WHERE fp.school_id = :sid AND fp.status IN ('PAID', 'Partial')
-                      AND (fp.academic_year_id = :ayid_fp OR s.academic_year_id = :ayid_stu)
+                      AND fp.academic_year_id = :ayid_fp
                       AND fp.payment_date >= :fdate AND fp.payment_date <= :tdate
                 ");
                 $stmtFees->execute([
                     ':sid' => $schoolId,
                     ':ayid_fp' => $workingYear['id'],
-                    ':ayid_stu' => $workingYear['id'],
                     ':fdate' => $currentMonthStart,
                     ':tdate' => $targetToDate
                 ]);
@@ -9973,7 +9970,12 @@ class SchoolAdminService extends BaseService
                     FROM additional_fee_payment_history afph
                     JOIN additional_fee_payments afp ON afph.payment_id = afp.id
                     JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+                    JOIN students s ON afp.student_id = s.id
                     WHERE afp.school_id = :sid 
+                      AND (
+                        afph.academic_year_id = :ayid1 
+                        OR (afph.academic_year_id IS NULL AND (aft.academic_year_id = :ayid2 OR s.academic_year_id = :ayid3))
+                      )
                       AND (
                         (afph.payment_date IS NOT NULL AND afph.payment_date >= :fdate1 AND afph.payment_date <= :tdate1)
                         OR (afph.payment_date IS NULL AND DATE(afph.created_at) >= :fdate2 AND DATE(afph.created_at) <= :tdate2)
@@ -9981,6 +9983,9 @@ class SchoolAdminService extends BaseService
                 ");
                 $stmtAddFees->execute([
                     ':sid' => $schoolId,
+                    ':ayid1' => $workingYear['id'],
+                    ':ayid2' => $workingYear['id'],
+                    ':ayid3' => $workingYear['id'],
                     ':fdate1' => $currentMonthStart,
                     ':tdate1' => $targetToDate,
                     ':fdate2' => $currentMonthStart,
@@ -10242,7 +10247,7 @@ class SchoolAdminService extends BaseService
         $ayClause = "";
         $paramsFee = [':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts];
         if ($targetAYId > 0) {
-            $ayClause = " AND (fp.academic_year_id = :target_ayid OR s.academic_year_id = :target_ayid OR (s.status IN ('Inactive', 'Alumni', 'Archived')))";
+            $ayClause = " AND fp.academic_year_id = :target_ayid";
             $paramsFee[':target_ayid'] = $targetAYId;
         }
 
@@ -10277,7 +10282,7 @@ class SchoolAdminService extends BaseService
         $ayClauseAdd = "";
         $paramsAdd = [':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts];
         if ($targetAYId > 0) {
-            $ayClauseAdd = " AND (aft.academic_year_id = :target_ayid OR s.academic_year_id = :target_ayid OR aft.academic_year_id IS NULL OR (s.status IN ('Inactive', 'Alumni', 'Archived')))";
+            $ayClauseAdd = " AND (afph.academic_year_id = :target_ayid OR (afph.academic_year_id IS NULL AND (aft.academic_year_id = :target_ayid OR s.academic_year_id = :target_ayid)))";
             $paramsAdd[':target_ayid'] = $targetAYId;
         }
 
