@@ -4572,6 +4572,15 @@ class SchoolAdminService extends BaseService
             $stmtUpdateNewStatus = $pdo->prepare("UPDATE academic_years SET is_current = 1, status = 'ACTIVE' WHERE id = :id AND school_id = :sid");
             $stmtUpdateNewStatus->execute([':id' => $newYearId, ':sid' => $schoolId]);
 
+            // Re-sync fee_payments for students enrolled in this newly active year
+            $stmtSyncDraftPayments = $pdo->prepare("
+                UPDATE fee_payments fp
+                JOIN students s ON fp.student_id = s.id
+                SET fp.academic_year_id = :new_ayid
+                WHERE fp.school_id = :sid AND s.academic_year_id = :new_ayid
+            ");
+            $stmtSyncDraftPayments->execute([':sid' => $schoolId, ':new_ayid' => $newYearId]);
+
             // Record required audit entries
             $stmtAuditLog = $pdo->prepare("
                 INSERT INTO audit_logs (action, target_school, user, ip_address)
@@ -7215,13 +7224,11 @@ class SchoolAdminService extends BaseService
             SELECT fee_month, COALESCE(SUM(amount_paid + COALESCE(discount_amount, 0)), 0) AS total_paid 
             FROM fee_payments 
             WHERE student_id = :student_id 
-              AND (academic_year_id = :ayid OR academic_year_id = :ayid_stu OR academic_year_id IS NULL)
+              AND status IN ('PAID', 'Partial')
             GROUP BY fee_month
         ");
         $stmtExistingPaid->execute([
-            ':student_id' => $studentId, 
-            ':ayid' => $paymentAcademicYearId,
-            ':ayid_stu' => $academicYearId
+            ':student_id' => $studentId
         ]);
         $existingPaidRows = $stmtExistingPaid->fetchAll(PDO::FETCH_ASSOC);
 
@@ -7424,7 +7431,8 @@ class SchoolAdminService extends BaseService
         $adminUserPhone = $adminUserData['phone'] ?? '';
         $adminUserName = $adminUserData['name'] ?? '';
 
-        $ayStart = !empty($workingYear['start_date']) ? $workingYear['start_date'] : '1970-01-01';
+        $isActiveAy = ($workingYear && (strtoupper($workingYear['status'] ?? '') === 'ACTIVE' || !empty($workingYear['is_current'])));
+        $ayStart = (!$isActiveAy && !empty($workingYear['start_date'])) ? $workingYear['start_date'] : '1970-01-01';
         $ayEnd = !empty($workingYear['end_date']) ? $workingYear['end_date'] : '2099-12-31';
         $ayStartTs = $ayStart . ' 00:00:00';
         $ayEndTs = $ayEnd . ' 23:59:59';
