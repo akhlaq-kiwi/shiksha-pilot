@@ -28,10 +28,11 @@ export default function CollectionHistoryPage() {
     total: 0,
     pages: 1
   });
-  const [availableMonths, setAvailableMonths] = useState([]);
+  const defaultPeriods = ['All Periods', '3 Months', '6 Months', '9 Months', '12 Months', '15 Months', '18 Months', '21 Months', '24 Months'];
+  const [availablePeriods, setAvailablePeriods] = useState(defaultPeriods);
   const [availableCollectors, setAvailableCollectors] = useState([]);
   
-  const [selectedMonth, setSelectedMonth] = useState('All Months');
+  const [selectedPeriod, setSelectedPeriod] = useState('All Periods');
   const [selectedCollector, setSelectedCollector] = useState('All Users');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -63,7 +64,8 @@ export default function CollectionHistoryPage() {
     
     try {
       const response = await schoolService.getCollectionHistory({
-        month: selectedMonth,
+        period: selectedPeriod,
+        month: selectedPeriod,
         deposit_by: selectedCollector,
         search: debouncedSearch,
         page: isInitial ? 1 : page,
@@ -97,8 +99,11 @@ export default function CollectionHistoryPage() {
       };
       setPagination(p);
       
-      if (response.available_months && response.available_months.length > 0) {
-        setAvailableMonths(response.available_months);
+      const periodsList = response.available_periods || response.available_months || [];
+      if (periodsList.length > 0) {
+        setAvailablePeriods(periodsList);
+      } else {
+        setAvailablePeriods(defaultPeriods);
       }
 
       if (response.available_collectors && response.available_collectors.length > 0) {
@@ -131,7 +136,7 @@ export default function CollectionHistoryPage() {
     } else {
       loadHistory(true);
     }
-  }, [selectedMonth, selectedCollector, debouncedSearch]);
+  }, [selectedPeriod, selectedCollector, debouncedSearch]);
 
   // Page index changes: fetch more records
   useEffect(() => {
@@ -212,15 +217,11 @@ export default function CollectionHistoryPage() {
     setViewingReceipt(receipt);
   };
 
-  const getDynamicMonthCardTitle = () => {
-    if (selectedMonth === 'All Months') {
-      return 'ALL MONTHS';
+  const getDynamicPeriodCardTitle = () => {
+    if (!selectedPeriod || selectedPeriod === 'All Periods' || selectedPeriod === 'All Months') {
+      return 'ALL PERIODS';
     }
-    const parts = selectedMonth.split(' ');
-    if (parts.length > 0) {
-      return `${parts[0].toUpperCase()} MONTH`;
-    }
-    return 'THIS MONTH';
+    return selectedPeriod.toUpperCase();
   };
 
   return (
@@ -247,7 +248,7 @@ export default function CollectionHistoryPage() {
         {[
           { label: 'Total Fee Collected', value: `₹${parseFloat(stats.total_collected).toLocaleString('en-IN')}`, icon: Banknote, color: 'text-primary bg-primary/5 border-primary/10' },
           { label: "Today's Collection", value: `₹${parseFloat(stats.today_collection).toLocaleString('en-IN')}`, icon: CheckCircle2, color: 'text-emerald-600 bg-emerald-50 border-emerald-100 dark:bg-emerald-950/20 dark:border-emerald-500/20' },
-          { label: getDynamicMonthCardTitle(), value: `₹${parseFloat(stats.this_month_collection).toLocaleString('en-IN')}`, icon: Calendar, color: 'text-primary bg-primary/10 border-primary/20' },
+          { label: getDynamicPeriodCardTitle(), value: `₹${parseFloat(stats.this_month_collection).toLocaleString('en-IN')}`, icon: Calendar, color: 'text-primary bg-primary/10 border-primary/20' },
           { label: 'Total Transactions', value: stats.total_transactions.toString(), icon: FileText, color: 'text-purple-600 bg-purple-50 border-purple-100 dark:bg-purple-950/20 dark:border-purple-500/20' },
         ].map((c, i) => {
           const Icon = c.icon;
@@ -304,22 +305,22 @@ export default function CollectionHistoryPage() {
             </select>
           </div>
 
-          {/* Month Selector dropdown */}
+          {/* Period Selector dropdown */}
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <label className="text-xs font-bold text-text-secondary shrink-0 flex items-center gap-1 uppercase tracking-wider">
-              <Calendar className="h-3.5 w-3.5 text-text-muted" /> Filter Month:
+              <Calendar className="h-3.5 w-3.5 text-text-muted" /> Filter Period:
             </label>
             <select
-              value={selectedMonth}
+              value={selectedPeriod}
               onChange={(e) => {
-                setSelectedMonth(e.target.value);
+                setSelectedPeriod(e.target.value);
                 setPage(1);
               }}
               className="w-full sm:w-44 rounded-xl border border-border bg-surface text-text-primary px-3 py-2 text-xs font-bold focus:border-primary focus:ring-primary outline-none h-10 cursor-pointer"
             >
-              {availableMonths.map((m) => (
-                <option key={m} value={m}>
-                  {m}
+              {(availablePeriods.length > 0 ? availablePeriods : defaultPeriods).map((p) => (
+                <option key={p} value={p}>
+                  {p}
                 </option>
               ))}
             </select>
@@ -510,6 +511,12 @@ export default function CollectionHistoryPage() {
           schoolName={schoolProfile?.name}
           schoolLogoUrl={schoolProfile?.logo_url}
           allPayments={transactions.map(t => ({
+            ...t,
+            is_additional: t.type === 'additional',
+            amount_paid: t.amount_paid !== undefined ? t.amount_paid : t.amount,
+            discount_amount: t.discount_amount || 0
+          }))}
+          additionalFeePayments={transactions.map(t => ({
             ...t,
             is_additional: t.type === 'additional',
             amount_paid: t.amount_paid !== undefined ? t.amount_paid : t.amount,

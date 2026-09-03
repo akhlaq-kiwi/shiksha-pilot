@@ -170,12 +170,15 @@ export default function FinancePage() {
     }
   });
 
-  // Group class fee configs by class ID
+  // Group class fee configs by academic_year_id and class_id
   const feeConfigMap = {};
   classFeeConfigs.forEach(cfg => {
     try {
+      const ayId = cfg.academic_year_id ? parseInt(cfg.academic_year_id, 10) : 0;
+      const cId = cfg.class_id ? parseInt(cfg.class_id, 10) : 0;
+      const key = `${ayId}_${cId}`;
       const monthlyFees = typeof cfg.monthly_fees === 'string' ? JSON.parse(cfg.monthly_fees) : cfg.monthly_fees;
-      feeConfigMap[cfg.class_id] = monthlyFees;
+      feeConfigMap[key] = monthlyFees;
     } catch (e) {
       console.error('Failed parsing monthly fees JSON config', e);
     }
@@ -217,7 +220,10 @@ export default function FinancePage() {
     const paidMonths = paidMonthsList
       .filter(p => parseInt(p.academic_year_id, 10) === parseInt(student.academic_year_id, 10))
       .map(p => p.fee_month);
-    const monthlyFees = feeConfigMap[student.class_id] || {};
+    const studentAyId = student.academic_year_id ? parseInt(student.academic_year_id, 10) : 0;
+    const studentClassId = student.class_id ? parseInt(student.class_id, 10) : 0;
+    const configKey = `${studentAyId}_${studentClassId}`;
+    const monthlyFees = feeConfigMap[configKey] || {};
     
     // Check if monthly fees are configured at all
     const hasConfiguredFees = Object.keys(monthlyFees).length > 0 && Object.values(monthlyFees).some(v => parseFloat(v) > 0);

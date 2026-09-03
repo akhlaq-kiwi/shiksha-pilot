@@ -1940,6 +1940,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
           schoolName={schoolProfile?.name}
           schoolLogoUrl={schoolProfile?.logo_path}
           allPayments={fee_summary.payments}
+          additionalFeePayments={data?.additional_fee_payments || fee_summary.additional_fees}
           onClose={() => setViewingReceipt(null)} 
         />
       )}

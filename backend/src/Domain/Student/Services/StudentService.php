@@ -865,7 +865,7 @@ class StudentService extends BaseService
 
         // 1. Fetch class fee config
         if ($academicYearId > 0) {
-            $stmtCfg = $pdo->prepare("SELECT * FROM class_fee_configurations WHERE school_id = :sid AND class_id = :cid AND (academic_year_id = :ayid OR academic_year_id IS NULL) LIMIT 1");
+            $stmtCfg = $pdo->prepare("SELECT * FROM class_fee_configurations WHERE school_id = :sid AND class_id = :cid AND academic_year_id = :ayid LIMIT 1");
             $stmtCfg->execute([':sid' => $schoolId, ':cid' => $classId, ':ayid' => $academicYearId]);
         } else {
             $stmtCfg = $pdo->prepare("SELECT * FROM class_fee_configurations WHERE school_id = :sid AND class_id = :cid LIMIT 1");
@@ -879,7 +879,7 @@ class StudentService extends BaseService
                     FROM class_fee_configurations cfg
                     JOIN classes c1 ON cfg.class_id = c1.id
                     JOIN classes c2 ON c1.name COLLATE utf8mb4_unicode_ci = c2.name COLLATE utf8mb4_unicode_ci AND c1.school_id = c2.school_id
-                    WHERE cfg.school_id = :sid AND c2.id = :cid AND (cfg.academic_year_id = :ayid OR cfg.academic_year_id IS NULL)
+                    WHERE cfg.school_id = :sid AND c2.id = :cid AND cfg.academic_year_id = :ayid
                     LIMIT 1
                 ");
                 $stmtFallback->execute([':sid' => $schoolId, ':cid' => $classId, ':ayid' => $academicYearId]);
