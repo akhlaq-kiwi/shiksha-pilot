@@ -480,18 +480,17 @@ class SchoolAdminService extends BaseService
                 JOIN additional_fee_payments afp ON afph.payment_id = afp.id
                 JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
                 JOIN students s ON afp.student_id = s.id
-                LEFT JOIN academic_years ay_fee ON aft.academic_year_id = ay_fee.id
                 WHERE afp.school_id = :school_id 
                   AND (
-                    aft.academic_year_id = :ayid1 
-                    OR s.academic_year_id = :ayid2
-                    OR (UPPER(COALESCE(ay_fee.status, '')) = 'DRAFT')
+                    afph.academic_year_id = :ayid1 
+                    OR (afph.academic_year_id IS NULL AND (aft.academic_year_id = :ayid2 OR s.academic_year_id = :ayid3))
                   )
             ");
             $stmtAddFeeChart->execute([
                 ':school_id' => $schoolId,
                 ':ayid1' => $activeYear['id'],
-                ':ayid2' => $activeYear['id']
+                ':ayid2' => $activeYear['id'],
+                ':ayid3' => $activeYear['id']
             ]);
             while ($row = $stmtAddFeeChart->fetch(\PDO::FETCH_ASSOC)) {
                 $amt = (float)($row['amount'] ?? 0);
@@ -4570,15 +4569,6 @@ class SchoolAdminService extends BaseService
             $stmtUpdateNewStatus = $pdo->prepare("UPDATE academic_years SET is_current = 1, status = 'ACTIVE' WHERE id = :id AND school_id = :sid");
             $stmtUpdateNewStatus->execute([':id' => $newYearId, ':sid' => $schoolId]);
 
-            // Re-sync fee_payments for students enrolled in this newly active year
-            $stmtSyncDraftPayments = $pdo->prepare("
-                UPDATE fee_payments fp
-                JOIN students s ON fp.student_id = s.id
-                SET fp.academic_year_id = :new_ayid
-                WHERE fp.school_id = :sid AND s.academic_year_id = :new_ayid
-            ");
-            $stmtSyncDraftPayments->execute([':sid' => $schoolId, ':new_ayid' => $newYearId]);
-
             // Record required audit entries
             $stmtAuditLog = $pdo->prepare("
                 INSERT INTO audit_logs (action, target_school, user, ip_address)
@@ -7381,8 +7371,14 @@ class SchoolAdminService extends BaseService
 
     private function ensureDiscountAndPartialSchema(PDO $pdo): void
     {
-        // Schema and historical data self-healing is performed in database migrations (020 & 021)
-        return;
+        try {
+            $stmtCheckCol = $pdo->query("SHOW COLUMNS FROM additional_fee_payment_history LIKE 'academic_year_id'");
+            if ($stmtCheckCol->rowCount() === 0) {
+                $pdo->exec("ALTER TABLE additional_fee_payment_history ADD COLUMN academic_year_id INT NULL");
+            }
+        } catch (\Throwable $ex) {
+            // Ignore if column exists
+        }
     }
 
     public function getCollectionHistory(array $user, array $params = []): array
@@ -7523,16 +7519,15 @@ class SchoolAdminService extends BaseService
             LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = afph.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = afp.school_id)
             WHERE afp.school_id = :school_id
               AND (
-                aft.academic_year_id = :ayid_add1 
-                OR s.academic_year_id = :ayid_add2
-                OR (:is_curr = 1 AND UPPER(COALESCE(pay_ay.status, '')) = 'DRAFT')
+                afph.academic_year_id = :ayid_add1 
+                OR (afph.academic_year_id IS NULL AND (aft.academic_year_id = :ayid_add2 OR s.academic_year_id = :ayid_add3))
               )
         ");
         $stmtAdditional->execute([
             ':school_id' => $schoolId,
             ':ayid_add1' => $workingYearId,
             ':ayid_add2' => $workingYearId,
-            ':is_curr' => $isCurrentAy ? 1 : 0
+            ':ayid_add3' => $workingYearId
         ]);
         $additional = $stmtAdditional->fetchAll(PDO::FETCH_ASSOC);
 
@@ -12254,12 +12249,20 @@ Only approve the settlement after reviewing all financial records.
             ':amount_paid' => $updatedAmountPaid
         ]);
 
+        $stmtActiveAy = $pdo->prepare("SELECT id FROM academic_years WHERE school_id = :sid AND (is_current = 1 OR UPPER(status) = 'ACTIVE') ORDER BY is_current DESC, id DESC LIMIT 1");
+        $stmtActiveAy->execute([':sid' => $schoolId]);
+        $historyAyId = (int)($stmtActiveAy->fetchColumn() ?: 0);
+        if ($historyAyId <= 0) {
+            $historyAyId = (int)($info['student_ay_id'] ?? 0);
+        }
+
         try {
+            $this->ensureDiscountAndPartialSchema($pdo);
             $stmtInsHistory = $pdo->prepare("
                 INSERT INTO additional_fee_payment_history 
-                (payment_id, school_id, student_id, amount_paid, discount_amount, payment_method, collected_by, receipt_no, payment_date, created_at)
+                (payment_id, school_id, student_id, amount_paid, discount_amount, payment_method, collected_by, receipt_no, payment_date, academic_year_id, created_at)
                 VALUES 
-                (:pid, :sid, :stid, :amt, :disc, :pmethod, :cby, :rno, :pdate, NOW())
+                (:pid, :sid, :stid, :amt, :disc, :pmethod, :cby, :rno, :pdate, :ayid, NOW())
             ");
             $stmtInsHistory->execute([
                 ':pid' => $id,
@@ -12270,7 +12273,8 @@ Only approve the settlement after reviewing all financial records.
                 ':pmethod' => $paymentMethod,
                 ':cby' => $collectedBy,
                 ':rno' => $receiptNo,
-                ':pdate' => $paymentDate
+                ':pdate' => $paymentDate,
+                ':ayid' => $historyAyId
             ]);
         } catch (\Throwable $e) {}
 

@@ -88,19 +88,17 @@ class FeeRepository extends BaseRepository
                 JOIN additional_fee_payments afp ON afph.payment_id = afp.id
                 JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
                 JOIN students s ON afp.student_id = s.id
-                LEFT JOIN academic_years ay_fee ON aft.academic_year_id = ay_fee.id
                 WHERE afp.school_id = :sid
                   AND (
-                    aft.academic_year_id = :ayid1 
-                    OR s.academic_year_id = :ayid2
-                    OR (:is_curr = 1 AND UPPER(COALESCE(ay_fee.status, '')) = 'DRAFT')
+                    afph.academic_year_id = :ayid1 
+                    OR (afph.academic_year_id IS NULL AND (aft.academic_year_id = :ayid2 OR s.academic_year_id = :ayid3))
                   )
             ");
             $stmtAdd->execute([
                 ':sid' => $schoolId,
                 ':ayid1' => $academicYearId,
                 ':ayid2' => $academicYearId,
-                ':is_curr' => $isCurrent
+                ':ayid3' => $academicYearId
             ]);
             $additionalCollected = (float)$stmtAdd->fetchColumn();
 
