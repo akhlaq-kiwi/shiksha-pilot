@@ -681,21 +681,42 @@ function AdditionalDepositModal({ student, unpaidFees, initialSelectedIds = [], 
     setSaving(true);
     setError('');
     try {
-      const discApplied = getDiscAmount();
-      const discPerFee = selectedIds.length > 0 ? (discApplied / selectedIds.length) : 0;
+      const totalDiscount = getDiscAmount();
+      let remainingDiscount = totalDiscount;
 
-      await Promise.all(selectedIds.map(id => {
+      const now = new Date();
+      const timestamp = 'REC' + now.getFullYear().toString() +
+        String(now.getMonth() + 1).padStart(2, '0') +
+        String(now.getDate()).padStart(2, '0') +
+        String(now.getHours()).padStart(2, '0') +
+        String(now.getMinutes()).padStart(2, '0') +
+        String(now.getSeconds()).padStart(2, '0') +
+        String(Math.floor(100 + Math.random() * 900));
+      const sharedReceiptNo = timestamp;
+
+      for (let i = 0; i < selectedIds.length; i++) {
+        const id = selectedIds[i];
         const fee = unpaidFees.find(f => f.id === id);
         const remaining = getFeeRemaining(fee);
         const userTypedAmt = isSingleFee ? (parseFloat(depositAmounts[id]) || remaining) : remaining;
-        const feeDisc = isSingleFee ? discApplied : discPerFee;
+
+        let feeDisc = 0;
+        if (isSingleFee) {
+          feeDisc = Math.min(totalDiscount, userTypedAmt);
+        } else {
+          feeDisc = Math.min(remainingDiscount, userTypedAmt);
+          remainingDiscount -= feeDisc;
+        }
+
         const netCashPaid = Math.max(0, userTypedAmt - feeDisc);
-        return schoolService.collectAdditionalFeePayment(id, { 
+
+        await schoolService.collectAdditionalFeePayment(id, { 
           payment_method: paymentMethod,
           amount_paid: netCashPaid,
-          discount_amount: feeDisc
+          discount_amount: feeDisc,
+          receipt_no: sharedReceiptNo
         });
-      }));
+      }
       window.dispatchEvent(new Event('fee-payment-updated'));
       onSave();
     } catch (err) {
