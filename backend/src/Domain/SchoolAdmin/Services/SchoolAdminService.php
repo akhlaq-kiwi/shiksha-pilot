@@ -9688,6 +9688,17 @@ class SchoolAdminService extends BaseService
             ];
         }
 
+        $isDraftYear = isset($workingYear['status']) && strtoupper($workingYear['status']) === 'DRAFT';
+        if ($isDraftYear) {
+            return [
+                'from_date' => !empty($from) ? $from : ($workingYear['start_date'] ?? date('Y-m-01')),
+                'to_date' => !empty($to) ? $to : date('Y-m-d'),
+                'fees_collected' => 0.0,
+                'salary_paid' => 0.0,
+                'profit_loss' => 0.0
+            ];
+        }
+
         $latestReport = null;
         $stmtLatest = $pdo->prepare("
             SELECT * FROM financial_reports 
@@ -9724,7 +9735,8 @@ class SchoolAdminService extends BaseService
             WHERE fp.school_id = :sid 
               AND fp.status IN ('PAID', 'Partial')
               AND (
-                s.academic_year_id = :ayid
+                fp.academic_year_id = :ayid_fp
+                OR s.academic_year_id = :ayid_stu
                 OR (
                   fp.created_at >= (SELECT created_at FROM academic_years WHERE id = :ayid_2 LIMIT 1)
                   AND (s.status = 'Inactive' OR s.status = 'Alumni' OR s.status = 'Archived')
@@ -9737,7 +9749,8 @@ class SchoolAdminService extends BaseService
         ");
         $stmtFees->execute([
             ':sid' => $schoolId,
-            ':ayid' => $workingYear['id'],
+            ':ayid_fp' => $workingYear['id'],
+            ':ayid_stu' => $workingYear['id'],
             ':ayid_2' => $workingYear['id'],
             ':from_date' => $from,
             ':to_date' => $to,
@@ -9847,6 +9860,9 @@ class SchoolAdminService extends BaseService
     {
         if (!$workingYear) return;
 
+        $isDraftYear = isset($workingYear['status']) && strtoupper($workingYear['status']) === 'DRAFT';
+        if ($isDraftYear) return;
+
         // Clean up invalid multi-month reports spanning across different calendar months
         $stmtBad = $pdo->prepare("
             SELECT id, `from_date`, `to_date` FROM financial_reports 
@@ -9899,15 +9915,17 @@ class SchoolAdminService extends BaseService
 
             if (!$exists) {
                 $stmtFees = $pdo->prepare("
-                    SELECT COALESCE(SUM(amount_paid), 0) 
-                    FROM fee_payments 
-                    WHERE school_id = :sid AND status IN ('PAID', 'Partial')
-                      AND academic_year_id = :ayid
-                      AND payment_date >= :fdate AND payment_date <= :tdate
+                    SELECT COALESCE(SUM(fp.amount_paid), 0) 
+                    FROM fee_payments fp
+                    JOIN students s ON fp.student_id = s.id
+                    WHERE fp.school_id = :sid AND fp.status IN ('PAID', 'Partial')
+                      AND (fp.academic_year_id = :ayid_fp OR s.academic_year_id = :ayid_stu)
+                      AND fp.payment_date >= :fdate AND fp.payment_date <= :tdate
                 ");
                 $stmtFees->execute([
                     ':sid' => $schoolId,
-                    ':ayid' => $workingYear['id'],
+                    ':ayid_fp' => $workingYear['id'],
+                    ':ayid_stu' => $workingYear['id'],
                     ':fdate' => $currentMonthStart,
                     ':tdate' => $targetToDate
                 ]);
@@ -9999,6 +10017,15 @@ class SchoolAdminService extends BaseService
         $pdo = $this->financialReportRepo->getPdo();
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
 
+        $isDraftYear = isset($workingYear['status']) && strtoupper($workingYear['status']) === 'DRAFT';
+        if ($isDraftYear) {
+            return [
+                'reports' => [],
+                'next_suggested_start_date' => $workingYear['start_date'] ?? date('Y-m-d'),
+                'has_previous_report' => false
+            ];
+        }
+
         $this->autoGenerateCompletedMonthlyReports($pdo, $schoolId, $workingYear);
 
         // 1. Fetch generated reports (filtered by selected Academic Year)
@@ -10074,6 +10101,11 @@ class SchoolAdminService extends BaseService
     {
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->financialReportRepo->getPdo();
+        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+
+        if ($workingYear && isset($workingYear['status']) && strtoupper($workingYear['status']) === 'DRAFT') {
+            throw new ValidationException(['fields' => 'Financial reports cannot be created for a Draft academic year.']);
+        }
 
         if (empty($data['from_date']) || empty($data['to_date'])) {
             throw new ValidationException(['from_date' => 'From date and To date are required.']);
