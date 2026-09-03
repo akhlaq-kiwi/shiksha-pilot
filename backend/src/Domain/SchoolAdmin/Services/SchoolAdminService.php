@@ -16410,20 +16410,18 @@ Only approve the settlement after reviewing all financial records.
             $monthlyFees = json_decode($cfgRow['monthly_fees'], true);
         }
 
-        // Fetch paid amounts per month for this student in this academic year (including partial payments)
+        // Fetch paid amounts per month for this student (including partial payments)
         $stmtPaid = $pdo->prepare("
             SELECT fee_month, COALESCE(SUM(amount_paid + COALESCE(discount_amount, 0)), 0) AS total_paid 
             FROM fee_payments 
             WHERE student_id = :student_id 
               AND school_id = :school_id 
-              AND (academic_year_id = :academic_year_id OR academic_year_id IS NULL)
               AND UPPER(status) IN ('PAID', 'PARTIAL', 'COMPLETED')
             GROUP BY fee_month
         ");
         $stmtPaid->execute([
             ':student_id' => $studentId,
-            ':school_id' => $schoolId,
-            ':academic_year_id' => $academicYearId
+            ':school_id' => $schoolId
         ]);
         $paidRows = $stmtPaid->fetchAll(PDO::FETCH_ASSOC) ?: [];
         $paidByMonth = [];
