@@ -7203,10 +7203,14 @@ class SchoolAdminService extends BaseService
             SELECT fee_month, COALESCE(SUM(amount_paid + COALESCE(discount_amount, 0)), 0) AS total_paid 
             FROM fee_payments 
             WHERE student_id = :student_id 
-              AND (academic_year_id = :ayid OR academic_year_id IS NULL)
+              AND (academic_year_id = :ayid OR academic_year_id = :ayid_stu OR academic_year_id IS NULL)
             GROUP BY fee_month
         ");
-        $stmtExistingPaid->execute([':student_id' => $studentId, ':ayid' => $paymentAcademicYearId]);
+        $stmtExistingPaid->execute([
+            ':student_id' => $studentId, 
+            ':ayid' => $paymentAcademicYearId,
+            ':ayid_stu' => $academicYearId
+        ]);
         $existingPaidRows = $stmtExistingPaid->fetchAll(PDO::FETCH_ASSOC);
 
         $existingPaidByMonth = [];
@@ -7445,11 +7449,12 @@ class SchoolAdminService extends BaseService
             LEFT JOIN academic_years pay_ay ON fp.academic_year_id = pay_ay.id
             LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = fp.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = fp.school_id)
             WHERE fp.school_id = :school_id AND fp.status IN ('PAID', 'Partial')
-              AND fp.academic_year_id = :ayid_fee
+              AND (fp.academic_year_id = :ayid_fee1 OR s.academic_year_id = :ayid_fee2)
         ");
         $stmtMonthly->execute([
             ':school_id' => $schoolId,
-            ':ayid_fee' => $workingYearId
+            ':ayid_fee1' => $workingYearId,
+            ':ayid_fee2' => $workingYearId
         ]);
         $monthly = $stmtMonthly->fetchAll(PDO::FETCH_ASSOC);
 
@@ -7495,7 +7500,7 @@ class SchoolAdminService extends BaseService
             LEFT JOIN academic_years pay_ay ON aft.academic_year_id = pay_ay.id
             LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = afph.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = afp.school_id)
             WHERE afp.school_id = :school_id
-              AND (afp.academic_year_id = :ayid_fee OR aft.academic_year_id = :ayid_fee)
+              AND (aft.academic_year_id = :ayid_fee OR aft.academic_year_id IS NULL)
         ");
         $stmtAdditional->execute([
             ':school_id' => $schoolId,
@@ -9844,15 +9849,25 @@ class SchoolAdminService extends BaseService
 
         // Clean up invalid multi-month reports spanning across different calendar months
         $stmtBad = $pdo->prepare("
-            SELECT id FROM financial_reports 
-            WHERE school_id = :sid 
-              AND DATE_FORMAT(from_date, '%Y-%m') != DATE_FORMAT(to_date, '%Y-%m')
+            SELECT id, `from_date`, `to_date` FROM financial_reports 
+            WHERE school_id = :sid
         ");
         $stmtBad->execute([':sid' => $schoolId]);
-        $badIds = $stmtBad->fetchAll(PDO::FETCH_COLUMN);
+        $allReports = $stmtBad->fetchAll(PDO::FETCH_ASSOC);
+        $badIds = [];
+        foreach ($allReports as $rRep) {
+            $fMonth = date('Y-m', strtotime($rRep['from_date']));
+            $tMonth = date('Y-m', strtotime($rRep['to_date']));
+            if ($fMonth !== $tMonth) {
+                $badIds[] = (int)$rRep['id'];
+            }
+        }
+        $badIds = array_filter(array_map('intval', $badIds));
         if (!empty($badIds)) {
-            $inClause = implode(',', array_map('intval', $badIds));
-            $pdo->exec("DELETE FROM financial_reports WHERE id IN ($inClause) AND school_id = $schoolId");
+            $inClause = implode(',', array_unique($badIds));
+            if (!empty($inClause)) {
+                $pdo->exec("DELETE FROM financial_reports WHERE id IN ($inClause) AND school_id = $schoolId");
+            }
         }
 
         $ayStart = $workingYear['start_date'];
