@@ -7564,13 +7564,6 @@ class SchoolAdminService extends BaseService
                 $t['display_collector_name'] = $cName;
             }
 
-            if (!empty($t['student_ay_id']) && (int)$t['student_ay_id'] !== $workingYearId && !empty($t['student_ay_name'])) {
-                if ($t['type'] === 'additional') {
-                    $t['fee_name'] = $t['fee_name'] . " (Dues for " . $t['student_ay_name'] . ")";
-                } else {
-                    $t['fee_name'] = $t['fee_name'] . " [Dues for " . $t['student_ay_name'] . "]";
-                }
-            }
             if (empty($t['receipt_no'])) {
                 if ($t['type'] === 'additional') {
                     $t['receipt_no'] = 'AFP-' . str_pad((string)$t['id'], 5, '0', STR_PAD_LEFT);
@@ -7578,9 +7571,74 @@ class SchoolAdminService extends BaseService
                     $t['receipt_no'] = 'REC-' . str_pad((string)$t['id'], 5, '0', STR_PAD_LEFT);
                 }
             }
+            $t['raw_receipt_no'] = trim($t['receipt_no']);
 
-            // Clean up receipt_no to be exactly 12 numeric digits
-            $cleanRef = preg_replace('/\D/', '', $t['receipt_no']);
+            return $t;
+        }, $merged);
+
+        // Group by raw_receipt_no (combining multi-month tuition payments and multi additional fee payments into 1 single transaction row)
+        $groups = [];
+        foreach ($merged as $t) {
+            $rNo = $t['raw_receipt_no'];
+            if (!isset($groups[$rNo])) {
+                $groups[$rNo] = $t;
+                $groups[$rNo]['items_list'] = [$t];
+            } else {
+                $groups[$rNo]['items_list'][] = $t;
+                $groups[$rNo]['amount'] += (float)$t['amount'];
+                $groups[$rNo]['amount_paid'] += (float)$t['amount_paid'];
+                $groups[$rNo]['discount_amount'] = (float)($groups[$rNo]['discount_amount'] ?? 0.0) + (float)($t['discount_amount'] ?? 0.0);
+            }
+        }
+
+        // Now re-process grouped transactions to build fee_name and clean up items
+        $mergedGrouped = [];
+        $academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+        
+        foreach ($groups as $rNo => $t) {
+            $items = $t['items_list'] ?? [$t];
+            $types = array_values(array_unique(array_column($items, 'type')));
+
+            if (count($types) === 1 && $types[0] === 'monthly') {
+                $months = array_values(array_unique(array_filter(array_column($items, 'fee_month'))));
+                usort($months, function($a, $b) use ($academicMonths) {
+                    $idxA = array_search($a, $academicMonths, true);
+                    $idxB = array_search($b, $academicMonths, true);
+                    return ($idxA === false ? 99 : $idxA) - ($idxB === false ? 99 : $idxB);
+                });
+
+                if (count($months) > 1) {
+                    $firstMonth = $months[0];
+                    $lastMonth = $months[count($months) - 1];
+                    $t['fee_name'] = "$firstMonth to $lastMonth";
+                    $t['fee_month'] = implode(', ', $months);
+                } elseif (count($months) === 1) {
+                    $t['fee_name'] = "Monthly Fee (" . $months[0] . ")";
+                    $t['fee_month'] = $months[0];
+                }
+            } elseif (count($types) === 1 && $types[0] === 'additional') {
+                $names = array_values(array_unique(array_filter(array_column($items, 'fee_name'))));
+                $t['fee_name'] = implode(', ', $names);
+            } else {
+                $names = array_values(array_unique(array_filter(array_column($items, 'fee_name'))));
+                $t['fee_name'] = implode(', ', $names);
+            }
+
+            // Append Dues for Academic Year name if student enrolled year differs from working year
+            if (!empty($t['student_ay_id']) && (int)$t['student_ay_id'] !== $workingYearId && !empty($t['student_ay_name'])) {
+                if ($t['type'] === 'additional') {
+                    $t['fee_name'] = $t['fee_name'] . " (Dues for " . $t['student_ay_name'] . ")";
+                } else {
+                    $t['fee_name'] = $t['fee_name'] . " [Dues for " . $t['student_ay_name'] . "]";
+                }
+            }
+            // Re-apply the Draft suffix if applicable
+            if (isset($t['academic_year_status']) && strcasecmp($t['academic_year_status'], 'Draft') === 0) {
+                $t['fee_name'] = $t['fee_name'] . ' [Draft Year: ' . ($t['academic_year_name'] ?? '') . ']';
+            }
+
+            // Format clean 12-digit receipt number for display per transaction group
+            $cleanRef = preg_replace('/\D/', '', $t['raw_receipt_no']);
             if ($cleanRef === '') {
                 $cleanRef = (string)$t['id'];
             }
@@ -7605,71 +7663,7 @@ class SchoolAdminService extends BaseService
             }
             $t['receipt_no'] = implode('', $chars);
 
-            return $t;
-        }, $merged);
-
-        // Group by receipt_no (combining multi-month tuition payments into one transaction row)
-        $groups = [];
-        foreach ($merged as $t) {
-            $rNo = $t['receipt_no'];
-            if (!isset($groups[$rNo])) {
-                $groups[$rNo] = $t;
-                $groups[$rNo]['months_list'] = [];
-                if ($t['type'] === 'monthly' && !empty($t['fee_month'])) {
-                    $groups[$rNo]['months_list'][] = $t['fee_month'];
-                }
-            } else {
-                // Add to amount and amount_paid
-                $groups[$rNo]['amount'] += (float)$t['amount'];
-                $groups[$rNo]['amount_paid'] += (float)$t['amount_paid'];
-                $groups[$rNo]['discount_amount'] = (float)($groups[$rNo]['discount_amount'] ?? 0.0) + (float)($t['discount_amount'] ?? 0.0);
-                if ($t['type'] === 'monthly' && !empty($t['fee_month'])) {
-                    $groups[$rNo]['months_list'][] = $t['fee_month'];
-                }
-            }
-        }
-
-        // Now re-process grouped transactions to build fee_name and clean up months_list
-        $mergedGrouped = [];
-        $academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
-        
-        foreach ($groups as $rNo => $t) {
-            if ($t['type'] === 'monthly' && !empty($t['months_list'])) {
-                // Sort months according to academic cycle
-                usort($t['months_list'], function($a, $b) use ($academicMonths) {
-                    $idxA = array_search($a, $academicMonths, true);
-                    $idxB = array_search($b, $academicMonths, true);
-                    return ($idxA === false ? 99 : $idxA) - ($idxB === false ? 99 : $idxB);
-                });
-                
-                // Remove duplicates in months_list
-                $t['months_list'] = array_values(array_unique($t['months_list']));
-                
-                // Generate formatted fee name
-                if (count($t['months_list']) > 1) {
-                    $firstMonth = $t['months_list'][0];
-                    $lastMonth = $t['months_list'][count($t['months_list']) - 1];
-                    $t['fee_name'] = "Monthly Fee ($firstMonth to $lastMonth)";
-                    $t['fee_month'] = implode(', ', $t['months_list']);
-                } else {
-                    $t['fee_name'] = "Monthly Fee (" . $t['months_list'][0] . ")";
-                    $t['fee_month'] = $t['months_list'][0];
-                }
-            }
-
-            // Append Dues for Academic Year name if student enrolled year differs from working year
-            if (!empty($t['student_ay_id']) && (int)$t['student_ay_id'] !== $workingYearId && !empty($t['student_ay_name'])) {
-                if ($t['type'] === 'additional') {
-                    $t['fee_name'] = $t['fee_name'] . " (Dues for " . $t['student_ay_name'] . ")";
-                } else {
-                    $t['fee_name'] = $t['fee_name'] . " [Dues for " . $t['student_ay_name'] . "]";
-                }
-            }
-            // Re-apply the Draft suffix if applicable
-            if (isset($t['academic_year_status']) && strcasecmp($t['academic_year_status'], 'Draft') === 0) {
-                $t['fee_name'] = $t['fee_name'] . ' [Draft Year: ' . ($t['academic_year_name'] ?? '') . ']';
-            }
-            unset($t['months_list']);
+            unset($t['items_list'], $t['raw_receipt_no']);
             $mergedGrouped[] = $t;
         }
 
@@ -12231,7 +12225,7 @@ Only approve the settlement after reviewing all financial records.
                 $collectedBy = $uName;
             }
         }
-        $receiptNo = $this->generateUniqueRefNo($pdo);
+        $receiptNo = !empty($data['receipt_no']) ? trim((string)$data['receipt_no']) : $this->generateUniqueRefNo($pdo);
 
         $stmtUpdate = $pdo->prepare("
             UPDATE additional_fee_payments 
