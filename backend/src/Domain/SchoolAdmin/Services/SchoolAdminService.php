@@ -475,14 +475,14 @@ class SchoolAdminService extends BaseService
 
             // Query 2: Additional fee payments for this academic year (grouped by deposit payment_date)
             $stmtAddFeeChart = $pdo->prepare("
-                SELECT afp.payment_date, afp.created_at, COALESCE(afp.amount_paid, afp.amount) AS amount
+                SELECT afp.payment_date, afp.created_at, COALESCE(afph.amount_paid, afp.amount_paid, afp.amount) AS amount
                 FROM additional_fee_payments afp
+                LEFT JOIN additional_fee_payment_history afph ON afph.payment_id = afp.id
                 JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
                 WHERE afp.school_id = :school_id 
-                  AND aft.academic_year_id = :academic_year_id 
                   AND LOWER(afp.status) IN ('paid', 'partial')
             ");
-            $stmtAddFeeChart->execute([':school_id' => $schoolId, ':academic_year_id' => $activeYear['id']]);
+            $stmtAddFeeChart->execute([':school_id' => $schoolId]);
             while ($row = $stmtAddFeeChart->fetch(\PDO::FETCH_ASSOC)) {
                 $amt = (float)($row['amount'] ?? 0);
                 if ($amt <= 0) continue;
@@ -7500,11 +7500,9 @@ class SchoolAdminService extends BaseService
             LEFT JOIN academic_years pay_ay ON aft.academic_year_id = pay_ay.id
             LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = afph.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = afp.school_id)
             WHERE afp.school_id = :school_id
-              AND (aft.academic_year_id = :ayid_fee OR aft.academic_year_id IS NULL)
         ");
         $stmtAdditional->execute([
-            ':school_id' => $schoolId,
-            ':ayid_fee' => $workingYearId
+            ':school_id' => $schoolId
         ]);
         $additional = $stmtAdditional->fetchAll(PDO::FETCH_ASSOC);
 
@@ -11629,10 +11627,10 @@ Only approve the settlement after reviewing all financial records.
                        MAX(aft.category) as category,
                        COUNT(DISTINCT aft.id) as type_count,
                        COUNT(afp.id) as total_students,
-                       SUM(CASE WHEN afp.status = 'Paid' THEN 1 ELSE 0 END) as collected_students,
-                       SUM(CASE WHEN afp.status = 'Pending' THEN 1 ELSE 0 END) as pending_students,
-                       SUM(CASE WHEN afp.status = 'Paid' THEN afp.amount ELSE 0 END) as collected_amount,
-                       SUM(CASE WHEN afp.status = 'Pending' THEN afp.amount ELSE 0 END) as pending_amount
+                       SUM(CASE WHEN LOWER(afp.status) IN ('paid', 'partial') THEN 1 ELSE 0 END) as collected_students,
+                       SUM(CASE WHEN LOWER(afp.status) IN ('pending', 'partial') THEN 1 ELSE 0 END) as pending_students,
+                       SUM(COALESCE(afp.amount_paid, 0)) as collected_amount,
+                       SUM(GREATEST(0, afp.amount - (COALESCE(afp.amount_paid, 0) + COALESCE(afp.discount_amount, 0)))) as pending_amount
                 FROM additional_fee_types aft
                 LEFT JOIN additional_fee_payments afp ON afp.fee_type_id = aft.id
                 WHERE aft.school_id = :sid AND aft.academic_year_id = :ayid
@@ -11648,10 +11646,10 @@ Only approve the settlement after reviewing all financial records.
                        MAX(aft.category) as category,
                        COUNT(DISTINCT aft.id) as type_count,
                        COUNT(afp.id) as total_students,
-                       SUM(CASE WHEN afp.status = 'Paid' THEN 1 ELSE 0 END) as collected_students,
-                       SUM(CASE WHEN afp.status = 'Pending' THEN 1 ELSE 0 END) as pending_students,
-                       SUM(CASE WHEN afp.status = 'Paid' THEN afp.amount ELSE 0 END) as collected_amount,
-                       SUM(CASE WHEN afp.status = 'Pending' THEN afp.amount ELSE 0 END) as pending_amount
+                       SUM(CASE WHEN LOWER(afp.status) IN ('paid', 'partial') THEN 1 ELSE 0 END) as collected_students,
+                       SUM(CASE WHEN LOWER(afp.status) IN ('pending', 'partial') THEN 1 ELSE 0 END) as pending_students,
+                       SUM(COALESCE(afp.amount_paid, 0)) as collected_amount,
+                       SUM(GREATEST(0, afp.amount - (COALESCE(afp.amount_paid, 0) + COALESCE(afp.discount_amount, 0)))) as pending_amount
                 FROM additional_fee_types aft
                 LEFT JOIN additional_fee_payments afp ON afp.fee_type_id = aft.id
                 WHERE aft.school_id = :sid
