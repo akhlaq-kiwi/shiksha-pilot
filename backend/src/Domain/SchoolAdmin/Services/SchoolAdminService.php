@@ -7412,6 +7412,11 @@ class SchoolAdminService extends BaseService
         $adminUserPhone = $adminUserData['phone'] ?? '';
         $adminUserName = $adminUserData['name'] ?? '';
 
+        $ayStart = !empty($workingYear['start_date']) ? $workingYear['start_date'] : '1970-01-01';
+        $ayEnd = !empty($workingYear['end_date']) ? $workingYear['end_date'] : '2099-12-31';
+        $ayStartTs = $ayStart . ' 00:00:00';
+        $ayEndTs = $ayEnd . ' 23:59:59';
+
         // 2. Fetch monthly fee payments
         $stmtMonthly = $pdo->prepare("
             SELECT 
@@ -7449,12 +7454,19 @@ class SchoolAdminService extends BaseService
             LEFT JOIN academic_years pay_ay ON fp.academic_year_id = pay_ay.id
             LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = fp.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = fp.school_id)
             WHERE fp.school_id = :school_id AND fp.status IN ('PAID', 'Partial')
-              AND (fp.academic_year_id = :ayid_fee1 OR s.academic_year_id = :ayid_fee2)
+              AND (
+                (fp.payment_date IS NOT NULL AND fp.payment_date >= :fdate1 AND fp.payment_date <= :tdate1)
+                OR (fp.payment_date IS NULL AND fp.created_at >= :from_ts1 AND fp.created_at <= :to_ts1)
+                OR fp.academic_year_id = :ayid_fee1
+              )
         ");
         $stmtMonthly->execute([
             ':school_id' => $schoolId,
-            ':ayid_fee1' => $workingYearId,
-            ':ayid_fee2' => $workingYearId
+            ':fdate1' => $ayStart,
+            ':tdate1' => $ayEnd,
+            ':from_ts1' => $ayStartTs,
+            ':to_ts1' => $ayEndTs,
+            ':ayid_fee1' => $workingYearId
         ]);
         $monthly = $stmtMonthly->fetchAll(PDO::FETCH_ASSOC);
 
@@ -7500,9 +7512,17 @@ class SchoolAdminService extends BaseService
             LEFT JOIN academic_years pay_ay ON aft.academic_year_id = pay_ay.id
             LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = afph.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = afp.school_id)
             WHERE afp.school_id = :school_id
+              AND (
+                (afph.payment_date IS NOT NULL AND afph.payment_date >= :fdate2 AND afph.payment_date <= :tdate2)
+                OR (afph.payment_date IS NULL AND afph.created_at >= :from_ts2 AND afph.created_at <= :to_ts2)
+              )
         ");
         $stmtAdditional->execute([
-            ':school_id' => $schoolId
+            ':school_id' => $schoolId,
+            ':fdate2' => $ayStart,
+            ':tdate2' => $ayEnd,
+            ':from_ts2' => $ayStartTs,
+            ':to_ts2' => $ayEndTs
         ]);
         $additional = $stmtAdditional->fetchAll(PDO::FETCH_ASSOC);
 
@@ -10631,8 +10651,9 @@ Only approve the settlement after reviewing all financial records.
         $ayClause2 = "";
         $paramsFee2 = [':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts];
         if ($targetAYId2 > 0) {
-            $ayClause2 = " AND (fp.academic_year_id = :target_ayid OR s.academic_year_id = :target_ayid OR (s.status IN ('Inactive', 'Alumni', 'Archived')))";
-            $paramsFee2[':target_ayid'] = $targetAYId2;
+            $ayClause2 = " AND (fp.academic_year_id = :target_ayid1 OR s.academic_year_id = :target_ayid2 OR (s.status IN ('Inactive', 'Alumni', 'Archived')))";
+            $paramsFee2[':target_ayid1'] = $targetAYId2;
+            $paramsFee2[':target_ayid2'] = $targetAYId2;
         }
 
         $stmtFeeList = $pdo->prepare("
@@ -10666,8 +10687,9 @@ Only approve the settlement after reviewing all financial records.
         $ayClauseAdd2 = "";
         $paramsAdd2 = [':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts];
         if ($targetAYId2 > 0) {
-            $ayClauseAdd2 = " AND (aft.academic_year_id = :target_ayid OR s.academic_year_id = :target_ayid OR aft.academic_year_id IS NULL OR (s.status IN ('Inactive', 'Alumni', 'Archived')))";
-            $paramsAdd2[':target_ayid'] = $targetAYId2;
+            $ayClauseAdd2 = " AND (aft.academic_year_id = :target_ayid1 OR s.academic_year_id = :target_ayid2 OR aft.academic_year_id IS NULL OR (s.status IN ('Inactive', 'Alumni', 'Archived')))";
+            $paramsAdd2[':target_ayid1'] = $targetAYId2;
+            $paramsAdd2[':target_ayid2'] = $targetAYId2;
         }
 
         $stmtAddFeeList = $pdo->prepare("
