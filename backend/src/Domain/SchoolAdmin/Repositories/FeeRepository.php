@@ -59,9 +59,11 @@ class FeeRepository extends BaseRepository
     public function getTotalCollectedBySchool(int $schoolId, ?int $academicYearId = null): float
     {
         if ($academicYearId !== null) {
-            $stmtAy = $this->pdo->prepare("SELECT UPPER(COALESCE(status, '')) AS status FROM academic_years WHERE id = :id AND school_id = :sid LIMIT 1");
+            $stmtAy = $this->pdo->prepare("SELECT UPPER(COALESCE(status, '')) AS status, COALESCE(is_current, 0) AS is_current FROM academic_years WHERE id = :id AND school_id = :sid LIMIT 1");
             $stmtAy->execute([':id' => $academicYearId, ':sid' => $schoolId]);
-            $ayStatus = (string)$stmtAy->fetchColumn();
+            $ayRow = $stmtAy->fetch(\PDO::FETCH_ASSOC);
+            $ayStatus = $ayRow ? (string)$ayRow['status'] : '';
+            $isCurrent = $ayRow ? (int)$ayRow['is_current'] : 0;
 
             if ($ayStatus === 'DRAFT') {
                 return 0.0;
@@ -86,13 +88,19 @@ class FeeRepository extends BaseRepository
                 JOIN additional_fee_payments afp ON afph.payment_id = afp.id
                 JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
                 JOIN students s ON afp.student_id = s.id
+                LEFT JOIN academic_years ay_fee ON aft.academic_year_id = ay_fee.id
                 WHERE afp.school_id = :sid
-                  AND (aft.academic_year_id = :ayid1 OR s.academic_year_id = :ayid2)
+                  AND (
+                    aft.academic_year_id = :ayid1 
+                    OR s.academic_year_id = :ayid2
+                    OR (:is_curr = 1 AND UPPER(COALESCE(ay_fee.status, '')) = 'DRAFT')
+                  )
             ");
             $stmtAdd->execute([
                 ':sid' => $schoolId,
                 ':ayid1' => $academicYearId,
-                ':ayid2' => $academicYearId
+                ':ayid2' => $academicYearId,
+                ':is_curr' => $isCurrent
             ]);
             $additionalCollected = (float)$stmtAdd->fetchColumn();
 

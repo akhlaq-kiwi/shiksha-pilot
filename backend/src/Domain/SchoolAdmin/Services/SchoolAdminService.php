@@ -480,8 +480,13 @@ class SchoolAdminService extends BaseService
                 JOIN additional_fee_payments afp ON afph.payment_id = afp.id
                 JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
                 JOIN students s ON afp.student_id = s.id
+                LEFT JOIN academic_years ay_fee ON aft.academic_year_id = ay_fee.id
                 WHERE afp.school_id = :school_id 
-                  AND (aft.academic_year_id = :ayid1 OR s.academic_year_id = :ayid2)
+                  AND (
+                    aft.academic_year_id = :ayid1 
+                    OR s.academic_year_id = :ayid2
+                    OR (UPPER(COALESCE(ay_fee.status, '')) = 'DRAFT')
+                  )
             ");
             $stmtAddFeeChart->execute([
                 ':school_id' => $schoolId,
@@ -7517,12 +7522,17 @@ class SchoolAdminService extends BaseService
             LEFT JOIN academic_years pay_ay ON aft.academic_year_id = pay_ay.id
             LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = afph.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = afp.school_id)
             WHERE afp.school_id = :school_id
-              AND (aft.academic_year_id = :ayid_add1 OR s.academic_year_id = :ayid_add2)
+              AND (
+                aft.academic_year_id = :ayid_add1 
+                OR s.academic_year_id = :ayid_add2
+                OR (:is_curr = 1 AND UPPER(COALESCE(pay_ay.status, '')) = 'DRAFT')
+              )
         ");
         $stmtAdditional->execute([
             ':school_id' => $schoolId,
             ':ayid_add1' => $workingYearId,
-            ':ayid_add2' => $workingYearId
+            ':ayid_add2' => $workingYearId,
+            ':is_curr' => $isCurrentAy ? 1 : 0
         ]);
         $additional = $stmtAdditional->fetchAll(PDO::FETCH_ASSOC);
 
