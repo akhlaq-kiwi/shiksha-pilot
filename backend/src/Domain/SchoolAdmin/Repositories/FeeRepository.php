@@ -68,7 +68,8 @@ class FeeRepository extends BaseRepository
                 return 0.0;
             }
 
-            $ayStart = !empty($ayRow['start_date']) ? $ayRow['start_date'] : '1970-01-01';
+            $isActiveAy = ($ayStatus === 'ACTIVE' || (isset($ayRow['is_current']) && (int)$ayRow['is_current'] === 1));
+            $ayStart = (!$isActiveAy && !empty($ayRow['start_date'])) ? $ayRow['start_date'] : '1970-01-01';
             $ayEnd = !empty($ayRow['end_date']) ? $ayRow['end_date'] : '2099-12-31';
             $ayStartTs = $ayStart . ' 00:00:00';
             $ayEndTs = $ayEnd . ' 23:59:59';
