@@ -9768,24 +9768,12 @@ class SchoolAdminService extends BaseService
             JOIN students s ON afp.student_id = s.id
             WHERE afp.school_id = :sid 
               AND (
-                s.academic_year_id = :ayid_stu
-                OR aft.academic_year_id = :ayid_fee
-                OR aft.academic_year_id IS NULL
-                OR (
-                  afph.created_at >= (SELECT created_at FROM academic_years WHERE id = :ayid_2 LIMIT 1)
-                  AND (s.status = 'Inactive' OR s.status = 'Alumni' OR s.status = 'Archived')
-                )
-              )
-              AND (
                 (afph.payment_date IS NOT NULL AND afph.payment_date >= :from_date AND afph.payment_date <= :to_date)
                 OR (afph.payment_date IS NULL AND afph.created_at >= :from_ts AND afph.created_at <= :to_ts)
               )
         ");
         $stmtAddFees->execute([
             ':sid' => $schoolId,
-            ':ayid_stu' => $workingYear['id'],
-            ':ayid_fee' => $workingYear['id'],
-            ':ayid_2' => $workingYear['id'],
             ':from_date' => $from,
             ':to_date' => $to,
             ':from_ts' => $fromTs,
@@ -9937,7 +9925,6 @@ class SchoolAdminService extends BaseService
                     JOIN additional_fee_payments afp ON afph.payment_id = afp.id
                     JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
                     WHERE afp.school_id = :sid 
-                      AND aft.academic_year_id = :ayid
                       AND (
                         (afph.payment_date IS NOT NULL AND afph.payment_date >= :fdate1 AND afph.payment_date <= :tdate1)
                         OR (afph.payment_date IS NULL AND DATE(afph.created_at) >= :fdate2 AND DATE(afph.created_at) <= :tdate2)
@@ -9945,7 +9932,6 @@ class SchoolAdminService extends BaseService
                 ");
                 $stmtAddFees->execute([
                     ':sid' => $schoolId,
-                    ':ayid' => $workingYear['id'],
                     ':fdate1' => $currentMonthStart,
                     ':tdate1' => $targetToDate,
                     ':fdate2' => $currentMonthStart,
