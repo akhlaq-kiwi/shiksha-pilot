@@ -9874,15 +9874,47 @@ class SchoolAdminService extends BaseService
             }
         }
 
+        $today = date('Y-m-d');
+        $currentOngoingMonthStart = date('Y-m-01', strtotime($today));
+
+        $isArchivedYear = (isset($workingYear['status']) && strtoupper($workingYear['status']) === 'ARCHIVED') 
+            || (isset($workingYear['migration_status']) && strtoupper($workingYear['migration_status']) === 'COMPLETED');
+
+        // For an ACTIVE academic year, clean up any auto-generated pending report for the current ongoing month
+        if (!$isArchivedYear) {
+            $stmtDelOngoing = $pdo->prepare("
+                DELETE FROM financial_reports 
+                WHERE school_id = :sid 
+                  AND status = 'Pending'
+                  AND `from_date` >= :ongoing_start
+            ");
+            $stmtDelOngoing->execute([
+                ':sid' => $schoolId,
+                ':ongoing_start' => $currentOngoingMonthStart
+            ]);
+        }
+
         $ayStart = $workingYear['start_date'];
         $ayEnd = $workingYear['end_date'];
-        $today = date('Y-m-d');
 
         $currentMonthStart = date('Y-m-01', strtotime($ayStart));
         
         while ($currentMonthStart <= $ayEnd && $currentMonthStart <= $today) {
             $monthEnd = date('Y-m-t', strtotime($currentMonthStart));
-            $targetToDate = ($today < $monthEnd) ? $today : $monthEnd;
+
+            if (!$isArchivedYear) {
+                // For an ACTIVE academic year: Only auto-generate for months that have FULLY completed before today ($monthEnd < $today)
+                if ($monthEnd >= $today) {
+                    $currentMonthStart = date('Y-m-d', strtotime($currentMonthStart . ' +1 month'));
+                    continue;
+                }
+                $targetToDate = $monthEnd;
+            } else {
+                // For an ARCHIVED / COMPLETED academic year (migration completed):
+                // Allow partial month report up to the migration date ($today or $ayEnd)
+                $effectiveEnd = ($ayEnd < $today) ? $ayEnd : $today;
+                $targetToDate = ($effectiveEnd < $monthEnd) ? $effectiveEnd : $monthEnd;
+            }
 
             $stmtCheck = $pdo->prepare("
                 SELECT id FROM financial_reports 
