@@ -88,11 +88,9 @@ class FeeRepository extends BaseRepository
                 JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
                 WHERE afp.school_id = :sid
                   AND LOWER(afp.status) IN ('paid', 'partial')
-                  AND (aft.academic_year_id = :ayid OR aft.academic_year_id IS NULL)
             ");
             $stmtAdd->execute([
-                ':sid' => $schoolId, 
-                ':ayid' => $academicYearId
+                ':sid' => $schoolId
             ]);
             $additionalCollected = (float)$stmtAdd->fetchColumn();
 
