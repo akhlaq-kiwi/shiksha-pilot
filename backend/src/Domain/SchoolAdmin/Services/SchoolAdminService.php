@@ -473,16 +473,28 @@ class SchoolAdminService extends BaseService
                 }
             }
 
+            $ayStart = !empty($activeYear['start_date']) ? $activeYear['start_date'] : '1970-01-01';
+            $ayEnd = !empty($activeYear['end_date']) ? $activeYear['end_date'] : '2099-12-31';
+
             // Query 2: Additional fee payments for this academic year (grouped by deposit payment_date)
             $stmtAddFeeChart = $pdo->prepare("
-                SELECT afp.payment_date, afp.created_at, COALESCE(afph.amount_paid, afp.amount_paid, afp.amount) AS amount
-                FROM additional_fee_payments afp
-                LEFT JOIN additional_fee_payment_history afph ON afph.payment_id = afp.id
+                SELECT afph.payment_date, afph.created_at, afph.amount_paid AS amount
+                FROM additional_fee_payment_history afph
+                JOIN additional_fee_payments afp ON afph.payment_id = afp.id
                 JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
                 WHERE afp.school_id = :school_id 
-                  AND LOWER(afp.status) IN ('paid', 'partial')
+                  AND (
+                    (afph.payment_date IS NOT NULL AND afph.payment_date >= :fdate AND afph.payment_date <= :tdate)
+                    OR (afph.payment_date IS NULL AND afph.created_at >= :from_ts AND afph.created_at <= :to_ts)
+                  )
             ");
-            $stmtAddFeeChart->execute([':school_id' => $schoolId]);
+            $stmtAddFeeChart->execute([
+                ':school_id' => $schoolId,
+                ':fdate' => $ayStart,
+                ':tdate' => $ayEnd,
+                ':from_ts' => $ayStart . ' 00:00:00',
+                ':to_ts' => $ayEnd . ' 23:59:59'
+            ]);
             while ($row = $stmtAddFeeChart->fetch(\PDO::FETCH_ASSOC)) {
                 $amt = (float)($row['amount'] ?? 0);
                 if ($amt <= 0) continue;
