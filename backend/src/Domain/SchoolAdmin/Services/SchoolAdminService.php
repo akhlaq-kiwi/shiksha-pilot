@@ -441,7 +441,9 @@ class SchoolAdminService extends BaseService
         $salaryDisbursementChart = [];
         $academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
 
-        if ($activeYear) {
+        $isDraftDashboard = isset($activeYear['status']) && strtoupper($activeYear['status']) === 'DRAFT';
+
+        if ($activeYear && !$isDraftDashboard) {
             // 1. Fee collection chart
             $feeMap = [];
             foreach ($academicMonths as $m) {
@@ -7377,6 +7379,28 @@ class SchoolAdminService extends BaseService
         $isCurrentAy = !empty($workingYear['is_current']) || (isset($workingYear['status']) && strtoupper($workingYear['status']) === 'ACTIVE');
         $startDate = $workingYear['start_date'] ?? '1970-01-01';
 
+        $isDraftAy = isset($workingYear['status']) && strtoupper($workingYear['status']) === 'DRAFT';
+        if ($isDraftAy) {
+            $limit = isset($params['limit']) && is_numeric($params['limit']) ? (int)$params['limit'] : 10;
+            return [
+                'transactions' => [],
+                'stats' => [
+                    'total_collected' => 0.0,
+                    'today_collection' => 0.0,
+                    'this_month_collection' => 0.0,
+                    'total_transactions' => 0
+                ],
+                'pagination' => [
+                    'page' => 1,
+                    'limit' => $limit,
+                    'total' => 0,
+                    'pages' => 1
+                ],
+                'available_months' => [],
+                'available_collectors' => []
+            ];
+        }
+
         // Fetch School Admin User details for fallback phone matching
         $stmtAdminUser = $pdo->prepare("SELECT name, phone FROM users WHERE school_id = :sid AND (UPPER(role) IN ('SCHOOL_ADMIN', 'ADMIN') OR LOWER(role) LIKE '%admin%') LIMIT 1");
         $stmtAdminUser->execute([':sid' => $schoolId]);
@@ -7421,22 +7445,11 @@ class SchoolAdminService extends BaseService
             LEFT JOIN academic_years pay_ay ON fp.academic_year_id = pay_ay.id
             LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = fp.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = fp.school_id)
             WHERE fp.school_id = :school_id AND fp.status IN ('PAID', 'Partial')
-              AND (
-                s.academic_year_id = :ayid_stu 
-                OR fp.academic_year_id = :ayid_fee
-                OR (
-                  :is_curr1 = 1 
-                  AND (s.status = 'Inactive' OR s.status = 'Alumni' OR s.status = 'Archived')
-                  AND fp.created_at >= (SELECT created_at FROM academic_years WHERE school_id = :sid_sub AND (is_current = 1 OR UPPER(status) = 'ACTIVE') LIMIT 1)
-                )
-              )
+              AND fp.academic_year_id = :ayid_fee
         ");
         $stmtMonthly->execute([
             ':school_id' => $schoolId,
-            ':ayid_stu' => $workingYearId,
-            ':ayid_fee' => $workingYearId,
-            ':is_curr1' => $isCurrentAy ? 1 : 0,
-            ':sid_sub' => $schoolId
+            ':ayid_fee' => $workingYearId
         ]);
         $monthly = $stmtMonthly->fetchAll(PDO::FETCH_ASSOC);
 
@@ -7482,23 +7495,11 @@ class SchoolAdminService extends BaseService
             LEFT JOIN academic_years pay_ay ON aft.academic_year_id = pay_ay.id
             LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = afph.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = afp.school_id)
             WHERE afp.school_id = :school_id
-              AND (
-                s.academic_year_id = :ayid_stu 
-                OR aft.academic_year_id = :ayid_fee 
-                OR aft.academic_year_id IS NULL
-                OR (
-                  :is_curr1 = 1 
-                  AND (s.status = 'Inactive' OR s.status = 'Alumni' OR s.status = 'Archived')
-                  AND afph.created_at >= (SELECT created_at FROM academic_years WHERE school_id = :sid_sub AND (is_current = 1 OR UPPER(status) = 'ACTIVE') LIMIT 1)
-                )
-              )
+              AND (afp.academic_year_id = :ayid_fee OR aft.academic_year_id = :ayid_fee)
         ");
         $stmtAdditional->execute([
             ':school_id' => $schoolId,
-            ':ayid_stu' => $workingYearId,
-            ':ayid_fee' => $workingYearId,
-            ':is_curr1' => $isCurrentAy ? 1 : 0,
-            ':sid_sub' => $schoolId
+            ':ayid_fee' => $workingYearId
         ]);
         $additional = $stmtAdditional->fetchAll(PDO::FETCH_ASSOC);
 
