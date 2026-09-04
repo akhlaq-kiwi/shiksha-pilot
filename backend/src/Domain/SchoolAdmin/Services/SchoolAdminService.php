@@ -10128,8 +10128,17 @@ class SchoolAdminService extends BaseService
 
         // Retrieve bounds of transactions contributing to this report
         list($from_ts, $operator, $to_ts) = $this->getReportBounds($pdo, $schoolId, $report);
+        $repAyId = (int)($report['academic_year_id'] ?? 0);
 
         // Fetch Student Fee Collections
+        $feeParams = [':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts];
+        $ayClauseFp = "";
+        if ($repAyId) {
+            $ayClauseFp = " AND (fp.academic_year_id = :ayid1 OR (fp.academic_year_id IS NULL AND s.academic_year_id = :ayid2))";
+            $feeParams[':ayid1'] = $repAyId;
+            $feeParams[':ayid2'] = $repAyId;
+        }
+
         $stmtFeeList = $pdo->prepare("
             SELECT 
                 fp.created_at AS deposit_time, 
@@ -10150,12 +10159,21 @@ class SchoolAdminService extends BaseService
             LEFT JOIN classes c ON s.class_id = c.id
             LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = fp.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = fp.school_id)
             WHERE fp.school_id = :sid 
+              {$ayClauseFp}
               AND fp.status IN ('PAID', 'Partial')
               AND fp.created_at {$operator} :from_ts 
               AND fp.created_at <= :to_ts
         ");
-        $stmtFeeList->execute([':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts]);
+        $stmtFeeList->execute($feeParams);
         $feePayments = $stmtFeeList->fetchAll(PDO::FETCH_ASSOC);
+
+        $addParams = [':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts];
+        $ayClauseAdd = "";
+        if ($repAyId) {
+            $ayClauseAdd = " AND (afph.academic_year_id = :ayid1 OR (afph.academic_year_id IS NULL AND s.academic_year_id = :ayid2))";
+            $addParams[':ayid1'] = $repAyId;
+            $addParams[':ayid2'] = $repAyId;
+        }
 
         $stmtAddFeeList = $pdo->prepare("
             SELECT 
@@ -10179,13 +10197,21 @@ class SchoolAdminService extends BaseService
             JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
             LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = afph.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = afp.school_id)
             WHERE afp.school_id = :sid 
+              {$ayClauseAdd}
               AND afph.created_at {$operator} :from_ts 
               AND afph.created_at <= :to_ts
         ");
-        $stmtAddFeeList->execute([':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts]);
+        $stmtAddFeeList->execute($addParams);
         $additionalFeeCollections = $stmtAddFeeList->fetchAll(PDO::FETCH_ASSOC);
 
         $feeCollections = array_merge($feePayments, $additionalFeeCollections);
+
+        $salParams = [':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts];
+        $ayClauseSal = "";
+        if ($repAyId) {
+            $ayClauseSal = " AND (sp.academic_year_id = :ayid OR sp.academic_year_id IS NULL)";
+            $salParams[':ayid'] = $repAyId;
+        }
 
         $stmtStaff = $pdo->prepare("
             SELECT 
@@ -10197,11 +10223,19 @@ class SchoolAdminService extends BaseService
             FROM staff_payments sp
             JOIN staff st ON sp.staff_id = st.id
             WHERE sp.school_id = :sid
+              {$ayClauseSal}
               AND sp.created_at {$operator} :from_ts
               AND sp.created_at <= :to_ts
         ");
-        $stmtStaff->execute([':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts]);
+        $stmtStaff->execute($salParams);
         $staffExpenses = $stmtStaff->fetchAll(PDO::FETCH_ASSOC);
+
+        $expParams = [':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts];
+        $ayClauseExp = "";
+        if ($repAyId) {
+            $ayClauseExp = " AND (se.academic_year_id = :ayid OR se.academic_year_id IS NULL)";
+            $expParams[':ayid'] = $repAyId;
+        }
 
         $stmtOtherExp = $pdo->prepare("
             SELECT 
@@ -10213,10 +10247,11 @@ class SchoolAdminService extends BaseService
             FROM school_expenses se
             LEFT JOIN users u ON se.created_by = u.id
             WHERE se.school_id = :sid
+              {$ayClauseExp}
               AND se.created_at {$operator} :from_ts
               AND se.created_at <= :to_ts
         ");
-        $stmtOtherExp->execute([':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts]);
+        $stmtOtherExp->execute($expParams);
         $otherExpenses = $stmtOtherExp->fetchAll(PDO::FETCH_ASSOC);
         $otherExpenses = $stmtOtherExp->fetchAll(PDO::FETCH_ASSOC);
 
@@ -10462,8 +10497,17 @@ Only approve the settlement after reviewing all financial records.
 
         // Retrieve bounds of transactions contributing to this report
         list($from_ts, $operator, $to_ts) = $this->getReportBounds($pdo, $schoolId, $report);
+        $repAyId = (int)($report['academic_year_id'] ?? 0);
 
         // Fetch Student Fee Collections
+        $feeParams = [':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts];
+        $ayClauseFp = "";
+        if ($repAyId) {
+            $ayClauseFp = " AND (fp.academic_year_id = :ayid1 OR (fp.academic_year_id IS NULL AND s.academic_year_id = :ayid2))";
+            $feeParams[':ayid1'] = $repAyId;
+            $feeParams[':ayid2'] = $repAyId;
+        }
+
         $stmtFeeList = $pdo->prepare("
             SELECT 
                 fp.created_at AS deposit_time, 
@@ -10484,12 +10528,21 @@ Only approve the settlement after reviewing all financial records.
             LEFT JOIN classes c ON s.class_id = c.id
             LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = fp.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = fp.school_id)
             WHERE fp.school_id = :sid 
+              {$ayClauseFp}
               AND fp.status IN ('PAID', 'Partial')
               AND fp.created_at {$operator} :from_ts 
               AND fp.created_at <= :to_ts
         ");
-        $stmtFeeList->execute([':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts]);
+        $stmtFeeList->execute($feeParams);
         $feePayments = $stmtFeeList->fetchAll(PDO::FETCH_ASSOC);
+
+        $addParams = [':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts];
+        $ayClauseAdd = "";
+        if ($repAyId) {
+            $ayClauseAdd = " AND (afph.academic_year_id = :ayid1 OR (afph.academic_year_id IS NULL AND s.academic_year_id = :ayid2))";
+            $addParams[':ayid1'] = $repAyId;
+            $addParams[':ayid2'] = $repAyId;
+        }
 
         $stmtAddFeeList = $pdo->prepare("
             SELECT 
@@ -10513,10 +10566,11 @@ Only approve the settlement after reviewing all financial records.
             JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
             LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = afph.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = afp.school_id)
             WHERE afp.school_id = :sid 
+              {$ayClauseAdd}
               AND afph.created_at {$operator} :from_ts 
               AND afph.created_at <= :to_ts
         ");
-        $stmtAddFeeList->execute([':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts]);
+        $stmtAddFeeList->execute($addParams);
         $addPayments = $stmtAddFeeList->fetchAll(PDO::FETCH_ASSOC);
 
         // Format descriptions if student is enrolled in a different academic year (e.g. Archived Year Dues)
@@ -10648,15 +10702,19 @@ Only approve the settlement after reviewing all financial records.
             throw new ValidationException(['message' => 'No working academic year found.']);
         }
 
+        $repAyId = (int)($workingYear['id'] ?? 0);
+
         $stmtLatest = $pdo->prepare("
             SELECT * FROM financial_reports 
             WHERE school_id = :sid 
+              AND (academic_year_id = :ayid OR academic_year_id IS NULL)
               AND `from_date` >= :start_date 
               AND `to_date` <= :end_date
             ORDER BY id DESC LIMIT 1
         ");
         $stmtLatest->execute([
             ':sid' => $schoolId,
+            ':ayid' => $repAyId,
             ':start_date' => $workingYear['start_date'],
             ':end_date' => $workingYear['end_date']
         ]);
@@ -10672,6 +10730,20 @@ Only approve the settlement after reviewing all financial records.
 
         $fromTs = $from . ' 00:00:00';
         $toTs = $to . ' 23:59:59';
+
+        $feeParams = [
+            ':sid' => $schoolId,
+            ':from_date' => $from,
+            ':to_date' => $to,
+            ':from_ts' => $fromTs,
+            ':to_ts' => $toTs
+        ];
+        $ayClauseFp = "";
+        if ($repAyId) {
+            $ayClauseFp = " AND (fp.academic_year_id = :ayid1 OR (fp.academic_year_id IS NULL AND s.academic_year_id = :ayid2))";
+            $feeParams[':ayid1'] = $repAyId;
+            $feeParams[':ayid2'] = $repAyId;
+        }
 
         $stmtFeeList = $pdo->prepare("
             SELECT 
@@ -10693,20 +10765,29 @@ Only approve the settlement after reviewing all financial records.
             LEFT JOIN classes c ON s.class_id = c.id
             LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = fp.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = fp.school_id)
             WHERE fp.school_id = :sid 
+              {$ayClauseFp}
               AND fp.status IN ('PAID', 'Partial')
               AND (
                 (fp.payment_date IS NOT NULL AND fp.payment_date >= :from_date AND fp.payment_date <= :to_date)
                 OR (fp.payment_date IS NULL AND fp.created_at >= :from_ts AND fp.created_at <= :to_ts)
               )
         ");
-        $stmtFeeList->execute([
+        $stmtFeeList->execute($feeParams);
+        $feePayments = $stmtFeeList->fetchAll(PDO::FETCH_ASSOC);
+
+        $addParams = [
             ':sid' => $schoolId,
             ':from_date' => $from,
             ':to_date' => $to,
             ':from_ts' => $fromTs,
             ':to_ts' => $toTs
-        ]);
-        $feePayments = $stmtFeeList->fetchAll(PDO::FETCH_ASSOC);
+        ];
+        $ayClauseAdd = "";
+        if ($repAyId) {
+            $ayClauseAdd = " AND (afph.academic_year_id = :ayid1 OR (afph.academic_year_id IS NULL AND s.academic_year_id = :ayid2))";
+            $addParams[':ayid1'] = $repAyId;
+            $addParams[':ayid2'] = $repAyId;
+        }
 
         $stmtAddFeeList = $pdo->prepare("
             SELECT 
@@ -10730,18 +10811,13 @@ Only approve the settlement after reviewing all financial records.
             JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
             LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = afph.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = afp.school_id)
             WHERE afp.school_id = :sid 
+              {$ayClauseAdd}
               AND (
                 (afph.payment_date IS NOT NULL AND afph.payment_date >= :from_date AND afph.payment_date <= :to_date)
                 OR (afph.payment_date IS NULL AND afph.created_at >= :from_ts AND afph.created_at <= :to_ts)
               )
         ");
-        $stmtAddFeeList->execute([
-            ':sid' => $schoolId,
-            ':from_date' => $from,
-            ':to_date' => $to,
-            ':from_ts' => $fromTs,
-            ':to_ts' => $toTs
-        ]);
+        $stmtAddFeeList->execute($addParams);
         $addPayments = $stmtAddFeeList->fetchAll(PDO::FETCH_ASSOC);
 
         $workingYearId = $workingYear ? (int)$workingYear['id'] : 0;
