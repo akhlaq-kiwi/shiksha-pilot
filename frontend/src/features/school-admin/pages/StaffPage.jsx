@@ -2017,11 +2017,22 @@ export default function StaffPage() {
                 <span className="text-zinc-500">Amount:</span>
                 <span className="text-green-600 font-bold">
                   ₹{(() => {
+                    let amount = teacherDetails?.salary || 0;
                     const isJoiningMonth = teacherDetails?.joining_month_proration && teacherDetails?.joining_month_proration.month === disburseMonth;
-                    const amount = isJoiningMonth ? teacherDetails.joining_month_proration.payable_salary : (teacherDetails?.salary || 0);
+                    if (isJoiningMonth) {
+                      amount = teacherDetails.joining_month_proration.payable_salary;
+                    } else if (teacherDetails?.monthly_salaries && teacherDetails?.monthly_salaries[disburseMonth] !== undefined) {
+                      amount = teacherDetails.monthly_salaries[disburseMonth];
+                    }
                     return Math.round(parseFloat(amount)).toLocaleString('en-IN');
                   })()}
-                  {teacherDetails?.joining_month_proration && teacherDetails?.joining_month_proration.month === disburseMonth && ' (Prorated)'}
+                  {(() => {
+                    const isJoiningMonth = teacherDetails?.joining_month_proration && teacherDetails?.joining_month_proration.month === disburseMonth;
+                    const isMonthlyProrated = teacherDetails?.monthly_salaries && 
+                                              teacherDetails?.monthly_salaries[disburseMonth] !== undefined && 
+                                              parseFloat(teacherDetails.monthly_salaries[disburseMonth]) < parseFloat(teacherDetails?.salary || 0);
+                    return (isJoiningMonth || isMonthlyProrated) ? ' (Prorated)' : '';
+                  })()}
                 </span>
               </div>
             </div>
