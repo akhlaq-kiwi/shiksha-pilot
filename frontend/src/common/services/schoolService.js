@@ -401,6 +401,10 @@ export const schoolService = {
     return apiClient.post(`/api/school/financial-reports/${id}/settlement-request`);
   },
 
+  deleteFinancialReport(id) {
+    return apiClient.delete(`/api/school/financial-reports/${id}`);
+  },
+
   exportFinancialReport(id) {
     return apiClient.get(`/api/school/financial-reports/${id}/export`);
   },

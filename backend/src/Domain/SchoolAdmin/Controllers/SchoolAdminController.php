@@ -1442,6 +1442,17 @@ class SchoolAdminController extends BaseController
         return $this->success($response, $data, 'Settlement request submitted successfully');
     }
 
+    public function deleteFinancialReport(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int)$args['id'];
+        $this->service->deleteFinancialReport($user, $id);
+
+        return $this->success($response, null, 'Financial report deleted successfully');
+    }
+
     public function exportFinancialReport(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);

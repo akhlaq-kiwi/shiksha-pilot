@@ -90,6 +90,7 @@ return function (App $app) {
     $app->post('/api/school/financial-reports', [SchoolAdminController::class, 'createFinancialReport']);
     $app->put('/api/school/financial-reports/{id}/settle', [SchoolAdminController::class, 'updateFinancialReportStatus']);
     $app->post('/api/school/financial-reports/{id}/settlement-request', [SchoolAdminController::class, 'submitSettlementRequest']);
+    $app->delete('/api/school/financial-reports/{id}', [SchoolAdminController::class, 'deleteFinancialReport']);
     $app->get('/api/school/financial-reports/{id}/export', [SchoolAdminController::class, 'exportFinancialReport']);
     $app->get('/api/public/financial-reports/{id}/settlement/approve', [SchoolAdminController::class, 'ownerApproveSettlement']);
     $app->get('/api/public/financial-reports/{id}/settlement/reject', [SchoolAdminController::class, 'ownerRejectSettlement']);
