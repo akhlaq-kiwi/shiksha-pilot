@@ -9810,7 +9810,8 @@ class SchoolAdminService extends BaseService
         // 1. Total Student Tuition Fees Collected within report period
         $stmtFeesParams = array_merge([
             ':sid' => $schoolId,
-            ':ayid' => $academicYearId,
+            ':ayid1' => $academicYearId,
+            ':ayid2' => $academicYearId,
             ':from_date' => $from,
             ':to_date' => $to,
             ':from_ts' => $fromTs,
@@ -9822,7 +9823,7 @@ class SchoolAdminService extends BaseService
             FROM fee_payments fp
             JOIN students s ON fp.student_id = s.id
             WHERE fp.school_id = :sid 
-              AND (fp.academic_year_id = :ayid OR (fp.academic_year_id IS NULL AND s.academic_year_id = :ayid))
+              AND (fp.academic_year_id = :ayid1 OR (fp.academic_year_id IS NULL AND s.academic_year_id = :ayid2))
               AND fp.status IN ('PAID', 'Partial')
               {$cutoffClauseFp}
               AND (
@@ -9836,7 +9837,8 @@ class SchoolAdminService extends BaseService
         // 2. Total Additional Paid Fees within report period (from payment history)
         $stmtAddParams = array_merge([
             ':sid' => $schoolId,
-            ':ayid' => $academicYearId,
+            ':ayid1' => $academicYearId,
+            ':ayid2' => $academicYearId,
             ':from_date' => $from,
             ':to_date' => $to,
             ':from_ts' => $fromTs,
@@ -9850,7 +9852,7 @@ class SchoolAdminService extends BaseService
             JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
             JOIN students s ON afp.student_id = s.id
             WHERE afp.school_id = :sid 
-              AND (afph.academic_year_id = :ayid OR (afph.academic_year_id IS NULL AND s.academic_year_id = :ayid))
+              AND (afph.academic_year_id = :ayid1 OR (afph.academic_year_id IS NULL AND s.academic_year_id = :ayid2))
               {$cutoffClauseAdd}
               AND (
                 (afph.payment_date IS NOT NULL AND afph.payment_date >= :from_date AND afph.payment_date <= :to_date)
@@ -9876,7 +9878,7 @@ class SchoolAdminService extends BaseService
             SELECT COALESCE(SUM(amount_paid), 0) 
             FROM staff_payments 
             WHERE school_id = :sid 
-              AND (academic_year_id = :ayid OR (academic_year_id IS NULL AND payment_date >= :from_date AND payment_date <= :to_date))
+              AND (academic_year_id = :ayid OR academic_year_id IS NULL)
               {$cutoffClauseSal}
               AND (
                 (payment_date IS NOT NULL AND payment_date >= :from_date AND payment_date <= :to_date)
@@ -9900,7 +9902,7 @@ class SchoolAdminService extends BaseService
             SELECT COALESCE(SUM(amount), 0) 
             FROM school_expenses 
             WHERE school_id = :sid 
-              AND (academic_year_id = :ayid OR (academic_year_id IS NULL AND expense_date >= :from_date AND expense_date <= :to_date))
+              AND (academic_year_id = :ayid OR academic_year_id IS NULL)
               {$cutoffClauseExp}
               AND (
                 (expense_date IS NOT NULL AND expense_date >= :from_date AND expense_date <= :to_date)
