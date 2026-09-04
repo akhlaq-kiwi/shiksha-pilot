@@ -9652,7 +9652,7 @@ class SchoolAdminService extends BaseService
         $stmt->execute([
             ':sid' => $schoolId,
             ':staff_id' => $staffId,
-            ':ayid' => $prevYear['id'],
+            ':ayid' => (int)$workingYear['id'],
             ':amount_paid' => $totalPaid,
             ':month' => 'Previous Year - ' . $monthsString,
             ':payment_date' => $paymentDate
@@ -10779,6 +10779,13 @@ Only approve the settlement after reviewing all financial records.
             return strcmp($a['student_name'] ?? '', $b['student_name'] ?? '');
         });
 
+        $ayClauseSal2 = "";
+        $paramsSal2 = [':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts];
+        if ($targetAYId2 > 0) {
+            $ayClauseSal2 = " AND sp.academic_year_id = :target_ayid";
+            $paramsSal2[':target_ayid'] = $targetAYId2;
+        }
+
         $stmtSalaryList = $pdo->prepare("
             SELECT sp.payment_month, sp.academic_year_id, st.name AS staff_name, sp.payment_date AS expense_date, sp.amount_paid AS amount, ay.name AS ay_name
             FROM staff_payments sp
@@ -10787,8 +10794,9 @@ Only approve the settlement after reviewing all financial records.
             WHERE sp.school_id = :sid 
               AND sp.created_at {$operator} :from_ts 
               AND sp.created_at <= :to_ts
+              {$ayClauseSal2}
         ");
-        $stmtSalaryList->execute([':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts]);
+        $stmtSalaryList->execute($paramsSal2);
         $salaryPaymentsRaw = $stmtSalaryList->fetchAll(PDO::FETCH_ASSOC);
 
         $salaryPayments = [];
@@ -10807,14 +10815,22 @@ Only approve the settlement after reviewing all financial records.
             ];
         }
 
+        $ayClauseExp2 = "";
+        $paramsExp2 = [':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts];
+        if ($targetAYId2 > 0) {
+            $ayClauseExp2 = " AND (academic_year_id = :target_ayid OR academic_year_id IS NULL)";
+            $paramsExp2[':target_ayid'] = $targetAYId2;
+        }
+
         $stmtExpenseList = $pdo->prepare("
             SELECT description, 'School Expense' AS category, expense_date, amount
             FROM school_expenses
             WHERE school_id = :sid 
               AND created_at {$operator} :from_ts 
               AND created_at <= :to_ts
+              {$ayClauseExp2}
         ");
-        $stmtExpenseList->execute([':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts]);
+        $stmtExpenseList->execute($paramsExp2);
         $expensesItems = $stmtExpenseList->fetchAll(PDO::FETCH_ASSOC);
 
         $expenses = array_merge($salaryPayments, $expensesItems);
@@ -16458,14 +16474,12 @@ Only approve the settlement after reviewing all financial records.
             FROM fee_payments 
             WHERE student_id = :student_id 
               AND school_id = :school_id 
-              AND academic_year_id = :academic_year_id
               AND UPPER(status) IN ('PAID', 'PARTIAL', 'COMPLETED')
             GROUP BY fee_month
         ");
         $stmtPaid->execute([
             ':student_id' => $studentId,
-            ':school_id' => $schoolId,
-            ':academic_year_id' => $academicYearId
+            ':school_id' => $schoolId
         ]);
         $paidRows = $stmtPaid->fetchAll(PDO::FETCH_ASSOC) ?: [];
         $paidByMonth = [];
