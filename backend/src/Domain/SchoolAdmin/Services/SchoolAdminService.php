@@ -10213,12 +10213,22 @@ Please verify the attached Excel workbook carefully before approving or rejectin
 Only approve the settlement after reviewing all financial records.
 ";
 
-        $secret = getenv('DB_PASS') ?: 'secure_fallback_salt';
+        $secret = getenv('APP_SECRET') ?: 'shikshapilot_settlement_secret_key_2026';
         $approveSig = hash_hmac('sha256', "report-{$report['id']}-action-approve", $secret);
         $rejectSig = hash_hmac('sha256', "report-{$report['id']}-action-reject", $secret);
 
-        $approveLink = "http://localhost:8000/api/public/financial-reports/{$report['id']}/settlement/approve?signature={$approveSig}";
-        $rejectLink = "http://localhost:8000/api/public/financial-reports/{$report['id']}/settlement/reject?signature={$rejectSig}";
+        $baseUrl = getenv('APP_URL');
+        if (!$baseUrl && isset($_SERVER['HTTP_HOST'])) {
+            $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+            $baseUrl = "{$scheme}://{$_SERVER['HTTP_HOST']}";
+        }
+        if (!$baseUrl) {
+            $baseUrl = 'http://localhost:8000';
+        }
+        $baseUrl = rtrim($baseUrl, '/');
+
+        $approveLink = "{$baseUrl}/api/public/financial-reports/{$report['id']}/settlement/approve?signature={$approveSig}";
+        $rejectLink = "{$baseUrl}/api/public/financial-reports/{$report['id']}/settlement/reject?signature={$rejectSig}";
 
         $emailBodyHtml = "
 <h3>Settlement Approval Request – Financial Report {$report['report_id']}</h3>
@@ -10295,7 +10305,7 @@ Only approve the settlement after reviewing all financial records.
         }
 
         // Validate HMAC signature to ensure link is secure
-        $secret = getenv('DB_PASS') ?: 'secure_fallback_salt';
+        $secret = getenv('APP_SECRET') ?: 'shikshapilot_settlement_secret_key_2026';
         $expectedSig = hash_hmac('sha256', "report-{$id}-action-approve", $secret);
         if (!hash_equals($expectedSig, $signature)) {
             return $this->renderOwnerResponseHtml("Unauthorized", "Invalid security signature for this settlement request.", false);
@@ -10340,7 +10350,7 @@ Only approve the settlement after reviewing all financial records.
         }
 
         // Validate HMAC signature to ensure link is secure
-        $secret = getenv('DB_PASS') ?: 'secure_fallback_salt';
+        $secret = getenv('APP_SECRET') ?: 'shikshapilot_settlement_secret_key_2026';
         $expectedSig = hash_hmac('sha256', "report-{$id}-action-reject", $secret);
         if (!hash_equals($expectedSig, $signature)) {
             return $this->renderOwnerResponseHtml("Unauthorized", "Invalid security signature for this settlement request.", false);
