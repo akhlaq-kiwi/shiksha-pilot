@@ -9701,10 +9701,45 @@ class SchoolAdminService extends BaseService
         $stmtDel->execute([':id' => $id, ':sid' => $schoolId]);
     }
 
+    private function ensureFinancialReportSchema(\PDO $pdo): void
+    {
+        static $checked = false;
+        if ($checked) return;
+        $checked = true;
+
+        try {
+            $stmtCol = $pdo->query("SHOW COLUMNS FROM financial_reports LIKE 'academic_year_id'");
+            if (!$stmtCol->fetch()) {
+                $pdo->exec("ALTER TABLE financial_reports ADD COLUMN academic_year_id INT(11) NULL AFTER school_id");
+            }
+            $stmtCol->closeCursor();
+
+            $pdo->exec("
+                UPDATE financial_reports fr
+                JOIN academic_years ay ON fr.school_id = ay.school_id 
+                  AND fr.from_date >= ay.start_date 
+                  AND fr.from_date <= ay.end_date
+                SET fr.academic_year_id = ay.id
+                WHERE fr.academic_year_id IS NULL
+            ");
+
+            $pdo->exec("
+                UPDATE additional_fee_payment_history afph
+                JOIN additional_fee_payments afp ON afph.payment_id = afp.id
+                JOIN students s ON afp.student_id = s.id
+                SET afph.academic_year_id = s.academic_year_id
+                WHERE afph.academic_year_id IS NULL
+            ");
+        } catch (\Throwable $e) {
+            // Ignore schema alter errors if already updated
+        }
+    }
+
     public function getFinancialPreview(array $user, string $from = '', string $to = ''): array
     {
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->financialReportRepo->getPdo();
+        $this->ensureFinancialReportSchema($pdo);
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
 
         if (!$workingYear) {
@@ -9717,13 +9752,16 @@ class SchoolAdminService extends BaseService
             ];
         }
 
+        $academicYearId = (int)$workingYear['id'];
+
         $latestReport = null;
         $stmtLatest = $pdo->prepare("
             SELECT * FROM financial_reports 
             WHERE school_id = :sid 
+              AND (academic_year_id = :ayid OR academic_year_id IS NULL)
             ORDER BY id DESC LIMIT 1
         ");
-        $stmtLatest->execute([':sid' => $schoolId]);
+        $stmtLatest->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
         $latestReport = $stmtLatest->fetch(PDO::FETCH_ASSOC);
 
         if (empty($from)) {
@@ -9734,12 +9772,21 @@ class SchoolAdminService extends BaseService
                 $from = $workingYear['start_date'] ?? date('Y-m-01');
             }
         }
+
+        $today = date('Y-m-d');
         if (empty($to)) {
-            $to = date('Y-m-d');
+            if (!empty($workingYear['end_date']) && $today > $workingYear['end_date']) {
+                $to = $workingYear['end_date'];
+            } else {
+                $to = max($from, $today);
+            }
         }
 
         if (strtotime($from) > strtotime($to)) {
-            $from = date('Y-m-01');
+            $from = $workingYear['start_date'] ?? date('Y-m-01');
+            if (strtotime($from) > strtotime($to)) {
+                $to = $from;
+            }
         }
 
         $fromTs = $from . ' 00:00:00';
@@ -9763,6 +9810,7 @@ class SchoolAdminService extends BaseService
         // 1. Total Student Tuition Fees Collected within report period
         $stmtFeesParams = array_merge([
             ':sid' => $schoolId,
+            ':ayid' => $academicYearId,
             ':from_date' => $from,
             ':to_date' => $to,
             ':from_ts' => $fromTs,
@@ -9774,6 +9822,7 @@ class SchoolAdminService extends BaseService
             FROM fee_payments fp
             JOIN students s ON fp.student_id = s.id
             WHERE fp.school_id = :sid 
+              AND (fp.academic_year_id = :ayid OR (fp.academic_year_id IS NULL AND s.academic_year_id = :ayid))
               AND fp.status IN ('PAID', 'Partial')
               {$cutoffClauseFp}
               AND (
@@ -9787,6 +9836,7 @@ class SchoolAdminService extends BaseService
         // 2. Total Additional Paid Fees within report period (from payment history)
         $stmtAddParams = array_merge([
             ':sid' => $schoolId,
+            ':ayid' => $academicYearId,
             ':from_date' => $from,
             ':to_date' => $to,
             ':from_ts' => $fromTs,
@@ -9800,6 +9850,7 @@ class SchoolAdminService extends BaseService
             JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
             JOIN students s ON afp.student_id = s.id
             WHERE afp.school_id = :sid 
+              AND (afph.academic_year_id = :ayid OR (afph.academic_year_id IS NULL AND s.academic_year_id = :ayid))
               {$cutoffClauseAdd}
               AND (
                 (afph.payment_date IS NOT NULL AND afph.payment_date >= :from_date AND afph.payment_date <= :to_date)
@@ -9814,6 +9865,7 @@ class SchoolAdminService extends BaseService
         // 3. Total Teacher Salaries Paid within report period
         $stmtSalParams = array_merge([
             ':sid' => $schoolId,
+            ':ayid' => $academicYearId,
             ':from_date' => $from,
             ':to_date' => $to,
             ':from_ts' => $fromTs,
@@ -9824,6 +9876,7 @@ class SchoolAdminService extends BaseService
             SELECT COALESCE(SUM(amount_paid), 0) 
             FROM staff_payments 
             WHERE school_id = :sid 
+              AND (academic_year_id = :ayid OR (academic_year_id IS NULL AND payment_date >= :from_date AND payment_date <= :to_date))
               {$cutoffClauseSal}
               AND (
                 (payment_date IS NOT NULL AND payment_date >= :from_date AND payment_date <= :to_date)
@@ -9836,6 +9889,7 @@ class SchoolAdminService extends BaseService
         // 4. Total School Expenses Logged within report period
         $stmtExpParams = array_merge([
             ':sid' => $schoolId,
+            ':ayid' => $academicYearId,
             ':from_date' => $from,
             ':to_date' => $to,
             ':from_ts' => $fromTs,
@@ -9846,6 +9900,7 @@ class SchoolAdminService extends BaseService
             SELECT COALESCE(SUM(amount), 0) 
             FROM school_expenses 
             WHERE school_id = :sid 
+              AND (academic_year_id = :ayid OR (academic_year_id IS NULL AND expense_date >= :from_date AND expense_date <= :to_date))
               {$cutoffClauseExp}
               AND (
                 (expense_date IS NOT NULL AND expense_date >= :from_date AND expense_date <= :to_date)
@@ -9880,7 +9935,10 @@ class SchoolAdminService extends BaseService
     {
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->financialReportRepo->getPdo();
+        $this->ensureFinancialReportSchema($pdo);
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+
+        $academicYearId = $workingYear ? (int)$workingYear['id'] : 0;
 
         $isDraftYear = isset($workingYear['status']) && strtoupper($workingYear['status']) === 'DRAFT';
         if ($isDraftYear) {
@@ -9891,13 +9949,14 @@ class SchoolAdminService extends BaseService
             ];
         }
 
-        // 1. Fetch generated reports for the school
+        // 1. Fetch generated reports for the school AND active academic year
         $stmt = $pdo->prepare("
             SELECT * FROM financial_reports 
             WHERE school_id = :sid 
+              AND (academic_year_id = :ayid OR academic_year_id IS NULL)
             ORDER BY id DESC
         ");
-        $stmt->execute([':sid' => $schoolId]);
+        $stmt->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
         $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         // 2. Format float values and dates
@@ -9934,7 +9993,9 @@ class SchoolAdminService extends BaseService
     {
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->financialReportRepo->getPdo();
+        $this->ensureFinancialReportSchema($pdo);
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+        $academicYearId = $workingYear ? (int)$workingYear['id'] : null;
 
         if (empty($data['from_date']) || empty($data['to_date'])) {
             throw new ValidationException(['from_date' => 'From date and To date are required.']);
@@ -9951,9 +10012,10 @@ class SchoolAdminService extends BaseService
         $stmtLatest = $pdo->prepare("
             SELECT * FROM financial_reports 
             WHERE school_id = :sid 
+              AND (academic_year_id = :ayid OR academic_year_id IS NULL)
             ORDER BY id DESC LIMIT 1
         ");
-        $stmtLatest->execute([':sid' => $schoolId]);
+        $stmtLatest->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
         $latestReport = $stmtLatest->fetch(PDO::FETCH_ASSOC);
 
         if ($latestReport && $latestReport['status'] !== 'Settled') {
@@ -9975,6 +10037,7 @@ class SchoolAdminService extends BaseService
 
         $id = $this->financialReportRepo->create([
             'school_id' => $schoolId,
+            'academic_year_id' => $academicYearId,
             'report_id' => $reportId,
             'from_date' => $from,
             'to_date' => $to,
@@ -10934,13 +10997,25 @@ Only approve the settlement after reviewing all financial records.
 
     private function getReportBounds(PDO $pdo, int $schoolId, array $report): array
     {
-        // Find previous report
-        $stmtPrev = $pdo->prepare("
-            SELECT * FROM financial_reports 
-            WHERE school_id = :sid AND created_at < :created_at 
-            ORDER BY created_at DESC LIMIT 1
-        ");
-        $stmtPrev->execute([':sid' => $schoolId, ':created_at' => $report['created_at']]);
+        // Find previous report for this academic year
+        $ayParam = $report['academic_year_id'] ?? null;
+        if ($ayParam !== null) {
+            $stmtPrev = $pdo->prepare("
+                SELECT * FROM financial_reports 
+                WHERE school_id = :sid 
+                  AND (academic_year_id = :ayid OR academic_year_id IS NULL)
+                  AND created_at < :created_at 
+                ORDER BY created_at DESC LIMIT 1
+            ");
+            $stmtPrev->execute([':sid' => $schoolId, ':ayid' => $ayParam, ':created_at' => $report['created_at']]);
+        } else {
+            $stmtPrev = $pdo->prepare("
+                SELECT * FROM financial_reports 
+                WHERE school_id = :sid AND created_at < :created_at 
+                ORDER BY created_at DESC LIMIT 1
+            ");
+            $stmtPrev->execute([':sid' => $schoolId, ':created_at' => $report['created_at']]);
+        }
         $prevReport = $stmtPrev->fetch(PDO::FETCH_ASSOC);
 
         if ($prevReport) {
