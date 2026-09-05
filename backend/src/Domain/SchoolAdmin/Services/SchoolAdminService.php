@@ -2641,9 +2641,11 @@ class SchoolAdminService extends BaseService
 
             if (!empty($joiningDateStr)) {
                 try {
-                    $joiningMonthName = date('F', strtotime((string)$joiningDateStr));
-                    if ($monthName === $joiningMonthName) {
-                        $joiningDateObj = new \DateTime((string)$joiningDateStr);
+                    $joiningDateObj = new \DateTime((string)$joiningDateStr);
+                    $joiningYM = $joiningDateObj->format('Y-m');
+                    $targetYM = sprintf("%04d-%02d", $mYear, (int)$mNum);
+
+                    if ($targetYM === $joiningYM) {
                         $daysInMonth = (int)$joiningDateObj->format('t');
                         $dayNum = (int)$joiningDateObj->format('d');
                         $workedDays = ($daysInMonth - $dayNum) + 1;
