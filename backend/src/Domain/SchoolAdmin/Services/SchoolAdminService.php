@@ -7521,9 +7521,9 @@ class SchoolAdminService extends BaseService
                 fp.receipt_no,
                 CASE 
                   WHEN s.last_name = '.' OR s.last_name IS NULL OR TRIM(s.last_name) = '' THEN 
-                    TRIM(CONCAT(s.first_name, ' ', COALESCE(s.middle_name, '')))
+                    TRIM(CONCAT(s.first_name, IF(s.middle_name IS NOT NULL AND TRIM(s.middle_name) != '', CONCAT(' ', TRIM(s.middle_name)), '')))
                   ELSE 
-                    TRIM(CONCAT(s.first_name, ' ', COALESCE(s.middle_name, ''), ' ', s.last_name))
+                    TRIM(CONCAT(s.first_name, IF(s.middle_name IS NOT NULL AND TRIM(s.middle_name) != '', CONCAT(' ', TRIM(s.middle_name)), ''), ' ', TRIM(s.last_name)))
                 END AS student_name,
                 s.roll_no AS student_roll_no,
                 s.academic_year_id AS student_ay_id,
@@ -7568,9 +7568,9 @@ class SchoolAdminService extends BaseService
                 COALESCE(afph.receipt_no, afp.receipt_no) AS receipt_no,
                 CASE 
                   WHEN s.last_name = '.' OR s.last_name IS NULL OR TRIM(s.last_name) = '' THEN 
-                    TRIM(CONCAT(s.first_name, ' ', COALESCE(s.middle_name, '')))
+                    TRIM(CONCAT(s.first_name, IF(s.middle_name IS NOT NULL AND TRIM(s.middle_name) != '', CONCAT(' ', TRIM(s.middle_name)), '')))
                   ELSE 
-                    TRIM(CONCAT(s.first_name, ' ', COALESCE(s.middle_name, ''), ' ', s.last_name))
+                    TRIM(CONCAT(s.first_name, IF(s.middle_name IS NOT NULL AND TRIM(s.middle_name) != '', CONCAT(' ', TRIM(s.middle_name)), ''), ' ', TRIM(s.last_name)))
                 END AS student_name,
                 s.roll_no AS student_roll_no,
                 s.academic_year_id AS student_ay_id,
@@ -7845,15 +7845,32 @@ class SchoolAdminService extends BaseService
 
             // 3. Search Query check (AND condition)
             if ($search !== '') {
-                $matchSearch = (
-                    stripos($t['student_name'], $search) !== false ||
-                    stripos((string)$t['student_roll_no'], $search) !== false ||
-                    stripos($t['receipt_no'], $search) !== false ||
-                    stripos($t['class_name'], $search) !== false ||
-                    stripos($t['collected_by'], $search) !== false
+                $normSearch = preg_replace('/\s+/', ' ', trim($search));
+                $normStudentName = preg_replace('/\s+/', ' ', trim($t['student_name'] ?? ''));
+                
+                $exactSubstringMatch = (
+                    stripos($normStudentName, $normSearch) !== false ||
+                    stripos((string)$t['student_roll_no'], $normSearch) !== false ||
+                    stripos($t['receipt_no'], $normSearch) !== false ||
+                    stripos($t['class_name'], $normSearch) !== false ||
+                    stripos($t['collected_by'], $normSearch) !== false
                 );
-                if (!$matchSearch) {
-                    return false;
+
+                if (!$exactSubstringMatch) {
+                    $searchTokens = array_filter(explode(' ', $normSearch));
+                    $allTokensMatched = !empty($searchTokens);
+                    $fullSearchableText = strtolower($normStudentName . ' ' . ($t['student_roll_no'] ?? '') . ' ' . ($t['receipt_no'] ?? '') . ' ' . ($t['class_name'] ?? '') . ' ' . ($t['collected_by'] ?? ''));
+                    
+                    foreach ($searchTokens as $token) {
+                        if (stripos($fullSearchableText, $token) === false) {
+                            $allTokensMatched = false;
+                            break;
+                        }
+                    }
+
+                    if (!$allTokensMatched) {
+                        return false;
+                    }
                 }
             }
 
@@ -9824,8 +9841,8 @@ class SchoolAdminService extends BaseService
         $latestReport = $stmtLatest->fetch(PDO::FETCH_ASSOC);
 
         if (empty($from)) {
-            if ($latestReport && !empty($latestReport['from_date'])) {
-                $from = $latestReport['from_date'];
+            if ($latestReport && !empty($latestReport['to_date'])) {
+                $from = $latestReport['to_date'];
             } else {
                 $from = $workingYear['start_date'] ?? '2000-01-01';
             }
@@ -10040,8 +10057,8 @@ class SchoolAdminService extends BaseService
         $suggestedStartDate = '';
         $latestReport = $reports[0] ?? null;
 
-        if ($latestReport) {
-            $suggestedStartDate = date('Y-m-d', strtotime($latestReport['to_date'] . ' +1 day'));
+        if ($latestReport && !empty($latestReport['to_date'])) {
+            $suggestedStartDate = $latestReport['to_date'];
         } else {
             if ($workingYear) {
                 $suggestedStartDate = $workingYear['start_date'];
