@@ -2387,17 +2387,36 @@ class SchoolAdminService extends BaseService
 
         $member['is_migrated'] = $this->isStaffMigrated($pdo, $id, $schoolId);
 
+        // Resolve all related staff IDs for this teacher across academic years (matching employee_id or email)
+        $relatedStaffIds = [(int)$id];
+        if (!empty($member['employee_id'])) {
+            $stmtRel = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND employee_id = :emp_id");
+            $stmtRel->execute([':sid' => $schoolId, ':emp_id' => $member['employee_id']]);
+            $relIds = $stmtRel->fetchAll(PDO::FETCH_COLUMN) ?: [];
+            foreach ($relIds as $rId) {
+                $relatedStaffIds[] = (int)$rId;
+            }
+        } else if (!empty($member['email'])) {
+            $stmtRel = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND email = :email");
+            $stmtRel->execute([':sid' => $schoolId, ':email' => $member['email']]);
+            $relIds = $stmtRel->fetchAll(PDO::FETCH_COLUMN) ?: [];
+            foreach ($relIds as $rId) {
+                $relatedStaffIds[] = (int)$rId;
+            }
+        }
+        $relatedStaffIds = array_values(array_unique($relatedStaffIds));
+
         // Fetch salary payments for current working academic year or current active year
         $member['salary_payments'] = [];
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
         if ($workingYear) {
+            $inClause = implode(',', array_map('intval', $relatedStaffIds));
             $stmtPayments = $pdo->prepare("
                 SELECT * FROM staff_payments 
-                WHERE staff_id = :sid 
+                WHERE staff_id IN ($inClause) 
                   AND (academic_year_id = :ayid OR academic_year_id = (SELECT id FROM academic_years WHERE school_id = :school_id AND is_current = 1 LIMIT 1))
             ");
             $stmtPayments->execute([
-                ':sid' => $id,
                 ':ayid' => $workingYear['id'],
                 ':school_id' => $schoolId
             ]);
@@ -2447,18 +2466,18 @@ class SchoolAdminService extends BaseService
             $member['monthly_salaries'] = $monthlySalaries;
         }
 
-        // Calculate Previous Year Pending Salaries for Migrated Teachers
+        // Calculate Previous Year Pending Salaries for Migrated Teachers (Scanning up to 2 previous academic years - LIMIT 2)
         $member['previous_year_pending'] = null;
         if ($workingYear) {
             $stmtPrevYear = $pdo->prepare("
                 SELECT * FROM academic_years 
                 WHERE school_id = :sid AND start_date < :curr_start_date 
-                ORDER BY start_date DESC LIMIT 1
+                ORDER BY start_date DESC LIMIT 2
             ");
             $stmtPrevYear->execute([':sid' => $schoolId, ':curr_start_date' => $workingYear['start_date']]);
-            $prevYear = $stmtPrevYear->fetch(PDO::FETCH_ASSOC);
+            $prevYears = $stmtPrevYear->fetchAll(PDO::FETCH_ASSOC) ?: [];
             
-            if ($prevYear) {
+            foreach ($prevYears as $prevYear) {
                 // Find matching staff record in previous year
                 $oldStaff = null;
                 if (!empty($member['employee_id'])) {
@@ -2472,17 +2491,16 @@ class SchoolAdminService extends BaseService
                 }
                 
                 if ($oldStaff) {
-                    // Fetch paid months for this teacher in previous academic year (check both old staff_id and current staff_id)
+                    // Fetch paid months for this teacher in previous academic year (check all related staff_ids)
+                    $inClause = implode(',', array_map('intval', $relatedStaffIds));
                     $stmtOldPaid = $pdo->prepare("
                         SELECT payment_month FROM staff_payments 
                         WHERE school_id = :sid 
-                          AND (staff_id = :old_sid OR staff_id = :curr_sid)
+                          AND staff_id IN ($inClause)
                           AND (academic_year_id = :ayid OR payment_month LIKE 'Previous Year - %')
                     ");
                     $stmtOldPaid->execute([
                         ':sid' => $schoolId,
-                        ':old_sid' => $oldStaff['id'],
-                        ':curr_sid' => $id,
                         ':ayid' => $prevYear['id']
                     ]);
                     $oldPaidRaw = $stmtOldPaid->fetchAll(PDO::FETCH_COLUMN) ?: [];
@@ -2528,6 +2546,7 @@ class SchoolAdminService extends BaseService
                                 $mNum = $monthMap[$mName] ?? '01';
                                 $mYear = ($idx >= 9) ? ($ayStartYear + 1) : $ayStartYear;
                                 $targetYM = "{$mYear}-{$mNum}";
+
                                 if ($targetYM >= $joiningYM) {
                                     $startMonthIndex = $idx;
                                     break;
@@ -2564,7 +2583,7 @@ class SchoolAdminService extends BaseService
                     }
 
                     if (!empty($validPrevMonths)) {
-                        $member['previous_year_pending'] = [
+                        $candidateCard = [
                             'academic_year_id' => $prevYear['id'],
                             'academic_year_name' => $prevYear['name'],
                             'valid_months' => $validPrevMonths,
@@ -2573,6 +2592,16 @@ class SchoolAdminService extends BaseService
                             'salary' => (float)$oldStaff['salary'],
                             'total_pending' => count($pendingMonths) * (float)$oldStaff['salary']
                         ];
+
+                        if ($member['previous_year_pending'] === null) {
+                            $member['previous_year_pending'] = $candidateCard;
+                        }
+
+                        // Prioritize the academic year that actually has pending months
+                        if (!empty($pendingMonths)) {
+                            $member['previous_year_pending'] = $candidateCard;
+                            break;
+                        }
                     }
                 }
             }
