@@ -9799,9 +9799,67 @@ class SchoolAdminService extends BaseService
                 SET afph.academic_year_id = s.academic_year_id
                 WHERE afph.academic_year_id IS NULL
             ");
+
+            // Resequence existing financial reports per school and academic year to fix any historical gap discrepancies
+            $stmtAll = $pdo->query("SELECT id, school_id, academic_year_id, report_id FROM financial_reports ORDER BY school_id ASC, academic_year_id ASC, id ASC");
+            if ($stmtAll) {
+                $rowsAll = $stmtAll->fetchAll(\PDO::FETCH_ASSOC);
+                $stmtAll->closeCursor();
+
+                $groups = [];
+                foreach ($rowsAll as $r) {
+                    $key = $r['school_id'] . '_' . ($r['academic_year_id'] ?? 'null');
+                    $groups[$key][] = $r;
+                }
+
+                $stmtUpd = $pdo->prepare("UPDATE financial_reports SET report_id = :rep_id WHERE id = :id");
+                foreach ($groups as $groupReports) {
+                    $seq = 1;
+                    foreach ($groupReports as $r) {
+                        $expectedId = 'REP-' . str_pad((string)$seq, 3, '0', STR_PAD_LEFT);
+                        if ($r['report_id'] !== $expectedId) {
+                            $stmtUpd->execute([
+                                ':rep_id' => $expectedId,
+                                ':id' => $r['id']
+                            ]);
+                        }
+                        $seq++;
+                    }
+                }
+            }
         } catch (\Throwable $e) {
             // Ignore schema alter errors if already updated
         }
+    }
+
+    public function generateNextReportId(\PDO $pdo, int $schoolId, ?int $academicYearId): string
+    {
+        if ($academicYearId !== null) {
+            $stmt = $pdo->prepare("
+                SELECT report_id FROM financial_reports 
+                WHERE school_id = :sid AND academic_year_id = :ayid
+            ");
+            $stmt->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+        } else {
+            $stmt = $pdo->prepare("
+                SELECT report_id FROM financial_reports 
+                WHERE school_id = :sid AND academic_year_id IS NULL
+            ");
+            $stmt->execute([':sid' => $schoolId]);
+        }
+        $reportIds = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+
+        $maxSeq = 0;
+        foreach ($reportIds as $repId) {
+            if (preg_match('/REP-(\d+)/i', $repId, $matches)) {
+                $num = (int)$matches[1];
+                if ($num > $maxSeq) {
+                    $maxSeq = $num;
+                }
+            }
+        }
+
+        return 'REP-' . str_pad((string)($maxSeq + 1), 3, '0', STR_PAD_LEFT);
     }
 
     public function getFinancialPreview(array $user, string $from = '', string $to = '', ?int $overrideAyId = null): array
@@ -10115,11 +10173,8 @@ class SchoolAdminService extends BaseService
         // Recalculate profit loss for security with transaction isolation
         $preview = $this->getFinancialPreview($user, $from, $to, $academicYearId);
 
-        // Generate report ID (REP-XXX)
-        $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM financial_reports WHERE school_id = :sid");
-        $stmtCount->execute([':sid' => $schoolId]);
-        $count = (int)$stmtCount->fetchColumn();
-        $reportId = 'REP-' . str_pad((string)($count + 1), 3, '0', STR_PAD_LEFT);
+        // Generate report ID (REP-XXX) sequentially per academic year
+        $reportId = $this->generateNextReportId($pdo, $schoolId, $academicYearId);
 
         $id = $this->financialReportRepo->create([
             'school_id' => $schoolId,
