@@ -4609,11 +4609,13 @@ class SchoolAdminService extends BaseService
                     $prevYearObj = $stmtPrevYear->fetch(PDO::FETCH_ASSOC);
 
                     if ($prevYearObj) {
-                        $preview = $this->getFinancialPreview($user, $prevYearObj['start_date'], date('Y-m-d'));
+                        $preview = $this->getFinancialPreview($user, $prevYearObj['start_date'], date('Y-m-d'), (int)$prevYearId);
                         if (abs($preview['fees_collected']) > 0.01 || abs($preview['salary_paid']) > 0.01) {
                             $this->createFinancialReport($user, [
                                 'from_date' => $preview['from_date'],
-                                'to_date' => $preview['to_date']
+                                'to_date' => $preview['to_date'],
+                                'academic_year_id' => (int)$prevYearId,
+                                'status' => 'Settled'
                             ]);
                         }
                     }
@@ -9754,12 +9756,19 @@ class SchoolAdminService extends BaseService
         }
     }
 
-    public function getFinancialPreview(array $user, string $from = '', string $to = ''): array
+    public function getFinancialPreview(array $user, string $from = '', string $to = '', ?int $overrideAyId = null): array
     {
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->financialReportRepo->getPdo();
         $this->ensureFinancialReportSchema($pdo);
-        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+        
+        if ($overrideAyId) {
+            $stmtAyOverride = $pdo->prepare("SELECT * FROM academic_years WHERE id = :id AND school_id = :sid LIMIT 1");
+            $stmtAyOverride->execute([':id' => $overrideAyId, ':sid' => $schoolId]);
+            $workingYear = $stmtAyOverride->fetch(PDO::FETCH_ASSOC);
+        } else {
+            $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+        }
 
         if (!$workingYear) {
             return [
@@ -9980,6 +9989,28 @@ class SchoolAdminService extends BaseService
         $stmt->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
         $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+        // Auto-heal/generate final report for Archived academic years if un-reported transactions exist
+        if ($workingYear && isset($workingYear['status']) && strtoupper($workingYear['status']) === 'ARCHIVED') {
+            try {
+                $preview = $this->getFinancialPreview($user, $workingYear['start_date'], $workingYear['end_date'], $academicYearId);
+                if (abs($preview['fees_collected']) > 0.01 || abs($preview['salary_paid']) > 0.01) {
+                    $latestReport = $reports[0] ?? null;
+                    if (!$latestReport || $latestReport['status'] === 'Settled') {
+                        $this->createFinancialReport($user, [
+                            'from_date' => $preview['from_date'],
+                            'to_date' => $preview['to_date'],
+                            'academic_year_id' => $academicYearId,
+                            'status' => 'Settled'
+                        ]);
+                        $stmt->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+                        $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                    }
+                }
+            } catch (\Throwable $ex) {
+                // Ignore auto-heal failures
+            }
+        }
+
         // 2. Format float values and dates
         $reports = array_map(function($r) {
             $r['id'] = (int)$r['id'];
@@ -10016,7 +10047,8 @@ class SchoolAdminService extends BaseService
         $pdo = $this->financialReportRepo->getPdo();
         $this->ensureFinancialReportSchema($pdo);
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
-        $academicYearId = $workingYear ? (int)$workingYear['id'] : null;
+        $academicYearId = !empty($data['academic_year_id']) ? (int)$data['academic_year_id'] : ($workingYear ? (int)$workingYear['id'] : null);
+        $reportStatus = !empty($data['status']) ? $data['status'] : 'Hand Over';
 
         if (empty($data['from_date']) || empty($data['to_date'])) {
             throw new ValidationException(['from_date' => 'From date and To date are required.']);
@@ -10048,7 +10080,7 @@ class SchoolAdminService extends BaseService
         }
 
         // Recalculate profit loss for security with transaction isolation
-        $preview = $this->getFinancialPreview($user, $from, $to);
+        $preview = $this->getFinancialPreview($user, $from, $to, $academicYearId);
 
         // Generate report ID (REP-XXX)
         $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM financial_reports WHERE school_id = :sid");
@@ -10065,7 +10097,7 @@ class SchoolAdminService extends BaseService
             'fees_collected' => $preview['fees_collected'],
             'salary_paid' => $preview['salary_paid'],
             'profit_loss' => $preview['profit_loss'],
-            'status' => 'Hand Over'
+            'status' => $reportStatus
         ]);
 
         return $this->financialReportRepo->findById($id);
