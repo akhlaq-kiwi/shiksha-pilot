@@ -9793,21 +9793,15 @@ class SchoolAdminService extends BaseService
         $latestReport = $stmtLatest->fetch(PDO::FETCH_ASSOC);
 
         if (empty($from)) {
-            if ($latestReport && !empty($latestReport['to_date'])) {
-                $nextStart = date('Y-m-d', strtotime($latestReport['to_date'] . ' +1 day'));
-                $from = $nextStart;
+            if ($latestReport && !empty($latestReport['from_date'])) {
+                $from = $latestReport['from_date'];
             } else {
-                $from = $workingYear['start_date'] ?? date('Y-m-01');
+                $from = $workingYear['start_date'] ?? '2000-01-01';
             }
         }
 
-        $today = date('Y-m-d');
         if (empty($to)) {
-            if (!empty($workingYear['end_date']) && $today > $workingYear['end_date']) {
-                $to = $workingYear['end_date'];
-            } else {
-                $to = max($from, $today);
-            }
+            $to = date('Y-m-d');
         }
 
         if (strtotime($from) > strtotime($to)) {
@@ -9992,7 +9986,7 @@ class SchoolAdminService extends BaseService
         // Auto-heal/generate final report for Archived academic years if un-reported transactions exist
         if ($workingYear && isset($workingYear['status']) && strtoupper($workingYear['status']) === 'ARCHIVED') {
             try {
-                $preview = $this->getFinancialPreview($user, $workingYear['start_date'], $workingYear['end_date'], $academicYearId);
+                $preview = $this->getFinancialPreview($user, '', '', $academicYearId);
                 if (abs($preview['fees_collected']) > 0.01 || abs($preview['salary_paid']) > 0.01) {
                     $latestReport = $reports[0] ?? null;
                     if (!$latestReport || $latestReport['status'] === 'Settled') {
