@@ -10678,6 +10678,20 @@ Only approve the settlement after reviewing all financial records.
         $latestReport = $stmtLatest->fetch(PDO::FETCH_ASSOC);
         $latestReportCreatedAt = $latestReport ? $latestReport['created_at'] : null;
 
+        $cutoffClauseFp = "";
+        $cutoffClauseAdd = "";
+        $cutoffClauseSal = "";
+        $cutoffClauseExp = "";
+        $cutoffParams = [];
+
+        if ($latestReport && !empty($latestReport['created_at'])) {
+            $cutoffClauseFp = " AND fp.created_at > :cutoff_ts";
+            $cutoffClauseAdd = " AND afph.created_at > :cutoff_ts";
+            $cutoffClauseSal = " AND sp.created_at > :cutoff_ts";
+            $cutoffClauseExp = " AND se.created_at > :cutoff_ts";
+            $cutoffParams[':cutoff_ts'] = $latestReport['created_at'];
+        }
+
         if (empty($from)) {
             $from = $workingYear['start_date'] ?? date('Y-m-01');
         }
@@ -10688,13 +10702,13 @@ Only approve the settlement after reviewing all financial records.
         $fromTs = $from . ' 00:00:00';
         $toTs = $to . ' 23:59:59';
 
-        $feeParams = [
+        $feeParams = array_merge([
             ':sid' => $schoolId,
             ':from_date' => $from,
             ':to_date' => $to,
             ':from_ts' => $fromTs,
             ':to_ts' => $toTs
-        ];
+        ], $cutoffParams);
         $ayClauseFp = "";
         if ($repAyId) {
             $ayClauseFp = " AND (fp.academic_year_id = :ayid1 OR (fp.academic_year_id IS NULL AND s.academic_year_id = :ayid2))";
@@ -10723,6 +10737,7 @@ Only approve the settlement after reviewing all financial records.
             LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = fp.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = fp.school_id)
             WHERE fp.school_id = :sid 
               {$ayClauseFp}
+              {$cutoffClauseFp}
               AND fp.status IN ('PAID', 'Partial')
               AND (
                 (fp.payment_date IS NOT NULL AND fp.payment_date >= :from_date AND fp.payment_date <= :to_date)
@@ -10732,13 +10747,13 @@ Only approve the settlement after reviewing all financial records.
         $stmtFeeList->execute($feeParams);
         $feePayments = $stmtFeeList->fetchAll(PDO::FETCH_ASSOC);
 
-        $addParams = [
+        $addParams = array_merge([
             ':sid' => $schoolId,
             ':from_date' => $from,
             ':to_date' => $to,
             ':from_ts' => $fromTs,
             ':to_ts' => $toTs
-        ];
+        ], $cutoffParams);
         $ayClauseAdd = "";
         if ($repAyId) {
             $ayClauseAdd = " AND (afph.academic_year_id = :ayid1 OR (afph.academic_year_id IS NULL AND s.academic_year_id = :ayid2))";
@@ -10769,6 +10784,7 @@ Only approve the settlement after reviewing all financial records.
             LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = afph.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = afp.school_id)
             WHERE afp.school_id = :sid 
               {$ayClauseAdd}
+              {$cutoffClauseAdd}
               AND (
                 (afph.payment_date IS NOT NULL AND afph.payment_date >= :from_date AND afph.payment_date <= :to_date)
                 OR (afph.payment_date IS NULL AND afph.created_at >= :from_ts AND afph.created_at <= :to_ts)
@@ -10822,13 +10838,13 @@ Only approve the settlement after reviewing all financial records.
             return strcmp($a['student_name'] ?? '', $b['student_name'] ?? '');
         });
 
-        $salParams = [
+        $salParams = array_merge([
             ':sid' => $schoolId,
             ':from_date' => $from,
             ':to_date' => $to,
             ':from_ts' => $fromTs,
             ':to_ts' => $toTs
-        ];
+        ], $cutoffParams);
         $ayClauseSal = "";
         if ($repAyId) {
             $ayClauseSal = " AND (sp.academic_year_id = :ayid OR sp.academic_year_id IS NULL)";
@@ -10842,6 +10858,7 @@ Only approve the settlement after reviewing all financial records.
             LEFT JOIN academic_years ay ON sp.academic_year_id = ay.id
             WHERE sp.school_id = :sid 
               {$ayClauseSal}
+              {$cutoffClauseSal}
               AND (
                 (sp.payment_date IS NOT NULL AND sp.payment_date >= :from_date AND sp.payment_date <= :to_date)
                 OR (sp.payment_date IS NULL AND sp.created_at >= :from_ts AND sp.created_at <= :to_ts)
@@ -10866,13 +10883,13 @@ Only approve the settlement after reviewing all financial records.
             ];
         }
 
-        $expParams = [
+        $expParams = array_merge([
             ':sid' => $schoolId,
             ':from_date' => $from,
             ':to_date' => $to,
             ':from_ts' => $fromTs,
             ':to_ts' => $toTs
-        ];
+        ], $cutoffParams);
         $ayClauseExp = "";
         if ($repAyId) {
             $ayClauseExp = " AND (se.academic_year_id = :ayid OR se.academic_year_id IS NULL)";
@@ -10884,6 +10901,7 @@ Only approve the settlement after reviewing all financial records.
             FROM school_expenses se
             WHERE se.school_id = :sid 
               {$ayClauseExp}
+              {$cutoffClauseExp}
               AND (
                 (se.expense_date IS NOT NULL AND se.expense_date >= :from_date AND se.expense_date <= :to_date)
                 OR (se.expense_date IS NULL AND se.created_at >= :from_ts AND se.created_at <= :to_ts)
