@@ -4646,7 +4646,7 @@ class SchoolAdminService extends BaseService
                                 'from_date' => $preview['from_date'],
                                 'to_date' => $preview['to_date'],
                                 'academic_year_id' => (int)$prevYearId,
-                                'status' => 'Settled'
+                                'status' => 'Hand Over'
                             ]);
                         }
                     }
@@ -10033,7 +10033,7 @@ class SchoolAdminService extends BaseService
                             'from_date' => $preview['from_date'],
                             'to_date' => $preview['to_date'],
                             'academic_year_id' => $academicYearId,
-                            'status' => 'Settled'
+                            'status' => 'Hand Over'
                         ]);
                         $stmt->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
                         $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
