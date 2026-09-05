@@ -9995,15 +9995,6 @@ class SchoolAdminService extends BaseService
 
         $academicYearId = $workingYear ? (int)$workingYear['id'] : 0;
 
-        $isDraftYear = isset($workingYear['status']) && strtoupper($workingYear['status']) === 'DRAFT';
-        if ($isDraftYear) {
-            return [
-                'reports' => [],
-                'next_suggested_start_date' => $workingYear['start_date'] ?? date('Y-m-d'),
-                'has_previous_report' => false
-            ];
-        }
-
         // 1. Fetch generated reports for the school AND active academic year
         $stmt = $pdo->prepare("
             SELECT * FROM financial_reports 
