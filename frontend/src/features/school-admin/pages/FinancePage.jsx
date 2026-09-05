@@ -196,12 +196,17 @@ export default function FinancePage() {
   const hasPreviousYearDuesByStudent = {};
 
   additionalFeePayments.forEach(p => {
-    if (p.status === 'Pending' && (!p.due_date || p.due_date <= todayStr || p.fee_name === 'Previous Year Dues')) {
+    const pStatus = (p.status || '').toLowerCase();
+    if ((pStatus === 'pending' || pStatus === 'partial') && (!p.due_date || p.due_date <= todayStr || p.fee_name === 'Previous Year Dues')) {
       const studentId = parseInt(p.student_id, 10);
       if (!additionalUnpaidByStudent[studentId]) {
         additionalUnpaidByStudent[studentId] = 0;
       }
-      additionalUnpaidByStudent[studentId] += parseFloat(p.amount || 0);
+      const totalAmt = parseFloat(p.amount || 0);
+      const paidAmt = parseFloat(p.amount_paid || 0);
+      const discAmt = parseFloat(p.discount_amount || 0);
+      const remDue = Math.max(0, totalAmt - paidAmt - discAmt);
+      additionalUnpaidByStudent[studentId] += remDue;
 
       if (!unpaidAddCountByStudent[studentId]) {
         unpaidAddCountByStudent[studentId] = 0;
@@ -244,7 +249,7 @@ export default function FinancePage() {
     const unpaidAddAmt = additionalUnpaidByStudent[student.id] || 0;
     outstandingDues += unpaidAddAmt;
 
-    const paidAddCount = additionalFeePayments.filter(p => parseInt(p.student_id, 10) === student.id && p.status === 'Paid').length;
+    const paidAddCount = additionalFeePayments.filter(p => parseInt(p.student_id, 10) === student.id && (p.status === 'Paid' || p.status === 'Partial')).length;
     const hasPayments = paidMonths.length > 0 || paidAddCount > 0;
 
     let status = 'PAID';
