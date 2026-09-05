@@ -1201,9 +1201,8 @@ export default function StaffPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                     {getVisibleMonths(t.joining_date, currentYear?.start_date || (academicYears.find(y => y.is_current) || academicYears.find(y => y.status === 'Draft'))?.start_date).map(month => {
                       const payment = (t.salary_payments || []).find(p => 
-                        p.payment_month === month && 
-                        (!t.previous_year_pending || parseInt(p.academic_year_id, 10) !== parseInt(t.previous_year_pending.academic_year_id, 10)) &&
-                        !String(p.payment_month).startsWith('Previous Year - ')
+                        (p.payment_month === month || p.payment_month === `Previous Year - ${month}`) && 
+                        (!t.previous_year_pending || parseInt(p.academic_year_id, 10) !== parseInt(t.previous_year_pending.academic_year_id, 10))
                       );
                       const isPaid = !!payment;
                       const isLocked = payment ? !!payment.is_locked : false;
