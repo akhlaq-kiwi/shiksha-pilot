@@ -3975,6 +3975,25 @@ class SchoolAdminService extends BaseService
         $prevYearId = (int)$currentYearId;
         $prevYear = $currentYearObj;
 
+        // Enforce: Prevent completing migration if there are pending/unsettled financial reports in the active session
+        $stmtUnsettled = $pdo->prepare("
+            SELECT report_id, status FROM financial_reports 
+            WHERE school_id = :sid 
+              AND (academic_year_id = :ayid OR academic_year_id IS NULL)
+              AND status != 'Settled'
+            ORDER BY id DESC LIMIT 1
+        ");
+        $stmtUnsettled->execute([':sid' => $schoolId, ':ayid' => $currentYearId]);
+        $unsettledReport = $stmtUnsettled->fetch(PDO::FETCH_ASSOC);
+
+        if ($unsettledReport) {
+            $repId = htmlspecialchars($unsettledReport['report_id']);
+            $repStatus = htmlspecialchars($unsettledReport['status']);
+            throw new ValidationException([
+                'migration' => "Cannot complete Academic Year Migration because Financial Report '{$repId}' is currently in '{$repStatus}' status. Please settle all financial reports before completing migration."
+            ]);
+        }
+
         // Fetch the DRAFT academic year for migration target
         $stmtDraft = $pdo->prepare("SELECT * FROM academic_years WHERE school_id = :sid AND status = 'Draft' LIMIT 1");
         $stmtDraft->execute([':sid' => $schoolId]);
@@ -10064,6 +10083,17 @@ class SchoolAdminService extends BaseService
 
         if ($report['status'] === 'Settled') {
             throw new ValidationException(['fields' => 'Settled reports cannot be deleted.']);
+        }
+
+        // Enforce: Financial reports in an Archived academic year cannot be deleted under any status
+        if (!empty($report['academic_year_id'])) {
+            $stmtAy = $pdo->prepare("SELECT status FROM academic_years WHERE id = :ayid AND school_id = :sid");
+            $stmtAy->execute([':ayid' => (int)$report['academic_year_id'], ':sid' => $schoolId]);
+            $ayStatus = $stmtAy->fetchColumn();
+
+            if ($ayStatus === 'Archived') {
+                throw new ValidationException(['fields' => 'Financial reports in an Archived academic year cannot be deleted.']);
+            }
         }
 
         $stmt = $pdo->prepare("DELETE FROM financial_reports WHERE id = :id AND school_id = :sid");

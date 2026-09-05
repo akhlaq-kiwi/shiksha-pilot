@@ -162,6 +162,10 @@ export default function FinancialReportsPage() {
   };
 
   const handleDeleteReportClick = (report) => {
+    if (isReadOnly || currentYear?.status === 'Archived') {
+      setError('Financial reports in an Archived academic year cannot be deleted.');
+      return;
+    }
     if (report.status === 'Settled') {
       setError('Settled reports cannot be deleted.');
       return;
@@ -620,7 +624,7 @@ export default function FinancialReportsPage() {
                         <Download className="h-3 w-3" /> Export Report
                       </button>
 
-                      {r.status !== 'Settled' && (
+                      {r.status !== 'Settled' && !isReadOnly && currentYear?.status !== 'Archived' && (
                         <button
                           onClick={() => handleDeleteReportClick(r)}
                           title="Delete Unsettled Report"
