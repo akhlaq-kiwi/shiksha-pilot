@@ -65,16 +65,17 @@ class FeeRepository extends BaseRepository
             $ayStatus = $ayRow ? (string)$ayRow['status'] : '';
             $isCurrent = $ayRow ? (int)$ayRow['is_current'] : 0;
 
-            if ($ayStatus === 'DRAFT') {
-                return 0.0;
-            }
+
+
+            $ayClauseMonthly = "AND fp.academic_year_id = :ayid";
+            $ayClauseAdd = "AND (afph.academic_year_id = :ayid1 OR (afph.academic_year_id IS NULL AND (aft.academic_year_id = :ayid2 OR s.academic_year_id = :ayid3)))";
 
             $stmt = $this->pdo->prepare("
                 SELECT COALESCE(SUM(fp.amount_paid), 0) 
                 FROM fee_payments fp
                 WHERE fp.school_id = :sid 
                   AND fp.status IN ('PAID', 'Partial')
-                  AND fp.academic_year_id = :ayid
+                  {$ayClauseMonthly}
             ");
             $stmt->execute([
                 ':sid' => $schoolId, 
@@ -89,10 +90,7 @@ class FeeRepository extends BaseRepository
                 JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
                 JOIN students s ON afp.student_id = s.id
                 WHERE afp.school_id = :sid
-                  AND (
-                    afph.academic_year_id = :ayid1 
-                    OR (afph.academic_year_id IS NULL AND (aft.academic_year_id = :ayid2 OR s.academic_year_id = :ayid3))
-                  )
+                  {$ayClauseAdd}
             ");
             $stmtAdd->execute([
                 ':sid' => $schoolId,

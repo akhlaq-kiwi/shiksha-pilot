@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Calendar, ArrowRight, AlertCircle, RefreshCw, BarChart2, Sparkles, Download, MoreHorizontal } from 'lucide-react';
+import { FileText, Calendar, ArrowRight, AlertCircle, RefreshCw, BarChart2, Sparkles, Download, MoreHorizontal, Trash2, AlertTriangle } from 'lucide-react';
 import { Card, CardHeader, CardTitle } from '../../../common/ui/card';
 import { Button } from '../../../common/ui/button';
 import { Input } from '../../../common/ui/input';
@@ -137,10 +137,63 @@ export default function FinancialReportsPage() {
   
   // Action states
   const [submitting, setSubmitting] = useState(false);
+  const [generatingReport, setGeneratingReport] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [showGenerateConfirm, setShowGenerateConfirm] = useState(false);
   const [showSettlementConfirm, setShowSettlementConfirm] = useState(false);
   const [settlementTarget, setSettlementTarget] = useState(null);
+
+  const [showBlockedModal, setShowBlockedModal] = useState(false);
+  const [blockedReport, setBlockedReport] = useState(null);
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [reportToDelete, setReportToDelete] = useState(null);
+  const [deletingReport, setDeletingReport] = useState(false);
+  const [handingOverId, setHandingOverId] = useState(null);
+
+  const handleStartGenerate = () => {
+    if (reports.length > 0 && reports[0].status !== 'Settled') {
+      setBlockedReport(reports[0]);
+      setShowBlockedModal(true);
+      return;
+    }
+    setShowGenerateConfirm(true);
+  };
+
+  const handleDeleteReportClick = (report) => {
+    if (isReadOnly || currentYear?.status === 'Archived') {
+      setError('Financial reports in an Archived academic year cannot be deleted.');
+      return;
+    }
+    if (report.status === 'Settled') {
+      setError('Settled reports cannot be deleted.');
+      return;
+    }
+    setReportToDelete(report);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleConfirmDeleteReport = async () => {
+    if (!reportToDelete) return;
+    setDeletingReport(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      await schoolService.deleteFinancialReport(reportToDelete.id);
+      setSuccess(`Financial report ${reportToDelete.report_id} deleted successfully.`);
+      setShowDeleteConfirm(false);
+      setReportToDelete(null);
+      await loadReports();
+      setTimeout(() => setSuccess(''), 4000);
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Failed to delete financial report.');
+    } finally {
+      setDeletingReport(false);
+    }
+  };
 
   const fetchPreview = async (fDate = fromDate, tDate = toDate) => {
     const start = fDate || getISOFirstDayOfMonth();
@@ -208,6 +261,30 @@ export default function FinancialReportsPage() {
     fetchPreview(fDate, tDate);
   };
 
+  const handleConfirmGenerateReport = async () => {
+    setShowGenerateConfirm(false);
+    setGeneratingReport(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      const fDate = fromDate || getISOFirstDayOfMonth();
+      const tDate = toDate || getISOToday();
+      await schoolService.createFinancialReport({
+        from_date: fDate,
+        to_date: tDate
+      });
+      setSuccess('Financial report generated successfully.');
+      await loadReports();
+      setTimeout(() => setSuccess(''), 4000);
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Failed to generate financial report.');
+    } finally {
+      setGeneratingReport(false);
+    }
+  };
+
   const handleSendSettlementRequest = (report) => {
     setSettlementTarget(report);
     setShowSettlementConfirm(true);
@@ -270,22 +347,25 @@ export default function FinancialReportsPage() {
 
   const handleConfirmSettlementRequest = async () => {
     if (!settlementTarget) return;
+    const targetId = settlementTarget.id;
     setShowSettlementConfirm(false);
+    setHandingOverId(targetId);
     setSubmitting(true);
     setError('');
     setSuccess('');
     
     try {
-      await schoolService.submitSettlementRequest(settlementTarget.id);
-      setSuccess('Settlement request submitted successfully.');
+      await schoolService.submitSettlementRequest(targetId);
+      setSuccess('Hand over request submitted successfully. Email notification sent to School Admin.');
       setSettlementTarget(null);
       await loadReports();
       setTimeout(() => setSuccess(''), 4000);
     } catch (err) {
       console.error(err);
-      setError(err.message || 'Failed to submit settlement request.');
+      setError(err.message || 'Failed to submit hand over request.');
     } finally {
       setSubmitting(false);
+      setHandingOverId(null);
     }
   };
 
@@ -300,7 +380,7 @@ export default function FinancialReportsPage() {
           </div>
           <div>
             <h2 className="text-2xl font-bold text-text-primary tracking-tight font-display">Financial Reports</h2>
-            <p className="text-text-secondary text-xs mt-1">Automatic monthly accounting reports for school owners and live profit/loss preview for ongoing month.</p>
+            <p className="text-text-secondary text-xs mt-1">On-demand financial accounting reports for school owners and live profit/loss preview for ongoing period.</p>
           </div>
         </div>
       </div>
@@ -319,7 +399,7 @@ export default function FinancialReportsPage() {
             </CardHeader>
             <div className="space-y-4">
               <div className="text-xs text-text-secondary leading-relaxed bg-zinc-50/50 dark:bg-zinc-900/10 p-3.5 rounded-xl border border-border border-dashed">
-                Completed monthly financial reports are generated <strong>automatically by the system on the 1st day of every month at 12:00 AM</strong> (covering all 28, 30, or 31 days of the month). Use this preview to inspect live transactions for the current month.
+                Inspect live transaction ledgers and generate on-demand financial accounting reports for any period. Click <strong>Generate Financial Report</strong> below to freeze transactions and log a report into history.
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -350,19 +430,38 @@ export default function FinancialReportsPage() {
                 </p>
               )}
 
-              <Button 
-                onClick={handlePreview} 
-                disabled={previewLoading}
-                className="w-full py-2.5 font-bold uppercase tracking-wider text-xs flex items-center justify-center gap-2"
-              >
-                {previewLoading ? (
-                  <>
-                    <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Calculating Preview...
-                  </>
-                ) : (
-                  'Preview Report'
-                )}
-              </Button>
+              <div className="space-y-3 pt-1">
+                <Button 
+                  onClick={handlePreview} 
+                  disabled={previewLoading || generatingReport}
+                  variant="secondary"
+                  className="w-full py-2.5 font-bold uppercase tracking-wider text-xs flex items-center justify-center gap-2"
+                >
+                  {previewLoading ? (
+                    <>
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Calculating...
+                    </>
+                  ) : (
+                    'Preview Report'
+                  )}
+                </Button>
+
+                <Button 
+                  onClick={handleStartGenerate} 
+                  disabled={previewLoading || generatingReport}
+                  className="w-full py-2.5 font-bold uppercase tracking-wider text-xs flex items-center justify-center gap-2 bg-primary text-white"
+                >
+                  {generatingReport ? (
+                    <>
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-3.5 w-3.5" /> Generate Financial Report
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </Card>
 
@@ -481,28 +580,60 @@ export default function FinancialReportsPage() {
               return (
                 <Card key={r.id} className="bg-surface border border-border p-5 rounded-2xl shadow-2xs space-y-4 relative hover:shadow-xs transition-shadow">
                   
-                  {/* Card Header ID & Settle Action */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                  {/* Card Header ID & Status */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-bold text-text-primary font-mono">{r.report_id}</span>
-                      {r.status === 'Request Sent' && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase border bg-primary/10 text-primary border-primary/20">
-                          Request Sent
+                      
+                      {handingOverId === r.id ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[11px] font-bold uppercase border bg-amber-500/10 text-amber-700 border-amber-500/30 font-sans animate-pulse">
+                          <RefreshCw className="h-3 w-3 animate-spin text-amber-600" /> Handing Over...
                         </span>
-                      )}
-                      {r.status === 'Settled' && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase border bg-green-500/10 text-green-600 border-green-500/20 font-sans">
+                      ) : r.status === 'Hand Over' ? (
+                        <button
+                          onClick={() => handleSendSettlementRequest(r)}
+                          title="Click to hand over report"
+                          className="inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-bold uppercase border bg-amber-500/10 text-amber-700 border-amber-500/30 font-sans hover:bg-amber-500/20 hover:scale-105 transition-all cursor-pointer shadow-2xs"
+                        >
+                          Hand Over
+                        </button>
+                      ) : (r.status === 'Pending' || r.status === 'Request Sent') ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-bold uppercase border bg-amber-500/15 text-amber-800 border-amber-500/30 font-sans">
+                          Pending
+                        </span>
+                      ) : (r.status === 'Handed Over' || r.status === 'Settled') ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-bold uppercase border bg-emerald-500/10 text-emerald-700 border-emerald-500/30 font-sans">
                           Settled
                         </span>
-                      )}
+                      ) : r.status === 'Rejected' ? (
+                        <button
+                          onClick={() => handleSendSettlementRequest(r)}
+                          title="Click to re-submit handover request"
+                          className="inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-bold uppercase border bg-red-500/10 text-red-600 border-red-500/30 font-sans hover:bg-red-500/20 hover:scale-105 transition-all cursor-pointer shadow-2xs"
+                        >
+                          Rejected
+                        </button>
+                      ) : null}
                     </div>
 
-                    <button
-                      onClick={() => handleExportReport(r)}
-                      className="text-[11px] font-bold uppercase tracking-tight text-primary hover:underline"
-                    >
-                      Export Report
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleExportReport(r)}
+                        className="text-[11px] font-bold uppercase tracking-tight text-emerald-600 hover:text-emerald-700 hover:underline whitespace-nowrap flex items-center gap-1"
+                      >
+                        <Download className="h-3 w-3" /> Export Report
+                      </button>
+
+                      {r.status !== 'Settled' && !isReadOnly && currentYear?.status !== 'Archived' && (
+                        <button
+                          onClick={() => handleDeleteReportClick(r)}
+                          title="Delete Unsettled Report"
+                          className="p-1 text-zinc-400 hover:text-red-500 transition-colors rounded-md hover:bg-red-50 dark:hover:bg-red-950/30"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Period dates */}
@@ -547,6 +678,42 @@ export default function FinancialReportsPage() {
           </div>
         )}
 
+      {showGenerateConfirm && (
+        <Dialog
+          isOpen={showGenerateConfirm}
+          onClose={() => setShowGenerateConfirm(false)}
+          title="Generate Financial Report?"
+          description=""
+          className="max-w-md animate-in fade-in duration-200"
+          footer={
+            <div className="flex gap-2 justify-end w-full">
+              <Button 
+                variant="secondary" 
+                onClick={() => setShowGenerateConfirm(false)}
+                disabled={generatingReport}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleConfirmGenerateReport}
+                disabled={generatingReport}
+                className="font-bold bg-primary text-white"
+              >
+                {generatingReport ? 'Generating...' : 'Generate Report'}
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-3 text-sm mt-2">
+            <p className="text-zinc-600 dark:text-zinc-400">
+              Are you sure you want to generate a financial report for the period <strong className="text-text-primary">{formatDateDisplay(fromDate)}</strong> to <strong className="text-text-primary">{formatDateDisplay(toDate)}</strong>?
+            </p>
+            <p className="text-xs text-zinc-500 leading-normal">
+              This will freeze transactions for this period into your history with status <span className="font-bold text-amber-600">Hand Over</span>.
+            </p>
+          </div>
+        </Dialog>
+      )}
 
       {showSettlementConfirm && (
         <Dialog
@@ -555,7 +722,7 @@ export default function FinancialReportsPage() {
             setShowSettlementConfirm(false);
             setSettlementTarget(null);
           }}
-          title="Send Settlement Request?"
+          title="Hand Over Financial Report?"
           description=""
           className="max-w-md animate-in fade-in duration-200"
           footer={
@@ -575,21 +742,110 @@ export default function FinancialReportsPage() {
                 disabled={submitting}
                 className="font-bold bg-teal-600 hover:bg-teal-700 text-white"
               >
-                {submitting ? 'Sending...' : 'Send Request'}
+                {submitting ? 'Sending...' : 'Hand Over'}
               </Button>
             </div>
           }
         >
           <div className="space-y-3 text-sm mt-2">
             <p className="text-zinc-600 dark:text-zinc-400">
-              Are you sure you want to send this financial report for settlement approval?
+              Are you sure you want to hand over report <strong className="text-text-primary font-mono">{settlementTarget?.report_id}</strong> to the School Admin / Owner?
             </p>
             <p className="text-xs text-zinc-500 leading-normal">
-              Your school owner will review the report and its attached financial statement before approving or rejecting the request.
+              An email containing the financial statement summary and Excel file attachment will be sent to the School Admin email address.
             </p>
             <p className="text-xs text-zinc-500 leading-normal font-semibold">
-              Once submitted, the request will remain pending until the owner takes action.
+              The status will update to <span className="text-amber-600 font-bold">Pending</span> until approved or rejected via email.
             </p>
+          </div>
+        </Dialog>
+      )}
+
+      {/* Blocked Report Generation Warning Modal */}
+      {showBlockedModal && (
+        <Dialog
+          isOpen={showBlockedModal}
+          onClose={() => {
+            setShowBlockedModal(false);
+            setBlockedReport(null);
+          }}
+          title="Previous Report Settlement Required"
+          description=""
+          showClose={false}
+          className="max-w-md animate-in fade-in duration-200 border-amber-500/30"
+          footer={
+            <div className="flex justify-center w-full">
+              <Button 
+                onClick={() => {
+                  setShowBlockedModal(false);
+                  setBlockedReport(null);
+                }}
+                className="font-bold bg-amber-600 hover:bg-amber-700 text-white px-6"
+              >
+                Understand & Close
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-3 text-sm mt-2">
+            <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-900 dark:text-amber-200 text-xs space-y-2">
+              <p className="font-bold text-sm text-amber-900 dark:text-amber-200 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" /> Cannot Generate New Report
+              </p>
+              <p className="leading-relaxed">
+                You cannot generate a new financial report because the last generated report (<strong className="font-mono text-amber-950 dark:text-white font-bold">{blockedReport?.report_id}</strong>) is currently in <strong className="uppercase font-bold text-amber-800 dark:text-amber-300">{blockedReport?.status}</strong> status.
+              </p>
+              <p className="leading-relaxed pt-1.5 border-t border-amber-500/20 text-amber-900 dark:text-amber-200">
+                Please make sure the previous report is settled or deleted before generating a new financial report.
+              </p>
+            </div>
+          </div>
+        </Dialog>
+      )}
+
+      {/* Delete Report Confirmation Modal */}
+      {showDeleteConfirm && (
+        <Dialog
+          isOpen={showDeleteConfirm}
+          onClose={() => {
+            setShowDeleteConfirm(false);
+            setReportToDelete(null);
+          }}
+          title="Delete Unsettled Report?"
+          description=""
+          className="max-w-md animate-in fade-in duration-200 border-red-500/30"
+          footer={
+            <div className="flex gap-2 justify-end w-full">
+              <Button 
+                variant="secondary" 
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  setReportToDelete(null);
+                }}
+                disabled={deletingReport}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleConfirmDeleteReport}
+                disabled={deletingReport}
+                className="font-bold bg-red-600 hover:bg-red-700 text-white"
+              >
+                {deletingReport ? 'Deleting...' : 'Delete Report'}
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-3 text-sm mt-2">
+            <p className="text-zinc-600 dark:text-zinc-400">
+              Are you sure you want to delete report <strong className="text-text-primary font-mono">{reportToDelete?.report_id}</strong>?
+            </p>
+            <div className="p-3.5 bg-red-500/10 border border-red-500/20 rounded-xl text-red-800 dark:text-red-300 text-xs space-y-1">
+              <p className="font-bold">Transaction Safety Guaranteed:</p>
+              <p className="leading-relaxed text-zinc-600 dark:text-zinc-400">
+                All fee payments, salary disbursements, and expenses from this period will remain safe in the database and will automatically be included in your next generated report.
+              </p>
+            </div>
           </div>
         </Dialog>
       )}
@@ -598,3 +854,4 @@ export default function FinancialReportsPage() {
   </div>
   );
 }
+

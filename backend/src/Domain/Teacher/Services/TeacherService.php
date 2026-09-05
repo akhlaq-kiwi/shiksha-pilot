@@ -1047,9 +1047,15 @@ class TeacherService extends BaseService
                     $monthSalary = $prevSalary;
                     if (!empty($prevJoiningDateStr)) {
                         try {
-                            $joiningMonthName = date('F', strtotime($prevJoiningDateStr));
-                            if ($month === $joiningMonthName) {
-                                $joiningDateObj = new \DateTime($prevJoiningDateStr);
+                            $joiningDateObj = new \DateTime($prevJoiningDateStr);
+                            $joiningYM = $joiningDateObj->format('Y-m');
+                            $ayStartYear = (int)date('Y', strtotime($prevYear['start_date'] ?? date('Y-04-01')));
+                            $mNum = $monthMap[$month] ?? '01';
+                            $mIdx = array_search($month, ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March']);
+                            $mYear = ($mIdx !== false && $mIdx >= 9) ? ($ayStartYear + 1) : $ayStartYear;
+                            $targetYM = sprintf("%04d-%02d", $mYear, (int)$mNum);
+
+                            if ($targetYM === $joiningYM) {
                                 $daysInMonth = (int)$joiningDateObj->format('t');
                                 $dayNum = (int)$joiningDateObj->format('d');
                                 $workedDays = ($daysInMonth - $dayNum) + 1;
@@ -1132,9 +1138,11 @@ class TeacherService extends BaseService
 
             if (!empty($joiningDateStr)) {
                 try {
-                    $joiningMonthName = date('F', strtotime((string)$joiningDateStr));
-                    if ($monthName === $joiningMonthName) {
-                        $joiningDateObj = new \DateTime((string)$joiningDateStr);
+                    $joiningDateObj = new \DateTime((string)$joiningDateStr);
+                    $joiningYM = $joiningDateObj->format('Y-m');
+                    $targetYM = sprintf("%04d-%02d", $mYear, (int)$mNum);
+
+                    if ($targetYM === $joiningYM) {
                         $daysInMonth = (int)$joiningDateObj->format('t');
                         $dayNum = (int)$joiningDateObj->format('d');
                         $workedDays = ($daysInMonth - $dayNum) + 1;

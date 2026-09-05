@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Plus, CheckCircle2, ChevronRight, UserCog, Users, ShieldAlert, Award, FileSpreadsheet, ArrowLeft, RefreshCw, Check, Lock, Save, Trash2, Loader2, AlertTriangle, X, Download, GraduationCap } from 'lucide-react';
+import { Plus, CheckCircle2, ChevronRight, UserCog, Users, ShieldAlert, Award, FileSpreadsheet, ArrowLeft, RefreshCw, Check, Lock, Save, Trash2, Loader2, AlertTriangle, AlertCircle, X, Download, GraduationCap } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
@@ -51,6 +51,8 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
   const [showHighestClassToggleCard, setShowHighestClassToggleCard] = useState(false);
   const [draftWarningInfo, setDraftWarningInfo] = useState(null);
   const [promoteHighestClassToggle, setPromoteHighestClassToggle] = useState(false);
+  const [showUnsettledMigrationModal, setShowUnsettledMigrationModal] = useState(false);
+  const [unsettledReportForMigration, setUnsettledReportForMigration] = useState(null);
 
   // Auto-clear success message for Class Teacher assignment after 5 seconds
   useEffect(() => {
@@ -1391,6 +1393,21 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
   const startActivation = async (year) => {
     setFormError('');
     setTargetYear(year);
+
+    // Instant pre-check: Block opening the migration wizard if an unsettled financial report exists!
+    try {
+      const resReports = await schoolService.getFinancialReports();
+      const reports = resReports?.reports || [];
+      const unsettledReport = reports.find(r => r.status !== 'Settled');
+      if (unsettledReport) {
+        setUnsettledReportForMigration(unsettledReport);
+        setShowUnsettledMigrationModal(true);
+        return;
+      }
+    } catch (checkErr) {
+      console.error('Failed to pre-check financial reports for migration', checkErr);
+    }
+
     setWizardStep(1); // 1: Teachers, 2: Students, 3: Review
 
     try {
@@ -2905,6 +2922,41 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
               Okay
             </Button>
           </div>
+        </div>
+      </Dialog>
+
+      {/* Unsettled Financial Report Alert Dialog Modal */}
+      <Dialog
+        isOpen={showUnsettledMigrationModal}
+        onClose={() => setShowUnsettledMigrationModal(false)}
+        title="Unsettled Financial Report Pending"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setShowUnsettledMigrationModal(false)}>
+              Close
+            </Button>
+            <Button 
+              className="bg-primary hover:bg-primary/95 text-white font-bold"
+              onClick={() => {
+                setShowUnsettledMigrationModal(false);
+                window.location.href = '/school-admin/financial-reports';
+              }}
+            >
+              Go to Financial Reports
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4 pt-2">
+          <div className="flex items-center gap-3 p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-800 dark:text-amber-400">
+            <AlertCircle className="h-6 w-6 shrink-0 text-amber-600" />
+            <p className="text-xs font-semibold leading-relaxed">
+              Cannot start Academic Year Migration because Financial Report <strong>{unsettledReportForMigration?.report_id || 'unsettled'}</strong> is currently in <strong>'{unsettledReportForMigration?.status || 'Pending'}'</strong> status.
+            </p>
+          </div>
+          <p className="text-xs text-text-secondary leading-relaxed">
+            Please make sure all financial reports in the active session are settled or cleared before starting the Academic Year Migration wizard.
+          </p>
         </div>
       </Dialog>
 

@@ -1201,9 +1201,8 @@ export default function StaffPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                     {getVisibleMonths(t.joining_date, currentYear?.start_date || (academicYears.find(y => y.is_current) || academicYears.find(y => y.status === 'Draft'))?.start_date).map(month => {
                       const payment = (t.salary_payments || []).find(p => 
-                        p.payment_month === month && 
-                        (!t.previous_year_pending || parseInt(p.academic_year_id, 10) !== parseInt(t.previous_year_pending.academic_year_id, 10)) &&
-                        !String(p.payment_month).startsWith('Previous Year - ')
+                        (p.payment_month === month || p.payment_month === `Previous Year - ${month}`) && 
+                        (!t.previous_year_pending || parseInt(p.academic_year_id, 10) !== parseInt(t.previous_year_pending.academic_year_id, 10))
                       );
                       const isPaid = !!payment;
                       const isLocked = payment ? !!payment.is_locked : false;
@@ -2017,11 +2016,22 @@ export default function StaffPage() {
                 <span className="text-zinc-500">Amount:</span>
                 <span className="text-green-600 font-bold">
                   ₹{(() => {
+                    let amount = teacherDetails?.salary || 0;
                     const isJoiningMonth = teacherDetails?.joining_month_proration && teacherDetails?.joining_month_proration.month === disburseMonth;
-                    const amount = isJoiningMonth ? teacherDetails.joining_month_proration.payable_salary : (teacherDetails?.salary || 0);
+                    if (isJoiningMonth) {
+                      amount = teacherDetails.joining_month_proration.payable_salary;
+                    } else if (teacherDetails?.monthly_salaries && teacherDetails?.monthly_salaries[disburseMonth] !== undefined) {
+                      amount = teacherDetails.monthly_salaries[disburseMonth];
+                    }
                     return Math.round(parseFloat(amount)).toLocaleString('en-IN');
                   })()}
-                  {teacherDetails?.joining_month_proration && teacherDetails?.joining_month_proration.month === disburseMonth && ' (Prorated)'}
+                  {(() => {
+                    const isJoiningMonth = teacherDetails?.joining_month_proration && teacherDetails?.joining_month_proration.month === disburseMonth;
+                    const isMonthlyProrated = teacherDetails?.monthly_salaries && 
+                                              teacherDetails?.monthly_salaries[disburseMonth] !== undefined && 
+                                              parseFloat(teacherDetails.monthly_salaries[disburseMonth]) < parseFloat(teacherDetails?.salary || 0);
+                    return (isJoiningMonth || isMonthlyProrated) ? ' (Prorated)' : '';
+                  })()}
                 </span>
               </div>
             </div>

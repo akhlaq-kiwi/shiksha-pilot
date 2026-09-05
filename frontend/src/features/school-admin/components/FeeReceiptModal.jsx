@@ -4,7 +4,7 @@ import { Button } from '../../../common/ui/button';
 import { apiClient } from '../../../common/services/apiClient';
 import html2pdf from 'html2pdf.js';
 
-export function FeeReceiptModal({ receipt, student, schoolName, schoolLogoUrl, allPayments = [], onClose }) {
+export function FeeReceiptModal({ receipt, student, schoolName, schoolLogoUrl, allPayments = [], additionalFeePayments = [], onClose }) {
   const handlePrint = async () => {
     try {
       const isAdditional = receipt.is_additional || (receipt.fee_name && receipt.fee_name !== 'Previous Year Dues' && !receipt.fee_month) ? 1 : 0;
@@ -81,23 +81,36 @@ export function FeeReceiptModal({ receipt, student, schoolName, schoolLogoUrl, a
     return date.toLocaleDateString('en-GB', options);
   };
 
+  const allAddFees = additionalFeePayments && additionalFeePayments.length 
+    ? additionalFeePayments 
+    : (allPayments && allPayments.length ? allPayments.filter(p => p.is_additional || p.type === 'additional') : []);
+
   const groupPayments = receipt.is_additional
-    ? [receipt]
+    ? (allAddFees.length 
+        ? allAddFees.filter(p => p.receipt_no && receipt.receipt_no && p.receipt_no === receipt.receipt_no)
+        : [receipt])
     : (allPayments.length 
         ? allPayments.filter(p => p.receipt_no === receipt.receipt_no) 
         : [receipt]);
 
-  const academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
-  
-  const sortedGroup = [...groupPayments].sort((a, b) => {
-    const idxA = academicMonths.indexOf(a.fee_month);
-    const idxB = academicMonths.indexOf(b.fee_month);
-    return idxA - idxB;
-  });
+  const sortedGroup = groupPayments.length > 0 ? groupPayments : [receipt];
 
-  const totalAmountPaid = sortedGroup.reduce((sum, p) => sum + parseFloat(p.amount_paid !== undefined && p.amount_paid !== null ? p.amount_paid : (p.amount || 0)), 0);
-  const totalDiscount = sortedGroup.reduce((sum, p) => sum + parseFloat(p.discount_amount || 0), 0);
-  const totalPayable = totalAmountPaid + totalDiscount;
+  const totalAmountPaid = sortedGroup.reduce((sum, p) => {
+    const val = p.amount_paid !== undefined && p.amount_paid !== null ? parseFloat(p.amount_paid) : (parseFloat(p.amount) || 0);
+    return sum + (isNaN(val) ? 0 : val);
+  }, 0);
+
+  const totalDiscount = sortedGroup.reduce((sum, p) => {
+    const val = parseFloat(p.discount_amount || 0);
+    return sum + (isNaN(val) ? 0 : val);
+  }, 0);
+
+  const totalPayable = sortedGroup.reduce((sum, p) => {
+    const paid = p.amount_paid !== undefined && p.amount_paid !== null ? parseFloat(p.amount_paid) : 0;
+    const disc = parseFloat(p.discount_amount || 0);
+    const gross = p.amount !== undefined && p.amount !== null && parseFloat(p.amount) > 0 ? parseFloat(p.amount) : (paid + disc);
+    return sum + (isNaN(gross) ? 0 : gross);
+  }, 0);
   const displaySchoolName = schoolName || 'SHIKSHA PILOT SCHOOL';
 
   const currentYearName = student?.academic_year_name || student?.academic_year || '2027–2028';
@@ -153,7 +166,12 @@ export function FeeReceiptModal({ receipt, student, schoolName, schoolLogoUrl, a
                   {receipt.is_additional ? 'Description' : (sortedGroup.length > 1 ? 'Billing Months' : 'Billing Month')}
                 </p>
                 <p className="text-sm font-bold text-text-primary mt-0.5 max-w-[200px] break-words">
-                  {receipt.is_additional ? receipt.fee_name : (() => {
+                  {receipt.is_additional ? (() => {
+                    const names = sortedGroup.map(p => p.fee_name || p.fee_month).filter(Boolean);
+                    const uniqueNames = Array.from(new Set(names));
+                    return uniqueNames.length > 0 ? uniqueNames.join(', ') : (receipt.fee_name || 'Additional Fee');
+                  })() : (() => {
+                    const academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
                     const months = sortedGroup.map(p => p.fee_month).filter(Boolean);
                     if (months.length === 0 && receipt.fee_month) months.push(receipt.fee_month);
                     
