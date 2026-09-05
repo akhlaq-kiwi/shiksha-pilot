@@ -475,15 +475,6 @@ export default function FinancialReportsPage() {
           <Card className="bg-surface border border-border p-6 rounded-2xl shadow-2xs flex flex-col justify-between min-h-[300px]">
             <CardHeader className="p-0 pb-2 border-b border-border flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-bold text-text-primary uppercase tracking-wider">Financial Statement Preview</CardTitle>
-              {previewData && (
-                <DropdownMenu
-                  trigger={<MoreHorizontal className="h-4 w-4" />}
-                >
-                  <DropdownItem onClick={handleExportPreviewReport}>
-                    <Download className="h-3.5 w-3.5 mr-2 inline" /> Export Report
-                  </DropdownItem>
-                </DropdownMenu>
-              )}
             </CardHeader>
             
             <div className="flex-1 flex flex-col justify-center py-6">

@@ -174,17 +174,39 @@ try {
             $profitLoss = $totalFees - $totalExpenses;
 
             // 7. Auto-generate Financial Report REP-XXX with status 'Pending'
-            $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM financial_reports WHERE school_id = :sid");
-            $stmtCount->execute([':sid' => $schoolId]);
-            $count = (int)$stmtCount->fetchColumn();
-            $reportId = 'REP-' . str_pad((string)($count + 1), 3, '0', STR_PAD_LEFT);
+            if ($yearId !== null) {
+                $stmtReports = $pdo->prepare("
+                    SELECT report_id FROM financial_reports 
+                    WHERE school_id = :sid AND academic_year_id = :ayid
+                ");
+                $stmtReports->execute([':sid' => $schoolId, ':ayid' => $yearId]);
+            } else {
+                $stmtReports = $pdo->prepare("
+                    SELECT report_id FROM financial_reports 
+                    WHERE school_id = :sid AND academic_year_id IS NULL
+                ");
+                $stmtReports->execute([':sid' => $schoolId]);
+            }
+            $existingReportIds = $stmtReports->fetchAll(PDO::FETCH_COLUMN);
+
+            $maxSeq = 0;
+            foreach ($existingReportIds as $repId) {
+                if (preg_match('/REP-(\d+)/i', $repId, $matches)) {
+                    $num = (int)$matches[1];
+                    if ($num > $maxSeq) {
+                        $maxSeq = $num;
+                    }
+                }
+            }
+            $reportId = 'REP-' . str_pad((string)($maxSeq + 1), 3, '0', STR_PAD_LEFT);
 
             $stmtIns = $pdo->prepare("
-                INSERT INTO financial_reports (school_id, report_id, `from_date`, `to_date`, fees_collected, salary_paid, profit_loss, status)
-                VALUES (:sid, :report_id, :from_date, :to_date, :fees_collected, :salary_paid, :profit_loss, 'Pending')
+                INSERT INTO financial_reports (school_id, academic_year_id, report_id, `from_date`, `to_date`, fees_collected, salary_paid, profit_loss, status)
+                VALUES (:sid, :ayid, :report_id, :from_date, :to_date, :fees_collected, :salary_paid, :profit_loss, 'Pending')
             ");
             $stmtIns->execute([
                 ':sid' => $schoolId,
+                ':ayid' => $yearId,
                 ':report_id' => $reportId,
                 ':from_date' => $from,
                 ':to_date' => $to,
