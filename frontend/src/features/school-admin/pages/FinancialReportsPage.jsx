@@ -229,8 +229,14 @@ export default function FinancialReportsPage() {
       setNextSuggestedStartDate(suggestedStart);
       setHasPreviousReport(!!res.has_previous_report);
 
-      // Auto load preview for current ongoing month
-      fetchPreview(initialFrom, initialTo);
+      let effectiveFrom = initialFrom;
+      if (res.has_previous_report && suggestedStart) {
+        effectiveFrom = suggestedStart;
+        setFromDate(suggestedStart);
+      }
+
+      // Auto load preview for current ongoing month or suggested period
+      fetchPreview(effectiveFrom, initialTo);
     } catch (err) {
       console.error(err);
       setError('Failed to load financial reports history.');

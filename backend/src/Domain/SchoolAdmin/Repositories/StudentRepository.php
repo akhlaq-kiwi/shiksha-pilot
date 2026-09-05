@@ -32,12 +32,15 @@ class StudentRepository extends BaseRepository
         }
 
         if (!empty($filters['search'])) {
-            $where .= ' AND (s.name LIKE :search_name OR s.admission_no LIKE :search_adm OR s.sr_no LIKE :search_sr OR s.first_name LIKE :search_first OR s.last_name LIKE :search_last)';
-            $bindings[':search_name'] = '%' . $filters['search'] . '%';
-            $bindings[':search_adm'] = '%' . $filters['search'] . '%';
-            $bindings[':search_sr'] = '%' . $filters['search'] . '%';
-            $bindings[':search_first'] = '%' . $filters['search'] . '%';
-            $bindings[':search_last'] = '%' . $filters['search'] . '%';
+            $sTerm = '%' . $filters['search'] . '%';
+            $where .= ' AND (s.name LIKE :search_name OR s.admission_no LIKE :search_adm OR s.sr_no LIKE :search_sr OR s.first_name LIKE :search_first OR s.last_name LIKE :search_last OR CONCAT(COALESCE(s.first_name,\'\'), \' \', COALESCE(s.last_name,\'\')) LIKE :search_full OR CONCAT(COALESCE(s.first_name,\'\'), \' \', COALESCE(s.middle_name,\'\'), \' \', COALESCE(s.last_name,\'\')) LIKE :search_full2)';
+            $bindings[':search_name'] = $sTerm;
+            $bindings[':search_adm'] = $sTerm;
+            $bindings[':search_sr'] = $sTerm;
+            $bindings[':search_first'] = $sTerm;
+            $bindings[':search_last'] = $sTerm;
+            $bindings[':search_full'] = $sTerm;
+            $bindings[':search_full2'] = $sTerm;
         }
 
         // Handle sorting
