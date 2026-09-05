@@ -156,17 +156,35 @@ export default function FinancePage() {
   const currentAcademicIdx = monthMapping[calendarMonth] !== undefined ? monthMapping[calendarMonth] : 2; // default to June/index 2 if outside mapping
   const monthsToEvaluate = ACADEMIC_MONTHS.slice(0, currentAcademicIdx + 1);
 
-  // Group payments by student ID
+  // Group payments by student ID and fee_month (accumulate amount_paid + discount_amount for monthly fees)
+  const monthlyPaidByStudentAndMonth = {};
   const paymentsByStudent = {};
+
   feePayments.forEach(p => {
-    if (p.status === 'PAID') {
-      if (!paymentsByStudent[p.student_id]) {
-        paymentsByStudent[p.student_id] = [];
+    const pStatus = (p.status || '').toUpperCase();
+    if (pStatus === 'PAID' || pStatus === 'PARTIAL') {
+      const studentId = parseInt(p.student_id, 10);
+      const ayId = parseInt(p.academic_year_id, 10);
+      const mName = p.fee_month ? p.fee_month.trim() : '';
+
+      if (studentId && mName) {
+        const key = `${studentId}_${ayId}_${mName}`;
+        if (!monthlyPaidByStudentAndMonth[key]) {
+          monthlyPaidByStudentAndMonth[key] = 0;
+        }
+        const paidAmt = parseFloat(p.amount_paid || 0);
+        const discAmt = parseFloat(p.discount_amount || 0);
+        monthlyPaidByStudentAndMonth[key] += (paidAmt + discAmt);
+
+        if (!paymentsByStudent[studentId]) {
+          paymentsByStudent[studentId] = [];
+        }
+        paymentsByStudent[studentId].push({
+          fee_month: mName,
+          academic_year_id: p.academic_year_id,
+          status: p.status
+        });
       }
-      paymentsByStudent[p.student_id].push({
-        fee_month: p.fee_month,
-        academic_year_id: p.academic_year_id
-      });
     }
   });
 
@@ -221,10 +239,6 @@ export default function FinancePage() {
 
   // Process students status & outstanding dues
   const processedStudents = students.map(student => {
-    const paidMonthsList = paymentsByStudent[student.id] || [];
-    const paidMonths = paidMonthsList
-      .filter(p => parseInt(p.academic_year_id, 10) === parseInt(student.academic_year_id, 10))
-      .map(p => p.fee_month);
     const studentAyId = student.academic_year_id ? parseInt(student.academic_year_id, 10) : 0;
     const studentClassId = student.class_id ? parseInt(student.class_id, 10) : 0;
     const configKey = `${studentAyId}_${studentClassId}`;
@@ -235,14 +249,19 @@ export default function FinancePage() {
 
     let unpaidCount = 0;
     let outstandingDues = 0;
+    const paidMonths = [];
 
     monthsToEvaluate.forEach(m => {
-      if (!paidMonths.includes(m)) {
-        const amt = monthlyFees[m] !== undefined ? parseFloat(monthlyFees[m]) : 0;
-        if (amt > 0) {
-          unpaidCount++;
-          outstandingDues += amt;
-        }
+      const key = `${student.id}_${studentAyId}_${m}`;
+      const alreadyPaid = monthlyPaidByStudentAndMonth[key] || 0;
+      const configuredFee = monthlyFees[m] !== undefined ? parseFloat(monthlyFees[m]) : 0;
+      const remForMonth = Math.max(0, configuredFee - alreadyPaid);
+
+      if (remForMonth > 0 && configuredFee > 0) {
+        unpaidCount++;
+        outstandingDues += remForMonth;
+      } else if (configuredFee > 0 && remForMonth === 0) {
+        paidMonths.push(m);
       }
     });
 
