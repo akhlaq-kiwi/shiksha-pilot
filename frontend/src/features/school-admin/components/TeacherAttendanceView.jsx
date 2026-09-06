@@ -5,6 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/car
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
 import { Input } from '../../../common/ui/input';
 import { Select } from '../../../common/ui/select';
+import { Dialog } from '../../../common/ui/dialog';
 import { schoolService } from '../../../common/services/schoolService';
 import { useToast } from '../../../common/components/Toast';
 
@@ -48,7 +49,37 @@ export function TeacherAttendanceView() {
   const [teacherTab, setTeacherTab] = useState('daily'); // 'daily', 'report', 'settings'
   const [selectedDate, setSelectedDate] = useState(getTodayLocalDateString());
 
-  const handleShiftDate = (days) => {
+  // Daily State
+  const [loadingDaily, setLoadingDaily] = useState(false);
+  const [dailyData, setDailyData] = useState(null);
+  const [dailyMap, setDailyMap] = useState({});
+  const [savingDaily, setSavingDaily] = useState(false);
+
+  // Unsaved Changes Tracking
+  const [hasUnsavedDaily, setHasUnsavedDaily] = useState(false);
+  const [showUnsavedModal, setShowUnsavedModal] = useState(false);
+  const [pendingNav, setPendingNav] = useState(null); // { type: 'date' | 'tab', value: string }
+
+  const executeNavAction = (nav) => {
+    if (!nav) return;
+    if (nav.type === 'date') {
+      setSelectedDate(nav.value);
+    } else if (nav.type === 'tab') {
+      setTeacherTab(nav.value);
+    }
+  };
+
+  const requestDateChange = (newDateStr) => {
+    if (!newDateStr || newDateStr === selectedDate) return;
+    if (hasUnsavedDaily) {
+      setPendingNav({ type: 'date', value: newDateStr });
+      setShowUnsavedModal(true);
+    } else {
+      setSelectedDate(newDateStr);
+    }
+  };
+
+  const requestShiftDate = (days) => {
     if (!selectedDate) return;
     const parts = selectedDate.split('-');
     if (parts.length !== 3) return;
@@ -63,14 +94,18 @@ export function TeacherAttendanceView() {
     const maxDate = getTodayLocalDateString();
     if (days > 0 && maxDate && newDateStr > maxDate) return;
 
-    setSelectedDate(newDateStr);
+    requestDateChange(newDateStr);
   };
 
-  // Daily State
-  const [loadingDaily, setLoadingDaily] = useState(false);
-  const [dailyData, setDailyData] = useState(null);
-  const [dailyMap, setDailyMap] = useState({});
-  const [savingDaily, setSavingDaily] = useState(false);
+  const requestTabChange = (newTab) => {
+    if (newTab === teacherTab) return;
+    if (teacherTab === 'daily' && hasUnsavedDaily) {
+      setPendingNav({ type: 'tab', value: newTab });
+      setShowUnsavedModal(true);
+    } else {
+      setTeacherTab(newTab);
+    }
+  };
 
   // Monthly Report State
   const [reportMonth, setReportMonth] = useState(new Date().getMonth() + 1);
@@ -110,6 +145,7 @@ export function TeacherAttendanceView() {
         };
       });
       setDailyMap(map);
+      setHasUnsavedDaily(false);
     } catch (err) {
       console.error(err);
       toast.error('Failed to load teacher attendance.');
@@ -192,10 +228,11 @@ export function TeacherAttendanceView() {
         entry_time: status === 'Present' ? (dailyData?.configured_entry_time || '08:30 AM') : '—'
       }
     }));
+    setHasUnsavedDaily(true);
   };
 
-  const handleSaveDaily = async () => {
-    if (!dailyData || !dailyData.records) return;
+  const handleSaveDaily = async (navToExecute = null) => {
+    if (!dailyData || !dailyData.records) return false;
     setSavingDaily(true);
     try {
       const records = dailyData.records.map(r => {
@@ -208,13 +245,35 @@ export function TeacherAttendanceView() {
       });
       await schoolService.markTeacherAttendance({ date: selectedDate, records });
       toast.success('Teacher attendance updated successfully.');
-      loadDailyData();
+      setHasUnsavedDaily(false);
+      if (navToExecute) {
+        executeNavAction(navToExecute);
+      } else {
+        loadDailyData();
+      }
+      return true;
     } catch (err) {
       console.error(err);
       toast.error('Failed to save teacher attendance.');
+      return false;
     } finally {
       setSavingDaily(false);
     }
+  };
+
+  const handleSaveAndNavigate = async () => {
+    const nav = pendingNav;
+    setShowUnsavedModal(false);
+    setPendingNav(null);
+    await handleSaveDaily(nav);
+  };
+
+  const handleIgnoreUnsaved = () => {
+    const nav = pendingNav;
+    setShowUnsavedModal(false);
+    setHasUnsavedDaily(false);
+    setPendingNav(null);
+    executeNavAction(nav);
   };
 
   const handleSaveSettingsClick = (e) => {
@@ -309,7 +368,7 @@ export function TeacherAttendanceView() {
       {/* Sub Tabs */}
       <div className="flex gap-2 border-b border-border">
         <button
-          onClick={() => setTeacherTab('daily')}
+          onClick={() => requestTabChange('daily')}
           className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px flex items-center gap-2 ${
             teacherTab === 'daily'
               ? 'border-primary text-primary'
@@ -320,7 +379,7 @@ export function TeacherAttendanceView() {
           Daily Attendance
         </button>
         <button
-          onClick={() => setTeacherTab('report')}
+          onClick={() => requestTabChange('report')}
           className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px flex items-center gap-2 ${
             teacherTab === 'report'
               ? 'border-primary text-primary'
@@ -331,7 +390,7 @@ export function TeacherAttendanceView() {
           Monthly Report
         </button>
         <button
-          onClick={() => setTeacherTab('settings')}
+          onClick={() => requestTabChange('settings')}
           className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px flex items-center gap-2 ${
             teacherTab === 'settings'
               ? 'border-primary text-primary'
@@ -357,7 +416,7 @@ export function TeacherAttendanceView() {
                       type="button"
                       variant="outline"
                       size="icon"
-                      onClick={() => handleShiftDate(-1)}
+                      onClick={() => requestShiftDate(-1)}
                       className="h-10 w-10 shrink-0 bg-background border-border hover:bg-zinc-100 dark:hover:bg-zinc-800"
                       title="Previous Day"
                     >
@@ -366,7 +425,7 @@ export function TeacherAttendanceView() {
                     <Input
                       type="date"
                       value={selectedDate}
-                      onChange={(e) => setSelectedDate(e.target.value)}
+                      onChange={(e) => requestDateChange(e.target.value)}
                       max={getTodayLocalDateString()}
                       className="h-10 bg-background"
                     />
@@ -374,7 +433,7 @@ export function TeacherAttendanceView() {
                       type="button"
                       variant="outline"
                       size="icon"
-                      onClick={() => handleShiftDate(1)}
+                      onClick={() => requestShiftDate(1)}
                       disabled={selectedDate >= getTodayLocalDateString()}
                       className="h-10 w-10 shrink-0 bg-background border-border hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40"
                       title="Next Day"
@@ -812,6 +871,48 @@ export function TeacherAttendanceView() {
           </div>
         </div>
       )}
+
+      {/* Unsaved Attendance Changes Confirmation Dialog */}
+      <Dialog
+        isOpen={showUnsavedModal}
+        onClose={() => {
+          setShowUnsavedModal(false);
+          setPendingNav(null);
+        }}
+        title="Unsaved Attendance Changes"
+        footer={
+          <div className="flex items-center gap-2 justify-end w-full">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleIgnoreUnsaved}
+              className="font-bold text-xs px-4 h-9"
+            >
+              Ignore
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSaveAndNavigate}
+              disabled={savingDaily}
+              className="font-bold text-xs px-4 h-9 bg-primary text-white hover:bg-primary/90"
+            >
+              {savingDaily ? 'Saving...' : 'Save Attendance'}
+            </Button>
+          </div>
+        }
+      >
+        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-sm flex items-start gap-3">
+          <ShieldAlert className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+          <div className="space-y-1.5">
+            <p className="font-bold text-sm text-amber-900 dark:text-amber-200">
+              You have unsaved changes in teacher attendance.
+            </p>
+            <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
+              You updated teacher attendance for date <strong>{selectedDate}</strong> but haven't saved it yet. Would you like to save attendance before moving forward, or ignore changes?
+            </p>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }
