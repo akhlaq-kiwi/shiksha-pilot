@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { Landmark, Plus, Search, Calendar, Clock, Eye, Edit, Trash2, MoreVertical, X, AlertTriangle, User, ChevronDown, RefreshCw, Percent, Clipboard, CheckCircle, HelpCircle, FileSpreadsheet, FileText, FileDown, AlertCircle, Info, Paperclip, Upload } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
@@ -33,6 +33,9 @@ const formatDateFull = (dateStr) => {
 const formatClassColumnText = (assignedTo) => {
   if (!assignedTo) return 'For All Classes';
   const clean = String(assignedTo).trim().toLowerCase();
+  if (clean.includes('1 student') || clean.includes('individual student')) {
+    return 'For 1 Student';
+  }
   if (
     clean === '' || 
     clean === '—' || 
@@ -58,6 +61,7 @@ const ACADEMIC_MONTHS = ['April', 'May', 'June', 'July', 'August', 'September', 
 
 export default function FinanceManagementPage() {
   const location = useLocation();
+  const navigate = useNavigate();
   const initialTab = location.state?.tab || new URLSearchParams(location.search).get('tab') || 'expenses';
   const [activeTab, setActiveTab] = useState(initialTab);
 
@@ -207,6 +211,8 @@ export default function FinanceManagementPage() {
   const [feeSchoolAmount, setFeeSchoolAmount] = useState('');
   const [classAmountsMap, setClassAmountsMap] = useState({}); // classId => amount string
   const [feeDueDate, setFeeDueDate] = useState('');
+  const [selectedIndividualStudent, setSelectedIndividualStudent] = useState(null);
+  const [studentSearchQuery, setStudentSearchQuery] = useState('');
   const [feeSubmitting, setFeeSubmitting] = useState(false);
   const [feeFormErrors, setFeeFormErrors] = useState({});
 
@@ -1020,6 +1026,8 @@ export default function FinanceManagementPage() {
     setEditingFeeType(null);
     setFeeDescription('');
     setFeeSchoolAmount('');
+    setSelectedIndividualStudent(null);
+    setStudentSearchQuery('');
     
     // Auto-populate unique classes map to empty string amounts
     const initialMap = {};
@@ -1081,27 +1089,41 @@ export default function FinanceManagementPage() {
     const errors = {};
     if (!feeDescription.trim()) {
       errors.description = 'Fee description is required.';
-    }
-    if (!feeDueDate) {
-      errors.dueDate = 'Due date is required.';
+    } else if (feeDescription.trim().length > 27) {
+      errors.description = 'Fee description cannot exceed 27 characters.';
     }
 
     const payload = {
       name: feeDescription.trim(),
-      due_date: feeDueDate
+      due_date: feeDueDate || getLocalDateString()
     };
 
     // Mode specific attributes
     if (!editingFeeType) {
       payload.effective_date = getLocalDateString();
       payload.apply_type = applyType;
-      if (applyType === 'school') {
-        if (!feeSchoolAmount) {
-          errors.amount = 'Fee amount is required.';
-        } else if (parseFloat(feeSchoolAmount) <= 0) {
-          errors.amount = 'Amount must be greater than zero.';
+
+      if (applyType === 'student') {
+        if (!selectedIndividualStudent) {
+          errors.student = 'Please select a student.';
         } else {
-          payload.amount = parseFloat(feeSchoolAmount);
+          payload.student_id = selectedIndividualStudent.id;
+        }
+
+        if (!feeSchoolAmount || !feeSchoolAmount.toString().trim()) {
+          errors.amount = 'Fee amount is required.';
+        } else if (!/^[1-9]\d*$/.test(feeSchoolAmount.toString().trim())) {
+          errors.amount = 'Amount must be a positive whole number (no decimals or negative values).';
+        } else {
+          payload.amount = parseInt(feeSchoolAmount, 10);
+        }
+      } else if (applyType === 'school') {
+        if (!feeSchoolAmount || !feeSchoolAmount.toString().trim()) {
+          errors.amount = 'Fee amount is required.';
+        } else if (!/^[1-9]\d*$/.test(feeSchoolAmount.toString().trim())) {
+          errors.amount = 'Amount must be a positive whole number (no decimals or negative values).';
+        } else {
+          payload.amount = parseInt(feeSchoolAmount, 10);
         }
       } else {
         const activeClassAmounts = {};
@@ -1113,10 +1135,10 @@ export default function FinanceManagementPage() {
           if (val === undefined || val === null || val.trim() === '') {
             missingClasses.push(uc.name);
           } else {
-            const amt = parseFloat(val);
-            if (isNaN(amt) || amt <= 0) {
+            if (!/^[1-9]\d*$/.test(val.trim())) {
               invalidClasses.push(uc.name);
             } else {
+              const amt = parseInt(val.trim(), 10);
               uc.ids.forEach(cid => {
                 activeClassAmounts[cid] = amt;
               });
@@ -1127,7 +1149,7 @@ export default function FinanceManagementPage() {
         if (missingClasses.length > 0) {
           errors.classAmounts = `Fee amount for all classes is mandatory. Missing for: ${missingClasses.join(', ')}`;
         } else if (invalidClasses.length > 0) {
-          errors.classAmounts = `Fee amount must be greater than zero for all classes. Invalid for: ${invalidClasses.join(', ')}`;
+          errors.classAmounts = `Fee amount must be a positive whole number (no decimals or negative values) for all classes. Invalid for: ${invalidClasses.join(', ')}`;
         } else {
           payload.class_amounts = activeClassAmounts;
         }
@@ -1135,12 +1157,12 @@ export default function FinanceManagementPage() {
     } else {
       // Editing Mode
       if (editingFeeType.assigned_to === 'For All' || editingFeeType.assigned_to === 'For All Classes') {
-        if (!feeSchoolAmount) {
+        if (!feeSchoolAmount || !feeSchoolAmount.toString().trim()) {
           errors.amount = 'Fee amount is required.';
-        } else if (parseFloat(feeSchoolAmount) <= 0) {
-          errors.amount = 'Amount must be greater than zero.';
+        } else if (!/^[1-9]\d*$/.test(feeSchoolAmount.toString().trim())) {
+          errors.amount = 'Amount must be a positive whole number (no decimals or negative values).';
         } else {
-          payload.amount = parseFloat(feeSchoolAmount);
+          payload.amount = parseInt(feeSchoolAmount, 10);
         }
       }
     }
@@ -1160,8 +1182,8 @@ export default function FinanceManagementPage() {
         await schoolService.updateAdditionalFeeType(editingFeeType.id, payload);
         setSuccess('Additional fee updated successfully.');
       } else {
-        const result = await schoolService.createAdditionalFeeType(payload);
-        setSuccess(`Fee successfully applied to ${result.assigned_count} active students.`);
+        await schoolService.createAdditionalFeeType(payload);
+        setSuccess('Fee Applied Successfully');
       }
       setIsApplyFeeModalOpen(false);
       setEditingFeeType(null);
@@ -2185,7 +2207,7 @@ export default function FinanceManagementPage() {
           {!editingFeeType && (
             <div className="space-y-1.5">
               <label htmlFor="apply-fee-to" className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Apply Fee To</label>
-              <div className="flex items-center gap-6 mt-1">
+              <div className="flex flex-wrap items-center gap-6 mt-1">
                 <label className="flex items-center gap-2 font-bold cursor-pointer">
                   <input 
                     type="radio" 
@@ -2208,16 +2230,135 @@ export default function FinanceManagementPage() {
                   />
                   Selected Classes
                 </label>
+                <label className="flex items-center gap-2 font-bold cursor-pointer">
+                  <input 
+                    type="radio" 
+                    name="applyFeeType" 
+                    value="student" 
+                    checked={applyType === 'student'} 
+                    onChange={() => setApplyType('student')}
+                    className="cursor-pointer"
+                  />
+                  For Individual Student
+                </label>
               </div>
+            </div>
+          )}
+
+          {/* Individual Student Search & Card Selection List */}
+          {!editingFeeType && applyType === 'student' && (
+            <div className="space-y-2 animate-in slide-in-from-top-1 duration-200">
+              <label className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">
+                Select Student *
+              </label>
+              
+              {selectedIndividualStudent ? (
+                /* Selected Student Card */
+                <div className="p-3 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-500/40 rounded-xl flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xs">
+                      ✓
+                    </div>
+                    <div>
+                      <div className="font-bold text-xs text-text-primary">
+                        {selectedIndividualStudent.name}
+                      </div>
+                      <div className="text-[11px] text-text-muted flex items-center gap-2 mt-0.5">
+                        <span>Class: <strong>{selectedIndividualStudent.class_name}{selectedIndividualStudent.section ? `-${selectedIndividualStudent.section}` : ''}</strong></span>
+                        <span>•</span>
+                        <span>SR No: <strong>{selectedIndividualStudent.sr_no || 'N/A'}</strong></span>
+                      </div>
+                    </div>
+                  </div>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setSelectedIndividualStudent(null)}
+                    className="h-7 text-[11px] font-bold"
+                  >
+                    Change Student
+                  </Button>
+                </div>
+              ) : (
+                /* Search Box & Results List */
+                <div className="space-y-2">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-text-muted" />
+                    <Input
+                      type="text"
+                      placeholder="Search student by Name or SR No..."
+                      value={studentSearchQuery}
+                      onChange={e => setStudentSearchQuery(e.target.value)}
+                      className="pl-8 text-xs"
+                    />
+                  </div>
+
+                  <div className="border border-border rounded-xl max-h-[180px] overflow-y-auto p-1.5 space-y-1.5 bg-zinc-50/50 dark:bg-zinc-900/50">
+                    {studentsList
+                      .filter(s => s.status === 'ACTIVE')
+                      .filter(s => {
+                        if (!studentSearchQuery.trim()) return true;
+                        const q = studentSearchQuery.toLowerCase().trim();
+                        const nameMatch = s.name && s.name.toLowerCase().includes(q);
+                        const srMatch = s.sr_no && s.sr_no.toString().toLowerCase().includes(q);
+                        return nameMatch || srMatch;
+                      })
+                      .slice(0, 50)
+                      .map(s => (
+                        <div
+                          key={s.id}
+                          onClick={() => {
+                            setSelectedIndividualStudent(s);
+                            if (feeFormErrors.student) {
+                              setFeeFormErrors(prev => ({ ...prev, student: null }));
+                            }
+                          }}
+                          className="p-2.5 rounded-lg border border-border bg-surface hover:border-emerald-500/50 hover:bg-emerald-50/30 dark:hover:bg-emerald-950/10 cursor-pointer transition-all flex items-center justify-between group"
+                        >
+                          <div>
+                            <div className="font-bold text-xs text-text-primary group-hover:text-emerald-600 dark:group-hover:text-emerald-400">
+                              {s.name}
+                            </div>
+                            <div className="text-[11px] text-text-muted flex items-center gap-2 mt-0.5">
+                              <span>Class: <strong>{s.class_name}{s.section ? `-${s.section}` : ''}</strong></span>
+                              <span>•</span>
+                              <span>SR No: <strong>{s.sr_no || 'N/A'}</strong></span>
+                            </div>
+                          </div>
+                          <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                            Select →
+                          </span>
+                        </div>
+                      ))
+                    }
+                    {studentsList.filter(s => s.status === 'ACTIVE' && (!studentSearchQuery.trim() || (s.name && s.name.toLowerCase().includes(studentSearchQuery.toLowerCase().trim())) || (s.sr_no && s.sr_no.toString().toLowerCase().includes(studentSearchQuery.toLowerCase().trim())))).length === 0 && (
+                      <div className="p-4 text-center text-text-muted text-xs font-medium">
+                        No matching active students found.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {feeFormErrors.student && (
+                <p className="text-[11px] text-red-500 font-bold mt-1">{feeFormErrors.student}</p>
+              )}
             </div>
           )}
 
           {/* Description */}
           <div className="space-y-1.5">
-            <label className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Fee Description *</label>
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Fee Description *</label>
+              <span className={`text-[10px] ${feeDescription.length >= 27 ? 'text-amber-600 font-bold' : 'text-text-muted'}`}>
+                {feeDescription.length}/27
+              </span>
+            </div>
             <Input id="apply-fee-to" 
               placeholder="e.g. Annual Sports Fee" 
               value={feeDescription} 
+              maxLength={27}
               onChange={e => setFeeDescription(e.target.value)} 
               className="text-xs"
             />
@@ -2226,15 +2367,25 @@ export default function FinanceManagementPage() {
             )}
           </div>
 
-          {/* Case 1: Entire School Amount */}
-          {applyType === 'school' && (
+          {/* Amount (₹) - For Entire School OR Individual Student */}
+          {(applyType === 'school' || applyType === 'student') && (
             <div className="space-y-1.5 animate-in slide-in-from-top-1 duration-200">
               <label htmlFor="amount-2" className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Amount (₹) *</label>
               <Input id="amount-2" 
                 type="number" 
                 placeholder="e.g. 500" 
                 value={feeSchoolAmount} 
-                onChange={e => setFeeSchoolAmount(e.target.value)} 
+                onKeyDown={e => {
+                  if (['-', '.', ',', 'e', 'E'].includes(e.key)) {
+                    e.preventDefault();
+                  }
+                }}
+                onChange={e => {
+                  const val = e.target.value;
+                  if (val === '' || /^[1-9]\d*$/.test(val)) {
+                    setFeeSchoolAmount(val);
+                  }
+                }} 
                 disabled={editingFeeType && editingFeeType.collected_students > 0}
                 className="text-xs"
               />
@@ -2291,24 +2442,6 @@ export default function FinanceManagementPage() {
               ℹ️ Class amounts cannot be modified during edit. Please delete and recreate the additional fee if you need to reconfigure class allocation dues.
             </div>
           )}
-
-          {/* Due Date (Manual Input Disabled) */}
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Due Date *</label>
-            <Input 
-              type="date" 
-              value={feeDueDate} 
-              onChange={e => setFeeDueDate(e.target.value)} 
-              onKeyDown={e => e.preventDefault()}
-              className="text-xs"
-            />
-            {feeFormErrors.dueDate && (
-              <p className="text-[11px] text-red-500 font-bold mt-1">{feeFormErrors.dueDate}</p>
-            )}
-            <p className="text-[11px] text-text-muted mt-1 font-semibold leading-relaxed">
-              The selected Due Date determines when this fee becomes payable. Students will not see this fee as due until the selected date is reached.
-            </p>
-          </div>
 
         </form>
       </Dialog>

@@ -11639,8 +11639,10 @@ Only approve the settlement after reviewing all financial records.
             $typeCount = (int)($t['type_count'] ?? 1);
             $classCount = count($classNames);
 
-            // Determine if assigned to Entire School or Selected Classes
-            if ($typeCount > 1) {
+            // Determine if assigned to Entire School, Selected Classes, or Individual Student
+            if ((int)$t['total_students'] === 1 && $typeCount === 1) {
+                $t['assigned_to'] = 'For 1 Student';
+            } elseif ($typeCount > 1) {
                 $t['assigned_to'] = 'For Selected Classes';
             } elseif ($activeClassesCount > 0 && $classCount >= $activeClassesCount) {
                 $t['assigned_to'] = 'For All Classes';
@@ -11664,6 +11666,9 @@ Only approve the settlement after reviewing all financial records.
             throw new ValidationException(['name' => 'Fee description must be at least 3 characters.']);
         }
         $name = trim($data['name']);
+        if (mb_strlen($name) > 27) {
+            throw new ValidationException(['name' => 'Fee description cannot exceed 27 characters.']);
+        }
 
         // Get currently active or draft academic year
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
@@ -11672,18 +11677,42 @@ Only approve the settlement after reviewing all financial records.
         }
         $academicYearId = (int)$workingYear['id'];
 
-        // Validate dates
-        if (empty($data['due_date'])) {
-            throw new ValidationException(['due_date' => 'Due Date is required.']);
-        }
-        $dueDate = trim($data['due_date']);
+        // Default due_date to current date if not specified
+        $dueDate = !empty($data['due_date']) ? trim($data['due_date']) : date('Y-m-d');
 
-        $applyType = $data['apply_type'] ?? 'school'; // 'school' or 'classes'
+        $applyType = $data['apply_type'] ?? 'school'; // 'school', 'classes', or 'student'
         $studentsToApply = []; // Array of ['student_id' => int, 'class_id' => int, 'amount' => float]
 
-        if ($applyType === 'school') {
-            if (empty($data['amount']) || (float)$data['amount'] <= 0) {
-                throw new ValidationException(['amount' => 'Amount must be greater than 0.']);
+        if ($applyType === 'student') {
+            if (empty($data['student_id'])) {
+                throw new ValidationException(['student_id' => 'Please select a student.']);
+            }
+            $studentId = (int)$data['student_id'];
+
+            if (empty($data['amount']) || !preg_match('/^[1-9]\d*$/', (string)$data['amount'])) {
+                throw new ValidationException(['amount' => 'Amount must be a positive whole number (no decimals or negative values).']);
+            }
+            $amount = (float)$data['amount'];
+
+            // Fetch active student details
+            $stmtStudent = $pdo->prepare("
+                SELECT id, class_id FROM students 
+                WHERE school_id = :sid AND id = :stid AND status = 'ACTIVE' AND academic_year_id = :ayid
+            ");
+            $stmtStudent->execute([':sid' => $schoolId, ':stid' => $studentId, ':ayid' => $academicYearId]);
+            $sRow = $stmtStudent->fetch(PDO::FETCH_ASSOC);
+            if (!$sRow) {
+                throw new ValidationException(['student_id' => 'Selected student is invalid or inactive in the current academic year.']);
+            }
+
+            $studentsToApply[] = [
+                'student_id' => (int)$sRow['id'],
+                'class_id' => (int)$sRow['class_id'],
+                'amount' => $amount
+            ];
+        } elseif ($applyType === 'school') {
+            if (empty($data['amount']) || !preg_match('/^[1-9]\d*$/', (string)$data['amount'])) {
+                throw new ValidationException(['amount' => 'Amount must be a positive whole number (no decimals or negative values).']);
             }
             $amount = (float)$data['amount'];
 
@@ -11709,8 +11738,8 @@ Only approve the settlement after reviewing all financial records.
             }
 
             foreach ($data['class_amounts'] as $classId => $amt) {
-                if ((float)$amt <= 0) {
-                    throw new ValidationException(['amount' => 'Amount for selected classes must be greater than 0.']);
+                if (empty($amt) || !preg_match('/^[1-9]\d*$/', (string)$amt)) {
+                    throw new ValidationException(['amount' => 'Amount for selected classes must be a positive whole number (no decimals or negative values).']);
                 }
 
                 // Fetch active students in this class
@@ -11740,7 +11769,6 @@ Only approve the settlement after reviewing all financial records.
         }
 
         // Duplicate Check Rule: if a fee has already been applied previously, do NOT create duplicate entries
-        // Check if there are already records in additional_fee_payments with same fee name for the same student in current academic year
         $stmtDup = $pdo->prepare("
             SELECT COUNT(*) FROM additional_fee_payments afp
             JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
@@ -11756,7 +11784,7 @@ Only approve the settlement after reviewing all financial records.
                 ':ayid' => $academicYearId
             ]);
             if ((int)$stmtDup->fetchColumn() > 0) {
-                throw new ValidationException(['duplicate' => 'This additional fee has already been applied to the selected students.']);
+                throw new ValidationException(['duplicate' => 'This additional fee has already been applied to the selected student(s).']);
             }
         }
 
@@ -11765,8 +11793,8 @@ Only approve the settlement after reviewing all financial records.
         try {
             $classFeeTypeIds = []; // class_id => fee_type_id
             
-            if ($applyType === 'school') {
-                // Scenario 1: Entire School. Create ONE master Additional Fee Record
+            if ($applyType === 'school' || $applyType === 'student') {
+                // Create ONE master Additional Fee Record
                 $stmtType = $pdo->prepare("
                     INSERT INTO additional_fee_types (school_id, name, amount, academic_year_id, due_date)
                     VALUES (:sid, :name, :amount, :ayid, :due_date)
@@ -11780,7 +11808,7 @@ Only approve the settlement after reviewing all financial records.
                 ]);
                 $masterTypeId = (int)$pdo->lastInsertId();
                 
-                // Map all student classes to this single master fee type ID
+                // Map all student classes to this master fee type ID
                 foreach ($studentsToApply as $s) {
                     $classFeeTypeIds[$s['class_id']] = $masterTypeId;
                 }
