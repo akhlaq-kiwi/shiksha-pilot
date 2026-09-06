@@ -2299,10 +2299,18 @@ export default function FinanceManagementPage() {
                       .filter(s => s.status === 'ACTIVE')
                       .filter(s => {
                         if (!studentSearchQuery.trim()) return true;
-                        const q = studentSearchQuery.toLowerCase().trim();
-                        const nameMatch = s.name && s.name.toLowerCase().includes(q);
-                        const srMatch = s.sr_no && s.sr_no.toString().toLowerCase().includes(q);
-                        return nameMatch || srMatch;
+                        const fullSearchText = [
+                          s.name,
+                          s.first_name,
+                          s.middle_name,
+                          s.last_name,
+                          s.sr_no,
+                          s.roll_no,
+                          s.admission_no
+                        ].filter(Boolean).join(' ').toLowerCase().replace(/\s+/g, ' ');
+
+                        const queryWords = studentSearchQuery.toLowerCase().trim().split(/\s+/);
+                        return queryWords.every(word => fullSearchText.includes(word));
                       })
                       .slice(0, 50)
                       .map(s => (
@@ -2332,7 +2340,10 @@ export default function FinanceManagementPage() {
                         </div>
                       ))
                     }
-                    {studentsList.filter(s => s.status === 'ACTIVE' && (!studentSearchQuery.trim() || (s.name && s.name.toLowerCase().includes(studentSearchQuery.toLowerCase().trim())) || (s.sr_no && s.sr_no.toString().toLowerCase().includes(studentSearchQuery.toLowerCase().trim())))).length === 0 && (
+                    {studentsList.filter(s => s.status === 'ACTIVE' && (!studentSearchQuery.trim() || (() => {
+                      const fullSearchText = [s.name, s.first_name, s.middle_name, s.last_name, s.sr_no, s.roll_no, s.admission_no].filter(Boolean).join(' ').toLowerCase().replace(/\s+/g, ' ');
+                      return studentSearchQuery.toLowerCase().trim().split(/\s+/).every(w => fullSearchText.includes(w));
+                    })())).length === 0 && (
                       <div className="p-4 text-center text-text-muted text-xs font-medium">
                         No matching active students found.
                       </div>
@@ -2456,71 +2467,118 @@ export default function FinanceManagementPage() {
       >
         {viewingFeeType && (
           <div className="space-y-4 text-xs leading-relaxed">
-            <div className="flex items-center justify-between border-b border-border pb-3">
-              <div>
-                <span className="text-[11px] text-text-muted font-bold uppercase tracking-wider">Fee Description</span>
-                <p className="text-sm font-bold text-text-primary mt-0.5 uppercase">{viewingFeeType.name}</p>
-              </div>
-              <span className="inline-flex px-3 py-1 bg-zinc-100 text-zinc-950 dark:bg-zinc-800 dark:text-zinc-50 border border-border font-bold text-[11px] uppercase rounded-full tracking-wider">
-                {formatClassColumnText(viewingFeeType.assigned_to)}
-              </span>
-            </div>
+            {(viewingFeeType.assigned_to === 'For 1 Student' || !!viewingFeeType.student_info) ? (
+              /* Individual Student Fee Summary View */
+              <div className="space-y-3">
+                <div className="bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-xl border border-border space-y-3">
+                  <div className="grid grid-cols-2 gap-3 pb-3 border-b border-border/50">
+                    <div>
+                      <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Student Name</p>
+                      <p className="font-bold text-xs text-text-primary mt-0.5">{viewingFeeType.student_info?.student_name || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Class</p>
+                      <p className="font-bold text-xs text-text-primary mt-0.5">{viewingFeeType.student_info?.class_name || 'N/A'}</p>
+                    </div>
+                  </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-[11px] text-text-muted font-bold uppercase tracking-wider">Due Date</p>
-                <p className="font-bold mt-0.5 text-text-primary">{formatDateFull(viewingFeeType.due_date)}</p>
-              </div>
-              {(!viewingFeeType.class_amounts || viewingFeeType.class_amounts.length <= 1) && (
-                <div>
-                  <p className="text-[11px] text-text-muted font-bold uppercase tracking-wider">Fee Amount</p>
-                  <p className="font-bold mt-0.5 text-primary font-sans">{formatCurrency(viewingFeeType.amount)}</p>
-                </div>
-              )}
-            </div>
+                  <div className="grid grid-cols-2 gap-3 pb-3 border-b border-border/50">
+                    <div>
+                      <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Roll No</p>
+                      <p className="font-bold text-xs text-text-primary mt-0.5">{viewingFeeType.student_info?.roll_no || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">SR No</p>
+                      <p className="font-bold text-xs text-text-primary mt-0.5">{viewingFeeType.student_info?.sr_no || 'N/A'}</p>
+                    </div>
+                  </div>
 
-            {viewingFeeType.class_amounts && viewingFeeType.class_amounts.length > 0 && (
-              <div className="border-t border-border pt-4 space-y-2">
-                <p className="text-[11px] text-text-muted font-bold uppercase tracking-wider">Class-Wise Fee Configuration</p>
-                <div className="space-y-1.5 bg-zinc-50 dark:bg-zinc-900/50 p-3.5 rounded-xl border border-border">
-                  {(() => {
-                    const groups = {};
-                    viewingFeeType.class_amounts.forEach(item => {
-                      const amtKey = item.amount.toFixed(2);
-                      if (!groups[amtKey]) {
-                        groups[amtKey] = [];
-                      }
-                      groups[amtKey].push(item.class_name);
-                    });
-                    return Object.entries(groups).map(([amt, classes], idx) => (
-                      <div key={idx} className="flex justify-between items-center py-1 border-b border-border/40 last:border-0 text-text-primary">
-                        <span className="font-bold pr-4 truncate">{classes.join(', ')}</span>
-                        <span className="font-bold text-primary font-sans shrink-0">{formatCurrency(parseFloat(amt))}</span>
-                      </div>
-                    ));
-                  })()}
+                  <div className="grid grid-cols-2 gap-3 pb-3 border-b border-border/50">
+                    <div>
+                      <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Description</p>
+                      <p className="font-bold text-xs text-text-primary mt-0.5 uppercase">{viewingFeeType.name}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Due Date</p>
+                      <p className="font-bold text-xs text-text-primary mt-0.5">{formatDateFull(viewingFeeType.due_date)}</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Amount</p>
+                    <p className="text-sm font-bold text-primary font-sans mt-0.5">{formatCurrency(viewingFeeType.amount)}</p>
+                  </div>
                 </div>
               </div>
+            ) : (
+              /* Entire School / Selected Classes Summary View (Unchanged) */
+              <>
+                <div className="flex items-center justify-between border-b border-border pb-3">
+                  <div>
+                    <span className="text-[11px] text-text-muted font-bold uppercase tracking-wider">Fee Description</span>
+                    <p className="text-sm font-bold text-text-primary mt-0.5 uppercase">{viewingFeeType.name}</p>
+                  </div>
+                  <span className="inline-flex px-3 py-1 bg-zinc-100 text-zinc-950 dark:bg-zinc-800 dark:text-zinc-50 border border-border font-bold text-[11px] uppercase rounded-full tracking-wider">
+                    {formatClassColumnText(viewingFeeType.assigned_to)}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[11px] text-text-muted font-bold uppercase tracking-wider">Due Date</p>
+                    <p className="font-bold mt-0.5 text-text-primary">{formatDateFull(viewingFeeType.due_date)}</p>
+                  </div>
+                  {(!viewingFeeType.class_amounts || viewingFeeType.class_amounts.length <= 1) && (
+                    <div>
+                      <p className="text-[11px] text-text-muted font-bold uppercase tracking-wider">Fee Amount</p>
+                      <p className="font-bold mt-0.5 text-primary font-sans">{formatCurrency(viewingFeeType.amount)}</p>
+                    </div>
+                  )}
+                </div>
+
+                {viewingFeeType.class_amounts && viewingFeeType.class_amounts.length > 0 && (
+                  <div className="border-t border-border pt-4 space-y-2">
+                    <p className="text-[11px] text-text-muted font-bold uppercase tracking-wider">Class-Wise Fee Configuration</p>
+                    <div className="space-y-1.5 bg-zinc-50 dark:bg-zinc-900/50 p-3.5 rounded-xl border border-border">
+                      {(() => {
+                        const groups = {};
+                        viewingFeeType.class_amounts.forEach(item => {
+                          const amtKey = item.amount.toFixed(2);
+                          if (!groups[amtKey]) {
+                            groups[amtKey] = [];
+                          }
+                          groups[amtKey].push(item.class_name);
+                        });
+                        return Object.entries(groups).map(([amt, classes], idx) => (
+                          <div key={idx} className="flex justify-between items-center py-1 border-b border-border/40 last:border-0 text-text-primary">
+                            <span className="font-bold pr-4 truncate">{classes.join(', ')}</span>
+                            <span className="font-bold text-primary font-sans shrink-0">{formatCurrency(parseFloat(amt))}</span>
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  </div>
+                )}
+
+                <div className="border-t border-border pt-4 space-y-3">
+                  <h4 className="text-[11px] text-text-muted font-bold uppercase tracking-wider">Fee Collection Summary</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-xl border border-border">
+                    <div>
+                      <p className="text-[11px] text-text-muted font-bold uppercase tracking-wider">Total Amount</p>
+                      <p className="text-sm font-bold text-text-primary mt-0.5 font-sans">{formatCurrency(viewingFeeType.total_amount)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-text-muted font-bold uppercase tracking-wider">Collected Amount</p>
+                      <p className="text-sm font-bold text-green-600 mt-0.5 font-sans">{formatCurrency(viewingFeeType.collected_amount)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-text-muted font-bold uppercase tracking-wider">Pending Amount</p>
+                      <p className="text-sm font-bold text-red-500 mt-0.5 font-sans">{formatCurrency(viewingFeeType.pending_amount)}</p>
+                    </div>
+                  </div>
+                </div>
+              </>
             )}
-
-            <div className="border-t border-border pt-4 space-y-3">
-              <h4 className="text-[11px] text-text-muted font-bold uppercase tracking-wider">Fee Collection Summary</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-xl border border-border">
-                <div>
-                  <p className="text-[11px] text-text-muted font-bold uppercase tracking-wider">Total Amount</p>
-                  <p className="text-sm font-bold text-text-primary mt-0.5 font-sans">{formatCurrency(viewingFeeType.total_amount)}</p>
-                </div>
-                <div>
-                  <p className="text-[11px] text-text-muted font-bold uppercase tracking-wider">Collected Amount</p>
-                  <p className="text-sm font-bold text-green-600 mt-0.5 font-sans">{formatCurrency(viewingFeeType.collected_amount)}</p>
-                </div>
-                <div>
-                  <p className="text-[11px] text-text-muted font-bold uppercase tracking-wider">Pending Amount</p>
-                  <p className="text-sm font-bold text-red-500 mt-0.5 font-sans">{formatCurrency(viewingFeeType.pending_amount)}</p>
-                </div>
-              </div>
-            </div>
-
           </div>
         )}
       </Dialog>
