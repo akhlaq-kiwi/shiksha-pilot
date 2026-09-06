@@ -2947,16 +2947,18 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
           </div>
         }
       >
-        <div className="space-y-4 pt-2">
-          <div className="flex items-center gap-3 p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-800 dark:text-amber-400">
-            <AlertCircle className="h-6 w-6 shrink-0 text-amber-600" />
-            <p className="text-xs font-semibold leading-relaxed">
-              Cannot start Academic Year Migration because Financial Report <strong>{unsettledReportForMigration?.report_id || 'unsettled'}</strong> is currently in <strong>'{unsettledReportForMigration?.status || 'Pending'}'</strong> status.
-            </p>
+        <div className="pt-2">
+          <div className="flex items-start gap-3 p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-amber-900 dark:text-amber-300">
+            <AlertCircle className="h-5 w-5 shrink-0 text-amber-600 mt-0.5" />
+            <div className="space-y-2 text-xs leading-relaxed">
+              <p className="font-bold">
+                Cannot start Academic Year Migration because Financial Report <strong>{unsettledReportForMigration?.report_id || 'unsettled'}</strong> is currently in <strong>'{unsettledReportForMigration?.status || 'Pending'}'</strong> status.
+              </p>
+              <p className="text-amber-800/90 dark:text-amber-300/90 font-medium">
+                Please make sure all financial reports in the active session are settled or cleared before starting the Academic Year Migration wizard.
+              </p>
+            </div>
           </div>
-          <p className="text-xs text-text-secondary leading-relaxed">
-            Please make sure all financial reports in the active session are settled or cleared before starting the Academic Year Migration wizard.
-          </p>
         </div>
       </Dialog>
 

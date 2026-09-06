@@ -48,6 +48,17 @@ abstract class BaseController
             $schoolId = (int)($dbUser['school_id'] ?? 0);
             $phone = (string)($dbUser['phone'] ?? '');
 
+            // Check if school itself is active for non-SUPER_ADMIN roles
+            if ($userRole !== 'SUPER_ADMIN' && $schoolId > 0) {
+                $stmtSch = $pdo->prepare("SELECT status FROM schools WHERE id = :sid LIMIT 1");
+                $stmtSch->execute([':sid' => $schoolId]);
+                $schRow = $stmtSch->fetch(\PDO::FETCH_ASSOC);
+                $schStatus = strtoupper((string)($schRow['status'] ?? ''));
+                if ($schStatus !== 'ACTIVE') {
+                    throw new UnauthorizedException("You have been marked as Inactive please contact Shiksha Pilot Team for for more details");
+                }
+            }
+
             // For Teacher/Staff role: check if staff profile in school was marked Inactive or exit_date set
             if (!$isInactive && ($userRole === 'TEACHER' || $userRole === 'STAFF') && $schoolId > 0 && !empty($phone)) {
                 $stmtStaff = $pdo->prepare("

@@ -1201,8 +1201,9 @@ export default function StaffPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                     {getVisibleMonths(t.joining_date, currentYear?.start_date || (academicYears.find(y => y.is_current) || academicYears.find(y => y.status === 'Draft'))?.start_date).map(month => {
                       const payment = (t.salary_payments || []).find(p => 
-                        (p.payment_month === month || p.payment_month === `Previous Year - ${month}`) && 
-                        (!t.previous_year_pending || parseInt(p.academic_year_id, 10) !== parseInt(t.previous_year_pending.academic_year_id, 10))
+                        p.payment_month === month && 
+                        !p.payment_month.startsWith('Previous Year - ') &&
+                        parseInt(p.staff_id, 10) === parseInt(t.id, 10)
                       );
                       const isPaid = !!payment;
                       const isLocked = payment ? !!payment.is_locked : false;
@@ -1327,10 +1328,28 @@ export default function StaffPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                       {(t.previous_year_pending.valid_months && t.previous_year_pending.valid_months.length > 0 ? t.previous_year_pending.valid_months : ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March']).map(month => {
                         const isPending = t.previous_year_pending.pending_months.includes(month);
-                        const payment = (t.salary_payments || []).find(p => 
-                          (parseInt(p.academic_year_id, 10) === parseInt(t.previous_year_pending.academic_year_id, 10) && (p.payment_month === month || p.payment_month === `Previous Year - ${month}`)) || 
-                          p.payment_month === `Previous Year - ${month}`
-                        );
+                        const payment = (t.salary_payments || []).find(p => {
+                          if (!p.payment_month) return false;
+                          if (parseInt(p.academic_year_id, 10) === parseInt(t.previous_year_pending.academic_year_id, 10) && p.payment_month === month) {
+                            return true;
+                          }
+                          if (p.payment_month.startsWith('Previous Year - ')) {
+                            const cleanP = p.payment_month.replace('Previous Year - ', '').trim();
+                            const subMs = cleanP.split(',').map(s => s.trim());
+                            return subMs.some(sm => {
+                              const parts = sm.split(/[-–]/).map(s => s.trim());
+                              if (parts.length > 1) {
+                                const allMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+                                const startIdx = allMonths.indexOf(parts[0]);
+                                const endIdx = allMonths.indexOf(parts[1]);
+                                const mIdx = allMonths.indexOf(month);
+                                return startIdx !== -1 && endIdx !== -1 && mIdx >= startIdx && mIdx <= endIdx;
+                              }
+                              return sm === month;
+                            });
+                          }
+                          return false;
+                        });
                         const isPaid = payment ? true : (!isPending ? true : false);
                         const isLocked = payment ? !!payment.is_locked : false;
                         const isJoiningMonth = t.previous_year_pending?.joining_month_proration && t.previous_year_pending.joining_month_proration.month === month;
@@ -1338,7 +1357,12 @@ export default function StaffPage() {
                         let isProrated = false;
                         if (isPaid && payment) {
                           salaryAmount = payment.amount_paid;
-                          isProrated = !!payment.proration_details;
+                          isProrated = payment.is_prorated || parseFloat(payment.amount_paid) < parseFloat(t.previous_year_pending.salary || 0.0) || !!payment.proration_details;
+                        } else if (t.previous_year_pending?.monthly_salaries && t.previous_year_pending.monthly_salaries[month] !== undefined) {
+                          salaryAmount = t.previous_year_pending.monthly_salaries[month];
+                          if (salaryAmount < (t.previous_year_pending.salary || 0.0)) {
+                            isProrated = true;
+                          }
                         } else if (isJoiningMonth) {
                           salaryAmount = t.previous_year_pending.joining_month_proration.payable_salary;
                           isProrated = true;
