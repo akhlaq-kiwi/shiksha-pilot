@@ -2253,6 +2253,14 @@ class SchoolAdminService extends BaseService
         }
 
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+        if (isset($params['academic_year_id']) && (int)$params['academic_year_id'] > 0) {
+            $stmtReq = $pdo->prepare("SELECT * FROM academic_years WHERE id = :id AND school_id = :sid LIMIT 1");
+            $stmtReq->execute([':id' => (int)$params['academic_year_id'], ':sid' => $schoolId]);
+            $reqYear = $stmtReq->fetch(PDO::FETCH_ASSOC);
+            if ($reqYear) {
+                $workingYear = $reqYear;
+            }
+        }
         $ayid = $workingYear ? (int)$workingYear['id'] : 0;
 
         $stmt = $pdo->prepare("SELECT * FROM staff WHERE school_id = :sid AND academic_year_id = :ayid ORDER BY id DESC");
@@ -2491,18 +2499,31 @@ class SchoolAdminService extends BaseService
                 }
                 
                 if ($oldStaff) {
+                    // Find next academic year after $prevYear (if any)
+                    $stmtNextAy = $pdo->prepare("
+                        SELECT id FROM academic_years 
+                        WHERE school_id = :sid AND start_date > :prev_start_date 
+                        ORDER BY start_date ASC LIMIT 1
+                    ");
+                    $stmtNextAy->execute([':sid' => $schoolId, ':prev_start_date' => $prevYear['start_date']]);
+                    $nextAyId = (int)$stmtNextAy->fetchColumn();
+
                     // Fetch paid months for this teacher in previous academic year (check all related staff_ids)
                     $inClause = implode(',', array_map('intval', $relatedStaffIds));
                     $stmtOldPaid = $pdo->prepare("
                         SELECT payment_month FROM staff_payments 
                         WHERE school_id = :sid 
                           AND staff_id IN ($inClause)
-                          AND (academic_year_id = :ayid OR payment_month LIKE 'Previous Year - %')
+                          AND (
+                              (academic_year_id = :prev_ayid AND payment_month NOT LIKE 'Previous Year - %')
+                              " . ($nextAyId > 0 ? "OR (academic_year_id = :next_ayid AND payment_month LIKE 'Previous Year - %')" : "") . "
+                          )
                     ");
-                    $stmtOldPaid->execute([
-                        ':sid' => $schoolId,
-                        ':ayid' => $prevYear['id']
-                    ]);
+                    $paramsOldPaid = [':sid' => $schoolId, ':prev_ayid' => $prevYear['id']];
+                    if ($nextAyId > 0) {
+                        $paramsOldPaid[':next_ayid'] = $nextAyId;
+                    }
+                    $stmtOldPaid->execute($paramsOldPaid);
                     $oldPaidRaw = $stmtOldPaid->fetchAll(PDO::FETCH_COLUMN) ?: [];
                     $oldPaidMonths = [];
                     foreach ($oldPaidRaw as $op) {
@@ -2582,6 +2603,18 @@ class SchoolAdminService extends BaseService
                         } catch (\Exception $e) {}
                     }
 
+                    $prevMonthlySalaries = [];
+                    foreach ($validPrevMonths as $mName) {
+                        $prevMonthlySalaries[$mName] = $this->calculateStaffMonthlySalary(
+                            $pdo,
+                            $schoolId,
+                            (int)$oldStaff['id'],
+                            (float)$oldStaff['salary'],
+                            $mName,
+                            $prevYear
+                        );
+                    }
+
                     if (!empty($validPrevMonths)) {
                         $candidateCard = [
                             'academic_year_id' => $prevYear['id'],
@@ -2590,7 +2623,8 @@ class SchoolAdminService extends BaseService
                             'pending_months' => $pendingMonths,
                             'joining_month_proration' => $prevJoiningProration,
                             'salary' => (float)$oldStaff['salary'],
-                            'total_pending' => count($pendingMonths) * (float)$oldStaff['salary']
+                            'monthly_salaries' => $prevMonthlySalaries,
+                            'total_pending' => array_sum(array_intersect_key($prevMonthlySalaries, array_flip($pendingMonths)))
                         ];
 
                         if ($member['previous_year_pending'] === null) {
@@ -4640,8 +4674,8 @@ class SchoolAdminService extends BaseService
                     $prevYearObj = $stmtPrevYear->fetch(PDO::FETCH_ASSOC);
 
                     if ($prevYearObj) {
-                        $preview = $this->getFinancialPreview($user, $prevYearObj['start_date'], date('Y-m-d'), (int)$prevYearId);
-                        if (abs($preview['fees_collected']) > 0.01 || abs($preview['salary_paid']) > 0.01) {
+                        $preview = $this->getFinancialPreview($user, $prevYearObj['start_date'], $prevYearObj['end_date'] ?? date('Y-m-d'), (int)$prevYearId);
+                        if (abs($preview['fees_collected']) > 0.01 || abs($preview['salary_paid']) > 0.01 || abs($preview['profit_loss']) > 0.01) {
                             $this->createFinancialReport($user, [
                                 'from_date' => $preview['from_date'],
                                 'to_date' => $preview['to_date'],
@@ -9584,13 +9618,21 @@ class SchoolAdminService extends BaseService
         if (!$workingYear) {
             throw new ValidationException(['message' => 'No active or draft academic year found.']);
         }
-        if ($workingYear['status'] === 'Archived') {
-            throw new ValidationException(['message' => 'Cannot disburse salary under an Archived academic year. Please switch to the current year.']);
-        }
+        $payYearId = (int)$workingYear['id'];
+
         if ($workingYear['status'] === 'Draft') {
             throw new ValidationException(['message' => 'Salary cannot be disbursed under a Draft academic year. Academic year must be ACTIVE.']);
         }
-        $this->requireWritableAcademicYear($pdo, $schoolId);
+
+        if ($workingYear['status'] === 'Archived') {
+            if ($this->isStaffMigrated($pdo, $staffId, $schoolId)) {
+                throw new ValidationException(['message' => 'This teacher has been migrated/copied to the next academic year. Salary cannot be disbursed from the archived academic year. Please switch to the current year.']);
+            }
+            $activeYear = $this->getActiveAcademicYear($pdo, $schoolId);
+            $payYearId = $activeYear ? (int)$activeYear['id'] : (int)$workingYear['id'];
+        } else {
+            $this->requireWritableAcademicYear($pdo, $schoolId);
+        }
 
         // Fetch staff member
         $staff = $this->staffRepo->findById($staffId);
@@ -9634,12 +9676,12 @@ class SchoolAdminService extends BaseService
         $stmtOldPaid->execute([':sid' => $oldStaff['id'], ':ayid' => $prevYear['id']]);
         $oldPaidMonths = $stmtOldPaid->fetchAll(PDO::FETCH_COLUMN) ?: [];
 
-        // Fetch paid previous-year months in current year
+        // Fetch paid previous-year months in current year or pay year
         $stmtCurrOldPaid = $pdo->prepare("
             SELECT payment_month FROM staff_payments 
-            WHERE staff_id = :sid AND academic_year_id = :ayid AND payment_month LIKE 'Previous Year - %'
+            WHERE staff_id = :sid AND (academic_year_id = :ayid OR academic_year_id = :payayid) AND payment_month LIKE 'Previous Year - %'
         ");
-        $stmtCurrOldPaid->execute([':sid' => $staffId, ':ayid' => $workingYear['id']]);
+        $stmtCurrOldPaid->execute([':sid' => $staffId, ':ayid' => $workingYear['id'], ':payayid' => $payYearId]);
         $currOldPaid = $stmtCurrOldPaid->fetchAll(PDO::FETCH_COLUMN) ?: [];
 
         // Extract individual month names
@@ -9711,11 +9753,16 @@ class SchoolAdminService extends BaseService
         $monthsString = implode(', ', $resultParts);
 
         $salary = (float)($oldStaff['salary'] ?? 0.0);
-        $joiningDateStr = !empty($oldStaff['joining_date']) ? $oldStaff['joining_date'] : (!empty($staff['joining_date']) ? $staff['joining_date'] : null);
         $totalPaid = 0.0;
         foreach ($months as $m) {
-            $pror = $this->getSalaryProrationDetails($salary, $joiningDateStr, $m, $prevYear);
-            $totalPaid += (float)$pror['payable_salary'];
+            $totalPaid += (float)$this->calculateStaffMonthlySalary(
+                $pdo,
+                $schoolId,
+                (int)$oldStaff['id'],
+                $salary,
+                $m,
+                $prevYear
+            );
         }
         $paymentDate = date('Y-m-d');
 
@@ -9727,7 +9774,7 @@ class SchoolAdminService extends BaseService
         $stmt->execute([
             ':sid' => $schoolId,
             ':staff_id' => $staffId,
-            ':ayid' => (int)$workingYear['id'],
+            ':ayid' => $payYearId,
             ':amount_paid' => $totalPaid,
             ':month' => 'Previous Year - ' . $monthsString,
             ':payment_date' => $paymentDate
@@ -9907,13 +9954,13 @@ class SchoolAdminService extends BaseService
         }
 
         if (empty($to)) {
-            $to = date('Y-m-d');
+            $to = $workingYear['end_date'] ?? date('Y-m-d');
         }
 
         if (strtotime($from) > strtotime($to)) {
             $from = $workingYear['start_date'] ?? date('Y-m-01');
             if (strtotime($from) > strtotime($to)) {
-                $to = $from;
+                $to = $workingYear['end_date'] ?? $from;
             }
         }
 
@@ -9955,7 +10002,8 @@ class SchoolAdminService extends BaseService
               AND fp.status IN ('PAID', 'Partial')
               {$cutoffClauseFp}
               AND (
-                (fp.payment_date IS NOT NULL AND fp.payment_date >= :from_date AND fp.payment_date <= :to_date)
+                fp.academic_year_id IS NOT NULL
+                OR (fp.payment_date IS NOT NULL AND fp.payment_date >= :from_date AND fp.payment_date <= :to_date)
                 OR (fp.payment_date IS NULL AND fp.created_at >= :from_ts AND fp.created_at <= :to_ts)
               )
         ");
@@ -9983,7 +10031,8 @@ class SchoolAdminService extends BaseService
               AND (afph.academic_year_id = :ayid1 OR (afph.academic_year_id IS NULL AND s.academic_year_id = :ayid2))
               {$cutoffClauseAdd}
               AND (
-                (afph.payment_date IS NOT NULL AND afph.payment_date >= :from_date AND afph.payment_date <= :to_date)
+                afph.academic_year_id IS NOT NULL
+                OR (afph.payment_date IS NOT NULL AND afph.payment_date >= :from_date AND afph.payment_date <= :to_date)
                 OR (afph.payment_date IS NULL AND afph.created_at >= :from_ts AND afph.created_at <= :to_ts)
               )
         ");
@@ -10009,7 +10058,8 @@ class SchoolAdminService extends BaseService
               AND (academic_year_id = :ayid OR academic_year_id IS NULL)
               {$cutoffClauseSal}
               AND (
-                (payment_date IS NOT NULL AND payment_date >= :from_date AND payment_date <= :to_date)
+                academic_year_id IS NOT NULL
+                OR (payment_date IS NOT NULL AND payment_date >= :from_date AND payment_date <= :to_date)
                 OR (payment_date IS NULL AND created_at >= :from_ts AND created_at <= :to_ts)
               )
         ");
@@ -10033,7 +10083,8 @@ class SchoolAdminService extends BaseService
               AND (academic_year_id = :ayid OR academic_year_id IS NULL)
               {$cutoffClauseExp}
               AND (
-                (expense_date IS NOT NULL AND expense_date >= :from_date AND expense_date <= :to_date)
+                academic_year_id IS NOT NULL
+                OR (expense_date IS NOT NULL AND expense_date >= :from_date AND expense_date <= :to_date)
                 OR (expense_date IS NULL AND created_at >= :from_ts AND created_at <= :to_ts)
               )
         ");
@@ -10083,8 +10134,8 @@ class SchoolAdminService extends BaseService
         // Auto-heal/generate final report for Archived academic years if un-reported transactions exist
         if ($workingYear && isset($workingYear['status']) && strtoupper($workingYear['status']) === 'ARCHIVED') {
             try {
-                $preview = $this->getFinancialPreview($user, '', '', $academicYearId);
-                if (abs($preview['fees_collected']) > 0.01 || abs($preview['salary_paid']) > 0.01) {
+                $preview = $this->getFinancialPreview($user, $workingYear['start_date'] ?? '', $workingYear['end_date'] ?? '', $academicYearId);
+                if (abs($preview['fees_collected']) > 0.01 || abs($preview['salary_paid']) > 0.01 || abs($preview['profit_loss']) > 0.01) {
                     $latestReport = $reports[0] ?? null;
                     if (!$latestReport || $latestReport['status'] === 'Settled') {
                         $this->createFinancialReport($user, [
@@ -10284,6 +10335,7 @@ class SchoolAdminService extends BaseService
         }
         $subject = "Settlement Approval Request – Financial Report " . $report['report_id'];
         $sender = "shikshapilot@gmail.com";
+        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
         $academicYearName = $workingYear ? $workingYear['name'] : 'N/A';
         $reportPeriod = $report['from_date'] . ' to ' . $report['to_date'];
         $revenueVal = (float)$report['fees_collected'];
@@ -10492,8 +10544,13 @@ Only approve the settlement after reviewing all financial records.
         }
 
         // Retrieve bounds of transactions contributing to this report
-        list($from_ts, $operator, $to_ts) = $this->getReportBounds($pdo, $schoolId, $report);
+        list($from_ts, $operator, $to_ts, $hasPrev) = $this->getReportBounds($pdo, $schoolId, $report);
         $repAyId = (int)($report['academic_year_id'] ?? 0);
+
+        $createdClauseFp = $hasPrev ? "AND fp.created_at {$operator} :from_ts" : "AND (fp.academic_year_id IS NOT NULL OR fp.created_at >= :from_ts)";
+        $createdClauseAdd = $hasPrev ? "AND afph.created_at {$operator} :from_ts" : "AND (afph.academic_year_id IS NOT NULL OR afph.created_at >= :from_ts)";
+        $createdClauseSal = $hasPrev ? "AND sp.created_at {$operator} :from_ts" : "AND (sp.academic_year_id IS NOT NULL OR sp.created_at >= :from_ts)";
+        $createdClauseExp = $hasPrev ? "AND se.created_at {$operator} :from_ts" : "AND (se.academic_year_id IS NOT NULL OR se.created_at >= :from_ts)";
 
         // Fetch Student Fee Collections
         $feeParams = [':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts];
@@ -10526,7 +10583,7 @@ Only approve the settlement after reviewing all financial records.
             WHERE fp.school_id = :sid 
               {$ayClauseFp}
               AND fp.status IN ('PAID', 'Partial')
-              AND fp.created_at {$operator} :from_ts 
+              {$createdClauseFp}
               AND fp.created_at <= :to_ts
         ");
         $stmtFeeList->execute($feeParams);
@@ -10563,7 +10620,7 @@ Only approve the settlement after reviewing all financial records.
             LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = afph.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = afp.school_id)
             WHERE afp.school_id = :sid 
               {$ayClauseAdd}
-              AND afph.created_at {$operator} :from_ts 
+              {$createdClauseAdd}
               AND afph.created_at <= :to_ts
         ");
         $stmtAddFeeList->execute($addParams);
@@ -10633,7 +10690,7 @@ Only approve the settlement after reviewing all financial records.
             LEFT JOIN academic_years ay ON sp.academic_year_id = ay.id
             WHERE sp.school_id = :sid 
               {$ayClauseSal}
-              AND sp.created_at {$operator} :from_ts 
+              {$createdClauseSal}
               AND sp.created_at <= :to_ts
         ");
         $stmtSalaryList->execute($salParams);
@@ -10667,7 +10724,7 @@ Only approve the settlement after reviewing all financial records.
             FROM school_expenses se
             WHERE se.school_id = :sid 
               {$ayClauseExp}
-              AND se.created_at {$operator} :from_ts 
+              {$createdClauseExp}
               AND se.created_at <= :to_ts
         ");
         $stmtExpenseList->execute($expParams);
@@ -10915,7 +10972,8 @@ Only approve the settlement after reviewing all financial records.
               {$ayClauseSal}
               {$cutoffClauseSal}
               AND (
-                (sp.payment_date IS NOT NULL AND sp.payment_date >= :from_date AND sp.payment_date <= :to_date)
+                sp.academic_year_id IS NOT NULL
+                OR (sp.payment_date IS NOT NULL AND sp.payment_date >= :from_date AND sp.payment_date <= :to_date)
                 OR (sp.payment_date IS NULL AND sp.created_at >= :from_ts AND sp.created_at <= :to_ts)
               )
         ");
@@ -11145,9 +11203,11 @@ Only approve the settlement after reviewing all financial records.
         if ($prevReport) {
             $fromTimestamp = $prevReport['created_at'];
             $operator = '>';
+            $hasPrev = true;
         } else {
             $fromTimestamp = $report['from_date'] . ' 00:00:00';
             $operator = '>=';
+            $hasPrev = false;
         }
 
         $createdDate = date('Y-m-d', strtotime($report['created_at']));
@@ -11157,7 +11217,7 @@ Only approve the settlement after reviewing all financial records.
             $toTimestamp = $report['to_date'] . ' 23:59:59';
         }
 
-        return [$fromTimestamp, $operator, $toTimestamp];
+        return [$fromTimestamp, $operator, $toTimestamp, $hasPrev];
     }
 
     private function renderOwnerResponseHtml(string $title, string $message, bool $isSuccess): string

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, Users, Check, AlertCircle, Edit2, Save, FileText, CheckCircle2, Trash2, Plus, MoreVertical, Lock, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, Users, Check, AlertCircle, Edit2, Save, FileText, CheckCircle2, Trash2, Plus, MoreVertical, Lock, ChevronDown, ChevronLeft, ChevronRight, ShieldAlert } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
@@ -146,6 +146,121 @@ export default function AttendancePage() {
     ((c.section || '') === selectedSection || !selectedSection)
   );
 
+  // Unsaved Changes Tracking for Student Attendance
+  const [hasUnsavedStudentAtt, setHasUnsavedStudentAtt] = useState(false);
+  const [showUnsavedStudentModal, setShowUnsavedStudentModal] = useState(false);
+  const [pendingStudentNav, setPendingStudentNav] = useState(null);
+
+  const executePendingStudentNav = (nav) => {
+    if (!nav) return;
+    if (nav.type === 'date') {
+      setSelectedDate(nav.value);
+    } else if (nav.type === 'class') {
+      setSelectedClassName(nav.value);
+      const matchingSections = classes.filter(c => c.name === nav.value).map(c => c.section || '');
+      const firstSection = matchingSections[0] || '';
+      setSelectedSection(firstSection);
+      setStudents([]);
+      setAttendanceRecords([]);
+      setAttendanceMap({});
+    } else if (nav.type === 'section') {
+      setSelectedSection(nav.value);
+      setStudents([]);
+      setAttendanceRecords([]);
+      setAttendanceMap({});
+    } else if (nav.type === 'tab') {
+      setActiveTab(nav.value);
+    } else if (nav.type === 'userType') {
+      setUserType(nav.value);
+    }
+  };
+
+  const requestStudentDateChange = (newDateStr) => {
+    if (!newDateStr || newDateStr === selectedDate) return;
+    if (hasUnsavedStudentAtt) {
+      setPendingStudentNav({ type: 'date', value: newDateStr });
+      setShowUnsavedStudentModal(true);
+    } else {
+      setSelectedDate(newDateStr);
+    }
+  };
+
+  const requestStudentShiftDate = (days) => {
+    if (!selectedDate) return;
+    const parts = selectedDate.split('-');
+    if (parts.length !== 3) return;
+    const dt = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    dt.setDate(dt.getDate() + days);
+
+    const year = dt.getFullYear();
+    const month = String(dt.getMonth() + 1).padStart(2, '0');
+    const day = String(dt.getDate()).padStart(2, '0');
+    const newDateStr = `${year}-${month}-${day}`;
+
+    const minDate = currentYear?.start_date || '';
+    const todayStr = getTodayLocalDateString();
+
+    if (days < 0 && minDate && newDateStr < minDate) {
+      toast.warning(`Cannot select a date before the academic year started (${minDate}).`);
+      return;
+    }
+    if (days > 0 && newDateStr > todayStr) {
+      toast.warning("Cannot select a future date.");
+      return;
+    }
+
+    requestStudentDateChange(newDateStr);
+  };
+
+  const requestClassChange = (e) => {
+    const className = e.target.value;
+    if (hasUnsavedStudentAtt) {
+      setPendingStudentNav({ type: 'class', value: className });
+      setShowUnsavedStudentModal(true);
+    } else {
+      setSelectedClassName(className);
+      const matchingSections = classes.filter(c => c.name === className).map(c => c.section || '');
+      const firstSection = matchingSections[0] || '';
+      setSelectedSection(firstSection);
+      setStudents([]);
+      setAttendanceRecords([]);
+      setAttendanceMap({});
+    }
+  };
+
+  const requestSectionChange = (e) => {
+    const sectionName = e.target.value;
+    if (hasUnsavedStudentAtt) {
+      setPendingStudentNav({ type: 'section', value: sectionName });
+      setShowUnsavedStudentModal(true);
+    } else {
+      setSelectedSection(sectionName);
+      setStudents([]);
+      setAttendanceRecords([]);
+      setAttendanceMap({});
+    }
+  };
+
+  const requestStudentTabChange = (newTab) => {
+    if (newTab === activeTab) return;
+    if (activeTab === 'daily' && hasUnsavedStudentAtt) {
+      setPendingStudentNav({ type: 'tab', value: newTab });
+      setShowUnsavedStudentModal(true);
+    } else {
+      setActiveTab(newTab);
+    }
+  };
+
+  const requestUserTypeChange = (newUserType) => {
+    if (newUserType === userType) return;
+    if (userType === 'Student' && activeTab === 'daily' && hasUnsavedStudentAtt) {
+      setPendingStudentNav({ type: 'userType', value: newUserType });
+      setShowUnsavedStudentModal(true);
+    } else {
+      setUserType(newUserType);
+    }
+  };
+
   // Load daily attendance and students
   const loadDailyData = useCallback(async () => {
     if (!activeClass) return;
@@ -175,6 +290,7 @@ export default function AttendancePage() {
 
       setAttendanceMap(map);
       setIsEditing(false);
+      setHasUnsavedStudentAtt(false);
     } catch (err) {
       console.error(err);
       toast.error('Failed to load daily attendance data.');
@@ -237,10 +353,11 @@ export default function AttendancePage() {
       ...prev,
       [studentId]: status
     }));
+    setHasUnsavedStudentAtt(true);
   };
 
-  const handleSaveAttendance = async () => {
-    if (!activeClass) return;
+  const handleSaveAttendance = async (navToExecute = null) => {
+    if (!activeClass) return false;
     setSavingAttendance(true);
     try {
       const records = students.map(s => ({
@@ -254,13 +371,35 @@ export default function AttendancePage() {
         records: records
       });
       toast.success('Attendance saved successfully.', 'Success');
-      await loadDailyData();
+      setHasUnsavedStudentAtt(false);
+      if (navToExecute) {
+        executePendingStudentNav(navToExecute);
+      } else {
+        await loadDailyData();
+      }
+      return true;
     } catch (err) {
       console.error(err);
       toast.error(err.message || 'Failed to save student attendance.');
+      return false;
     } finally {
       setSavingAttendance(false);
     }
+  };
+
+  const handleSaveAndNavigateStudent = async () => {
+    const nav = pendingStudentNav;
+    setShowUnsavedStudentModal(false);
+    setPendingStudentNav(null);
+    await handleSaveAttendance(nav);
+  };
+
+  const handleIgnoreUnsavedStudent = () => {
+    const nav = pendingStudentNav;
+    setShowUnsavedStudentModal(false);
+    setHasUnsavedStudentAtt(false);
+    setPendingStudentNav(null);
+    executePendingStudentNav(nav);
   };
 
   // Helper to check if a date is Sunday
@@ -391,7 +530,7 @@ export default function AttendancePage() {
             </span>
             <select
               value={userType}
-              onChange={(e) => setUserType(e.target.value)}
+              onChange={(e) => requestUserTypeChange(e.target.value)}
               className="absolute inset-0 opacity-0 w-full h-full cursor-pointer font-bold"
             >
               <option value="Teacher">Teacher</option>
@@ -419,7 +558,7 @@ export default function AttendancePage() {
       {/* Tabs */}
       <div className="flex gap-1 border-b border-border">
         <button
-          onClick={() => setActiveTab('daily')}
+          onClick={() => requestStudentTabChange('daily')}
           className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px ${
             activeTab === 'daily'
               ? 'border-primary text-primary'
@@ -429,7 +568,7 @@ export default function AttendancePage() {
           Daily Attendance
         </button>
         <button
-          onClick={() => setActiveTab('report')}
+          onClick={() => requestStudentTabChange('report')}
           className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px ${
             activeTab === 'report'
               ? 'border-primary text-primary'
@@ -446,7 +585,7 @@ export default function AttendancePage() {
           <CardContent className="p-4 flex flex-wrap gap-4 items-end">
             <div className="flex-1 min-w-[150px] space-y-1.5">
               <label className="text-xs font-bold text-text-secondary uppercase">Class</label>
-              <Select value={selectedClassName} onChange={handleClassChange} disabled={loadingClasses}>
+              <Select value={selectedClassName} onChange={requestClassChange} disabled={loadingClasses}>
                 {loadingClasses ? (
                   <option>Loading...</option>
                 ) : (
@@ -460,7 +599,7 @@ export default function AttendancePage() {
                 <label className="text-xs font-bold text-text-secondary uppercase">Section</label>
                 <Select 
                   value={selectedSection} 
-                  onChange={handleSectionChange} 
+                  onChange={requestSectionChange} 
                   disabled={loadingClasses}
                 >
                   <option value="">Select Section</option>
@@ -481,7 +620,7 @@ export default function AttendancePage() {
                     type="button"
                     variant="outline"
                     size="icon"
-                    onClick={() => handleShiftDate(-1)}
+                    onClick={() => requestStudentShiftDate(-1)}
                     className="h-9 w-9 shrink-0 bg-background border-border hover:bg-zinc-100 dark:hover:bg-zinc-800"
                     title="Previous Day"
                   >
@@ -490,7 +629,7 @@ export default function AttendancePage() {
                   <Input 
                     type="date" 
                     value={selectedDate} 
-                    onChange={handleDateChange} 
+                    onChange={(e) => requestStudentDateChange(e.target.value)} 
                     min={currentYear?.start_date || ''}
                     max={getTodayLocalDateString()}
                     className="h-9 bg-background" 
@@ -499,7 +638,7 @@ export default function AttendancePage() {
                     type="button"
                     variant="outline"
                     size="icon"
-                    onClick={() => handleShiftDate(1)}
+                    onClick={() => requestStudentShiftDate(1)}
                     disabled={selectedDate >= getTodayLocalDateString()}
                     className="h-9 w-9 shrink-0 bg-background border-border hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40"
                     title="Next Day"
@@ -784,6 +923,48 @@ export default function AttendancePage() {
       )}
         </>
       )}
+
+      {/* Unsaved Student Attendance Changes Confirmation Dialog */}
+      <Dialog
+        isOpen={showUnsavedStudentModal}
+        onClose={() => {
+          setShowUnsavedStudentModal(false);
+          setPendingStudentNav(null);
+        }}
+        title="Unsaved Attendance Changes"
+        footer={
+          <div className="flex items-center gap-2 justify-end w-full">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleIgnoreUnsavedStudent}
+              className="font-bold text-xs px-4 h-9"
+            >
+              Ignore
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSaveAndNavigateStudent}
+              disabled={savingAttendance}
+              className="font-bold text-xs px-4 h-9 bg-primary text-white hover:bg-primary/90"
+            >
+              {savingAttendance ? 'Saving...' : 'Save Attendance'}
+            </Button>
+          </div>
+        }
+      >
+        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-sm flex items-start gap-3">
+          <ShieldAlert className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+          <div className="space-y-1.5">
+            <p className="font-bold text-sm text-amber-900 dark:text-amber-200">
+              You have unsaved changes in student attendance.
+            </p>
+            <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
+              You updated student attendance for date <strong>{selectedDate}</strong> but haven't saved it yet. Would you like to save attendance before moving forward, or ignore changes?
+            </p>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }

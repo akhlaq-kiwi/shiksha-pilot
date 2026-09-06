@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Shield, Key, Phone, AlertCircle, RefreshCw, Eye, EyeOff } from 'lucide-react';
 import logoImg from '../../../assets/logo.png';
 import { authService } from '../../../common/services/authService';
+import { useToast } from '../../../common/components/Toast';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../../common/ui/card';
 import { Input } from '../../../common/ui/input';
 
 export default function LoginForm({ onLoginSuccess }) {
+  const toast = useToast();
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -24,10 +26,13 @@ export default function LoginForm({ onLoginSuccess }) {
       // Only show error message if it explicitly pertains to inactive account or specific error
       if (decodedMsg.toLowerCase().includes('inactive') || decodedMsg.toLowerCase().includes('password') || decodedMsg.toLowerCase().includes('blocked')) {
         setErrors({ phone: decodedMsg });
+        if (decodedMsg.toLowerCase().includes('inactive') && toast) {
+          toast.error(decodedMsg);
+        }
       }
       sessionStorage.removeItem('login_error_message');
     }
-  }, []);
+  }, [toast]);
 
   const handlePasswordLogin = async (e) => {
     e.preventDefault();
@@ -53,7 +58,8 @@ export default function LoginForm({ onLoginSuccess }) {
     } catch (err) {
       const msg = err.message || (err.data && (err.data.message || err.data.phone || err.data.errors?.phone)) || '';
       if (msg.toLowerCase().includes('inactive')) {
-        setErrors({ phone: 'Your account marked as Inactive Please contact Academy management' });
+        const inactiveErr = msg || 'You have been marked as Inactive please contact Shiksha Pilot Team for for more details';
+        setErrors({ phone: inactiveErr });
       } else if (err.data && err.data.errors) {
         setErrors(err.data.errors);
       } else if (err.data && typeof err.data === 'object') {

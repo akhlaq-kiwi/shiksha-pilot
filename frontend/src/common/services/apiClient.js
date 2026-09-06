@@ -44,9 +44,10 @@ async function request(endpoint, options = {}) {
 
     const isInactive = errorMsg.toLowerCase().includes('inactive');
     if (isInactive) {
-      sessionStorage.setItem('login_error_message', errorMsg);
+      const finalMsg = errorMsg || 'You have been marked as Inactive please contact Shiksha Pilot Team for for more details';
+      sessionStorage.setItem('login_error_message', finalMsg);
       if (!window.location.pathname.startsWith('/login')) {
-        window.location.replace(`/login?error=${encodeURIComponent(errorMsg)}`);
+        window.location.replace(`/login?error=${encodeURIComponent(finalMsg)}`);
       }
     } else {
       sessionStorage.removeItem('login_error_message');

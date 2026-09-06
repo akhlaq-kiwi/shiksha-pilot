@@ -309,8 +309,23 @@ class PlatformService extends BaseService
             $errors['contact_email'] = 'This email address is already registered. Please use a different email address.';
         }
 
+        // Check 10-digit phone number validations
+        $adminPhoneClean = preg_replace('/[^0-9]/', '', (string)($data['admin_phone'] ?? ''));
+        if (empty($adminPhoneClean)) {
+            $errors['admin_phone'] = 'Admin phone number is required.';
+        } elseif (strlen($adminPhoneClean) !== 10) {
+            $errors['admin_phone'] = 'Admin phone number must be exactly 10 digits.';
+        }
+
+        if (!empty($data['contact_phone'])) {
+            $contactPhoneClean = preg_replace('/[^0-9]/', '', (string)$data['contact_phone']);
+            if (strlen($contactPhoneClean) !== 10) {
+                $errors['contact_phone'] = 'Contact phone number must be exactly 10 digits.';
+            }
+        }
+
         // Check if admin phone already exists in users table (active users)
-        if (!empty($data['admin_phone'])) {
+        if (!empty($data['admin_phone']) && empty($errors['admin_phone'])) {
             $cleaned = preg_replace('/[^0-9]/', '', (string)$data['admin_phone']);
             $normPhone = strlen($cleaned) >= 10 ? substr($cleaned, -10) : $cleaned;
             $stmtPhone = $pdo->prepare("SELECT COUNT(*) FROM users WHERE RIGHT(REGEXP_REPLACE(phone, '[^0-9]', ''), 10) = :phone AND UPPER(status) = 'ACTIVE'");
@@ -539,57 +554,31 @@ class PlatformService extends BaseService
 
         $pdo->beginTransaction();
         try {
-            // Delete all related tenant records across child tables to prevent FK constraint failures
-            $childTables = [
-                'academic_year_disabled_subjects',
-                'timetable',
-                'period_configurations',
-                'examination_seating_plans',
-                'examination_marks',
-                'examination_papers',
-                'examinations',
-                'final_academic_reports',
-                'academic_achievement_snapshots',
-                'student_transport_fees',
-                'late_payment_penalty_history',
-                'late_payment_penalty_applications',
-                'late_payment_penalty_configs',
-                'fee_payments',
-                'class_fee_configurations',
-                'additional_fee_types',
-                'fee_follow_ups',
-                'school_expenses',
-                'school_finance_settings',
-                'leave_requests',
-                'holidays',
-                'staff_payments',
-                'staff',
-                'students',
-                'subjects',
-                'classes',
-                'academic_years',
-                'subscriptions',
-                'users'
-            ];
+            $pdo->exec("SET FOREIGN_KEY_CHECKS = 0");
 
-            foreach ($childTables as $table) {
-                $stmtCheck = $pdo->prepare("SHOW TABLES LIKE :table");
-                $stmtCheck->execute([':table' => $table]);
-                if ($stmtCheck->fetchColumn() !== false) {
-                    $stmtCol = $pdo->prepare("SHOW COLUMNS FROM `{$table}` LIKE 'school_id'");
-                    $stmtCol->execute();
-                    if ($stmtCol->fetchColumn() !== false) {
-                        $pdo->prepare("DELETE FROM `{$table}` WHERE school_id = :sid")->execute([':sid' => $id]);
-                    }
-                }
+            // Dynamically fetch all child tables in the current database containing a school_id column
+            $stmtTables = $pdo->prepare("
+                SELECT TABLE_NAME 
+                FROM information_schema.COLUMNS 
+                WHERE TABLE_SCHEMA = DATABASE() 
+                  AND COLUMN_NAME = 'school_id'
+                  AND TABLE_NAME != 'schools'
+            ");
+            $stmtTables->execute();
+            $tables = $stmtTables->fetchAll(\PDO::FETCH_COLUMN);
+
+            foreach ($tables as $table) {
+                $pdo->prepare("DELETE FROM `{$table}` WHERE school_id = :sid")->execute([':sid' => $id]);
             }
 
             $this->schools->delete($id);
+            $pdo->exec("SET FOREIGN_KEY_CHECKS = 1");
             $pdo->commit();
         } catch (\Throwable $e) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
+            $pdo->exec("SET FOREIGN_KEY_CHECKS = 1");
             throw $e;
         }
 

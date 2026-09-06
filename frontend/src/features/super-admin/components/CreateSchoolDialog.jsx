@@ -54,7 +54,11 @@ export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating
   }, [isOpen]);
 
   const set = (key) => (e) => {
-    setForm(prev => ({ ...prev, [key]: e.target.value }));
+    let val = e.target.value;
+    if (key === 'contact_phone' || key === 'admin_phone') {
+      val = val.replace(/\D/g, '').slice(0, 10);
+    }
+    setForm(prev => ({ ...prev, [key]: val }));
     if (localErrors[key]) {
       setLocalErrors(prev => {
         const next = { ...prev };
@@ -85,6 +89,18 @@ export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    const errors = {};
+    if (!form.admin_phone || form.admin_phone.length !== 10) {
+      errors.admin_phone = 'Admin phone number must be exactly 10 digits.';
+    }
+    if (form.contact_phone && form.contact_phone.length !== 10) {
+      errors.contact_phone = 'Contact phone number must be exactly 10 digits.';
+    }
+    if (Object.keys(errors).length > 0) {
+      setLocalErrors(prev => ({ ...prev, ...errors }));
+      return;
+    }
+
     onSubmit(form, () => setForm({ 
       ...EMPTY, 
       admin_password: generatePassword(),
@@ -121,6 +137,7 @@ export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating
               placeholder="e.g. 9900000001"
               value={form.contact_phone}
               onChange={set('contact_phone')}
+              maxLength={10}
               className={localErrors?.contact_phone ? 'border-red-500 ring-1 ring-red-500' : ''}
             />
             {localErrors?.contact_phone && (
@@ -199,6 +216,7 @@ export default function CreateSchoolDialog({ isOpen, onClose, onSubmit, creating
                 placeholder="e.g. 9800000001"
                 value={form.admin_phone}
                 onChange={set('admin_phone')}
+                maxLength={10}
                 required
                 className={localErrors?.admin_phone ? 'border-red-500 ring-1 ring-red-500' : ''}
               />
