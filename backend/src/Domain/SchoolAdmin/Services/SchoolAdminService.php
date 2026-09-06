@@ -11608,7 +11608,23 @@ Only approve the settlement after reviewing all financial records.
               AND aft.school_id = :school_id
         ");
 
-        return array_map(function($t) use ($stmtClassAmounts, $activeClassesCount, $schoolId) {
+        $stmtStudentInfo = $pdo->prepare("
+            SELECT s.id, 
+                   CASE 
+                     WHEN s.last_name = '.' OR s.last_name IS NULL OR TRIM(s.last_name) = '' THEN 
+                       TRIM(CONCAT(s.first_name, ' ', COALESCE(s.middle_name, '')))
+                     ELSE 
+                       TRIM(CONCAT(s.first_name, ' ', COALESCE(s.middle_name, ''), ' ', s.last_name))
+                   END AS student_name,
+                   c.name AS class_name, c.section, s.roll_no, s.sr_no
+            FROM additional_fee_payments afp
+            JOIN students s ON s.id = afp.student_id
+            LEFT JOIN classes c ON c.id = s.class_id
+            WHERE afp.fee_type_id = :ftid
+            LIMIT 1
+        ");
+
+        return array_map(function($t) use ($stmtClassAmounts, $stmtStudentInfo, $activeClassesCount, $schoolId) {
             $t['id'] = (int)$t['id'];
             $t['amount'] = (float)$t['amount'];
             $t['academic_year_id'] = (int)$t['academic_year_id'];
@@ -11642,6 +11658,16 @@ Only approve the settlement after reviewing all financial records.
             // Determine if assigned to Entire School, Selected Classes, or Individual Student
             if ((int)$t['total_students'] === 1 && $typeCount === 1) {
                 $t['assigned_to'] = 'For 1 Student';
+                $stmtStudentInfo->execute([':ftid' => $t['id']]);
+                $sInfo = $stmtStudentInfo->fetch(PDO::FETCH_ASSOC);
+                if ($sInfo) {
+                    $t['student_info'] = [
+                        'student_name' => $sInfo['student_name'] ?: 'N/A',
+                        'class_name' => ($sInfo['class_name'] ?? 'N/A') . (!empty($sInfo['section']) ? '-' . $sInfo['section'] : ''),
+                        'roll_no' => $sInfo['roll_no'] ?: 'N/A',
+                        'sr_no' => $sInfo['sr_no'] ?: 'N/A'
+                    ];
+                }
             } elseif ($typeCount > 1) {
                 $t['assigned_to'] = 'For Selected Classes';
             } elseif ($activeClassesCount > 0 && $classCount >= $activeClassesCount) {
