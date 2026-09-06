@@ -971,14 +971,31 @@ class TeacherService extends BaseService
             $prevYearName = $prevYear['name'];
             $prevSalary = (float)($prevStaff['salary'] ?? $currSalary);
 
-            // Fetch all staff_payments matching previous year
-            $stmtOldPaid = $pdo->query("
-                SELECT * FROM staff_payments 
-                WHERE school_id = {$schoolId} 
-                  AND staff_id IN ({$inStaffIds}) 
-                  AND (academic_year_id = {$prevYearId} OR payment_month LIKE 'Previous Year - %')
+            // Find next academic year after $prevYear (if any)
+            $stmtNextAy = $pdo->prepare("
+                SELECT id FROM academic_years 
+                WHERE school_id = :sid AND start_date > :prev_start_date 
+                ORDER BY start_date ASC LIMIT 1
             ");
-            $oldPaidRecords = $stmtOldPaid->fetchAll() ?: [];
+            $stmtNextAy->execute([':sid' => $schoolId, ':prev_start_date' => $prevYear['start_date']]);
+            $nextAyId = (int)$stmtNextAy->fetchColumn();
+
+            // Fetch all staff_payments matching previous year
+            $stmtOldPaid = $pdo->prepare("
+                SELECT * FROM staff_payments 
+                WHERE school_id = :sid 
+                  AND staff_id IN ({$inStaffIds}) 
+                  AND (
+                      (academic_year_id = :prev_ayid AND payment_month NOT LIKE 'Previous Year - %')
+                      " . ($nextAyId > 0 ? "OR (academic_year_id = :next_ayid AND payment_month LIKE 'Previous Year - %')" : "") . "
+                  )
+            ");
+            $paramsOldPaid = [':sid' => $schoolId, ':prev_ayid' => $prevYearId];
+            if ($nextAyId > 0) {
+                $paramsOldPaid[':next_ayid'] = $nextAyId;
+            }
+            $stmtOldPaid->execute($paramsOldPaid);
+            $oldPaidRecords = $stmtOldPaid->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
             $oldPaidMonthsMap = [];
             foreach ($oldPaidRecords as $opr) {
