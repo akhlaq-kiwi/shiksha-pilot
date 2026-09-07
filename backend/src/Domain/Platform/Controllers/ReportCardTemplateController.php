@@ -21,6 +21,28 @@ class ReportCardTemplateController extends BaseController
         $this->db = $db;
     }
 
+    private function ensureBuiltinReportCardTemplates(): void
+    {
+        try {
+            $stmt = $this->db->query("SELECT COUNT(*) FROM report_card_templates WHERE is_system_default = 1");
+            $count = $stmt ? (int)$stmt->fetchColumn() : 0;
+            if ($stmt) $stmt->closeCursor();
+
+            if ($count < 4) {
+                $file025 = __DIR__ . '/../../Database/Migrations/025_ensure_builtin_report_card_templates.sql';
+                if (file_exists($file025)) {
+                    $sql = file_get_contents($file025);
+                    $statements = array_filter(array_map('trim', explode(';', $sql)), fn(string $s) => $s !== '');
+                    foreach ($statements as $st) {
+                        $this->db->exec($st);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            // Ignore fallback errors
+        }
+    }
+
     /**
      * GET /api/platform/report-card-templates
      * List all available report card templates
@@ -30,6 +52,8 @@ class ReportCardTemplateController extends BaseController
         $actor = $this->authenticate($request);
         $this->requireRole($actor, ['SUPER_ADMIN']);
 
+        $this->ensureBuiltinReportCardTemplates();
+
         $stmt = $this->db->query("
             SELECT t.*, 
                    (SELECT COUNT(*) FROM schools s WHERE s.report_card_template_id = t.id) as assigned_schools_count
@@ -37,6 +61,7 @@ class ReportCardTemplateController extends BaseController
             ORDER BY t.is_system_default DESC, t.name ASC
         ");
         $templates = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
 
         foreach ($templates as &$t) {
             $t['layout_config'] = json_decode($t['layout_config'] ?? '{}', true) ?? [];
@@ -172,7 +197,10 @@ class ReportCardTemplateController extends BaseController
         $actor = $this->authenticate($request);
         $this->requireRole($actor, ['SUPER_ADMIN']);
 
+        $this->ensureBuiltinReportCardTemplates();
+
         $schoolId = (int)($args['id'] ?? 0);
+
         $data = RequestParser::body($request);
         $templateId = isset($data['template_id']) ? (int)$data['template_id'] : null;
 
