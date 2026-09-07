@@ -8710,9 +8710,10 @@ class SchoolAdminService extends BaseService
         return ['success' => true, 'message' => 'Section deleted successfully.'];
     }
 
-    public function deleteFeePayment(array $user, int $id): bool
+    public function deleteFeePayment(array $user, int $id, ?string $otpCode = null): bool
     {
         $schoolId = $this->getSchoolId($user);
+        $userId = (int)($user['id'] ?? 0);
         $pdo = $this->feeRepo->getPdo();
 
         // Check if the payment exists and belongs to this school
@@ -8728,13 +8729,16 @@ class SchoolAdminService extends BaseService
         $receiptNo = $row['receipt_no'];
         $academicYearId = $row['academic_year_id'] !== null ? (int)$row['academic_year_id'] : 0;
 
-        // 1. Report lock check
-        if ($this->isTransactionInReport($pdo, $schoolId, $row['created_at']) || $this->isTransactionInReport($pdo, $schoolId, $row['payment_date'])) {
+        // 1. Report lock check (Check created_at timestamp against generated reports)
+        if ($this->isTransactionInReport($pdo, $schoolId, $row['created_at'])) {
             throw new ValidationException(
                 ['locked' => 'This action can not be done, This is already included in financial report'],
                 'This action can not be done, This is already included in financial report'
             );
         }
+
+        // 1.2 OTP Verification Check
+        $this->verifyFeeRevertOtp($pdo, $schoolId, $userId, 'monthly', $id, $otpCode);
 
         // 1.5. Target year writable check
         $stmtPayYear = $pdo->prepare("SELECT status FROM academic_years WHERE id = :id AND school_id = :sid LIMIT 1");
@@ -12341,12 +12345,13 @@ Only approve the settlement after reviewing all financial records.
         return $pay ?: [];
     }
 
-    public function revertAdditionalFeePayment(array $user, int $id): array
+    public function revertAdditionalFeePayment(array $user, int $id, ?string $otpCode = null): array
     {
         $schoolId = $this->getSchoolId($user);
+        $userId = (int)($user['id'] ?? 0);
         $pdo = $this->staffRepo->getPdo();
 
-        $stmtCheck = $pdo->prepare("SELECT id, receipt_no, student_id, payment_date, updated_at FROM additional_fee_payments WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtCheck = $pdo->prepare("SELECT id, receipt_no, student_id, payment_date, updated_at, created_at FROM additional_fee_payments WHERE id = :id AND school_id = :sid LIMIT 1");
         $stmtCheck->execute([':id' => $id, ':sid' => $schoolId]);
         $paymentDetails = $stmtCheck->fetch(PDO::FETCH_ASSOC);
         if ($paymentDetails === false) {
@@ -12360,7 +12365,7 @@ Only approve the settlement after reviewing all financial records.
         $relatedIds = [$id];
         $relatedRows = [$paymentDetails];
         if (!empty($receiptNo)) {
-            $stmtRelated = $pdo->prepare("SELECT id, payment_date, updated_at FROM additional_fee_payments WHERE school_id = :sid AND student_id = :stid AND receipt_no = :rno");
+            $stmtRelated = $pdo->prepare("SELECT id, payment_date, updated_at, created_at FROM additional_fee_payments WHERE school_id = :sid AND student_id = :stid AND receipt_no = :rno");
             $stmtRelated->execute([':sid' => $schoolId, ':stid' => $studentId, ':rno' => $receiptNo]);
             $fetchedRelated = $stmtRelated->fetchAll(PDO::FETCH_ASSOC);
             if (!empty($fetchedRelated)) {
@@ -12369,15 +12374,19 @@ Only approve the settlement after reviewing all financial records.
             }
         }
 
-        // 1. Report lock check on all related payments
+        // 1. Report lock check on all related payments (check created_at timestamp)
         foreach ($relatedRows as $rel) {
-            if ($this->isTransactionInReport($pdo, $schoolId, $rel['updated_at']) || $this->isTransactionInReport($pdo, $schoolId, $rel['payment_date'])) {
+            $txTime = !empty($rel['created_at']) ? $rel['created_at'] : $rel['updated_at'];
+            if ($this->isTransactionInReport($pdo, $schoolId, $txTime)) {
                 throw new ValidationException(
                     ['locked' => 'This action can not be done, This is already included in financial report'],
                     'This action can not be done, This is already included in financial report'
                 );
             }
         }
+
+        // 1.2 OTP Verification Check
+        $this->verifyFeeRevertOtp($pdo, $schoolId, $userId, 'additional', $id, $otpCode);
 
         // 2. Writable year check & Outstanding migration lock check
         $stmtGetInfo = $pdo->prepare("
@@ -13120,42 +13129,277 @@ Only approve the settlement after reviewing all financial records.
         $txVal = strtotime($txTime);
         if ($txVal === false || $txVal <= 0) return false;
 
-        $stmt = $pdo->prepare("SELECT * FROM financial_reports WHERE school_id = :sid ORDER BY created_at ASC");
+        $stmt = $pdo->prepare("SELECT * FROM financial_reports WHERE school_id = :sid ORDER BY id DESC LIMIT 1");
         $stmt->execute([':sid' => $schoolId]);
-        $reports = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        $latestReport = $stmt->fetch(\PDO::FETCH_ASSOC);
 
-        $prevCreatedAt = null;
-        foreach ($reports as $r) {
-            if ($prevCreatedAt !== null) {
-                $lowerBound = $prevCreatedAt;
-                $operator = '>';
-            } else {
-                $lowerBound = $r['from_date'] . ' 00:00:00';
-                $operator = '>=';
-            }
-
-            $createdDate = date('Y-m-d', strtotime($r['created_at']));
-            if ($r['to_date'] === $createdDate) {
-                $upperBound = $r['created_at'];
-            } else {
-                $upperBound = $r['to_date'] . ' 23:59:59';
-            }
-
-            $txVal = strtotime($txTime);
-            $lowerVal = strtotime($lowerBound);
-            $upperVal = strtotime($upperBound);
-
-            $inLower = ($operator === '>') ? ($txVal > $lowerVal) : ($txVal >= $lowerVal);
-            $inUpper = ($txVal <= $upperVal);
-
-            if ($inLower && $inUpper) {
-                return true;
-            }
-
-            $prevCreatedAt = $r['created_at'];
+        if (!$latestReport || empty($latestReport['created_at'])) {
+            return false;
         }
 
-        return false;
+        $reportCreatedVal = strtotime($latestReport['created_at']);
+        if ($reportCreatedVal === false || $reportCreatedVal <= 0) {
+            return false;
+        }
+
+        // A transaction is included in a report ONLY IF it was created ON OR BEFORE the report creation timestamp
+        return $txVal <= $reportCreatedVal;
+    }
+
+    public function requestFeeRevertOtp(array $user, array $data): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $userId = (int)($user['id'] ?? 0);
+        $pdo = $this->feeRepo->getPdo();
+
+        $paymentId = (int)($data['payment_id'] ?? 0);
+        $paymentType = strtolower(trim((string)($data['payment_type'] ?? '')));
+
+        if ($paymentId <= 0 || !in_array($paymentType, ['monthly', 'additional'], true)) {
+            throw new ValidationException(['fields' => 'Valid payment ID and payment type (monthly/additional) are required.']);
+        }
+
+        // Fetch payment details & student info
+        $studentName = '';
+        $className = '';
+        $feeDetails = '';
+        $amountStr = '0.00';
+        $receiptNo = 'N/A';
+        $createdAt = '';
+
+        if ($paymentType === 'monthly') {
+            $stmt = $pdo->prepare("
+                SELECT fp.*, s.name AS student_name, s.admission_no, c.name AS class_name
+                FROM fee_payments fp
+                JOIN students s ON fp.student_id = s.id
+                LEFT JOIN classes c ON s.class_id = c.id
+                WHERE fp.id = :id AND fp.school_id = :sid
+                LIMIT 1
+            ");
+            $stmt->execute([':id' => $paymentId, ':sid' => $schoolId]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if (!$row) {
+                throw new NotFoundException('Fee payment not found.');
+            }
+            $studentName = $row['student_name'];
+            $className = $row['class_name'] ?? 'N/A';
+            $feeDetails = "Monthly Fee (" . ($row['fee_month'] ?? 'N/A') . ")";
+            $amountStr = number_format((float)($row['amount_paid'] ?? 0), 2);
+            $receiptNo = !empty($row['receipt_no']) ? $row['receipt_no'] : 'N/A';
+            $createdAt = $row['created_at'];
+        } else {
+            $stmt = $pdo->prepare("
+                SELECT afp.*, s.name AS student_name, s.admission_no, c.name AS class_name, aft.name AS fee_name
+                FROM additional_fee_payments afp
+                JOIN students s ON afp.student_id = s.id
+                LEFT JOIN classes c ON s.class_id = c.id
+                JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+                WHERE afp.id = :id AND afp.school_id = :sid
+                LIMIT 1
+            ");
+            $stmt->execute([':id' => $paymentId, ':sid' => $schoolId]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if (!$row) {
+                throw new NotFoundException('Additional fee payment not found.');
+            }
+            $studentName = $row['student_name'];
+            $className = $row['class_name'] ?? 'N/A';
+            $feeDetails = "Additional Fee (" . ($row['fee_name'] ?? 'Additional Fee') . ")";
+            $amountStr = number_format((float)($row['amount_paid'] ?? 0), 2);
+            $receiptNo = !empty($row['receipt_no']) ? $row['receipt_no'] : 'N/A';
+            $createdAt = !empty($row['created_at']) ? $row['created_at'] : $row['updated_at'];
+        }
+
+        // Report lock pre-check before sending OTP
+        if ($this->isTransactionInReport($pdo, $schoolId, $createdAt)) {
+            throw new ValidationException(
+                ['locked' => 'This action can not be done, This is already included in financial report'],
+                'This action can not be done, This is already included in financial report'
+            );
+        }
+
+        // Fetch School Registered Email Address
+        $toEmail = '';
+        $stmtSchool = $pdo->prepare("SELECT name, contact_email FROM schools WHERE id = :sid LIMIT 1");
+        $stmtSchool->execute([':sid' => $schoolId]);
+        $schoolRow = $stmtSchool->fetch(\PDO::FETCH_ASSOC);
+
+        if (!empty($schoolRow['contact_email']) && filter_var($schoolRow['contact_email'], FILTER_VALIDATE_EMAIL)) {
+            $toEmail = trim($schoolRow['contact_email']);
+        } elseif (!empty($user['email']) && filter_var($user['email'], FILTER_VALIDATE_EMAIL)) {
+            $toEmail = trim($user['email']);
+        } else {
+            $stmtUser = $pdo->prepare("SELECT email FROM users WHERE id = :uid LIMIT 1");
+            $stmtUser->execute([':uid' => $userId]);
+            $uEmail = $stmtUser->fetchColumn();
+            if ($uEmail && filter_var($uEmail, FILTER_VALIDATE_EMAIL)) {
+                $toEmail = trim($uEmail);
+            }
+        }
+
+        if (empty($toEmail)) {
+            throw new ValidationException(['email' => 'No registered school admin email address found to send OTP. Please update contact email in school settings.']);
+        }
+
+        // Rate limiting: max 1 OTP request every 30 seconds
+        $stmtRate = $pdo->prepare("
+            SELECT created_at FROM fee_revert_otps 
+            WHERE school_id = :sid AND user_id = :uid AND payment_type = :ptype AND payment_id = :pid 
+            ORDER BY id DESC LIMIT 1
+        ");
+        $stmtRate->execute([
+            ':sid' => $schoolId,
+            ':uid' => $userId,
+            ':ptype' => $paymentType,
+            ':pid' => $paymentId
+        ]);
+        $lastOtpTime = $stmtRate->fetchColumn();
+        if ($lastOtpTime && (time() - strtotime((string)$lastOtpTime)) < 30) {
+            $wait = 30 - (time() - strtotime((string)$lastOtpTime));
+            throw new ValidationException(['rate_limit' => "Please wait {$wait} seconds before requesting a new OTP."]);
+        }
+
+        // Generate 4-digit OTP
+        $otpCode = sprintf("%04d", random_int(1000, 9999));
+
+        // Invalidate previous unused OTPs for this item
+        $pdo->prepare("
+            UPDATE fee_revert_otps SET is_used = 1 
+            WHERE school_id = :sid AND user_id = :uid AND payment_type = :ptype AND payment_id = :pid AND is_used = 0
+        ")->execute([
+            ':sid' => $schoolId,
+            ':uid' => $userId,
+            ':ptype' => $paymentType,
+            ':pid' => $paymentId
+        ]);
+
+        // Insert new OTP with 5 minute expiration
+        $expiresAt = date('Y-m-d H:i:s', strtotime('+5 minutes'));
+        $stmtIns = $pdo->prepare("
+            INSERT INTO fee_revert_otps (school_id, user_id, payment_type, payment_id, otp_code, attempts, is_used, expires_at)
+            VALUES (:sid, :uid, :ptype, :pid, :code, 0, 0, :exp)
+        ");
+        $stmtIns->execute([
+            ':sid' => $schoolId,
+            ':uid' => $userId,
+            ':ptype' => $paymentType,
+            ':pid' => $paymentId,
+            ':code' => $otpCode,
+            ':exp' => $expiresAt
+        ]);
+
+        // Email Sending
+        $schoolName = !empty($schoolRow['name']) ? htmlspecialchars($schoolRow['name']) : 'School Admin Portal';
+        $subject = "Security Verification: Fee Reversal OTP - ShikshaPilot";
+
+        $bodyHtml = "
+        <div style=\"font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; background-color: #ffffff;\">
+          <div style=\"background-color: #0f172a; color: #ffffff; padding: 20px; text-align: center;\">
+            <h2 style=\"margin: 0; font-size: 20px; font-weight: 600;\">ShikshaPilot Security Verification</h2>
+            <p style=\"margin: 5px 0 0 0; font-size: 13px; color: #94a3b8;\">Fee Payment Reversal Authorization</p>
+          </div>
+          <div style=\"padding: 24px; color: #334155;\">
+            <p style=\"margin-top: 0; font-size: 15px; line-height: 1.5;\">Dear School Admin ({$schoolName}),</p>
+            <p style=\"font-size: 14px; line-height: 1.5; color: #475569;\">
+              A request has been initiated to <strong>revert a fee payment</strong> on your school portal. To ensure complete financial transparency and prevent unauthorized fee modifications, please verify this action using the One-Time Password (OTP) below.
+            </p>
+            <div style=\"background-color: #f8fafc; border-left: 4px solid #3b82f6; padding: 16px; margin: 20px 0; border-radius: 4px;\">
+              <h4 style=\"margin: 0 0 10px 0; font-size: 13px; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px;\">Reversal Request Details:</h4>
+              <table style=\"width: 100%; font-size: 13px; color: #334155; border-collapse: collapse;\">
+                <tr><td style=\"padding: 4px 0; color: #64748b;\">Student Name:</td><td style=\"padding: 4px 0; font-weight: 600; text-align: right;\">" . htmlspecialchars($studentName) . "</td></tr>
+                <tr><td style=\"padding: 4px 0; color: #64748b;\">Class / Section:</td><td style=\"padding: 4px 0; font-weight: 600; text-align: right;\">" . htmlspecialchars($className) . "</td></tr>
+                <tr><td style=\"padding: 4px 0; color: #64748b;\">Fee Particulars:</td><td style=\"padding: 4px 0; font-weight: 600; text-align: right;\">" . htmlspecialchars($feeDetails) . "</td></tr>
+                <tr><td style=\"padding: 4px 0; color: #64748b;\">Amount Reverting:</td><td style=\"padding: 4px 0; font-weight: 600; text-align: right; color: #dc2626;\">₹{$amountStr}</td></tr>
+                <tr><td style=\"padding: 4px 0; color: #64748b;\">Receipt Number:</td><td style=\"padding: 4px 0; font-weight: 600; text-align: right;\">" . htmlspecialchars($receiptNo) . "</td></tr>
+              </table>
+            </div>
+            <div style=\"text-align: center; margin: 25px 0;\">
+              <p style=\"font-size: 13px; color: #64748b; margin-bottom: 8px;\">Your 4-Digit Security OTP Code:</p>
+              <div style=\"display: inline-block; background-color: #0f172a; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: 10px; padding: 12px 28px; border-radius: 8px;\">
+                {$otpCode}
+              </div>
+              <p style=\"font-size: 12px; color: #94a3b8; margin-top: 8px;\">(This code is valid for 5 minutes)</p>
+            </div>
+            <p style=\"font-size: 13px; color: #64748b; line-height: 1.5;\">
+              <strong>Important Security Notice:</strong> If you or an authorized administrator did not initiate this request, please do not share this OTP and review your account activity immediately.
+            </p>
+          </div>
+          <div style=\"background-color: #f1f5f9; padding: 15px; text-align: center; font-size: 12px; color: #64748b;\">
+            This is an automated security notification from ShikshaPilot.
+          </div>
+        </div>";
+
+        try {
+            SmtpMailer::send($toEmail, $subject, $bodyHtml, '', '');
+        } catch (\Throwable $e) {
+            $this->log('Failed to send fee revert OTP email', ['error' => $e->getMessage(), 'email' => $toEmail]);
+            throw new ValidationException(['email' => 'Failed to send OTP email: ' . $e->getMessage()]);
+        }
+
+        // Mask email for UI display
+        $parts = explode('@', $toEmail);
+        $namePart = $parts[0];
+        $domainPart = $parts[1] ?? '';
+        $maskedName = strlen($namePart) > 2 ? substr($namePart, 0, 2) . str_repeat('*', strlen($namePart) - 2) : $namePart . '***';
+        $maskedEmail = $maskedName . '@' . $domainPart;
+
+        return [
+            'success' => true,
+            'message' => 'OTP sent successfully to registered email address.',
+            'email_masked' => $maskedEmail
+        ];
+    }
+
+    private function verifyFeeRevertOtp(\PDO $pdo, int $schoolId, int $userId, string $paymentType, int $paymentId, ?string $otpCode): void
+    {
+        if (empty($otpCode)) {
+            throw new ValidationException(['otp' => 'OTP verification is required to revert fee payment.']);
+        }
+
+        $stmt = $pdo->prepare("
+            SELECT * FROM fee_revert_otps 
+            WHERE school_id = :sid AND user_id = :uid AND payment_type = :ptype AND payment_id = :pid AND is_used = 0 
+            ORDER BY id DESC LIMIT 1
+        ");
+        $stmt->execute([
+            ':sid' => $schoolId,
+            ':uid' => $userId,
+            ':ptype' => $paymentType,
+            ':pid' => $paymentId
+        ]);
+        $otpRow = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+        if (!$otpRow) {
+            throw new ValidationException(['otp' => 'No active OTP request found. Please click Send OTP again.']);
+        }
+
+        // Expiry check
+        if (strtotime($otpRow['expires_at']) < time()) {
+            $pdo->prepare("UPDATE fee_revert_otps SET is_used = 1 WHERE id = :id")->execute([':id' => $otpRow['id']]);
+            throw new ValidationException(['otp' => 'OTP code has expired. Please request a new OTP.']);
+        }
+
+        // Attempt limit check
+        if ((int)$otpRow['attempts'] >= 3) {
+            $pdo->prepare("UPDATE fee_revert_otps SET is_used = 1 WHERE id = :id")->execute([':id' => $otpRow['id']]);
+            throw new ValidationException(['otp' => 'Maximum invalid attempts reached. Please request a new OTP.']);
+        }
+
+        // Code match check
+        if (trim((string)$otpCode) !== trim((string)$otpRow['otp_code'])) {
+            $newAttempts = (int)$otpRow['attempts'] + 1;
+            if ($newAttempts >= 3) {
+                $pdo->prepare("UPDATE fee_revert_otps SET attempts = :att, is_used = 1 WHERE id = :id")->execute([':att' => $newAttempts, ':id' => $otpRow['id']]);
+                throw new ValidationException(['otp' => 'Maximum invalid attempts reached. Please request a new OTP.']);
+            } else {
+                $pdo->prepare("UPDATE fee_revert_otps SET attempts = :att WHERE id = :id")->execute([':att' => $newAttempts, ':id' => $otpRow['id']]);
+                $rem = 3 - $newAttempts;
+                throw new ValidationException(['otp' => "Invalid OTP code. {$rem} attempt(s) remaining."]);
+            }
+        }
+
+        // Mark OTP as used
+        $pdo->prepare("UPDATE fee_revert_otps SET is_used = 1 WHERE id = :id")->execute([':id' => $otpRow['id']]);
     }
 
     public function getHolidays(array $user): array
