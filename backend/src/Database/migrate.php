@@ -167,6 +167,27 @@ try {
 
     echo "\nAll migrations completed successfully.\n";
 
+    // Ensure built-in report card templates exist in report_card_templates
+    try {
+        $stmtTplCount = $pdo->query("SELECT COUNT(*) FROM report_card_templates WHERE is_system_default = 1");
+        $count = $stmtTplCount ? (int)$stmtTplCount->fetchColumn() : 0;
+        if ($stmtTplCount) $stmtTplCount->closeCursor();
+        
+        if ($count < 4) {
+            $file025 = __DIR__ . '/Migrations/025_ensure_builtin_report_card_templates.sql';
+            if (file_exists($file025)) {
+                $sql025 = file_get_contents($file025);
+                $statements025 = array_filter(array_map('trim', explode(';', $sql025)), fn(string $s) => $s !== '');
+                foreach ($statements025 as $st) {
+                    $pdo->exec($st);
+                }
+                echo "Auto-healed and restored built-in report card templates.\n";
+            }
+        }
+    } catch (\Throwable $tplEx) {
+        // Ignore fallback errors
+    }
+
     // Run Vocabulary Seeder
     require_once __DIR__ . '/vocabulary_seeder.php';
     seedVocabulary($pdo);
@@ -174,6 +195,7 @@ try {
     // Run School Directory Seeder
     require_once __DIR__ . '/school_directory_seeder.php';
     seedSchoolDirectory($pdo);
+
 
 } catch (Exception $e) {
     echo "\nMigration failed: " . $e->getMessage() . "\n";
