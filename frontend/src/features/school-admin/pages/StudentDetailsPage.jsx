@@ -929,6 +929,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
   const [showPhotoMenu, setShowPhotoMenu] = useState(false);
   const [schoolProfile, setSchoolProfile] = useState(null);
   const [revertConfirmOpen, setRevertConfirmOpen] = useState(false);
+  const [revertLockedOpen, setRevertLockedOpen] = useState(false);
   const [revertTarget, setRevertTarget] = useState(null); // { id, type: 'monthly' | 'additional', label }
   const [revertError, setRevertError] = useState('');
   const [revertSubmitting, setRevertSubmitting] = useState(false);
@@ -1186,6 +1187,14 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
       } else if (err.message) {
         errorMsg = err.message;
       }
+      
+      if (errorMsg.toLowerCase().includes('financial report') || (err.data && err.data.locked)) {
+        setRevertConfirmOpen(false);
+        setRevertTarget(null);
+        setRevertLockedOpen(true);
+        return;
+      }
+
       setRevertError(errorMsg);
     } finally {
       setRevertSendingOtp(false);
@@ -1227,6 +1236,14 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
       } else if (err.message) {
         errorMsg = err.message;
       }
+
+      if (errorMsg.toLowerCase().includes('financial report') || (err.data && err.data.locked)) {
+        setRevertConfirmOpen(false);
+        setRevertTarget(null);
+        setRevertLockedOpen(true);
+        return;
+      }
+
       setRevertError(errorMsg);
     } finally {
       setRevertSubmitting(false);
@@ -2169,6 +2186,35 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                 </div>
               </div>
             )}
+          </div>
+        </Dialog>
+      )}
+
+      {/* Revert Locked Alert Modal */}
+      {revertLockedOpen && (
+        <Dialog
+          isOpen={revertLockedOpen}
+          onClose={() => setRevertLockedOpen(false)}
+          title="Fee Reversal Locked"
+          description=""
+          className="max-w-md animate-in fade-in duration-200"
+          footer={
+            <div className="flex justify-end w-full">
+              <Button 
+                variant="primary"
+                onClick={() => setRevertLockedOpen(false)}
+                className="w-full font-bold bg-amber-500 hover:bg-amber-600 text-white border-none shadow-sm py-2.5 rounded-xl text-sm"
+              >
+                Understood
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-4 text-sm mt-2">
+            <div className="p-4 bg-amber-500/10 border border-amber-500/30 text-amber-900 rounded-2xl text-xs font-semibold leading-relaxed shadow-xs flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+              <span>This action can not be done, This is already included in financial report</span>
+            </div>
           </div>
         </Dialog>
       )}
