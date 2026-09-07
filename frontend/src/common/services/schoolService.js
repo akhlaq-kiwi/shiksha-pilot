@@ -630,6 +630,19 @@ export const schoolService = {
   },
   assignReportCardTemplateToSchool(schoolId, templateId) {
     return apiClient.post(`/api/platform/schools/${schoolId}/report-card-template`, { template_id: templateId });
+  },
+
+  requestFeeRevertOtp(payload) {
+    return apiClient.post('/api/school/fees/request-revert-otp', payload);
+  },
+
+  revertFeePayment(id, otpCode) {
+    return apiClient.delete(`/api/school/fee-payments/${id}`, { data: { otp_code: otpCode } });
+  },
+
+  revertAdditionalFeePayment(id, otpCode) {
+    return apiClient.post(`/api/school/additional-fees/payments/${id}/revert`, { otp_code: otpCode });
   }
 };
+
 

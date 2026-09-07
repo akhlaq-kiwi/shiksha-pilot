@@ -106,6 +106,7 @@ return function (App $app) {
     $app->get('/api/school/additional-fees/payments', [SchoolAdminController::class, 'getAdditionalFeePayments']);
     $app->post('/api/school/additional-fees/payments/{id}/pay', [SchoolAdminController::class, 'collectAdditionalFeePayment']);
     $app->post('/api/school/additional-fees/payments/{id}/revert', [SchoolAdminController::class, 'revertAdditionalFeePayment']);
+    $app->post('/api/school/fees/request-revert-otp', [SchoolAdminController::class, 'requestFeeRevertOtp']);
 
     // Transport Fee Management
     $app->get('/api/school/transport-fees', [SchoolAdminController::class, 'getTransportFees']);

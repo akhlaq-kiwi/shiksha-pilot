@@ -1238,9 +1238,22 @@ class SchoolAdminController extends BaseController
         $this->requireRole($user, ['SCHOOL_ADMIN']);
 
         $id = (int)$args['id'];
-        $this->service->deleteFeePayment($user, $id);
+        $body = RequestParser::body($request);
+        $otpCode = !empty($body['otp_code']) ? trim((string)$body['otp_code']) : (string)($request->getQueryParams()['otp_code'] ?? '');
+        $this->service->deleteFeePayment($user, $id, $otpCode);
 
         return $this->success($response, null, 'Payment reverted successfully');
+    }
+
+    public function requestFeeRevertOtp(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body = RequestParser::body($request);
+        $data = $this->service->requestFeeRevertOtp($user, $body);
+
+        return $this->success($response, $data, 'OTP sent to registered email address');
     }
 
     public function createAcademicYear(Request $request, Response $response): Response
@@ -1638,7 +1651,9 @@ class SchoolAdminController extends BaseController
         $this->requireRole($user, ['SCHOOL_ADMIN']);
 
         $id = (int)$args['id'];
-        $data = $this->service->revertAdditionalFeePayment($user, $id);
+        $body = RequestParser::body($request);
+        $otpCode = !empty($body['otp_code']) ? trim((string)$body['otp_code']) : (string)($request->getQueryParams()['otp_code'] ?? '');
+        $data = $this->service->revertAdditionalFeePayment($user, $id, $otpCode);
 
         return $this->success($response, $data, 'Additional fee payment reverted successfully');
     }

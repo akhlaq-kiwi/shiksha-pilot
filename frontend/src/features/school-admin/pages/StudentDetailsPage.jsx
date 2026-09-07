@@ -929,9 +929,27 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
   const [showPhotoMenu, setShowPhotoMenu] = useState(false);
   const [schoolProfile, setSchoolProfile] = useState(null);
   const [revertConfirmOpen, setRevertConfirmOpen] = useState(false);
+  const [revertLockedOpen, setRevertLockedOpen] = useState(false);
   const [revertTarget, setRevertTarget] = useState(null); // { id, type: 'monthly' | 'additional', label }
   const [revertError, setRevertError] = useState('');
   const [revertSubmitting, setRevertSubmitting] = useState(false);
+  const [revertStep, setRevertStep] = useState(1); // 1 = Authorization Notice & Send OTP, 2 = Input 4-digit OTP & Verify
+  const [revertSendingOtp, setRevertSendingOtp] = useState(false);
+  const [revertOtpCode, setRevertOtpCode] = useState('');
+  const [revertMaskedEmail, setRevertMaskedEmail] = useState('');
+  const [revertTimer, setRevertTimer] = useState(0);
+
+  useEffect(() => {
+    let interval = null;
+    if (revertStep === 2 && revertTimer > 0) {
+      interval = setInterval(() => {
+        setRevertTimer((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [revertStep, revertTimer]);
 
   const getMonthYearString = (month, academicYearName) => {
     const parts = (academicYearName || '2025–2026').split(/[–-]/);
@@ -1093,6 +1111,9 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
   const handleRevertPayment = (receipt) => {
     if (!receipt || !receipt.id) return;
     setRevertError('');
+    setRevertStep(1);
+    setRevertOtpCode('');
+    setRevertMaskedEmail('');
     setRevertTarget({
       id: receipt.id,
       type: 'monthly',
@@ -1126,6 +1147,9 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
   const handleRevertAdditionalPayment = (item) => {
     if (!item || !item.id) return;
     setRevertError('');
+    setRevertStep(1);
+    setRevertOtpCode('');
+    setRevertMaskedEmail('');
     setRevertTarget({
       id: item.id,
       type: 'additional',
@@ -1134,19 +1158,67 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
     setRevertConfirmOpen(true);
   };
 
-  const confirmRevert = async () => {
+  const handleSendOtp = async () => {
     if (!revertTarget) return;
+    setRevertSendingOtp(true);
+    setRevertError('');
+    try {
+      const res = await schoolService.requestFeeRevertOtp({
+        payment_id: revertTarget.id,
+        payment_type: revertTarget.type
+      });
+      setRevertMaskedEmail(res?.email_masked || 'registered email');
+      setRevertStep(2);
+      setRevertTimer(30);
+      setRevertOtpCode('');
+    } catch (err) {
+      console.error(err);
+      let errorMsg = 'Failed to send OTP to registered email address.';
+      if (err.data) {
+        if (typeof err.data === 'string') {
+          errorMsg = err.data;
+        } else if (err.data.errors) {
+          const keys = Object.keys(err.data.errors);
+          if (keys.length > 0) errorMsg = err.data.errors[keys[0]];
+        } else {
+          const keys = Object.keys(err.data);
+          if (keys.length > 0) errorMsg = err.data[keys[0]];
+        }
+      } else if (err.message) {
+        errorMsg = err.message;
+      }
+      
+      if (errorMsg.toLowerCase().includes('financial report') || (err.data && err.data.locked)) {
+        setRevertConfirmOpen(false);
+        setRevertTarget(null);
+        setRevertLockedOpen(true);
+        return;
+      }
+
+      setRevertError(errorMsg);
+    } finally {
+      setRevertSendingOtp(false);
+    }
+  };
+
+  const confirmRevert = async () => {
+    if (!revertTarget || !revertOtpCode || revertOtpCode.length < 4) {
+      setRevertError('Please enter a valid 4-digit OTP code.');
+      return;
+    }
     setRevertSubmitting(true);
     setRevertError('');
     try {
       if (revertTarget.type === 'monthly') {
-        await schoolService.revertFeePayment(revertTarget.id);
+        await schoolService.revertFeePayment(revertTarget.id, revertOtpCode);
       } else {
-        await schoolService.revertAdditionalFeePayment(revertTarget.id);
+        await schoolService.revertAdditionalFeePayment(revertTarget.id, revertOtpCode);
       }
       window.dispatchEvent(new Event('fee-payment-updated'));
       setRevertConfirmOpen(false);
       setRevertTarget(null);
+      setRevertStep(1);
+      setRevertOtpCode('');
       await loadDetails();
     } catch (err) {
       console.error(err);
@@ -1156,18 +1228,22 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
           errorMsg = err.data;
         } else if (err.data.errors) {
           const keys = Object.keys(err.data.errors);
-          if (keys.length > 0) {
-            errorMsg = err.data.errors[keys[0]];
-          }
+          if (keys.length > 0) errorMsg = err.data.errors[keys[0]];
         } else {
           const keys = Object.keys(err.data);
-          if (keys.length > 0) {
-            errorMsg = err.data[keys[0]];
-          }
+          if (keys.length > 0) errorMsg = err.data[keys[0]];
         }
-      } else {
-        errorMsg = err.message || 'Failed to revert payment.';
+      } else if (err.message) {
+        errorMsg = err.message;
       }
+
+      if (errorMsg.toLowerCase().includes('financial report') || (err.data && err.data.locked)) {
+        setRevertConfirmOpen(false);
+        setRevertTarget(null);
+        setRevertLockedOpen(true);
+        return;
+      }
+
       setRevertError(errorMsg);
     } finally {
       setRevertSubmitting(false);
@@ -2001,8 +2077,10 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
           onClose={() => {
             setRevertConfirmOpen(false);
             setRevertTarget(null);
+            setRevertStep(1);
+            setRevertOtpCode('');
           }}
-          title="Revert Payment?"
+          title={revertStep === 1 ? "Revert Fee Authorization" : "Enter Verification OTP"}
           description=""
           className="max-w-md animate-in fade-in duration-200"
           footer={
@@ -2012,18 +2090,32 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                 onClick={() => {
                   setRevertConfirmOpen(false);
                   setRevertTarget(null);
+                  setRevertStep(1);
+                  setRevertOtpCode('');
                 }}
               >
                 Cancel
               </Button>
-              <Button 
-                variant="destructive"
-                onClick={confirmRevert}
-                disabled={revertSubmitting}
-                className="font-bold bg-red-600 hover:bg-red-700 text-white"
-              >
-                {revertSubmitting ? 'Reverting...' : 'Confirm Revert'}
-              </Button>
+
+              {revertStep === 1 ? (
+                <Button 
+                  variant="primary"
+                  onClick={handleSendOtp}
+                  disabled={revertSendingOtp}
+                  className="font-bold bg-amber-500 hover:bg-amber-600 text-white border-none shadow-sm"
+                >
+                  {revertSendingOtp ? 'Sending OTP...' : 'Send OTP'}
+                </Button>
+              ) : (
+                <Button 
+                  variant="destructive"
+                  onClick={confirmRevert}
+                  disabled={revertSubmitting || revertOtpCode.length < 4}
+                  className="font-bold bg-red-600 hover:bg-red-700 text-white"
+                >
+                  {revertSubmitting ? 'Verifying & Reverting...' : 'Verify & Revert'}
+                </Button>
+              )}
             </div>
           }
         >
@@ -2034,56 +2126,95 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                 <span>{revertError}</span>
               </div>
             )}
-            
-            {revertTarget && revertTarget.type === 'monthly' ? (
+
+            {revertStep === 1 ? (
               <div className="space-y-4">
-                <p className="text-text-secondary leading-relaxed font-semibold">
-                  You are about to revert fee payment for:
-                </p>
-                <div className="space-y-1">
-                  <span className="text-text-muted text-xs uppercase tracking-wider font-bold block">Student:</span>
-                  <span className="font-bold text-text-primary text-base block">{student?.name}</span>
+                <div className="p-4 bg-amber-500/10 border border-amber-500/30 text-amber-900 rounded-2xl text-xs font-medium leading-relaxed shadow-xs">
+                  To revert this fee payment, a 4-digit OTP verification is required for security and transparency. Click <strong>Send OTP</strong> to receive the verification code on the registered school admin email address.
                 </div>
-                
-                <div className="space-y-2">
-                  <span className="text-text-muted text-xs uppercase tracking-wider font-bold block">Months:</span>
-                  <div className="space-y-1 text-sm font-bold text-text-primary">
-                    {getRevertedMonthsList().map(m => (
-                      <div key={m} className="flex items-center gap-2">
-                        <span className="text-text-muted text-lg leading-none">•</span>
-                        <span>{getMonthYearString(m, student?.academic_year_name)}</span>
-                      </div>
-                    ))}
+
+                <div className="space-y-2.5 bg-amber-500/5 p-4 rounded-2xl border border-amber-500/20 shadow-xs">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-amber-800/80 font-medium">Student:</span>
+                    <span className="font-bold text-amber-950">{student?.name}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-amber-800/80 font-medium">Fee Details:</span>
+                    <span className="font-bold text-amber-950">
+                      {revertTarget?.type === 'monthly'
+                        ? `Monthly Fee (${getRevertedMonthsList().join(', ')})`
+                        : revertTarget?.label}
+                    </span>
                   </div>
                 </div>
-
-                <div className="space-y-1">
-                  <span className="text-text-muted text-xs uppercase tracking-wider font-bold block">Total Months:</span>
-                  <span className="font-bold text-text-primary text-base block">{getRevertedMonthsList().length}</span>
-                </div>
-
-                <p className="text-xs text-text-muted leading-relaxed font-medium pt-2 border-t border-border">
-                  This action will mark these months as unpaid and update all related financial records.
-                </p>
               </div>
             ) : (
               <div className="space-y-4">
-                <p className="text-text-secondary leading-relaxed font-semibold">
-                  You are about to revert the payment for:
+                <p className="text-text-secondary text-xs leading-relaxed">
+                  A 4-digit security OTP code has been sent to <strong className="text-text-primary">{revertMaskedEmail}</strong>. Please enter it below to authorize this fee reversal:
                 </p>
-                <div className="space-y-1">
-                  <span className="text-text-muted text-xs uppercase tracking-wider font-bold block">Student:</span>
-                  <span className="font-bold text-text-primary text-base block">{student?.name}</span>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-text-secondary uppercase tracking-wider block text-center">
+                    4-Digit Verification Code
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={4}
+                    value={revertOtpCode}
+                    onChange={(e) => setRevertOtpCode(e.target.value.replace(/\D/g, ''))}
+                    placeholder="• • • •"
+                    className="w-full text-center text-3xl font-extrabold tracking-[0.5em] py-3.5 px-4 rounded-xl border border-border bg-bg-surface focus:outline-none focus:ring-2 focus:ring-primary text-text-primary"
+                    autoFocus
+                  />
                 </div>
-                <div className="space-y-1">
-                  <span className="text-text-muted text-xs uppercase tracking-wider font-bold block">Fee Item:</span>
-                  <span className="font-bold text-text-primary text-sm block">{revertTarget?.label}</span>
+
+                <div className="flex justify-between items-center pt-2 text-xs">
+                  <span className="text-text-muted">Didn't receive code?</span>
+                  {revertTimer > 0 ? (
+                    <span className="text-text-muted font-medium">Resend OTP in <strong>{revertTimer}s</strong></span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleSendOtp}
+                      disabled={revertSendingOtp}
+                      className="text-primary font-bold hover:underline disabled:opacity-50"
+                    >
+                      {revertSendingOtp ? 'Sending...' : 'Resend OTP'}
+                    </button>
+                  )}
                 </div>
-                <p className="text-xs text-text-muted leading-relaxed font-medium pt-2 border-t border-border">
-                  This action will mark this item as unpaid and update all related financial records.
-                </p>
               </div>
             )}
+          </div>
+        </Dialog>
+      )}
+
+      {/* Revert Locked Alert Modal */}
+      {revertLockedOpen && (
+        <Dialog
+          isOpen={revertLockedOpen}
+          onClose={() => setRevertLockedOpen(false)}
+          title="Fee Reversal Locked"
+          description=""
+          className="max-w-md animate-in fade-in duration-200"
+          footer={
+            <div className="flex justify-end w-full">
+              <Button 
+                variant="primary"
+                onClick={() => setRevertLockedOpen(false)}
+                className="w-full font-bold bg-amber-500 hover:bg-amber-600 text-white border-none shadow-sm py-2.5 rounded-xl text-sm"
+              >
+                Understood
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-4 text-sm mt-2">
+            <div className="p-4 bg-amber-500/10 border border-amber-500/30 text-amber-900 rounded-2xl text-xs font-semibold leading-relaxed shadow-xs flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+              <span>This action can not be done, This is already included in financial report</span>
+            </div>
           </div>
         </Dialog>
       )}
