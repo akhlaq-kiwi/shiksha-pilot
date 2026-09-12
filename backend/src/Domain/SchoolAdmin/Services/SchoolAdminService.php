@@ -17599,16 +17599,8 @@ Only approve the settlement after reviewing all financial records.
         $stmtTeachers->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
         $teachers = $stmtTeachers->fetchAll(\PDO::FETCH_ASSOC);
 
-        // Self-healing database check: Ensure unique index on teacher_id is dropped on class_teacher_assignments table
-        try {
-            $stmtCheckIdx = $pdo->query("SHOW INDEX FROM class_teacher_assignments WHERE Key_name = 'teacher_id' AND Non_unique = 0");
-            if ($stmtCheckIdx && $stmtCheckIdx->fetch()) {
-                $pdo->exec("ALTER TABLE class_teacher_assignments DROP INDEX teacher_id");
-                try {
-                    $pdo->exec("ALTER TABLE class_teacher_assignments ADD INDEX idx_teacher_id (teacher_id)");
-                } catch (\Throwable $eIdx) {}
-            }
-        } catch (\Throwable $eIdxCheck) {}
+        // Self-healing database check: Ensure any unique index on teacher_id is dropped on class_teacher_assignments table
+        $this->ensureMultiClassTeacherAssignmentSchema($pdo);
 
         // Fetch assignments
         foreach ($classes as &$c) {
@@ -17710,16 +17702,8 @@ Only approve the settlement after reviewing all financial records.
             $payloadTeachers = [];
             // Multi-class assignment allowed - no single-teacher uniqueness check needed.
 
-            // Self-healing database check: Ensure unique index on teacher_id is dropped on class_teacher_assignments table
-            try {
-                $stmtCheckIdx = $pdo->query("SHOW INDEX FROM class_teacher_assignments WHERE Key_name = 'teacher_id' AND Non_unique = 0");
-                if ($stmtCheckIdx && $stmtCheckIdx->fetch()) {
-                    $pdo->exec("ALTER TABLE class_teacher_assignments DROP INDEX teacher_id");
-                    try {
-                        $pdo->exec("ALTER TABLE class_teacher_assignments ADD INDEX idx_teacher_id (teacher_id)");
-                    } catch (\Throwable $eIdx) {}
-                }
-            } catch (\Throwable $eIdxCheck) {}
+            // Self-healing database check: Ensure any unique index on teacher_id is dropped on class_teacher_assignments table
+            $this->ensureMultiClassTeacherAssignmentSchema($pdo);
 
             // Save / delete assignments
             foreach ($assignments as $a) {
@@ -17786,6 +17770,42 @@ Only approve the settlement after reviewing all financial records.
         }
 
         return ['success' => true];
+    }
+
+    private function ensureMultiClassTeacherAssignmentSchema(\PDO $pdo): void
+    {
+        try {
+            // Unconditionally drop any legacy unique index on teacher_id
+            $stmtIdx = $pdo->query("SHOW INDEX FROM class_teacher_assignments");
+            if ($stmtIdx) {
+                $indexes = $stmtIdx->fetchAll(\PDO::FETCH_ASSOC);
+                $uniqueTeacherIndexes = [];
+                foreach ($indexes as $idx) {
+                    if (isset($idx['Non_unique']) && (int)$idx['Non_unique'] === 0) {
+                        if (isset($idx['Column_name']) && $idx['Column_name'] === 'teacher_id') {
+                            if (isset($idx['Key_name']) && $idx['Key_name'] !== 'PRIMARY' && $idx['Key_name'] !== 'class_id') {
+                                $uniqueTeacherIndexes[$idx['Key_name']] = true;
+                            }
+                        }
+                    }
+                }
+                foreach (array_keys($uniqueTeacherIndexes) as $keyName) {
+                    try {
+                        $pdo->exec("ALTER TABLE `class_teacher_assignments` DROP INDEX `" . str_replace("`", "", $keyName) . "`");
+                    } catch (\Throwable $eDrop) {}
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        // Fallback unconditional attempts for standard index names
+        try { $pdo->exec("ALTER TABLE `class_teacher_assignments` DROP INDEX `teacher_id`"); } catch (\Throwable $e) {}
+        try { $pdo->exec("ALTER TABLE `class_teacher_assignments` DROP INDEX `teacher_id_2`"); } catch (\Throwable $e) {}
+        try { $pdo->exec("ALTER TABLE `class_teacher_assignments` DROP INDEX `uq_teacher_id`"); } catch (\Throwable $e) {}
+
+        // Ensure non-unique index exists
+        try {
+            $pdo->exec("ALTER TABLE `class_teacher_assignments` ADD INDEX `idx_teacher_id` (`teacher_id`)");
+        } catch (\Throwable $eAdd) {}
     }
 
     public function getMyPermissions(array $user): array
