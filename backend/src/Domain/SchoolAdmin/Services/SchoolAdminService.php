@@ -17599,6 +17599,9 @@ Only approve the settlement after reviewing all financial records.
         $stmtTeachers->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
         $teachers = $stmtTeachers->fetchAll(\PDO::FETCH_ASSOC);
 
+        // Self-healing database check: Ensure any unique index on teacher_id is dropped on class_teacher_assignments table
+        $this->ensureMultiClassTeacherAssignmentSchema($pdo);
+
         // Fetch assignments
         foreach ($classes as &$c) {
             $stmtAssign = $pdo->prepare("
@@ -17693,63 +17696,15 @@ Only approve the settlement after reviewing all financial records.
         // We expect an array of assignments, e.g. [{class_id: 1, teacher_id: 2}, ...]
         $assignments = isset($data['assignments']) && is_array($data['assignments']) ? $data['assignments'] : [];
 
+        // Self-healing database check OUTSIDE transaction: Ensure any unique index on teacher_id is dropped on class_teacher_assignments table
+        $this->ensureMultiClassTeacherAssignmentSchema($pdo);
+
         $pdo->beginTransaction();
         try {
-            // First check if there is any teacher duplicate assignment *within* this payload itself
-            $payloadTeachers = [];
-            foreach ($assignments as $a) {
-                $classId = isset($a['class_id']) ? (int)$a['class_id'] : null;
-                $teacherId = isset($a['teacher_id']) ? (int)$a['teacher_id'] : null;
-                if ($classId && $teacherId) {
-                    if (isset($payloadTeachers[$teacherId])) {
-                        // Duplicate teacher in payload
-                        $stmtTeacher = $pdo->prepare("SELECT name FROM staff WHERE id = :id AND school_id = :sid LIMIT 1");
-                        $stmtTeacher->execute([':id' => $teacherId, ':sid' => $schoolId]);
-                        $tName = $stmtTeacher->fetchColumn() ?: 'This teacher';
-                        
-                        $pdo->rollBack();
-                        throw new \App\Shared\Exceptions\ValidationException([
-                            'assignments' => "{$tName} is assigned to multiple classes in the request. One teacher can only be assigned to one class."
-                        ]);
-                    }
-                    $payloadTeachers[$teacherId] = $classId;
-                }
-            }
-
-            // Verify teacher uniqueness check from the DB (excluding unassigned)
-            foreach ($assignments as $a) {
-                $classId = isset($a['class_id']) ? (int)$a['class_id'] : null;
-                $teacherId = isset($a['teacher_id']) ? (int)$a['teacher_id'] : null;
-
-                if ($classId && $teacherId) {
-                    // Check if teacher is already assigned to another class
-                    $stmtCheck = $pdo->prepare("
-                        SELECT cta.class_id, c.name, c.section 
-                        FROM class_teacher_assignments cta
-                        JOIN classes c ON cta.class_id = c.id
-                        WHERE cta.school_id = :sid AND cta.teacher_id = :tid AND cta.class_id != :cid
-                    ");
-                    $stmtCheck->execute([':sid' => $schoolId, ':tid' => $teacherId, ':cid' => $classId]);
-                    $exists = $stmtCheck->fetch(\PDO::FETCH_ASSOC);
-
-                    if ($exists) {
-                        $clsName = $exists['name'] . ($exists['section'] ? '-' . $exists['section'] : '');
-                        $stmtTeacher = $pdo->prepare("SELECT name FROM staff WHERE id = :id AND school_id = :sid LIMIT 1");
-                        $stmtTeacher->execute([':id' => $teacherId, ':sid' => $schoolId]);
-                        $tName = $stmtTeacher->fetchColumn() ?: 'This teacher';
-
-                        $pdo->rollBack();
-                        throw new \App\Shared\Exceptions\ValidationException([
-                            'assignments' => "{$tName} is already assigned to {$clsName}. One teacher can only be assigned to one class."
-                        ]);
-                    }
-                }
-            }
-
             // Save / delete assignments
             foreach ($assignments as $a) {
                 $classId = isset($a['class_id']) ? (int)$a['class_id'] : null;
-                $teacherId = isset($a['teacher_id']) ? (int)$a['teacher_id'] : null;
+                $teacherId = isset($a['teacher_id']) && $a['teacher_id'] !== '' && $a['teacher_id'] !== null ? (int)$a['teacher_id'] : null;
 
                 if ($classId) {
                     // Get class name
@@ -17768,7 +17723,7 @@ Only approve the settlement after reviewing all financial records.
                     $stmtPrev->execute([':sid' => $schoolId, ':cid' => $classId]);
                     $prev = $stmtPrev->fetch(\PDO::FETCH_ASSOC);
 
-                    if ($teacherId === null || $teacherId === 0 || $teacherId === '') {
+                    if ($teacherId === null || $teacherId === 0) {
                         // Delete assignment
                         $stmtDel = $pdo->prepare("DELETE FROM class_teacher_assignments WHERE school_id = :sid AND class_id = :cid");
                         $stmtDel->execute([':sid' => $schoolId, ':cid' => $classId]);
@@ -17777,17 +17732,19 @@ Only approve the settlement after reviewing all financial records.
                             $this->logAudit($pdo, $user, 'Audits & Settings', 'Assign User Role', "Removed class teacher assignment for {$clsName} (Previous: {$prev['name']})");
                         }
                     } else {
-                        // Insert or Update assignment
+                        // Insert or Update assignment: cleanly delete existing assignment for this class first, then insert
                         $stmtTeacher = $pdo->prepare("SELECT name FROM staff WHERE id = :id AND school_id = :sid LIMIT 1");
                         $stmtTeacher->execute([':id' => $teacherId, ':sid' => $schoolId]);
                         $tName = $stmtTeacher->fetchColumn() ?: 'Teacher';
 
-                        $stmtUpsert = $pdo->prepare("
+                        $stmtDel = $pdo->prepare("DELETE FROM class_teacher_assignments WHERE school_id = :sid AND class_id = :cid");
+                        $stmtDel->execute([':sid' => $schoolId, ':cid' => $classId]);
+
+                        $stmtInsert = $pdo->prepare("
                             INSERT INTO class_teacher_assignments (school_id, class_id, teacher_id)
                             VALUES (:sid, :cid, :tid)
-                            ON DUPLICATE KEY UPDATE teacher_id = VALUES(teacher_id)
                         ");
-                        $stmtUpsert->execute([
+                        $stmtInsert->execute([
                             ':sid' => $schoolId,
                             ':cid' => $classId,
                             ':tid' => $teacherId
@@ -17811,6 +17768,54 @@ Only approve the settlement after reviewing all financial records.
         }
 
         return ['success' => true];
+    }
+
+    private function ensureMultiClassTeacherAssignmentSchema(\PDO $pdo): void
+    {
+        try {
+            $stmtIdx = $pdo->query("SHOW INDEX FROM class_teacher_assignments");
+            if ($stmtIdx) {
+                $indexes = $stmtIdx->fetchAll(\PDO::FETCH_ASSOC);
+                $indexGroups = [];
+                foreach ($indexes as $idx) {
+                    $keyName = $idx['Key_name'] ?? ($idx['key_name'] ?? '');
+                    $nonUnique = isset($idx['Non_unique']) ? (int)$idx['Non_unique'] : (isset($idx['non_unique']) ? (int)$idx['non_unique'] : 1);
+                    $colName = $idx['Column_name'] ?? ($idx['column_name'] ?? '');
+                    if ($keyName) {
+                        if (!isset($indexGroups[$keyName])) {
+                            $indexGroups[$keyName] = [
+                                'non_unique' => $nonUnique,
+                                'columns' => []
+                            ];
+                        }
+                        $indexGroups[$keyName]['columns'][] = strtolower($colName);
+                    }
+                }
+
+                foreach ($indexGroups as $keyName => $info) {
+                    if ($info['non_unique'] === 0 && strtoupper($keyName) !== 'PRIMARY') {
+                        $cols = $info['columns'];
+                        // Drop if key includes teacher_id OR if key name contains teacher
+                        if (in_array('teacher_id', $cols, true) || strpos(strtolower($keyName), 'teacher') !== false) {
+                            try {
+                                $pdo->exec("ALTER TABLE `class_teacher_assignments` DROP INDEX `" . str_replace("`", "", $keyName) . "`");
+                            } catch (\Throwable $eDrop) {}
+                        }
+                    }
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        // Fallback unconditional attempts for standard index names
+        $commonNames = ['teacher_id', 'teacher_id_2', 'uq_teacher_id', 'school_id_teacher_id', 'teacher_id_unique', 'class_teacher_assignments_teacher_id_unique', 'uq_teacher'];
+        foreach ($commonNames as $name) {
+            try { $pdo->exec("ALTER TABLE `class_teacher_assignments` DROP INDEX `" . $name . "`"); } catch (\Throwable $e) {}
+        }
+
+        // Ensure non-unique index on teacher_id exists
+        try {
+            $pdo->exec("ALTER TABLE `class_teacher_assignments` ADD INDEX `idx_teacher_id` (`teacher_id`)");
+        } catch (\Throwable $eAdd) {}
     }
 
     public function getMyPermissions(array $user): array

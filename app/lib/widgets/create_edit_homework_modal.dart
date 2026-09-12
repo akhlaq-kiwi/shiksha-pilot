@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/homework_service.dart';
+import '../utils/class_formatter.dart';
 
 class CreateEditHomeworkModal extends StatefulWidget {
   final HomeworkService homeworkService;
@@ -307,7 +308,8 @@ class _CreateEditHomeworkModalState extends State<CreateEditHomeworkModal> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Expanded(
+                Flexible(
+                  fit: FlexFit.loose,
                   child: _isLoadingClasses
                       ? const SizedBox(
                           width: 16,
@@ -325,7 +327,7 @@ class _CreateEditHomeworkModalState extends State<CreateEditHomeworkModal> {
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton<int>(
                               value: _selectedClassId,
-                              isExpanded: true,
+                              isExpanded: false,
                               isDense: true,
                               icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.indigo, size: 18),
                               hint: const Text(
@@ -333,11 +335,11 @@ class _CreateEditHomeworkModalState extends State<CreateEditHomeworkModal> {
                                 style: TextStyle(fontSize: 12, color: Colors.indigo, fontWeight: FontWeight.bold),
                               ),
                               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.indigo),
-                              items: _classesList.map((c) {
+                              items: sortClassesAscending(_classesList).map((c) {
                                 final int id = c['id'] is int ? c['id'] : int.parse(c['id'].toString());
-                                final String name = c['name'] ?? '';
-                                final String sec = c['section'] ?? '';
-                                final label = name + (sec.isNotEmpty ? ' - $sec' : '');
+                                final String rawName = c['name']?.toString() ?? '';
+                                final String sec = c['section']?.toString() ?? '';
+                                final String label = formatShortClassName(rawName, section: sec);
                                 return DropdownMenuItem<int>(
                                   value: id,
                                   child: Text(label, overflow: TextOverflow.ellipsis),

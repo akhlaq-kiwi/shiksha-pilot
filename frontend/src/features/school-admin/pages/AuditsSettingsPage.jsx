@@ -237,23 +237,6 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
       executeAutoSaveClassAssignment(classId, '', previousTeacherId);
       return;
     }
-
-    const currentClassWithThisTeacher = Object.entries(localAssignments).find(
-      ([cId, tId]) => String(tId) === String(newTeacherId) && String(cId) !== String(classId)
-    );
-
-    if (currentClassWithThisTeacher) {
-      const otherClassId = currentClassWithThisTeacher[0];
-      const otherClass = classesWithTeachers.find(c => String(c.id) === String(otherClassId));
-      const otherClassName = otherClass ? (otherClass.name + (otherClass.section ? '-' + otherClass.section : '')) : 'another class';
-      
-      const teacher = teachersWithPerms.find(t => String(t.id) === String(newTeacherId));
-      const tName = teacher ? teacher.name : 'This teacher';
-
-      setAssignError(`This teacher is already assigned to ${otherClassName}.`);
-      return;
-    }
-
     if (previousTeacherId && String(previousTeacherId) !== String(newTeacherId)) {
       const prevTeacher = teachersWithPerms.find(t => String(t.id) === String(previousTeacherId));
       const newTeacher = teachersWithPerms.find(t => String(t.id) === String(newTeacherId));

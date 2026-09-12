@@ -226,7 +226,7 @@ CREATE TABLE IF NOT EXISTS `class_teacher_assignments` (
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `class_id` (`class_id`),
-  UNIQUE KEY `teacher_id` (`teacher_id`),
+  KEY `idx_teacher_id` (`teacher_id`),
   KEY `school_id` (`school_id`),
   CONSTRAINT `class_teacher_assignments_ibfk_1` FOREIGN KEY (`school_id`) REFERENCES `schools` (`id`) ON DELETE CASCADE,
   CONSTRAINT `class_teacher_assignments_ibfk_2` FOREIGN KEY (`class_id`) REFERENCES `classes` (`id`) ON DELETE CASCADE,
