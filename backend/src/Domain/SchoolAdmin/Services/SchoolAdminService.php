@@ -17599,6 +17599,17 @@ Only approve the settlement after reviewing all financial records.
         $stmtTeachers->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
         $teachers = $stmtTeachers->fetchAll(\PDO::FETCH_ASSOC);
 
+        // Self-healing database check: Ensure unique index on teacher_id is dropped on class_teacher_assignments table
+        try {
+            $stmtCheckIdx = $pdo->query("SHOW INDEX FROM class_teacher_assignments WHERE Key_name = 'teacher_id' AND Non_unique = 0");
+            if ($stmtCheckIdx && $stmtCheckIdx->fetch()) {
+                $pdo->exec("ALTER TABLE class_teacher_assignments DROP INDEX teacher_id");
+                try {
+                    $pdo->exec("ALTER TABLE class_teacher_assignments ADD INDEX idx_teacher_id (teacher_id)");
+                } catch (\Throwable $eIdx) {}
+            }
+        } catch (\Throwable $eIdxCheck) {}
+
         // Fetch assignments
         foreach ($classes as &$c) {
             $stmtAssign = $pdo->prepare("
@@ -17698,6 +17709,17 @@ Only approve the settlement after reviewing all financial records.
             // First check if there is any teacher duplicate assignment *within* this payload itself
             $payloadTeachers = [];
             // Multi-class assignment allowed - no single-teacher uniqueness check needed.
+
+            // Self-healing database check: Ensure unique index on teacher_id is dropped on class_teacher_assignments table
+            try {
+                $stmtCheckIdx = $pdo->query("SHOW INDEX FROM class_teacher_assignments WHERE Key_name = 'teacher_id' AND Non_unique = 0");
+                if ($stmtCheckIdx && $stmtCheckIdx->fetch()) {
+                    $pdo->exec("ALTER TABLE class_teacher_assignments DROP INDEX teacher_id");
+                    try {
+                        $pdo->exec("ALTER TABLE class_teacher_assignments ADD INDEX idx_teacher_id (teacher_id)");
+                    } catch (\Throwable $eIdx) {}
+                }
+            } catch (\Throwable $eIdxCheck) {}
 
             // Save / delete assignments
             foreach ($assignments as $a) {
