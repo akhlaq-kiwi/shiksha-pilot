@@ -9,6 +9,16 @@ import { schoolService } from '../../../common/services/schoolService';
 import { ArrowLeft, Upload, Check, Calendar } from 'lucide-react';
 import { getClassIndex } from '../../../common/constants/predefinedClasses';
 
+export const normalizeReligion = (val) => {
+  if (!val) return '';
+  const str = String(val).trim();
+  if (['Hindu', '1', 'Hinduism', 'hindu', 'hinduism'].includes(str)) return 'Hindu';
+  if (['Muslim', '2', 'Islam', 'muslim', 'islam'].includes(str)) return 'Muslim';
+  if (['Sikh', '3', 'Sikhism', 'sikh', 'sikhism'].includes(str)) return 'Sikh';
+  if (['Christian', '4', 'Christianity', 'christian', 'christianity'].includes(str)) return 'Christian';
+  return str;
+};
+
 const INDIAN_STATES_AND_CITIES = {
   "Andhra Pradesh": [
     "Anantapur", "Chittoor", "Eluru", "Guntur", "Kadapa", "Kakinada", "Kurnool", 
@@ -1188,7 +1198,22 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                     </div>
                     <div className="space-y-1.5">
                       <label htmlFor="religion" className="text-xs font-bold text-text-secondary uppercase">Religion</label>
-                      <Input id="religion" name="religion" value={formData.religion} onChange={handleTextChange} placeholder="e.g. Hinduism" />
+                      <select
+                        id="religion"
+                        name="religion"
+                        value={normalizeReligion(formData.religion)}
+                        onChange={handleTextChange}
+                        className="flex h-9 w-full rounded-md border border-zinc-200 bg-surface px-3 py-1.5 text-sm text-text-primary shadow-xs transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-950 dark:border-zinc-800 dark:focus:ring-zinc-300"
+                      >
+                        <option value="">Select...</option>
+                        <option value="Hindu">Hindu</option>
+                        <option value="Muslim">Muslim</option>
+                        <option value="Sikh">Sikh</option>
+                        <option value="Christian">Christian</option>
+                        {formData.religion && !['Hindu', 'Muslim', 'Sikh', 'Christian', '1', '2', '3', '4', 'Hinduism', 'Islam', 'Sikhism', 'Christianity', ''].includes(String(formData.religion).trim()) && (
+                          <option value={formData.religion}>{formData.religion}</option>
+                        )}
+                      </select>
                     </div>
                     <div className="space-y-1.5">
                       <label htmlFor="aadhaar_no" className="text-xs font-bold text-text-secondary uppercase">Aadhaar Number</label>

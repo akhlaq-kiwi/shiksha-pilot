@@ -9,6 +9,7 @@ import { apiClient } from '../../../common/services/apiClient';
 import html2pdf from 'html2pdf.js';
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 import { FeeReceiptModal } from '../components/FeeReceiptModal';
+import { normalizeReligion } from './StudentEnrollmentForm';
 import { formatCurrency } from '../../../common/utils/format';
 import { resolveFileUrl } from '../../../common/utils/fileUrl';
 import {
@@ -1491,7 +1492,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                     <p><span className="text-text-muted block font-medium">Date of Birth</span> <span className="font-semibold text-text-primary text-sm">{student.dob || '-'}</span></p>
                     <p><span className="text-text-muted block font-medium">Aadhaar Number</span> <span className="font-semibold font-mono text-text-primary text-sm">{student.aadhaar_no || '-'}</span></p>
                     <p><span className="text-text-muted block font-medium">Category</span> <span className="font-semibold text-text-primary text-sm">{student.category || '-'}</span></p>
-                    <p><span className="text-text-muted block font-medium">Religion</span> <span className="font-semibold text-text-primary text-sm">{student.religion || '-'}</span></p>
+                    <p><span className="text-text-muted block font-medium">Religion</span> <span className="font-semibold text-text-primary text-sm">{normalizeReligion(student.religion) || '-'}</span></p>
                     <p><span className="text-text-muted block font-medium">Student Mobile</span> <span className="font-semibold font-mono text-text-primary text-sm">{student.student_mobile || '-'}</span></p>
                     <p><span className="text-text-muted block font-medium">Student Email</span> <span className="font-semibold text-text-primary text-sm">{student.student_email || '-'}</span></p>
                     <p><span className="text-text-muted block font-medium">Class Assigned</span> <span className="font-semibold text-text-primary text-sm">{student.class_name || 'Not Assigned'}</span></p>

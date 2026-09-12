@@ -17697,54 +17697,7 @@ Only approve the settlement after reviewing all financial records.
         try {
             // First check if there is any teacher duplicate assignment *within* this payload itself
             $payloadTeachers = [];
-            foreach ($assignments as $a) {
-                $classId = isset($a['class_id']) ? (int)$a['class_id'] : null;
-                $teacherId = isset($a['teacher_id']) ? (int)$a['teacher_id'] : null;
-                if ($classId && $teacherId) {
-                    if (isset($payloadTeachers[$teacherId])) {
-                        // Duplicate teacher in payload
-                        $stmtTeacher = $pdo->prepare("SELECT name FROM staff WHERE id = :id AND school_id = :sid LIMIT 1");
-                        $stmtTeacher->execute([':id' => $teacherId, ':sid' => $schoolId]);
-                        $tName = $stmtTeacher->fetchColumn() ?: 'This teacher';
-                        
-                        $pdo->rollBack();
-                        throw new \App\Shared\Exceptions\ValidationException([
-                            'assignments' => "{$tName} is assigned to multiple classes in the request. One teacher can only be assigned to one class."
-                        ]);
-                    }
-                    $payloadTeachers[$teacherId] = $classId;
-                }
-            }
-
-            // Verify teacher uniqueness check from the DB (excluding unassigned)
-            foreach ($assignments as $a) {
-                $classId = isset($a['class_id']) ? (int)$a['class_id'] : null;
-                $teacherId = isset($a['teacher_id']) ? (int)$a['teacher_id'] : null;
-
-                if ($classId && $teacherId) {
-                    // Check if teacher is already assigned to another class
-                    $stmtCheck = $pdo->prepare("
-                        SELECT cta.class_id, c.name, c.section 
-                        FROM class_teacher_assignments cta
-                        JOIN classes c ON cta.class_id = c.id
-                        WHERE cta.school_id = :sid AND cta.teacher_id = :tid AND cta.class_id != :cid
-                    ");
-                    $stmtCheck->execute([':sid' => $schoolId, ':tid' => $teacherId, ':cid' => $classId]);
-                    $exists = $stmtCheck->fetch(\PDO::FETCH_ASSOC);
-
-                    if ($exists) {
-                        $clsName = $exists['name'] . ($exists['section'] ? '-' . $exists['section'] : '');
-                        $stmtTeacher = $pdo->prepare("SELECT name FROM staff WHERE id = :id AND school_id = :sid LIMIT 1");
-                        $stmtTeacher->execute([':id' => $teacherId, ':sid' => $schoolId]);
-                        $tName = $stmtTeacher->fetchColumn() ?: 'This teacher';
-
-                        $pdo->rollBack();
-                        throw new \App\Shared\Exceptions\ValidationException([
-                            'assignments' => "{$tName} is already assigned to {$clsName}. One teacher can only be assigned to one class."
-                        ]);
-                    }
-                }
-            }
+            // Multi-class assignment allowed - no single-teacher uniqueness check needed.
 
             // Save / delete assignments
             foreach ($assignments as $a) {

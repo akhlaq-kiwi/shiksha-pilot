@@ -10,6 +10,7 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/services.dart';
 import 'package:school_hub/screens/due_restriction_screen.dart';
+import 'package:school_hub/utils/class_formatter.dart';
 
 class ExamDetailScreen extends StatefulWidget {
   final ExamService examService;
@@ -33,6 +34,7 @@ class ExamDetailScreen extends StatefulWidget {
 
 class _ExamDetailScreenState extends State<ExamDetailScreen> {
   Map<String, dynamic> _details = {};
+  int? _selectedClassId;
   bool _isLoading = true;
   bool _isDownloading = false;
   String? _errorMessage;
@@ -43,20 +45,23 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
     _loadDetails();
   }
 
-  Future<void> _loadDetails() async {
+  Future<void> _loadDetails([int? targetClassId]) async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
+      final cid = targetClassId ?? _selectedClassId;
       final data = await widget.examService.getExamDetails(
         widget.examId,
         widget.userRole,
         widget.studentId,
+        classId: cid,
       );
       setState(() {
         _details = data;
+        _selectedClassId = data['class_id'] is int ? data['class_id'] : int.tryParse(data['class_id']?.toString() ?? '');
         _isLoading = false;
       });
     } catch (err) {
@@ -588,7 +593,10 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
               loadMarksForSubject(selectedSubjectId);
             }
 
-            final className = marksSheetData?['class_name']?.toString() ?? '';
+            final rawClassName = marksSheetData?['class_name']?.toString() ?? '';
+            final fallbackClassName = (_details['full_class_name'] ?? _details['class_name'] ?? '').toString();
+            final className = rawClassName.isNotEmpty ? rawClassName : fallbackClassName;
+            final List<dynamic> assignedClasses = (_details['assigned_classes'] as List<dynamic>?) ?? [];
             final maxM = (marksSheetData?['max_marks'] ?? 100.0).toDouble();
             final passM = (marksSheetData?['passing_marks'] ?? 33.0).toDouble();
             final isResultPublished = (marksSheetData?['is_result_published'] == true || _details['result_status'] == 'Published');
@@ -715,11 +723,63 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                className.isNotEmpty ? 'Enter Marks - $className' : 'Enter Marks',
-                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.indigo),
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                              assignedClasses.length > 1
+                                  ? Row(
+                                      children: [
+                                        const Text(
+                                          'Enter Marks - ',
+                                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.indigo),
+                                        ),
+                                        Flexible(
+                                          fit: FlexFit.loose,
+                                          child: DropdownButtonHideUnderline(
+                                            child: DropdownButton<int>(
+                                              value: _selectedClassId,
+                                              isExpanded: false,
+                                              icon: const Icon(Icons.arrow_drop_down_rounded, color: Colors.indigo),
+                                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.indigo),
+                                              items: sortClassesAscending(assignedClasses).map((cls) {
+                                                final int id = cls['id'] is int ? cls['id'] : int.parse(cls['id'].toString());
+                                                final String rawName = (cls['full_class_name'] ?? cls['name'] ?? 'Class').toString();
+                                                final String sec = (cls['section'] ?? cls['class_section'] ?? '').toString();
+                                                final String name = formatShortClassName(rawName, section: sec);
+                                                return DropdownMenuItem<int>(
+                                                  value: id,
+                                                  child: Text(name, overflow: TextOverflow.ellipsis),
+                                                );
+                                              }).toList(),
+                                              onChanged: (val) async {
+                                                if (val != null && val != _selectedClassId) {
+                                                  setModalState(() {
+                                                    isLoadingSheet = true;
+                                                    marksSheetData = null;
+                                                  });
+                                                  await _loadDetails(val);
+                                                  final newScheme = (_details['scheme'] as List<dynamic>?) ?? [];
+                                                  if (newScheme.isNotEmpty) {
+                                                    final firstSub = (newScheme.first['subject_id'] is int)
+                                                        ? newScheme.first['subject_id'] as int
+                                                        : int.tryParse(newScheme.first['subject_id'].toString()) ?? 0;
+                                                    selectedSubjectId = firstSub;
+                                                    await loadMarksForSubject(firstSub);
+                                                  } else {
+                                                    setModalState(() {
+                                                      isLoadingSheet = false;
+                                                      sheetError = 'No scheduled subjects found for this class.';
+                                                    });
+                                                  }
+                                                }
+                                              },
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    )
+                                  : Text(
+                                      className.isNotEmpty ? 'Enter Marks - $className' : 'Enter Marks',
+                                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.indigo),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                               Text(
                                 _details['exam_name'] ?? 'Exam Marks Sheet',
                                 style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w600),
