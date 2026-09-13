@@ -542,7 +542,8 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setModalState) {
 
-            Future<void> loadMarksForSubject(int subId) async {
+            Future<void> loadMarksForSubject(int subId, {int? classId}) async {
+              final targetCid = classId ?? _selectedClassId;
               setModalState(() {
                 isLoadingSheet = true;
                 sheetError = null;
@@ -550,7 +551,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                 isEditingMode = false;
               });
               try {
-                final data = await widget.examService.getMarksSheet(widget.examId, subId);
+                final data = await widget.examService.getMarksSheet(widget.examId, subId, classId: targetCid);
                 marksControllers.forEach((_, c) => c.dispose());
                 marksControllers.clear();
                 marksFocusNodes.forEach((_, f) => f.dispose());
@@ -590,9 +591,10 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
             }
 
             if (marksSheetData == null && !isLoadingSheet && sheetError == null) {
-              loadMarksForSubject(selectedSubjectId);
+              loadMarksForSubject(selectedSubjectId, classId: _selectedClassId);
             }
 
+            final List<dynamic> currentScheme = (_details['scheme'] as List<dynamic>?) ?? [];
             final rawClassName = marksSheetData?['class_name']?.toString() ?? '';
             final fallbackClassName = (_details['full_class_name'] ?? _details['class_name'] ?? '').toString();
             final className = rawClassName.isNotEmpty ? rawClassName : fallbackClassName;
@@ -658,6 +660,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
 
                 await widget.examService.saveMarksSheet(widget.examId, {
                   'subject_id': selectedSubjectId,
+                  'class_id': _selectedClassId,
                   'marks': marksPayload,
                 });
 
@@ -753,6 +756,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                                   setModalState(() {
                                                     isLoadingSheet = true;
                                                     marksSheetData = null;
+                                                    sheetError = null;
                                                   });
                                                   await _loadDetails(val);
                                                   final newScheme = (_details['scheme'] as List<dynamic>?) ?? [];
@@ -761,11 +765,11 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                                         ? newScheme.first['subject_id'] as int
                                                         : int.tryParse(newScheme.first['subject_id'].toString()) ?? 0;
                                                     selectedSubjectId = firstSub;
-                                                    await loadMarksForSubject(firstSub);
+                                                    await loadMarksForSubject(firstSub, classId: val);
                                                   } else {
                                                     setModalState(() {
                                                       isLoadingSheet = false;
-                                                      sheetError = 'No scheduled subjects found for this class.';
+                                                      sheetError = 'No paper added yet';
                                                     });
                                                   }
                                                 }
@@ -796,17 +800,17 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                   ),
                   const Divider(height: 1),
 
-                  // Subjects Bar (Only if no error)
-                  if (sheetError == null) ...[
+                  // Subjects Bar (Only if no error and currentScheme is not empty)
+                  if (sheetError == null && currentScheme.isNotEmpty) ...[
                     Container(
                       height: 50,
                       color: Colors.grey.shade50,
                       child: ListView.builder(
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        itemCount: scheme.length,
+                        itemCount: currentScheme.length,
                         itemBuilder: (context, idx) {
-                          final item = scheme[idx];
+                          final item = currentScheme[idx];
                           final subId = (item['subject_id'] is int)
                               ? item['subject_id'] as int
                               : int.tryParse(item['subject_id'].toString()) ?? 0;
@@ -820,7 +824,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                   selectedSubjectId = subId;
                                   marksSheetData = null;
                                 });
-                                loadMarksForSubject(subId);
+                                loadMarksForSubject(subId, classId: _selectedClassId);
                               }
                             },
                             child: Container(
@@ -853,48 +857,57 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                     child: isLoadingSheet
                         ? const Center(child: CircularProgressIndicator())
                         : sheetError != null
-                            ? Center(
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(20),
-                                        decoration: BoxDecoration(
-                                          color: Colors.amber.shade50,
-                                          shape: BoxShape.circle,
+                            ? (() {
+                                final bool isNoClassError = sheetError!.contains('No class Assigned') || sheetError!.contains('Forbidden');
+                                final String title = isNoClassError ? 'No class Assigned to you yet' : 'No paper added yet';
+                                final String subtitle = isNoClassError
+                                    ? 'Please contact school administrator to assign a class to your teacher profile.'
+                                    : 'No exam paper has been added for this class yet.';
+                                final IconData icon = isNoClassError ? Icons.assignment_ind_outlined : Icons.note_alt_outlined;
+
+                                return Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(20),
+                                          decoration: BoxDecoration(
+                                            color: Colors.amber.shade50,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Icon(
+                                            icon,
+                                            size: 48,
+                                            color: Colors.amber.shade800,
+                                          ),
                                         ),
-                                        child: Icon(
-                                          Icons.assignment_ind_outlined,
-                                          size: 48,
-                                          color: Colors.amber.shade800,
+                                        const SizedBox(height: 20),
+                                        Text(
+                                          title,
+                                          style: const TextStyle(
+                                            fontSize: 17,
+                                            fontWeight: FontWeight.w900,
+                                            color: Colors.black87,
+                                          ),
+                                          textAlign: TextAlign.center,
                                         ),
-                                      ),
-                                      const SizedBox(height: 20),
-                                      const Text(
-                                        'No class Assigned to you yet',
-                                        style: TextStyle(
-                                          fontSize: 17,
-                                          fontWeight: FontWeight.w900,
-                                          color: Colors.black87,
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          subtitle,
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                          textAlign: TextAlign.center,
                                         ),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        'Please contact school administrator to assign a class to your teacher profile.',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w500,
-                                          color: Colors.grey.shade600,
-                                        ),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
-                                ),
-                              )
+                                );
+                              })()
                             : Column(
                                 children: [
                                   // Lock Banner if Result Published
