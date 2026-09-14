@@ -32,6 +32,7 @@ import 'package:school_hub/screens/user_profile_screen.dart';
 import 'package:school_hub/widgets/change_password_dialog.dart';
 import 'package:school_hub/screens/teacher_qr_scanner_screen.dart';
 import 'package:school_hub/screens/teacher_attendance_history_screen.dart';
+import 'package:school_hub/screens/question_paper_designer_screen.dart';
 
 class LauncherFeature {
   final String name;
@@ -194,6 +195,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       icon: Icons.emoji_events_rounded,
       color: Colors.amber.shade700,
       allowedRoles: ['PARENT', 'STUDENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL'],
+      isAvailable: true,
+    ),
+    LauncherFeature(
+      name: 'Paper Designer',
+      icon: Icons.design_services_rounded,
+      color: Colors.deepOrange,
+      allowedRoles: ['TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL'],
       isAvailable: true,
     ),
   ];
@@ -870,6 +878,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             builder: (context) => OutstandingScreen(
               baseUrl: widget.leaveService.baseUrl,
               token: token,
+            ),
+          ),
+        );
+      } else if (feature.name == 'Paper Designer' || feature.name == 'Question Paper Designer') {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => QuestionPaperDesignerScreen(
+              leaveService: widget.leaveService,
             ),
           ),
         );
