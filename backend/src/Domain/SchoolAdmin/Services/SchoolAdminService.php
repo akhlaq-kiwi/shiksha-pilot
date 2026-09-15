@@ -2692,11 +2692,13 @@ class SchoolAdminService extends BaseService
             return $baseSalary;
         }
 
-        // 1. Fetch Allowed Leaves
-        $stmtSett = $pdo->prepare("SELECT allowed_leaves FROM teacher_attendance_settings WHERE school_id = :sid LIMIT 1");
+        // 1. Fetch Allowed Leaves & Late Penalty Amount
+        $stmtSett = $pdo->prepare("SELECT allowed_leaves, late_penalty_amount FROM teacher_attendance_settings WHERE school_id = :sid LIMIT 1");
         $stmtSett->execute([':sid' => $schoolId]);
-        $allowedLeavesRaw = $stmtSett->fetchColumn();
+        $settRow = $stmtSett->fetch(PDO::FETCH_ASSOC);
+        $allowedLeavesRaw = $settRow['allowed_leaves'] ?? null;
         $allowedLeaves = ($allowedLeavesRaw !== false && $allowedLeavesRaw !== null && $allowedLeavesRaw !== '') ? (int)$allowedLeavesRaw : 0;
+        $latePenaltyAmount = (float)($settRow['late_penalty_amount'] ?? 0.0);
 
         // 2. Count Present days in month
         $stmtPres = $pdo->prepare("
@@ -2740,11 +2742,20 @@ class SchoolAdminService extends BaseService
         $paidLeaveDays = min($leaveCount, $allowedLeaves);
         $paidDays = $presentCount + $paidLeaveDays + $sundayCount + $holidayCount;
 
-        if ($paidDays >= $totalDaysInMonth) {
-            return $baseSalary;
+        $basePay = ($paidDays >= $totalDaysInMonth) ? $baseSalary : round(($paidDays / $totalDaysInMonth) * $baseSalary);
+
+        if ($latePenaltyAmount > 0) {
+            $stmtLate = $pdo->prepare("
+                SELECT COUNT(*) FROM teacher_attendance 
+                WHERE school_id = :sid AND staff_id = :st_id AND date >= :sdate AND date <= :edate AND status = 'Present' AND is_late = 1
+            ");
+            $stmtLate->execute([':sid' => $schoolId, ':st_id' => $staffId, ':sdate' => $startDate, ':edate' => $endDate]);
+            $lateDaysCount = (int)$stmtLate->fetchColumn();
+            $latePenaltyDeduction = $lateDaysCount * $latePenaltyAmount;
+            return max(0.0, (float)($basePay - $latePenaltyDeduction));
         }
 
-        return round(($paidDays / $totalDaysInMonth) * $baseSalary);
+        return (float)$basePay;
     }
 
     public function createStaff(array $user, array $data): array

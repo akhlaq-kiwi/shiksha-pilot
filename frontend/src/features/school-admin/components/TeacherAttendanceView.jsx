@@ -118,7 +118,8 @@ export function TeacherAttendanceView() {
   const [entryMinute, setEntryMinute] = useState('30');
   const [entryPeriod, setEntryPeriod] = useState('AM');
   const [allowedLeaves, setAllowedLeaves] = useState('0');
-  const [initialSettings, setInitialSettings] = useState({ entryTime: '08:30 AM', allowedLeaves: '0' });
+  const [latePenaltyAmount, setLatePenaltyAmount] = useState('0');
+  const [initialSettings, setInitialSettings] = useState({ entryTime: '08:30 AM', allowedLeaves: '0', latePenaltyAmount: '0' });
   const [showSaveSettingsModal, setShowSaveSettingsModal] = useState(false);
   const [loadingSettings, setLoadingSettings] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
@@ -160,15 +161,15 @@ export function TeacherAttendanceView() {
     }
   }, [teacherTab, loadDailyData]);
 
-  // Load Monthly Report
-  const loadMonthlyReport = useCallback(async () => {
+  // Load Monthly Report Data
+  const loadReportData = useCallback(async () => {
     setLoadingReport(true);
     try {
       const data = await schoolService.getTeacherAttendanceReport({ month: reportMonth, year: reportYear });
       setReportData(data);
     } catch (err) {
       console.error(err);
-      toast.error('Failed to load teacher monthly report.');
+      toast.error('Failed to load monthly attendance report.');
     } finally {
       setLoadingReport(false);
     }
@@ -176,11 +177,11 @@ export function TeacherAttendanceView() {
 
   useEffect(() => {
     if (teacherTab === 'report') {
-      loadMonthlyReport();
+      loadReportData();
     }
-  }, [teacherTab, loadMonthlyReport]);
+  }, [teacherTab, loadReportData]);
 
-  // Load Settings & QR
+  // Load Settings & QR Code Token
   const loadSettingsAndQr = useCallback(async () => {
     setLoadingSettings(true);
     setLoadingQr(true);
@@ -197,8 +198,13 @@ export function TeacherAttendanceView() {
         : '0';
       setAllowedLeaves(leavesVal);
 
+      const penaltyVal = (st.late_penalty_amount !== null && st.late_penalty_amount !== undefined && String(st.late_penalty_amount).trim() !== '')
+        ? String(st.late_penalty_amount)
+        : '0';
+      setLatePenaltyAmount(penaltyVal);
+
       const formattedTime = `${parsedTime.hour}:${parsedTime.minute} ${parsedTime.period}`;
-      setInitialSettings({ entryTime: formattedTime, allowedLeaves: leavesVal });
+      setInitialSettings({ entryTime: formattedTime, allowedLeaves: leavesVal, latePenaltyAmount: penaltyVal });
 
       const qr = await schoolService.getTeacherAttendanceQrToken();
       setQrPayload(qr?.qr_payload || qr?.data?.qr_payload || qr?.data?.data?.qr_payload || '');
@@ -220,14 +226,28 @@ export function TeacherAttendanceView() {
 
   // Handlers
   const handleStatusChange = (staffId, status) => {
-    setDailyMap(prev => ({
-      ...prev,
-      [staffId]: {
-        ...prev[staffId],
-        status,
-        entry_time: status === 'Present' ? (dailyData?.configured_entry_time || '08:30 AM') : '—'
+    setDailyMap(prev => {
+      const origRecord = dailyData?.records?.find(r => r.staff_id === staffId);
+      const isChanged = origRecord ? (origRecord.status !== status || prev[staffId]?.is_status_changed) : true;
+      let newEntryTime;
+      if (status === 'Present') {
+        newEntryTime = isChanged
+          ? (dailyData?.configured_entry_time || '08:30 AM')
+          : (origRecord?.entry_time || dailyData?.configured_entry_time || '08:30 AM');
+      } else {
+        newEntryTime = '—';
       }
-    }));
+
+      return {
+        ...prev,
+        [staffId]: {
+          ...prev[staffId],
+          status,
+          entry_time: newEntryTime,
+          is_status_changed: isChanged
+        }
+      };
+    });
     setHasUnsavedDaily(true);
   };
 
@@ -236,11 +256,16 @@ export function TeacherAttendanceView() {
     setSavingDaily(true);
     try {
       const records = dailyData.records.map(r => {
-        const status = dailyMap[r.staff_id]?.status || r.status;
+        const item = dailyMap[r.staff_id];
+        const status = item?.status || r.status;
+        const isChanged = item?.is_status_changed || r.status !== status;
         return {
           staff_id: r.staff_id,
           status: status,
-          entry_time: status === 'Present' ? (dailyData.configured_entry_time || '08:30 AM') : '—'
+          entry_time: status === 'Present' 
+            ? (isChanged ? (dailyData.configured_entry_time || '08:30 AM') : r.entry_time) 
+            : '—',
+          is_status_changed: isChanged
         };
       });
       await schoolService.markTeacherAttendance({ date: selectedDate, records });
@@ -288,10 +313,11 @@ export function TeacherAttendanceView() {
     try {
       await schoolService.saveTeacherAttendanceSettings({
         entry_time: formattedTime,
-        allowed_leaves: allowedLeaves.trim() !== '' ? parseInt(allowedLeaves, 10) : 0
+        allowed_leaves: allowedLeaves.trim() !== '' ? parseInt(allowedLeaves, 10) : 0,
+        late_penalty_amount: latePenaltyAmount.trim() !== '' ? parseFloat(latePenaltyAmount) : 0
       });
       toast.success('Teacher attendance configurations updated successfully.');
-      setInitialSettings({ entryTime: formattedTime, allowedLeaves: allowedLeaves });
+      setInitialSettings({ entryTime: formattedTime, allowedLeaves: allowedLeaves, latePenaltyAmount: latePenaltyAmount });
     } catch (err) {
       console.error(err);
       toast.error('Failed to save settings.');
@@ -730,9 +756,31 @@ export function TeacherAttendanceView() {
                     </p>
                   </div>
 
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-text-primary uppercase tracking-wide">
+                      Late Entry Penalty Amount per day (₹)
+                    </label>
+                    <Input
+                      type="number"
+                      value={latePenaltyAmount}
+                      onChange={(e) => setLatePenaltyAmount(e.target.value)}
+                      placeholder="0"
+                      className="h-10"
+                      min="0"
+                      step="any"
+                    />
+                    <p className="text-xs text-text-secondary">
+                      If configured (e.g. ₹10 per day late), per day late entries will automatically deduct penalty amount from monthly teacher salary cards.
+                    </p>
+                  </div>
+
                   {(() => {
                     const currentFormattedTime = `${entryHour}:${entryMinute} ${entryPeriod}`;
-                    const isDirty = (currentFormattedTime !== initialSettings.entryTime || allowedLeaves !== initialSettings.allowedLeaves);
+                    const isDirty = (
+                      currentFormattedTime !== initialSettings.entryTime ||
+                      allowedLeaves !== initialSettings.allowedLeaves ||
+                      latePenaltyAmount !== initialSettings.latePenaltyAmount
+                    );
                     return (
                       <Button
                         type="submit"

@@ -1,14 +1,22 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Wi-Fi LAN IP address of local dev server. Works over Wi-Fi even when cable is disconnected/reconnected.
+/// Configured Base URL from compile-time --dart-define or Production environment default.
+const String kEnvBaseUrl = String.fromEnvironment('BASE_URL', defaultValue: 'https://app.shikshapilot.com');
+
+/// QA Server Base URL.
+const String kQaBaseUrl = 'https://qa.shikshapilot.com';
+
+/// Production Base URL.
+const String kProductionBaseUrl = 'https://app.shikshapilot.com';
+
+/// Wi-Fi LAN IP address of local dev server.
 const String kWifiBaseUrl = 'http://10.237.103.71:8000';
 
 /// USB ADB reverse port forwarding URL.
 const String kUsbBaseUrl = 'http://127.0.0.1:8000';
 
 /// Default local dev server URL.
-const String kProductionBaseUrl = 'http://10.237.103.71:8000';
 const String kLocalBaseUrl = 'http://10.237.103.71:8000';
 
 /// Key under which a debug-time server override is stored.
@@ -20,10 +28,10 @@ bool get kServerOverrideAllowed => kDebugMode;
 /// Base URL for API calls, given an already-loaded [SharedPreferences].
 String resolveBaseUrlFrom(SharedPreferences prefs) {
   final saved = prefs.getString(kBaseUrlPrefKey);
-  if (saved != null && saved.isNotEmpty && saved != 'http://127.0.0.1:8000') {
+  if (saved != null && saved.isNotEmpty && saved != 'http://127.0.0.1:8000' && saved != 'http://10.237.103.71:8000') {
     return saved;
   }
-  return kWifiBaseUrl;
+  return kEnvBaseUrl;
 }
 
 /// Base URL for API calls, loading preferences as needed.
@@ -31,6 +39,7 @@ Future<String> resolveBaseUrl() async {
   final prefs = await SharedPreferences.getInstance();
   return resolveBaseUrlFrom(prefs);
 }
+
 
 
 

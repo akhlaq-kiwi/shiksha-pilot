@@ -25,8 +25,8 @@ Future<http.Response> _executeWithFallback(
   Future<http.Response> Function(Uri targetUri) requestFn,
 ) async {
   final List<String> candidateBaseUrls = [
-    _kWifiBaseUrl,
     originalUrl.origin,
+    _kWifiBaseUrl,
     _kUsbBaseUrl,
   ];
 

@@ -46,6 +46,7 @@ class TeacherAttendanceService
                   `academic_year_id` INT NOT NULL,
                   `entry_time` VARCHAR(20) NOT NULL DEFAULT '08:30 AM',
                   `allowed_leaves` INT NULL DEFAULT NULL,
+                  `late_penalty_amount` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
                   `qr_payload` TEXT NULL,
                   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -55,6 +56,18 @@ class TeacherAttendanceService
             $this->pdo->exec("ALTER TABLE `teacher_attendance_settings` ADD COLUMN `qr_payload` TEXT NULL");
         } catch (\Throwable $e) {
             // Ignore if column already exists or table setup complete
+        }
+
+        try {
+            $this->pdo->exec("ALTER TABLE `teacher_attendance_settings` ADD COLUMN `late_penalty_amount` DECIMAL(10,2) NOT NULL DEFAULT 0.00");
+        } catch (\Throwable $e) {
+            // Ignore if column already exists
+        }
+
+        try {
+            $this->pdo->exec("ALTER TABLE `teacher_attendance` ADD COLUMN `official_entry_time` VARCHAR(20) NULL AFTER `entry_time`");
+        } catch (\Throwable $e) {
+            // Ignore if column already exists
         }
     }
 
@@ -105,7 +118,7 @@ class TeacherAttendanceService
         $ay = $this->getWorkingAcademicYear($schoolId);
 
         $stmt = $this->pdo->prepare("
-            SELECT entry_time, allowed_leaves, qr_payload 
+            SELECT entry_time, allowed_leaves, late_penalty_amount, qr_payload 
             FROM teacher_attendance_settings 
             WHERE school_id = :sid AND academic_year_id = :ayid 
             LIMIT 1
@@ -119,6 +132,7 @@ class TeacherAttendanceService
             'academic_year_name' => $ay['name'],
             'entry_time' => $row['entry_time'] ?? '08:30 AM',
             'allowed_leaves' => (isset($row['allowed_leaves']) && $row['allowed_leaves'] !== null) ? (int)$row['allowed_leaves'] : 0,
+            'late_penalty_amount' => (isset($row['late_penalty_amount']) && $row['late_penalty_amount'] !== null) ? (float)$row['late_penalty_amount'] : 0.0,
             'qr_payload' => $row['qr_payload'] ?? null,
         ];
     }
@@ -132,17 +146,24 @@ class TeacherAttendanceService
         $allowedLeaves = (isset($data['allowed_leaves']) && $data['allowed_leaves'] !== '' && $data['allowed_leaves'] !== null) 
             ? (int)$data['allowed_leaves'] 
             : null;
+        $latePenaltyAmount = (isset($data['late_penalty_amount']) && $data['late_penalty_amount'] !== '' && $data['late_penalty_amount'] !== null)
+            ? (float)$data['late_penalty_amount']
+            : 0.0;
 
         $stmt = $this->pdo->prepare("
-            INSERT INTO teacher_attendance_settings (school_id, academic_year_id, entry_time, allowed_leaves)
-            VALUES (:sid, :ayid, :etime, :aleaves)
-            ON DUPLICATE KEY UPDATE entry_time = VALUES(entry_time), allowed_leaves = VALUES(allowed_leaves)
+            INSERT INTO teacher_attendance_settings (school_id, academic_year_id, entry_time, allowed_leaves, late_penalty_amount)
+            VALUES (:sid, :ayid, :etime, :aleaves, :lpenalty)
+            ON DUPLICATE KEY UPDATE 
+                entry_time = VALUES(entry_time), 
+                allowed_leaves = VALUES(allowed_leaves),
+                late_penalty_amount = VALUES(late_penalty_amount)
         ");
         $stmt->execute([
             ':sid' => $schoolId,
             ':ayid' => $ay['id'],
             ':etime' => $entryTime,
-            ':aleaves' => $allowedLeaves
+            ':aleaves' => $allowedLeaves,
+            ':lpenalty' => $latePenaltyAmount
         ]);
 
         return $this->getSettings($user);
@@ -191,7 +212,7 @@ class TeacherAttendanceService
 
         // Fetch saved attendance for this date & academic year
         $stmtAtt = $this->pdo->prepare("
-            SELECT staff_id, status, entry_time, is_late, reach_time
+            SELECT staff_id, status, entry_time, official_entry_time, is_late, reach_time
             FROM teacher_attendance
             WHERE school_id = :sid AND academic_year_id = :ayid AND date = :date
         ");
@@ -203,8 +224,7 @@ class TeacherAttendanceService
             $attMap[(int)$r['staff_id']] = $r;
         }
 
-        $configuredTime = $settings['entry_time'] ?? '08:30 AM';
-        $configuredMinutes = $this->parseTimeToMinutes($configuredTime);
+        $globalConfiguredTime = $settings['entry_time'] ?? '08:30 AM';
 
         $records = [];
         foreach ($staffList as $st) {
@@ -213,10 +233,15 @@ class TeacherAttendanceService
             $att = $attMap[$stId] ?? null;
 
             $status = $att ? $att['status'] : ($isDisabled ? ($isSunday ? 'Sunday' : 'Holiday') : 'Absent');
-            // If marked Present by Admin (reach_time is NULL), use current configured entry time
             $isSelfCheckin = $att && !empty($att['reach_time']);
+
+            // Baseline official entry time anchored for this record (or active setting if unmarked)
+            $recordOfficialTime = (!empty($att['official_entry_time']))
+                ? $att['official_entry_time']
+                : ((!empty($att['entry_time']) && $att['entry_time'] !== '—') ? $att['entry_time'] : $globalConfiguredTime);
+
             $entryTime = ($status === 'Present') 
-                ? ($isSelfCheckin ? ($att['entry_time'] ?? $configuredTime) : $configuredTime)
+                ? ($isSelfCheckin ? ($att['entry_time'] ?? $recordOfficialTime) : $recordOfficialTime)
                 : ($att ? ($att['entry_time'] ?? '—') : '—');
 
             $recLate = false;
@@ -229,15 +254,16 @@ class TeacherAttendanceService
                 if (!$isSelfCheckin) {
                     $frequencyText = 'On Time';
                 } else {
+                    $recordOfficialMinutes = $this->parseTimeToMinutes($recordOfficialTime);
                     $entryMinutes = $this->parseTimeToMinutes($entryTime);
-                    if ($entryMinutes > $configuredMinutes) {
+                    if ($entryMinutes > $recordOfficialMinutes) {
                         $recLate = true;
-                        $diff = $entryMinutes - $configuredMinutes;
+                        $diff = $entryMinutes - $recordOfficialMinutes;
                         $recLateText = $this->formatMinutesText($diff) . ' Late';
                         $frequencyText = $recLateText;
-                    } elseif ($entryMinutes < $configuredMinutes) {
+                    } elseif ($entryMinutes < $recordOfficialMinutes) {
                         $recEarly = true;
-                        $diff = $configuredMinutes - $entryMinutes;
+                        $diff = $recordOfficialMinutes - $entryMinutes;
                         $recEarlyText = $this->formatMinutesText($diff) . ' Early';
                         $frequencyText = $recEarlyText;
                     } else {
@@ -314,17 +340,31 @@ class TeacherAttendanceService
         }
 
         $settings = $this->getSettings($user);
-        $configuredMinutes = $this->parseTimeToMinutes($settings['entry_time']);
+        $officialTime = $settings['entry_time'] ?? '08:30 AM';
 
         $this->pdo->beginTransaction();
         try {
+            $stmtExisting = $this->pdo->prepare("
+                SELECT staff_id, status, entry_time, official_entry_time, is_late, reach_time
+                FROM teacher_attendance
+                WHERE school_id = :sid AND academic_year_id = :ayid AND date = :date
+            ");
+            $stmtExisting->execute([':sid' => $schoolId, ':ayid' => $ay['id'], ':date' => $date]);
+            $existingRows = $stmtExisting->fetchAll(PDO::FETCH_ASSOC);
+            $existingMap = [];
+            foreach ($existingRows as $ex) {
+                $existingMap[(int)$ex['staff_id']] = $ex;
+            }
+
             $stmtUpsert = $this->pdo->prepare("
-                INSERT INTO teacher_attendance (school_id, academic_year_id, staff_id, date, status, entry_time, is_late, reach_time)
-                VALUES (:sid, :ayid, :staff_id, :date, :status, :etime, :is_late, NOW())
+                INSERT INTO teacher_attendance (school_id, academic_year_id, staff_id, date, status, entry_time, official_entry_time, is_late, reach_time)
+                VALUES (:sid, :ayid, :staff_id, :date, :status, :etime, :oetime, :is_late, :rtime)
                 ON DUPLICATE KEY UPDATE 
                     status = VALUES(status), 
-                    entry_time = VALUES(entry_time), 
+                    entry_time = VALUES(entry_time),
+                    official_entry_time = VALUES(official_entry_time), 
                     is_late = VALUES(is_late),
+                    reach_time = VALUES(reach_time),
                     updated_at = NOW()
             ");
 
@@ -341,14 +381,46 @@ class TeacherAttendanceService
                     continue; // Skip marking attendance for dates before staff joined
                 }
 
-                $status = in_array($r['status'] ?? '', ['Present', 'Absent', 'Leave']) ? $r['status'] : 'Present';
-                if ($status === 'Present') {
-                    // Admin marked attendance default: always use current configured official entry time so it is On Time
-                    $entryTime = $settings['entry_time'];
-                    $isLate = 0;
+                $existing = $existingMap[$staffId] ?? null;
+                $newStatus = in_array($r['status'] ?? '', ['Present', 'Absent', 'Leave']) ? $r['status'] : 'Present';
+                $isStatusChanged = !empty($r['is_status_changed']) || ($existing && $existing['status'] !== $newStatus);
+
+                if ($existing) {
+                    if (!$isStatusChanged && $existing['status'] === $newStatus) {
+                        // Status unchanged: preserve existing details
+                        $entryTime = $existing['entry_time'];
+                        $recordOfficialTime = $existing['official_entry_time'] ?: $officialTime;
+                        $isLate = (int)($existing['is_late'] ?? 0);
+                        $reachTime = $existing['reach_time'];
+                    } else {
+                        // Status changed by Admin
+                        if ($newStatus === 'Present') {
+                            // Admin changed status to Present: reset to official entry time (On Time)
+                            $entryTime = $officialTime;
+                            $recordOfficialTime = $officialTime;
+                            $isLate = 0;
+                            $reachTime = null;
+                        } else {
+                            // Changed to Absent or Leave
+                            $entryTime = null;
+                            $recordOfficialTime = $existing['official_entry_time'] ?: $officialTime;
+                            $isLate = 0;
+                            $reachTime = null;
+                        }
+                    }
                 } else {
-                    $entryTime = null;
-                    $isLate = 0;
+                    // New record for this date
+                    if ($newStatus === 'Present') {
+                        $entryTime = $officialTime;
+                        $recordOfficialTime = $officialTime;
+                        $isLate = 0;
+                        $reachTime = null;
+                    } else {
+                        $entryTime = null;
+                        $recordOfficialTime = $officialTime;
+                        $isLate = 0;
+                        $reachTime = null;
+                    }
                 }
 
                 $stmtUpsert->execute([
@@ -356,9 +428,11 @@ class TeacherAttendanceService
                     ':ayid' => $ay['id'],
                     ':staff_id' => $staffId,
                     ':date' => $date,
-                    ':status' => $status,
+                    ':status' => $newStatus,
                     ':etime' => $entryTime,
-                    ':is_late' => $isLate
+                    ':oetime' => $recordOfficialTime,
+                    ':is_late' => $isLate,
+                    ':rtime' => $reachTime
                 ]);
             }
 
@@ -725,10 +799,12 @@ class TeacherAttendanceService
             ];
         }
 
+        $officialTime = $settings['entry_time'] ?? '08:30 AM';
+
         // Save Attendance Record
         $stmtInsert = $this->pdo->prepare("
-            INSERT INTO teacher_attendance (school_id, academic_year_id, staff_id, user_id, date, status, entry_time, is_late, reach_time)
-            VALUES (:sid, :ayid, :staff_id, :uid, :date, 'Present', :etime, :is_late, :rtime)
+            INSERT INTO teacher_attendance (school_id, academic_year_id, staff_id, user_id, date, status, entry_time, official_entry_time, is_late, reach_time)
+            VALUES (:sid, :ayid, :staff_id, :uid, :date, 'Present', :etime, :oetime, :is_late, :rtime)
         ");
         $stmtInsert->execute([
             ':sid' => $schoolId,
@@ -737,6 +813,7 @@ class TeacherAttendanceService
             ':uid' => $userId > 0 ? $userId : null,
             ':date' => $today,
             ':etime' => $reachTimeStr,
+            ':oetime' => $officialTime,
             ':is_late' => $isLate,
             ':rtime' => $nowSql
         ]);
