@@ -235,13 +235,13 @@ class TeacherAttendanceService
             $status = $att ? $att['status'] : ($isDisabled ? ($isSunday ? 'Sunday' : 'Holiday') : 'Absent');
             $isSelfCheckin = $att && !empty($att['reach_time']);
 
-            // Baseline official entry time anchored for this record (or active setting if unmarked)
+            // Baseline official entry time anchored for this record (or active setting if unmarked/legacy)
             $recordOfficialTime = (!empty($att['official_entry_time']))
                 ? $att['official_entry_time']
-                : ((!empty($att['entry_time']) && $att['entry_time'] !== '—') ? $att['entry_time'] : $globalConfiguredTime);
+                : $globalConfiguredTime;
 
             $entryTime = ($status === 'Present') 
-                ? ($isSelfCheckin ? ($att['entry_time'] ?? $recordOfficialTime) : $recordOfficialTime)
+                ? ($att['entry_time'] ?? $recordOfficialTime)
                 : ($att ? ($att['entry_time'] ?? '—') : '—');
 
             $recLate = false;
@@ -251,24 +251,20 @@ class TeacherAttendanceService
             $frequencyText = '—';
 
             if ($status === 'Present' && $entryTime !== '—') {
-                if (!$isSelfCheckin) {
-                    $frequencyText = 'On Time';
+                $recordOfficialMinutes = $this->parseTimeToMinutes($recordOfficialTime);
+                $entryMinutes = $this->parseTimeToMinutes($entryTime);
+                if ($entryMinutes > $recordOfficialMinutes) {
+                    $recLate = true;
+                    $diff = $entryMinutes - $recordOfficialMinutes;
+                    $recLateText = $this->formatMinutesText($diff) . ' Late';
+                    $frequencyText = $recLateText;
+                } elseif ($entryMinutes < $recordOfficialMinutes) {
+                    $recEarly = true;
+                    $diff = $recordOfficialMinutes - $entryMinutes;
+                    $recEarlyText = $this->formatMinutesText($diff) . ' Early';
+                    $frequencyText = $recEarlyText;
                 } else {
-                    $recordOfficialMinutes = $this->parseTimeToMinutes($recordOfficialTime);
-                    $entryMinutes = $this->parseTimeToMinutes($entryTime);
-                    if ($entryMinutes > $recordOfficialMinutes) {
-                        $recLate = true;
-                        $diff = $entryMinutes - $recordOfficialMinutes;
-                        $recLateText = $this->formatMinutesText($diff) . ' Late';
-                        $frequencyText = $recLateText;
-                    } elseif ($entryMinutes < $recordOfficialMinutes) {
-                        $recEarly = true;
-                        $diff = $recordOfficialMinutes - $entryMinutes;
-                        $recEarlyText = $this->formatMinutesText($diff) . ' Early';
-                        $frequencyText = $recEarlyText;
-                    } else {
-                        $frequencyText = 'On Time';
-                    }
+                    $frequencyText = 'On Time';
                 }
             }
 
