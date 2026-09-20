@@ -607,7 +607,7 @@ class _ExamListScreenState extends State<ExamListScreen> {
                                                               border: Border.all(color: statusColor.withOpacity(0.2)),
                                                             ),
                                                             child: Row(
-                                                              mainAxisSize: MinAxisSize.min,
+                                                              mainAxisSize: MainAxisSize.min,
                                                               children: [
                                                                 Container(
                                                                   width: 8,
@@ -880,7 +880,7 @@ class TermSubTestsScreen extends StatelessWidget {
                                 border: Border.all(color: statusColor.withOpacity(0.2)),
                               ),
                               child: Row(
-                                mainAxisSize: MinAxisSize.min,
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Container(
                                     width: 8,
