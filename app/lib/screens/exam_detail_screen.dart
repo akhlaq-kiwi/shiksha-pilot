@@ -18,6 +18,7 @@ class ExamDetailScreen extends StatefulWidget {
   final String examName;
   final String userRole;
   final int? studentId;
+  final int? classId;
 
   const ExamDetailScreen({
     Key? key,
@@ -26,6 +27,7 @@ class ExamDetailScreen extends StatefulWidget {
     required this.examName,
     required this.userRole,
     this.studentId,
+    this.classId,
   }) : super(key: key);
 
   @override
@@ -42,6 +44,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedClassId = widget.classId;
     _loadDetails();
   }
 
@@ -2167,7 +2170,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                              const SizedBox(width: 4),
                                              Expanded(child: _buildSummaryMetricCard('OVERALL GRADE', 'Grade ${rcData['grade'] ?? 'A'}', Colors.teal.shade50, const Color(0xFF042F2E))),
                                              const SizedBox(width: 4),
-                                             Expanded(child: _buildSummaryMetricCard('ATTENDANCE', '${rcData['attendance']?['attendance_rate'] ?? 100}%', Colors.amber.shade50, const Color(0xFF451A03))),
+                                             Expanded(child: _buildSummaryMetricCard('ATTENDANCE', '${rcData['attendance']?['attendance_rate'] ?? 0}%', Colors.amber.shade50, const Color(0xFF451A03))),
                                              const SizedBox(width: 4),
                                              Expanded(child: _buildSummaryMetricCard('CLASS RANK', '${(rcData['class_rank'] ?? '1').toString().split(' ')[0]}', Colors.teal.shade50, const Color(0xFF042F2E))),
                                            ],
@@ -2175,7 +2178,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                          const SizedBox(height: 16),
 
                                          // Teacher Remarks (If exists)
-                                         if (rcData['report_card_remark'] != null && rcData['report_card_remark'].toString().trim().isNotEmpty) ...[
+                                         if (_getResolvedTeacherRemark(rcData).isNotEmpty) ...[
                                            Padding(
                                              padding: const EdgeInsets.symmetric(horizontal: 4),
                                              child: RichText(
@@ -2183,7 +2186,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                                  style: const TextStyle(fontSize: 11, color: Colors.black87),
                                                  children: [
                                                    const TextSpan(text: 'Teacher Remarks: ', style: TextStyle(fontWeight: FontWeight.bold)),
-                                                   TextSpan(text: rcData['report_card_remark'].toString()),
+                                                   TextSpan(text: _getResolvedTeacherRemark(rcData)),
                                                  ],
                                                ),
                                              ),
@@ -2258,13 +2261,17 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
       'grade': pct >= 80 ? 'A' : (pct >= 60 ? 'B' : 'C'),
       'result': result['status']?.toUpperCase() ?? 'PASS',
       'class_rank': '1 of 1',
-      'attendance': {'attendance_rate': 100},
+      'attendance': {'attendance_rate': 0},
     };
   }
 
   Widget _buildFinalReportCardTable(Map<String, dynamic> rcData) {
     final List<dynamic> subjects = (rcData['subjects'] as List?) ?? [];
-    final List<dynamic> sessionExams = (rcData['session_exams'] as List?) ?? ['Quarterly Examination', 'Half Yearly Examination', 'Annual Examination'];
+    final String templateCode = (rcData['template_code'] ?? 'traditional').toString().toLowerCase();
+    final List<dynamic> defaultExams = (templateCode == 'cbse_classic')
+        ? ['Unit Test 1', 'Half Yearly Exam', 'Unit Test 2', 'Unit Test 3', 'Annual Exam', 'Final Assessment']
+        : ['Quarterly Examination', 'Half Yearly Examination', 'Annual Examination'];
+    final List<dynamic> sessionExams = (rcData['session_exams'] as List?) ?? defaultExams;
 
     return Container(
       decoration: BoxDecoration(
@@ -2585,6 +2592,19 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
     );
   }
 
+  String _getResolvedTeacherRemark(Map<String, dynamic> rcData) {
+    final String rawRemark = (rcData['report_card_remark'] ?? rcData['teacher_remark'] ?? '').toString().trim();
+    if (rawRemark.isEmpty) return '';
+    if (rawRemark.toUpperCase() == 'DYNAMIC') {
+      final double percentage = double.tryParse((rcData['percentage'] ?? 0.0).toString()) ?? 0.0;
+      if (percentage >= 75) return 'It was excellent performance by you really appreciable work you have done.';
+      if (percentage >= 60) return 'Good performance in examinations, keep working hard to excel further.';
+      if (percentage >= 40) return 'Average performance, needs to pay more attention and practice in studies.';
+      return 'Poor performance, requires immediate attention and improvement.';
+    }
+    return rawRemark;
+  }
+
   Future<void> _downloadReportCardPDF(Map<String, dynamic> reportCard, StateSetter setModalState) async {
     setModalState(() {
       _isDownloading = true;
@@ -2612,13 +2632,19 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
       final String grade = (reportCard['grade'] ?? 'F').toString();
       final String result = (reportCard['result'] ?? reportCard['status'] ?? 'PASS').toString().toUpperCase();
       final String classRank = (reportCard['class_rank'] ?? '1 of 1').toString();
-      final String remark = (reportCard['report_card_remark'] ?? '').toString();
+      final String remark = _getResolvedTeacherRemark(reportCard);
       final Map<String, dynamic> attendance = reportCard['attendance'] is Map ? Map<String, dynamic>.from(reportCard['attendance']) : {};
       final String attRate = '${attendance['attendance_rate'] ?? 100}%';
 
       final String schoolAddress = (reportCard['school_address'] ?? '').toString();
       final String schoolLogo = (reportCard['school_logo'] ?? '').toString();
       final String dob = (reportCard['dob'] ?? '-').toString();
+
+      final String pdfTemplateCode = (reportCard['template_code'] ?? 'traditional').toString().toLowerCase();
+      final List<dynamic> pdfDefaultExams = (pdfTemplateCode == 'cbse_classic')
+          ? ['Unit Test 1', 'Half Yearly Exam', 'Unit Test 2', 'Unit Test 3', 'Annual Exam', 'Final Assessment']
+          : ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam'];
+      final List<dynamic> pdfSessionExams = (reportCard['session_exams'] as List?) ?? pdfDefaultExams;
 
       pw.MemoryImage? logoImage;
       if (schoolLogo.isNotEmpty) {
@@ -2671,31 +2697,40 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
         headerFontSize = 10.0;
         sectionGap = 18.0;
         infoPaddingV = 12.0;
-        summaryLabelSize = 7.8;
+        summaryLabelSize = 8.0;
         summaryValueSize = 13.0;
         summaryPaddingV = 8.0;
-      } else if (subCount <= 8) {
-        cellPaddingV = 10.0;
+      } else if (subCount == 7) {
+        cellPaddingV = 11.0;
         headerPaddingV = 8.0;
-        tableFontSize = 9.5;
-        headerFontSize = 9.0;
+        tableFontSize = 10.0;
+        headerFontSize = 9.5;
         sectionGap = 15.0;
         infoPaddingV = 11.0;
         summaryLabelSize = 7.5;
         summaryValueSize = 12.0;
         summaryPaddingV = 7.0;
+      } else if (subCount == 8) {
+        cellPaddingV = 8.0;
+        headerPaddingV = 7.0;
+        tableFontSize = 9.5;
+        headerFontSize = 9.0;
+        sectionGap = 13.0;
+        infoPaddingV = 10.0;
+        summaryLabelSize = 7.5;
+        summaryValueSize = 11.5;
+        summaryPaddingV = 6.5;
       }
 
       pdf.addPage(
         pw.Page(
           pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          margin: const pw.EdgeInsets.all(24),
           build: (pw.Context context) {
             return pw.Container(
-              height: double.infinity,
               decoration: pw.BoxDecoration(
                 border: pw.Border.all(color: PdfColor.fromHex('#042F2E'), width: 2),
-                borderRadius: pw.BorderRadius.circular(10),
+                borderRadius: pw.BorderRadius.circular(12),
               ),
               padding: const pw.EdgeInsets.all(16),
               child: pw.Column(
@@ -2709,10 +2744,11 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                       borderRadius: pw.BorderRadius.circular(8),
                     ),
                     child: pw.Row(
+                      crossAxisAlignment: pw.CrossAxisAlignment.center,
                       children: [
                         pw.Container(
-                          width: 52,
-                          height: 52,
+                          width: 48,
+                          height: 48,
                           decoration: pw.BoxDecoration(
                             borderRadius: pw.BorderRadius.circular(8),
                             color: PdfColors.amber400,
@@ -2755,20 +2791,24 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                               pw.Row(
                                 children: [
                                   pw.Container(
-                                    padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: pw.BoxDecoration(
                                       color: PdfColors.amber400,
                                       borderRadius: pw.BorderRadius.circular(4),
                                     ),
                                     child: pw.Text(
-                                      (isPdfFinalReport ? 'FINAL ACADEMIC REPORT CARD' : examName).toUpperCase(),
-                                      style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#042F2E')),
+                                      isPdfFinalReport ? 'FINAL ACADEMIC REPORT CARD' : examName.toUpperCase(),
+                                      style: pw.TextStyle(
+                                        fontSize: 9,
+                                        fontWeight: pw.FontWeight.bold,
+                                        color: PdfColor.fromHex('#042F2E'),
+                                      ),
                                     ),
                                   ),
-                                  pw.SizedBox(width: 10),
+                                  pw.SizedBox(width: 8),
                                   pw.Text(
                                     'Session: $academicYear',
-                                    style: pw.TextStyle(fontSize: 9.5, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+                                    style: const pw.TextStyle(fontSize: 9.5, color: PdfColors.white),
                                   ),
                                 ],
                               ),
@@ -2782,10 +2822,10 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
 
                   // Student Details Grid
                   pw.Container(
-                    padding: pw.EdgeInsets.symmetric(horizontal: 12, vertical: infoPaddingV),
+                    padding: pw.EdgeInsets.all(infoPaddingV),
                     decoration: pw.BoxDecoration(
                       color: PdfColors.grey100,
-                      borderRadius: pw.BorderRadius.circular(8),
+                      borderRadius: pw.BorderRadius.circular(6),
                       border: pw.Border.all(color: PdfColors.grey300),
                     ),
                     child: pw.Column(
@@ -2832,7 +2872,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                           decoration: pw.BoxDecoration(color: PdfColor.fromHex('#042F2E')),
                           children: [
                             _pdfTableHeaderCell('SUBJECT', verticalPadding: headerPaddingV, fontSize: headerFontSize),
-                            ...((reportCard['session_exams'] as List? ?? ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam']).map((ex) {
+                            ...(pdfSessionExams.map((ex) {
                               return pw.Container(
                                 padding: pw.EdgeInsets.symmetric(vertical: headerPaddingV, horizontal: 2),
                                 alignment: pw.Alignment.center,
@@ -2856,7 +2896,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                           decoration: pw.BoxDecoration(color: PdfColor.fromHex('#033E3B')),
                           children: [
                             _pdfTableHeaderCell('', verticalPadding: 3, fontSize: 7),
-                            ...((reportCard['session_exams'] as List? ?? ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam']).expand((_) => [
+                            ...(pdfSessionExams.expand((_) => [
                               _pdfTableHeaderCell('M.M.', verticalPadding: 3, fontSize: 7.5, color: PdfColors.amber300),
                               _pdfTableHeaderCell('OBT.', verticalPadding: 3, fontSize: 7.5, color: PdfColors.amber300),
                             ])),
@@ -2872,12 +2912,11 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                           final String grandMax = (sub['grand_total_max'] ?? sub['max_marks'] ?? '-').toString();
                           final String grandObt = (sub['grand_total_obtained'] ?? sub['marks_obtained'] ?? '-').toString();
                           final String sGrade = (sub['grade'] ?? '-').toString();
-                          final List<dynamic> sessionExams = (reportCard['session_exams'] as List?) ?? ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam'];
 
                           return pw.TableRow(
                             children: [
                               _pdfTableCell(sName, alignLeft: true, verticalPadding: cellPaddingV, fontSize: tableFontSize),
-                              ...sessionExams.expand((exName) {
+                              ...pdfSessionExams.expand((exName) {
                                 final sc = examScores[exName] ?? examScores[exName.toString()];
                                 final String mm = sc != null ? (sc['max_marks'] ?? '-').toString() : '100';
                                 final String obt = sc != null ? (sc['marks_obtained'] ?? '-').toString() : '-';
@@ -2897,7 +2936,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                           decoration: const pw.BoxDecoration(color: PdfColors.teal50),
                           children: [
                             _pdfTableCell('Total Marks', alignLeft: true, isBold: true, color: PdfColor.fromHex('#042F2E'), verticalPadding: cellPaddingV, fontSize: tableFontSize),
-                            ...((reportCard['session_exams'] as List? ?? ['Quarterly Examination', 'Half Yearly Examination', 'Annual Examination']).expand((exName) {
+                            ...(pdfSessionExams.expand((exName) {
                               final Map<String, dynamic> examTotalsMap = Map<String, dynamic>.from(reportCard['exam_totals'] ?? {});
                               final exTot = Map<String, dynamic>.from(examTotalsMap[exName] ?? examTotalsMap[exName.toString()] ?? {});
                               final String exMax = (exTot['max_marks'] ?? 0).toString();
@@ -3283,7 +3322,8 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
   Widget build(BuildContext context) {
     final bool schemePub = _details['scheme_published'] == 1;
     final bool admitPub = _details['admit_card_published'] == 1;
-    final bool resultPub = _details['result_published'] == 1;
+    final bool resultPub = (_details['result_published'] == 1 || _details['result_published'] == true) &&
+        (_details['result'] != null || _details['report_card'] != null);
     final bool hasPapers = (_details['has_papers'] == 1) || (_details['scheme'] is List && (_details['scheme'] as List).isNotEmpty);
     
     final bool admitCardRestricted = _details['admit_card_restricted'] == true;

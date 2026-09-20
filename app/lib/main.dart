@@ -514,6 +514,10 @@ class _LoginScreenState extends State<LoginScreen> {
           _phoneValidationError = 'Invalid credential';
         });
         _formKey.currentState!.validate();
+      } else if (errorMsg.toLowerCase().contains('timeout') || errorMsg.toLowerCase().contains('future not completed')) {
+        setState(() {
+          _errorMessage = 'Connection timeout. Please check your network or server connection.';
+        });
       } else {
         setState(() {
           _errorMessage = errorMsg;

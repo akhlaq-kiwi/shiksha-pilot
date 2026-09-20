@@ -161,8 +161,12 @@ export const schoolService = {
     return apiClient.get(`/api/school/exams-new/${id}`);
   },
 
-  deleteExamination(id) {
-    return apiClient.delete(`/api/school/exams-new/${id}`);
+  requestExamDeleteOtp(id) {
+    return apiClient.post(`/api/school/exams-new/${id}/request-delete-otp`);
+  },
+
+  deleteExamination(id, otpCode) {
+    return apiClient.delete(`/api/school/exams-new/${id}`, { data: { otp_code: otpCode } });
   },
 
   updateExamination(id, data) {

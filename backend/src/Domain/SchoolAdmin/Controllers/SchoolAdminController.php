@@ -436,12 +436,23 @@ class SchoolAdminController extends BaseController
         return $this->success($response, $data);
     }
 
+    public function requestExamDeleteOtp(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $id = (int)$args['id'];
+        $res = $this->service->requestExamDeleteOtp($user, $id);
+        return $this->success($response, $res);
+    }
+
     public function deleteExamination(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
         $this->requireRole($user, ['SCHOOL_ADMIN']);
         $id = (int)$args['id'];
-        $this->service->deleteExamination($user, $id);
+        $body = RequestParser::body($request);
+        $otpCode = $body['otp_code'] ?? $request->getQueryParams()['otp'] ?? null;
+        $this->service->deleteExamination($user, $id, $otpCode);
         return $this->success($response, null, 'Examination deleted successfully');
     }
 

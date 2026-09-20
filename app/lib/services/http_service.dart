@@ -8,7 +8,7 @@ import 'package:school_hub/main.dart';
 
 export 'package:http/http.dart' hide get, post, put, delete;
 
-const String _kWifiBaseUrl = 'http://10.237.103.71:8000';
+const String _kWifiBaseUrl = 'http://10.145.85.71:8000';
 const String _kUsbBaseUrl = 'http://127.0.0.1:8000';
 
 Future<void> _saveWorkingBaseUrl(String base) async {
@@ -25,9 +25,9 @@ Future<http.Response> _executeWithFallback(
   Future<http.Response> Function(Uri targetUri) requestFn,
 ) async {
   final List<String> candidateBaseUrls = [
+    _kUsbBaseUrl,
     originalUrl.origin,
     _kWifiBaseUrl,
-    _kUsbBaseUrl,
   ];
 
   // Remove duplicates while preserving order
@@ -45,7 +45,7 @@ Future<http.Response> _executeWithFallback(
       final pathAndQuery = originalUrl.hasQuery ? '${originalUrl.path}?${originalUrl.query}' : originalUrl.path;
       final targetUri = Uri.parse('$base$pathAndQuery');
 
-      final response = await requestFn(targetUri).timeout(const Duration(seconds: 4));
+      final response = await requestFn(targetUri).timeout(const Duration(seconds: 15));
       _checkUnauthorized(response);
 
       // Save working base URL for subsequent calls
@@ -55,6 +55,10 @@ Future<http.Response> _executeWithFallback(
       lastError = e;
       debugPrint('HTTP request to $base failed: $e. Trying next candidate...');
     }
+  }
+
+  if (lastError is TimeoutException) {
+    throw TimeoutException('Connection timeout. Please check server connection.');
   }
 
   throw lastError ?? const SocketException('Connection failed on all available network interfaces.');

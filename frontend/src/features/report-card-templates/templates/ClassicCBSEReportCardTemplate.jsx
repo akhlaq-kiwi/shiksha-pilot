@@ -1,5 +1,6 @@
 import React from 'react';
 import { SIGNATURE_GAP, STAMP_SPACE, PAGE_CONTENT_MIN_HEIGHT } from '../reportCardLayout';
+import { sortSubjectsWithGradeAtBottom, isSubjectGradeBased } from '../../../common/services/reportCardEngine';
 
 /**
  * Template 2: Classic CBSE Style Report Card
@@ -7,10 +8,11 @@ import { SIGNATURE_GAP, STAMP_SPACE, PAGE_CONTENT_MIN_HEIGHT } from '../reportCa
  */
 export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
   const { student, school, academic_year, exam, subjects = [], summary } = data;
+  const subjectsList = sortSubjectsWithGradeAtBottom(subjects);
   const signatures = config.signatures || ['Class Teacher', 'Principal'];
 
   // Dynamic layout density scaling based on subject count (inline styles for guaranteed rendering)
-  const subCount = subjects?.length || 0;
+  const subCount = subjectsList?.length || 0;
 
   let cellPadding = '10px 14px';
   let headerPadding = '10px 14px';
@@ -100,7 +102,7 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
           {school.address}
         </p>
         <div className="inline-block border-y border-zinc-800 py-1 px-4 mt-2 font-sans font-bold text-xs uppercase tracking-widest text-zinc-900">
-          {exam.is_final_session_report ? 'FINAL ACADEMIC REPORT CARD' : 'ACADEMIC PERFORMANCE REPORT'} ({academic_year.name})
+          {exam.is_final_session_report ? 'FINAL ACADEMIC REPORT CARD' : (exam.name ? `${exam.name.toUpperCase()} REPORT CARD` : 'ACADEMIC PERFORMANCE REPORT')} ({academic_year.name})
         </div>
       </div>
 
@@ -108,39 +110,113 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
       <table className="w-full text-xs font-sans border border-zinc-400 border-collapse">
         <tbody>
           <tr className="border-b border-zinc-300">
-            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold bg-zinc-100 w-1/6">Student Name</td>
-            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold uppercase text-zinc-900 w-2/6">{student.name}</td>
-            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold bg-zinc-100 w-1/6">Roll No</td>
-            <td style={{ padding: metaPadding }} className="font-mono font-bold w-2/6">{student.roll_no}</td>
+            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold bg-zinc-100 whitespace-nowrap w-[18%]">Student Name</td>
+            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold uppercase text-zinc-900 w-[32%]">{student.name}</td>
+            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold bg-zinc-100 whitespace-nowrap w-[18%]">Roll No</td>
+            <td style={{ padding: metaPadding }} className="font-mono font-bold w-[32%]">{student.roll_no}</td>
           </tr>
           <tr className="border-b border-zinc-300">
-            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold bg-zinc-100">Admission No</td>
-            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-mono">{student.admission_no}</td>
-            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold bg-zinc-100">Class & Sec</td>
-            <td style={{ padding: metaPadding }} className="font-bold">{student.class_name} {student.section ? `(${student.section})` : ''}</td>
+            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold bg-zinc-100 whitespace-nowrap w-[18%]">Admission No</td>
+            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-mono w-[32%]">{student.admission_no}</td>
+            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold bg-zinc-100 whitespace-nowrap w-[18%]">Class & Sec</td>
+            <td style={{ padding: metaPadding }} className="font-bold w-[32%]">{student.class_name} {student.section ? `(${student.section})` : ''}</td>
           </tr>
           <tr className="border-b border-zinc-300">
-            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold bg-zinc-100">Father's Name</td>
-            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold text-zinc-900">{student.father_name || '—'}</td>
-            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold bg-zinc-100">Mother's Name</td>
-            <td style={{ padding: metaPadding }} className="font-bold text-zinc-900">{student.mother_name || '—'}</td>
+            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold bg-zinc-100 whitespace-nowrap w-[18%]">Father's Name</td>
+            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold text-zinc-900 w-[32%]">{student.father_name || '—'}</td>
+            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold bg-zinc-100 whitespace-nowrap w-[18%]">Mother's Name</td>
+            <td style={{ padding: metaPadding }} className="font-bold text-zinc-900 w-[32%]">{student.mother_name || '—'}</td>
           </tr>
           <tr>
-            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold bg-zinc-100">Date of Birth</td>
-            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-mono">{student.dob}</td>
-            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold bg-zinc-100">Roll / SR No</td>
-            <td style={{ padding: metaPadding }} className="font-mono font-bold">{student.roll_no} | {student.admission_no}</td>
+            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold bg-zinc-100 whitespace-nowrap w-[18%]">Date of Birth</td>
+            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-mono w-[32%]">{student.dob}</td>
+            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold bg-zinc-100 whitespace-nowrap w-[18%]">Roll / SR No</td>
+            <td style={{ padding: metaPadding }} className="font-mono font-bold w-[32%]">{student.roll_no} | {student.admission_no}</td>
           </tr>
         </tbody>
       </table>
 
       {/* Scholastic Achievements Table Container - Expands dynamically for small subject counts */}
-      <div className="font-sans flex-1 flex flex-col justify-between">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-900 border-b border-zinc-400 pb-1 mb-2">
-          Part 1: Scholastic Performance ({exam.name})
-        </h3>
+      <div className="font-sans flex-1 flex flex-col justify-between mt-3">
         
-        {exam.is_final_session_report ? (
+        {data.terminals && data.terminals.length > 0 ? (
+          <table className="w-full h-full border border-zinc-800 border-collapse" style={{ fontSize: fontSizePx }}>
+            <thead>
+              <tr className="bg-zinc-800 text-white font-bold uppercase text-[11px]">
+                <th rowSpan={2} style={{ padding: headerPadding }} className="text-left border-r border-zinc-700">Subject</th>
+                {data.terminals.map((t, idx) => (
+                  <th key={idx} colSpan={t.sub_tests.length} style={{ padding: headerPadding }} className="text-center border-r border-zinc-700">
+                    {t.name}
+                  </th>
+                ))}
+                <th rowSpan={2} style={{ padding: headerPadding }} className="text-center">Grade</th>
+              </tr>
+              <tr className="bg-zinc-700 text-white font-bold uppercase text-[8px]">
+                {data.terminals.map((t) => (
+                  <React.Fragment key={t.id || t.name}>
+                    {t.sub_tests.map((st) => (
+                      <th key={st.id || st.name} style={{ padding: headerPadding }} className="text-center border-r border-zinc-600 font-bold" title={`${st.name} (Max Marks: ${st.max_marks})`}>
+                        {st.name}
+                      </th>
+                    ))}
+                  </React.Fragment>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-300">
+              {subjectsList.map((s, idx) => (
+                <tr key={idx} className="border-b border-zinc-300">
+                  <td style={{ padding: cellPadding }} className="border-r border-zinc-300 font-bold text-zinc-900">{s.subject_name}</td>
+                  {data.terminals.map((t) => {
+                    const tScore = s.terminals?.[t.name];
+                    return (
+                      <React.Fragment key={t.id || t.name}>
+                        {t.sub_tests.map((st) => {
+                          const stScore = tScore?.sub_tests?.[st.name];
+                          return (
+                            <td key={st.id || st.name} style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono font-bold text-[10px]">
+                              {stScore && stScore.marks_obtained !== null && stScore.marks_obtained !== undefined ? stScore.marks_obtained : '—'}
+                            </td>
+                          );
+                        })}
+                      </React.Fragment>
+                    );
+                  })}
+                  <td style={{ padding: cellPadding }} className="text-center font-bold text-xs">{s.grade || '—'}</td>
+                </tr>
+              ))}
+              {/* Grand Total Row */}
+              <tr className="bg-zinc-100 font-bold border-t-2 border-zinc-800">
+                <td style={{ padding: cellPadding }} className="border-r border-zinc-300">Grand Total</td>
+                {data.terminals.map((t) => {
+                  const subTestTotals = t.sub_tests.map((st) => {
+                    let stObt = 0;
+                    subjectsList.forEach((s) => {
+                      if (isSubjectGradeBased(s)) return;
+                      const sc = s.terminals?.[t.name]?.sub_tests?.[st.name];
+                      if (sc) {
+                        if (sc.raw_obtained !== undefined) stObt += parseFloat(sc.raw_obtained) || 0;
+                        else if (typeof sc.marks_obtained === 'number') stObt += sc.marks_obtained;
+                      }
+                    });
+                    return { obt: stObt };
+                  });
+
+                  return (
+                    <React.Fragment key={t.id || t.name}>
+                      {t.sub_tests.map((st, i) => (
+                        <td key={st.id || st.name} style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono font-bold text-[10px]">
+                          {subTestTotals[i]?.obt || 0}
+                        </td>
+                      ))}
+                    </React.Fragment>
+                  );
+                })}
+                <td style={{ padding: cellPadding }} className="text-center font-bold text-sm">{summary.grade || '—'}</td>
+              </tr>
+            </tbody>
+          </table>
+        ) : exam.is_final_session_report ? (
           <table className="w-full h-full border border-zinc-800 border-collapse" style={{ fontSize: fontSizePx }}>
             <thead>
               <tr className="bg-zinc-800 text-white font-bold uppercase text-[11px]">
@@ -163,7 +239,7 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-300">
-              {subjects.map((s, idx) => (
+              {subjectsList.map((s, idx) => (
                 <tr key={idx} className="border-b border-zinc-300">
                   <td style={{ padding: cellPadding }} className="border-r border-zinc-300 font-bold text-zinc-900">{s.subject_name}</td>
                   {(data.session_exams || ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam']).map(exName => {
@@ -212,7 +288,7 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-300">
-              {subjects.map((s, idx) => (
+              {subjectsList.map((s, idx) => (
                 <tr key={idx} className="border-b border-zinc-300">
                   <td style={{ padding: cellPadding }} className="border-r border-zinc-300 font-bold text-zinc-900">{s.subject_name}</td>
                   <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono">{s.max_marks}</td>
@@ -265,7 +341,13 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
 
         <div className="bg-emerald-50 border border-emerald-200 p-2 rounded text-center flex flex-col justify-center">
           <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 block">Class Rank</span>
-          <span className="text-xs font-bold text-emerald-950 font-mono mt-0.5">{summary.class_rank}</span>
+          <span className="text-xs font-bold text-emerald-950 font-mono mt-0.5">
+            {(() => {
+              const rawRank = (summary?.class_rank || data?.class_rank || '1').toString().trim();
+              const match = rawRank.match(/^(\d+)/);
+              return match ? match[1] : rawRank;
+            })()}
+          </span>
         </div>
       </div>
 
@@ -273,10 +355,11 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
       {(() => {
         const remarkText = summary?.teacher_remark || data?.teacher_remark || data?.report_card_remark || school?.report_card_remark;
         if (!remarkText || remarkText.toString().trim() === '') return null;
+        const cleanRemark = remarkText.toString().replace(/^["']|["']$/g, '').trim();
         return (
           <div className="mt-2.5 px-1 font-sans text-xs leading-normal">
             <strong className="font-bold text-zinc-900">Teacher Remarks:</strong>{' '}
-            <span className="font-bold italic text-emerald-700">"{remarkText}"</span>
+            <span className="font-bold italic text-emerald-700">{cleanRemark}</span>
           </div>
         );
       })()}

@@ -56,7 +56,8 @@ class TeacherController extends BaseController
         $this->requireRole($user, 'TEACHER');
 
         $params = $request->getQueryParams();
-        $onlyAssigned = isset($params['only_assigned']) && $params['only_assigned'] === '1';
+        $rawOnlyAssigned = strtolower(trim((string)($params['only_assigned'] ?? '')));
+        $onlyAssigned = in_array($rawOnlyAssigned, ['1', 'true', 'yes'], true);
 
         $data = $this->service->getMyClasses((int) $user['id'], (int) $user['school_id'], $onlyAssigned);
 
@@ -225,7 +226,9 @@ class TeacherController extends BaseController
     {
         $user = $this->authenticate($request);
         $this->requireRole($user, 'TEACHER');
-        $data = $this->service->getExamsList($user);
+        $queryParams = $request->getQueryParams();
+        $classId = isset($queryParams['class_id']) ? (int)$queryParams['class_id'] : null;
+        $data = $this->service->getExamsList($user, $classId);
         return $this->success($response, $data);
     }
 

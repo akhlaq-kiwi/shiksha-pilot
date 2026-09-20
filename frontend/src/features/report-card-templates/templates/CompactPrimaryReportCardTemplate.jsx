@@ -1,5 +1,6 @@
 import React from 'react';
 import { SIGNATURE_GAP, STAMP_SPACE, PAGE_CONTENT_MIN_HEIGHT } from '../reportCardLayout';
+import { sortSubjectsWithGradeAtBottom } from '../../../common/services/reportCardEngine';
 
 /**
  * Template 4: Compact Primary School Format Report Card
@@ -7,11 +8,12 @@ import { SIGNATURE_GAP, STAMP_SPACE, PAGE_CONTENT_MIN_HEIGHT } from '../reportCa
  */
 export default function CompactPrimaryReportCardTemplate({ data, config = {} }) {
   const { student, school, academic_year, exam, subjects = [], summary } = data;
+  const subjectsList = sortSubjectsWithGradeAtBottom(subjects);
   const isFinalReport = exam.is_final_session_report;
   const signatures = config.signatures || ['Teacher Signature', 'Parent Signature'];
 
   // Dynamic layout density scaling based on subject count (inline styles for guaranteed rendering)
-  const subCount = subjects?.length || 0;
+  const subCount = subjectsList?.length || 0;
 
   let cellPadding = '10px 14px';
   let headerPadding = '10px 14px';
@@ -166,8 +168,8 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
                 <th style={{ padding: headerPadding }} className="text-center border-r border-amber-500">Obt.</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-amber-100 font-medium">
-              {subjects.map((sub, idx) => (
+            <tbody className="divide-y divide-amber-200">
+              {subjectsList.map((sub, idx) => (
                 <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-amber-50/30'}>
                   <td style={{ padding: cellPadding }} className="text-left font-bold text-zinc-900 border-r border-amber-100 whitespace-nowrap">{sub.subject_name}</td>
                   {(data.session_exams || ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam']).map(exName => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, FileText, CheckCircle, AlertCircle, Plus, 
@@ -38,6 +38,15 @@ export default function SeatingPlanPage() {
   // Preview / Summary State
   const [previewData, setPreviewData] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const previewRef = useRef(null);
+
+  useEffect(() => {
+    if (previewData && previewRef.current) {
+      setTimeout(() => {
+        previewRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 50);
+    }
+  }, [previewData]);
 
   // State B: Generated Report State
   const [generatedPlan, setGeneratedPlan] = useState(null);
@@ -744,7 +753,7 @@ export default function SeatingPlanPage() {
 
       {/* INSTANT SEATING PREVIEW AREA - Displayed directly below form inside State A */}
       {currentView === 'config' && previewData && (
-        <div className="max-w-5xl mx-auto mt-6 space-y-6 animate-in fade-in duration-300 no-print">
+        <div ref={previewRef} className="max-w-5xl mx-auto mt-6 space-y-6 animate-in fade-in duration-300 no-print scroll-mt-20">
           <Card>
             <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
               <CardTitle className="text-sm font-bold text-text-primary">Seating Allocation Preview</CardTitle>

@@ -167,6 +167,7 @@ return function (App $app) {
     $app->get('/api/school/exams-new/{id}', [SchoolAdminController::class, 'getExaminationDetails']);
     $app->put('/api/school/exams-new/{id}', [SchoolAdminController::class, 'updateExamination']);
     $app->delete('/api/school/exams-new/{id}', [SchoolAdminController::class, 'deleteExamination']);
+    $app->post('/api/school/exams-new/{id}/request-delete-otp', [SchoolAdminController::class, 'requestExamDeleteOtp']);
     $app->get('/api/school/exams-new/{id}/timetable', [SchoolAdminController::class, 'getExamTimetable']);
     $app->post('/api/school/exams-new/{id}/timetable', [SchoolAdminController::class, 'saveExamTimetable']);
     $app->get('/api/school/exams-new/{id}/marks', [SchoolAdminController::class, 'getExamMarksSheet']);
