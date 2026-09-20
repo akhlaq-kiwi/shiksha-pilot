@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Configured Base URL from compile-time --dart-define or local environment default.
-const String kEnvBaseUrl = String.fromEnvironment('BASE_URL', defaultValue: 'http://127.0.0.1:8000');
+const String kEnvBaseUrl = String.fromEnvironment('BASE_URL', defaultValue: 'https://qa.shikshapilot.com');
 
 /// QA Server Base URL.
 const String kQaBaseUrl = 'https://qa.shikshapilot.com';
@@ -28,7 +28,7 @@ bool get kServerOverrideAllowed => kDebugMode;
 /// Base URL for API calls, given an already-loaded [SharedPreferences].
 String resolveBaseUrlFrom(SharedPreferences prefs) {
   final saved = prefs.getString(kBaseUrlPrefKey);
-  if (saved != null && saved.isNotEmpty && saved != 'https://app.shikshapilot.com' && saved != 'https://qa.shikshapilot.com') {
+  if (saved != null && saved.isNotEmpty && saved != 'http://127.0.0.1:8000' && saved != 'http://10.145.85.71:8000') {
     return saved;
   }
   return kEnvBaseUrl;
