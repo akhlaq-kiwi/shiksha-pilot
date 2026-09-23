@@ -71,6 +71,8 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
     metaPadding = '4px 5px';
   }
 
+  const validTerminals = (data.terminals || []).filter(t => Array.isArray(t.sub_tests) && t.sub_tests.length > 0);
+
   return (
     <div
       className="w-full bg-white text-zinc-900 font-serif relative flex flex-col justify-between h-full"
@@ -139,12 +141,12 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
       {/* Scholastic Achievements Table Container - Expands dynamically for small subject counts */}
       <div className="font-sans flex-1 flex flex-col justify-between mt-3">
         
-        {data.terminals && data.terminals.length > 0 ? (
+        {validTerminals.length > 0 ? (
           <table className="w-full h-full border border-zinc-800 border-collapse" style={{ fontSize: fontSizePx }}>
             <thead>
               <tr className="bg-zinc-800 text-white font-bold uppercase text-[11px]">
                 <th rowSpan={2} style={{ padding: headerPadding }} className="text-left border-r border-zinc-700">Subject</th>
-                {data.terminals.map((t, idx) => (
+                {validTerminals.map((t, idx) => (
                   <th key={idx} colSpan={t.sub_tests.length} style={{ padding: headerPadding }} className="text-center border-r border-zinc-700">
                     {t.name}
                   </th>
@@ -152,7 +154,7 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
                 <th rowSpan={2} style={{ padding: headerPadding }} className="text-center">Grade</th>
               </tr>
               <tr className="bg-zinc-700 text-white font-bold uppercase text-[8px]">
-                {data.terminals.map((t) => (
+                {validTerminals.map((t) => (
                   <React.Fragment key={t.id || t.name}>
                     {t.sub_tests.map((st) => (
                       <th key={st.id || st.name} style={{ padding: headerPadding }} className="text-center border-r border-zinc-600 font-bold" title={`${st.name} (Max Marks: ${st.max_marks})`}>
@@ -167,7 +169,7 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
               {subjectsList.map((s, idx) => (
                 <tr key={idx} className="border-b border-zinc-300">
                   <td style={{ padding: cellPadding }} className="border-r border-zinc-300 font-bold text-zinc-900">{s.subject_name}</td>
-                  {data.terminals.map((t) => {
+                  {validTerminals.map((t) => {
                     const tScore = s.terminals?.[t.name];
                     return (
                       <React.Fragment key={t.id || t.name}>
@@ -188,7 +190,7 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
               {/* Grand Total Row */}
               <tr className="bg-zinc-100 font-bold border-t-2 border-zinc-800">
                 <td style={{ padding: cellPadding }} className="border-r border-zinc-300">Grand Total</td>
-                {data.terminals.map((t) => {
+                {validTerminals.map((t) => {
                   const subTestTotals = t.sub_tests.map((st) => {
                     let stObt = 0;
                     subjectsList.forEach((s) => {

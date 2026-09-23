@@ -15704,6 +15704,19 @@ Only approve the settlement after reviewing all financial records.
         $stmtConfigured->execute([':cid' => $classId]);
         $configuredExamIds = array_map('intval', $stmtConfigured->fetchAll(\PDO::FETCH_COLUMN) ?: []);
 
+        // Fetch exam IDs that actually have marks entered for students of this class
+        $stmtWithMarks = $pdo->prepare("
+            SELECT DISTINCT em.exam_id
+            FROM examination_marks em
+            JOIN students s ON em.student_id = s.id
+            WHERE s.class_id = :cid
+              AND (em.marks_obtained IS NOT NULL AND TRIM(em.marks_obtained) != '' OR em.is_absent = 1)
+        ");
+        $stmtWithMarks->execute([':cid' => $classId]);
+        $withMarksExamIds = array_map('intval', $stmtWithMarks->fetchAll(\PDO::FETCH_COLUMN) ?: []);
+
+        $activeExamIds = array_unique(array_merge($configuredExamIds, $withMarksExamIds));
+
         // Fetch top-level Terminal Exams strictly for cbse_classic in this academic year
         $stmtTerminals = $pdo->prepare("
             SELECT e.* FROM examinations e
@@ -15728,7 +15741,6 @@ Only approve the settlement after reviewing all financial records.
         }
 
         // Fetch all sub-tests for these terminals dynamically from database
-        $stdSubNames = ['Unit Test 1', 'Unit Test 2', 'Unit Test 3'];
         $terminalsData = [];
         $allExamIdsToFetch = [];
 
@@ -15746,28 +15758,35 @@ Only approve the settlement after reviewing all financial records.
             if (!empty($subTests)) {
                 foreach ($subTests as $st) {
                     $stId = (int)$st['id'];
-                    $allExamIdsToFetch[] = $stId;
-                    $subTestList[] = [
-                        'id' => $stId,
-                        'name' => $st['name'],
-                        'max_marks' => (float)($st['max_marks'] ?? 30)
-                    ];
+                    // Include sub-test ONLY if at least 1 paper is added or 1 mark entered for this class
+                    if (in_array($stId, $activeExamIds, true)) {
+                        $allExamIdsToFetch[] = $stId;
+                        $subTestList[] = [
+                            'id' => $stId,
+                            'name' => $st['name'],
+                            'max_marks' => (float)($st['max_marks'] ?? 30)
+                        ];
+                    }
                 }
             } else {
-                foreach ($stdSubNames as $stName) {
+                // If top-level terminal itself has papers or marks directly
+                if (in_array($termId, $activeExamIds, true)) {
+                    $allExamIdsToFetch[] = $termId;
                     $subTestList[] = [
-                        'id' => 0,
-                        'name' => $stName,
-                        'max_marks' => 30.0
+                        'id' => $termId,
+                        'name' => $term['name'],
+                        'max_marks' => (float)($term['max_marks'] ?? 100)
                     ];
                 }
             }
 
-            $terminalsData[] = [
-                'id' => $termId,
-                'name' => $term['name'],
-                'sub_tests' => $subTestList
-            ];
+            if (!empty($subTestList)) {
+                $terminalsData[] = [
+                    'id' => $termId,
+                    'name' => $term['name'],
+                    'sub_tests' => $subTestList
+                ];
+            }
         }
 
         if (empty($allExamIdsToFetch)) {
