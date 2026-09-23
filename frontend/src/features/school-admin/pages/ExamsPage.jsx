@@ -2663,9 +2663,9 @@ export default function ExamsPage() {
           <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Examinations</h2>
           <p className="text-text-secondary text-sm mt-1">Configure exams, manage timetables, enter marks, and generate student report cards.</p>
         </div>
-        {effectiveActiveView === 'dashboard' && !isReadOnly && hasReportCardTemplate && (
+        {effectiveActiveView === 'dashboard' && hasReportCardTemplate && (
           <div className="flex gap-2 sm:items-center">
-            {!isCBSEClassic && (
+            {!isReadOnly && !isCBSEClassic && (
               <Button 
                 className="flex items-center gap-2 font-bold bg-primary text-white" 
                 onClick={() => {
