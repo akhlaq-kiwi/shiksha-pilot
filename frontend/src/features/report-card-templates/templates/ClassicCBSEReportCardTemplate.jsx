@@ -218,65 +218,6 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
               </tr>
             </tbody>
           </table>
-        ) : exam.is_final_session_report ? (
-          <table className="w-full h-full border border-zinc-800 border-collapse" style={{ fontSize: fontSizePx }}>
-            <thead>
-              <tr className="bg-zinc-800 text-white font-bold uppercase text-[11px]">
-                <th rowSpan={2} style={{ padding: headerPadding }} className="text-left border-r border-zinc-700">Subject</th>
-                {(data.session_exams || ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam']).map(exName => (
-                  <th key={exName} colSpan={2} style={{ padding: headerPadding }} className="text-center border-r border-zinc-700">{exName}</th>
-                ))}
-                <th colSpan={2} style={{ padding: headerPadding }} className="text-center border-r border-zinc-700">Grand Total</th>
-                <th rowSpan={2} style={{ padding: headerPadding }} className="text-center">Grade</th>
-              </tr>
-              <tr className="bg-zinc-700 text-white font-bold uppercase text-[8px]">
-                {(data.session_exams || ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam']).map(exName => (
-                  <React.Fragment key={exName}>
-                    <th style={{ padding: headerPadding }} className="text-center border-r border-zinc-600">M.M.</th>
-                    <th style={{ padding: headerPadding }} className="text-center border-r border-zinc-600">Obt.</th>
-                  </React.Fragment>
-                ))}
-                <th style={{ padding: headerPadding }} className="text-center border-r border-zinc-600">Max</th>
-                <th style={{ padding: headerPadding }} className="text-center border-r border-zinc-600">Obt.</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-300">
-              {subjectsList.map((s, idx) => (
-                <tr key={idx} className="border-b border-zinc-300">
-                  <td style={{ padding: cellPadding }} className="border-r border-zinc-300 font-bold text-zinc-900">{s.subject_name}</td>
-                  {(data.session_exams || ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam']).map(exName => {
-                    const score = s.exam_scores?.[exName];
-                    return (
-                      <React.Fragment key={exName}>
-                        <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono text-[11px]">
-                          {score ? score.max_marks : '—'}
-                        </td>
-                        <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono font-bold text-[11px]">
-                          {score ? score.marks_obtained : '—'}
-                        </td>
-                      </React.Fragment>
-                    );
-                  })}
-                  <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono font-bold text-zinc-700 text-[11px]">{s.grand_total_max ?? s.max_marks ?? '—'}</td>
-                  <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono font-bold text-zinc-900 text-[11px]">{s.grand_total_obtained ?? s.marks_obtained ?? '—'}</td>
-                  <td style={{ padding: cellPadding }} className="text-center font-bold text-xs">{s.grade || '—'}</td>
-                </tr>
-              ))}
-              {/* Total Marks Row (Inside tbody so height expands equally with subject rows) */}
-              <tr className="bg-zinc-100 font-bold border-t-2 border-zinc-800">
-                <td style={{ padding: cellPadding }} className="border-r border-zinc-300">Grand Total</td>
-                {(data.session_exams || ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam']).map(exName => (
-                  <React.Fragment key={exName}>
-                    <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono">{data.exam_totals?.[exName]?.max_marks ?? 0}</td>
-                    <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono font-bold">{data.exam_totals?.[exName]?.marks_obtained ?? 0}</td>
-                  </React.Fragment>
-                ))}
-                <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono font-bold">{summary.total_max ?? '—'}</td>
-                <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-300 font-mono font-bold text-sm">{summary.total_obtained ?? '—'}</td>
-                <td style={{ padding: cellPadding }} className="text-center font-bold text-sm">{summary.grade || '—'}</td>
-              </tr>
-            </tbody>
-          </table>
         ) : (
           <table className="w-full h-full border border-zinc-800 border-collapse" style={{ fontSize: fontSizePx }}>
             <thead>
