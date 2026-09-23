@@ -1420,7 +1420,7 @@ class TeacherService extends BaseService
                 FROM examinations e
                 WHERE e.school_id = :school_id
                   AND e.parent_id IS NULL
-                  AND (e.template_code = 'cbse_classic' OR e.template_code IS NULL)
+                  AND (e.template_code = 'cbse_classic' OR (e.template_code IS NULL AND (LOWER(e.name) LIKE '%first term%' OR LOWER(e.name) LIKE '%second term%')))
             ";
             $paramsTerm = [':school_id' => $schoolId];
             if ($academicYearId > 0) {
@@ -1444,10 +1444,11 @@ class TeacherService extends BaseService
                        COALESCE(MAX(CASE WHEN ecs.status = 'Published' THEN 1 ELSE 0 END), 0) AS result_status_val
                 FROM examinations e
                 LEFT JOIN examination_class_status ecs ON e.id = ecs.exam_id " . ($classId ? "AND ecs.class_id = :class_id" : "") . "
+                LEFT JOIN examinations p ON e.parent_id = p.id
                 WHERE e.school_id = :school_id 
                   AND e.parent_id IS NOT NULL
                   AND e.status = 'Published'
-                  AND (e.template_code = 'cbse_classic' OR e.template_code IS NULL)
+                  AND (e.template_code = 'cbse_classic' OR p.template_code = 'cbse_classic' OR e.template_code IS NULL)
             ";
             $paramsSubs = [':school_id' => $schoolId];
             if ($classId) {
@@ -1514,7 +1515,7 @@ class TeacherService extends BaseService
             WHERE e.school_id = :school_id
               AND e.status = 'Published'
               AND e.parent_id IS NULL
-              AND (e.template_code = 'modern' OR e.template_code IS NULL)
+              AND (e.template_code = 'modern' OR (e.template_code IS NULL AND (LOWER(e.name) LIKE '%quarterly%' OR LOWER(e.name) LIKE '%half%' OR LOWER(e.name) LIKE '%annual%')))
         ";
         $params = [':school_id' => $schoolId];
         if ($classId) {

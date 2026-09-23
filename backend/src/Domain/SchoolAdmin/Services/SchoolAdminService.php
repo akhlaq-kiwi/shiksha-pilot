@@ -13749,6 +13749,34 @@ Only approve the settlement after reviewing all financial records.
             // Ignore if already nullable or structure modified
         }
 
+        try {
+            $pdo->exec("
+                UPDATE examinations 
+                SET template_code = 'cbse_classic' 
+                WHERE school_id = {$schoolId} 
+                  AND parent_id IS NULL 
+                  AND (template_code IS NULL OR template_code = '') 
+                  AND (LOWER(name) LIKE '%first term%' OR LOWER(name) LIKE '%second term%')
+            ");
+            $pdo->exec("
+                UPDATE examinations e
+                JOIN examinations p ON e.parent_id = p.id
+                SET e.template_code = 'cbse_classic'
+                WHERE e.school_id = {$schoolId}
+                  AND p.template_code = 'cbse_classic'
+                  AND (e.template_code IS NULL OR e.template_code = '')
+            ");
+            $pdo->exec("
+                UPDATE examinations 
+                SET template_code = 'modern' 
+                WHERE school_id = {$schoolId} 
+                  AND parent_id IS NULL 
+                  AND (template_code IS NULL OR template_code = '') 
+                  AND (LOWER(name) LIKE '%quarterly%' OR LOWER(name) LIKE '%half%' OR LOWER(name) LIKE '%annual%')
+            ");
+        } catch (\Throwable $t) {
+        }
+
         if ($tplCode === 'cbse_classic') {
             $defaultTerminals = [
                 'FIRST TERM EXAMINATION' => 'First terminal evaluation.',
