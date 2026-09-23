@@ -990,7 +990,6 @@ export default function ExamsPage() {
   };
 
   const getExamMinStartDate = (targetExamId, examsList = [], explicitParentId = null) => {
-    const todayStr = getTodayLocalDateString();
     let siblings = [];
 
     let parentId = explicitParentId;
@@ -1026,13 +1025,13 @@ export default function ExamsPage() {
     const targetIdx = targetExamId ? sorted.findIndex(e => Number(e.id) === Number(targetExamId)) : sorted.length;
     
     const preceding = sorted.filter((e, idx) => (targetIdx === -1 || idx < targetIdx) && Number(e.id) !== Number(targetExamId) && e.end_date);
-    if (preceding.length === 0) return todayStr;
+    if (preceding.length === 0) return null;
 
     const latestEndDate = preceding.reduce((max, e) => (e.end_date > max ? e.end_date : max), '');
-    if (!latestEndDate) return todayStr;
+    if (!latestEndDate) return null;
 
     const dayAfter = addDays(latestEndDate, 1);
-    return dayAfter > todayStr ? dayAfter : todayStr;
+    return dayAfter;
   };
 
   const getExamMaxEndDate = (targetExamId, examsList = [], explicitParentId = null) => {
@@ -1150,19 +1149,6 @@ export default function ExamsPage() {
     if (e) e.preventDefault();
     if (!editExamData.name) {
       setError('Please enter examination name.');
-      return;
-    }
-    const todayStr = getTodayLocalDateString();
-    if (editExamData.start_date && editExamData.start_date < todayStr) {
-      setError('Start Date cannot be in the past.');
-      return;
-    }
-    if (editExamData.end_date && editExamData.end_date < todayStr) {
-      setError('End Date cannot be in the past.');
-      return;
-    }
-    if (editExamData.publish_date && editExamData.publish_date < todayStr) {
-      setError('Result Publish Date cannot be in the past.');
       return;
     }
     const minAllowedStart = getExamMinStartDate(editExamData.id, exams, editExamData.parent_id);
