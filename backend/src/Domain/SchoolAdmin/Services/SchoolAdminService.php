@@ -14519,27 +14519,81 @@ Only approve the settlement after reviewing all financial records.
 
         $pdo->beginTransaction();
         try {
-            // Delete old papers for this class
-            $stmtDel = $pdo->prepare("DELETE FROM examination_papers WHERE exam_id = :exam_id AND class_id = :class_id");
-            $stmtDel->execute([':exam_id' => $examId, ':class_id' => $classId]);
+            // Fetch existing papers for this exam and class indexed by subject_id
+            $stmtExisting = $pdo->prepare("
+                SELECT id, subject_id 
+                FROM examination_papers 
+                WHERE exam_id = :exam_id AND class_id = :class_id
+            ");
+            $stmtExisting->execute([':exam_id' => $examId, ':class_id' => $classId]);
+            $existingRows = $stmtExisting->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            
+            $existingMap = [];
+            foreach ($existingRows as $row) {
+                $existingMap[(int)$row['subject_id']] = (int)$row['id'];
+            }
 
-            // Insert new papers
             $stmtIns = $pdo->prepare("
                 INSERT INTO examination_papers (exam_id, class_id, subject_id, exam_date, start_time, end_time, max_marks, passing_marks, room)
                 VALUES (:exam_id, :class_id, :subid, :edate, :stime, :etime, :maxm, :passm, :room)
             ");
+
+            $stmtUpd = $pdo->prepare("
+                UPDATE examination_papers 
+                SET exam_date = :edate, start_time = :stime, end_time = :etime, max_marks = :maxm, passing_marks = :passm, room = :room
+                WHERE id = :id
+            ");
+
+            $submittedSubIds = [];
             foreach ($papers as $p) {
-                $stmtIns->execute([
-                    ':exam_id' => $examId,
-                    ':class_id' => $classId,
-                    ':subid' => (int)$p['subject_id'],
-                    ':edate' => $p['exam_date'],
-                    ':stime' => $p['start_time'],
-                    ':etime' => $p['end_time'],
-                    ':maxm' => (float)$p['max_marks'],
-                    ':passm' => (int)ceil((float)$p['passing_marks']),
-                    ':room' => !empty($p['room']) ? $p['room'] : null
-                ]);
+                $subId = (int)$p['subject_id'];
+                $submittedSubIds[] = $subId;
+
+                $eDate = $p['exam_date'];
+                $sTime = $p['start_time'];
+                $eTime = $p['end_time'];
+                $maxM = (float)$p['max_marks'];
+                $passM = (int)ceil((float)$p['passing_marks']);
+                $room = !empty($p['room']) ? $p['room'] : null;
+
+                if (isset($existingMap[$subId])) {
+                    // Update existing paper to preserve paper_id and student marks entered so far
+                    $stmtUpd->execute([
+                        ':edate' => $eDate,
+                        ':stime' => $sTime,
+                        ':etime' => $eTime,
+                        ':maxm' => $maxM,
+                        ':passm' => $passM,
+                        ':room' => $room,
+                        ':id' => $existingMap[$subId]
+                    ]);
+                } else {
+                    // Insert new paper
+                    $stmtIns->execute([
+                        ':exam_id' => $examId,
+                        ':class_id' => $classId,
+                        ':subid' => $subId,
+                        ':edate' => $eDate,
+                        ':stime' => $sTime,
+                        ':etime' => $eTime,
+                        ':maxm' => $maxM,
+                        ':passm' => $passM,
+                        ':room' => $room
+                    ]);
+                }
+            }
+
+            // Remove only papers for subjects that were explicitly removed from timetable
+            if (!empty($submittedSubIds)) {
+                $inSubIds = implode(',', array_map('intval', array_unique($submittedSubIds)));
+                $stmtDelRemoved = $pdo->prepare("
+                    DELETE FROM examination_papers 
+                    WHERE exam_id = :exam_id AND class_id = :class_id AND subject_id NOT IN ({$inSubIds})
+                ");
+                $stmtDelRemoved->execute([':exam_id' => $examId, ':class_id' => $classId]);
+            } else {
+                $stmtDelAll = $pdo->prepare("DELETE FROM examination_papers WHERE exam_id = :exam_id AND class_id = :class_id");
+                $stmtDelAll->execute([':exam_id' => $examId, ':class_id' => $classId]);
             }
 
             // Ensure examination_class_status record exists without force-setting scheme_published
