@@ -56,7 +56,7 @@ class ReportCardTemplateController extends BaseController
 
         $stmt = $this->db->query("
             SELECT t.*, 
-                   (SELECT COUNT(*) FROM schools s WHERE s.report_card_template_id = t.id) as assigned_schools_count
+                   (SELECT COUNT(*) FROM schools s WHERE s.report_card_template_id = t.id OR (t.is_system_default = 1 AND s.report_card_template_id IS NULL AND t.id = 1)) as assigned_schools_count
             FROM report_card_templates t
             ORDER BY t.is_system_default DESC, t.name ASC
         ");
@@ -70,6 +70,58 @@ class ReportCardTemplateController extends BaseController
         }
 
         return $this->success($response, $templates);
+    }
+
+    /**
+     * GET /api/platform/report-card-templates/{id}/schools
+     * List all schools currently assigned to a specific report card template
+     */
+    public function getAssignedSchools(Request $request, Response $response, array $args): Response
+    {
+        $actor = $this->authenticate($request);
+        $this->requireRole($actor, ['SUPER_ADMIN']);
+
+        $templateId = (int)($args['id'] ?? 0);
+
+        $stmtTpl = $this->db->prepare("SELECT id, name, code, is_system_default FROM report_card_templates WHERE id = ?");
+        $stmtTpl->execute([$templateId]);
+        $tpl = $stmtTpl->fetch(PDO::FETCH_ASSOC);
+
+        if (!$tpl) {
+            return $this->error($response, 'Template not found.', 404);
+        }
+
+        $isDefault = (bool)$tpl['is_system_default'];
+
+        if ($isDefault && (int)$tpl['id'] === 1) {
+            $stmt = $this->db->prepare("
+                SELECT s.id, s.name, s.code, s.city, s.state, s.phone, s.contact_no, s.email, s.status, s.created_at, s.report_card_template_id
+                FROM schools s
+                WHERE s.report_card_template_id = ? OR s.report_card_template_id IS NULL
+                ORDER BY s.name ASC
+            ");
+            $stmt->execute([$templateId]);
+        } else {
+            $stmt = $this->db->prepare("
+                SELECT s.id, s.name, s.code, s.city, s.state, s.phone, s.contact_no, s.email, s.status, s.created_at, s.report_card_template_id
+                FROM schools s
+                WHERE s.report_card_template_id = ?
+                ORDER BY s.name ASC
+            ");
+            $stmt->execute([$templateId]);
+        }
+
+        $schools = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        return $this->success($response, [
+            'template' => [
+                'id' => (int)$tpl['id'],
+                'name' => $tpl['name'],
+                'code' => $tpl['code'],
+                'is_system_default' => $isDefault
+            ],
+            'schools' => $schools
+        ]);
     }
 
     /**

@@ -60,6 +60,7 @@ return function (App $app) {
 
     // Super Admin Report Card Templates
     $app->get('/api/platform/report-card-templates', [ReportCardTemplateController::class, 'listTemplates']);
+    $app->get('/api/platform/report-card-templates/{id}/schools', [ReportCardTemplateController::class, 'getAssignedSchools']);
     $app->post('/api/platform/report-card-templates', [ReportCardTemplateController::class, 'createTemplate']);
     $app->put('/api/platform/report-card-templates/{id}', [ReportCardTemplateController::class, 'updateTemplate']);
     $app->delete('/api/platform/report-card-templates/{id}', [ReportCardTemplateController::class, 'deleteTemplate']);

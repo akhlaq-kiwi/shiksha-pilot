@@ -623,6 +623,9 @@ export const schoolService = {
   getReportCardTemplates() {
     return apiClient.get('/api/platform/report-card-templates');
   },
+  getTemplateAssignedSchools(id) {
+    return apiClient.get(`/api/platform/report-card-templates/${id}/schools`);
+  },
   createReportCardTemplate(templateData) {
     return apiClient.post('/api/platform/report-card-templates', templateData);
   },
