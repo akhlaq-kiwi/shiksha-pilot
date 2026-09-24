@@ -1467,6 +1467,7 @@ class TeacherService extends BaseService
             $sqlSubs = "
                 SELECT e.id, e.parent_id, e.name, e.start_date, e.end_date, e.max_marks, e.status AS exam_status,
                        COALESCE(MAX(ecs.scheme_published), 0) AS scheme_published,
+                       (SELECT COUNT(*) FROM examination_papers ep WHERE ep.exam_id = e.id) AS papers_count,
                        COALESCE(MAX(CASE WHEN ecs.status = 'Published' THEN 1 ELSE 0 END), 0) AS result_status_val
                 FROM examinations e
                 LEFT JOIN examination_class_status ecs ON e.id = ecs.exam_id " . ($classId ? "AND ecs.class_id = :class_id" : "") . "
@@ -1496,10 +1497,12 @@ class TeacherService extends BaseService
             foreach ($subTests as $st) {
                 $st['id'] = (int)$st['id'];
                 $st['parent_id'] = (int)$st['parent_id'];
-                $st['scheme_published'] = (int)$st['scheme_published'];
+                $hasAddedPapers = ((int)($st['papers_count'] ?? 0)) > 0;
+                $st['scheme_published'] = ((int)$st['scheme_published'] === 1 || $hasAddedPapers) ? 1 : 0;
                 $st['admit_card_published'] = 1; // Teachers can access admit cards / seatings
                 $st['result_published'] = (int)($st['result_status_val'] ?? 0);
                 unset($st['result_status_val']);
+                unset($st['papers_count']);
 
                 if (!empty($st['start_date']) && $st['start_date'] > $today) {
                     $st['status'] = 'Upcoming';
@@ -1695,7 +1698,7 @@ class TeacherService extends BaseService
         $stmtScheme = $pdo->prepare("
             SELECT ep.id, ep.subject_id, ep.exam_date, ep.start_time, ep.end_time, ep.max_marks, ep.passing_marks, ep.room,
                    CASE WHEN ep.max_marks = 0 THEN 'grade' ELSE 'marks' END AS evaluation_type,
-                   s.name AS subject_name
+                   s.name AS subject_name, ep.class_id
             FROM examination_papers ep
             JOIN subjects s ON ep.subject_id = s.id
             WHERE ep.exam_id = :exam_id AND ep.class_id = :class_id
@@ -1703,8 +1706,30 @@ class TeacherService extends BaseService
         ");
         $stmtScheme->execute([':exam_id' => $examId, ':class_id' => $classId]);
         $schemePapers = $stmtScheme->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        // Fallback: If no papers for teacher's default assigned class, check if papers exist for ANY class in this exam
+        if (empty($schemePapers)) {
+            $stmtSchemeAll = $pdo->prepare("
+                SELECT ep.id, ep.subject_id, ep.exam_date, ep.start_time, ep.end_time, ep.max_marks, ep.passing_marks, ep.room,
+                       CASE WHEN ep.max_marks = 0 THEN 'grade' ELSE 'marks' END AS evaluation_type,
+                       s.name AS subject_name, ep.class_id
+                FROM examination_papers ep
+                JOIN subjects s ON ep.subject_id = s.id
+                WHERE ep.exam_id = :exam_id
+                ORDER BY ep.exam_date ASC, ep.start_time ASC
+            ");
+            $stmtSchemeAll->execute([':exam_id' => $examId]);
+            $schemePapers = $stmtSchemeAll->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            if (!empty($schemePapers)) {
+                $response['class_id'] = (int)$schemePapers[0]['class_id'];
+            }
+        }
+
         $response['scheme'] = $schemePapers;
         $response['has_papers'] = !empty($schemePapers) ? 1 : 0;
+        if (!empty($schemePapers)) {
+            $response['scheme_published'] = 1;
+        }
 
         // Fetch all published class examination schemes for the school (sorted in logical class order)
         $stmtClasses = $pdo->prepare("
