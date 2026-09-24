@@ -60,6 +60,7 @@ return function (App $app) {
 
     // Super Admin Report Card Templates
     $app->get('/api/platform/report-card-templates', [ReportCardTemplateController::class, 'listTemplates']);
+    $app->get('/api/platform/report-card-templates/{id}/schools', [ReportCardTemplateController::class, 'getAssignedSchools']);
     $app->post('/api/platform/report-card-templates', [ReportCardTemplateController::class, 'createTemplate']);
     $app->put('/api/platform/report-card-templates/{id}', [ReportCardTemplateController::class, 'updateTemplate']);
     $app->delete('/api/platform/report-card-templates/{id}', [ReportCardTemplateController::class, 'deleteTemplate']);
@@ -167,6 +168,7 @@ return function (App $app) {
     $app->get('/api/school/exams-new/{id}', [SchoolAdminController::class, 'getExaminationDetails']);
     $app->put('/api/school/exams-new/{id}', [SchoolAdminController::class, 'updateExamination']);
     $app->delete('/api/school/exams-new/{id}', [SchoolAdminController::class, 'deleteExamination']);
+    $app->post('/api/school/exams-new/{id}/request-delete-otp', [SchoolAdminController::class, 'requestExamDeleteOtp']);
     $app->get('/api/school/exams-new/{id}/timetable', [SchoolAdminController::class, 'getExamTimetable']);
     $app->post('/api/school/exams-new/{id}/timetable', [SchoolAdminController::class, 'saveExamTimetable']);
     $app->get('/api/school/exams-new/{id}/marks', [SchoolAdminController::class, 'getExamMarksSheet']);

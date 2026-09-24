@@ -12,10 +12,14 @@ export function DropdownMenu({ trigger, children, align = 'right' }) {
   const toggle = (e) => {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const opensUpward = spaceBelow < 180 && rect.top > 180;
     setCoords({
       top: rect.bottom,
+      bottom: rect.top,
       left: rect.left,
-      right: rect.right
+      right: rect.right,
+      opensUpward
     });
     setIsOpen((prev) => !prev);
   };
@@ -85,7 +89,9 @@ export function DropdownMenu({ trigger, children, align = 'right' }) {
           id="dropdown-portal-menu"
           style={{
             position: 'fixed',
-            top: `${coords.top + 4}px`,
+            ...(coords.opensUpward
+              ? { bottom: `${Math.max(0, window.innerHeight - coords.bottom + 4)}px` }
+              : { top: `${coords.top + 4}px` }),
             ...(align === 'right'
               ? { right: `${Math.max(0, window.innerWidth - coords.right)}px` }
               : { left: `${coords.left}px` }),

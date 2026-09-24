@@ -27,6 +27,48 @@ export function formatDateOfBirth(dobStr) {
   return str;
 }
 
+export function isSubjectGradeBased(s) {
+  if (!s) return false;
+  if (s.is_grade_only === true || s.is_grade_based === true) return true;
+  if (s.evaluation_type === 'grade') return true;
+  if (s.max_marks === 'GRADE' || s.grand_total_max === 'GRADE') return true;
+  if (s.max_marks !== undefined && s.max_marks !== null && parseFloat(s.max_marks) === 0) return true;
+  if (s.grand_total_max !== undefined && s.grand_total_max !== null && parseFloat(s.grand_total_max) === 0 && (s.grand_total_obtained === 0 || typeof s.grand_total_obtained === 'string')) {
+    return true;
+  }
+  if (s.terminals) {
+    let hasNumericMax = false;
+    Object.values(s.terminals).forEach(t => {
+      if (t?.sub_tests) {
+        Object.values(t.sub_tests).forEach(st => {
+          if (st.max_marks && parseFloat(st.max_marks) > 0) {
+            hasNumericMax = true;
+          }
+        });
+      }
+    });
+    if (!hasNumericMax && Object.keys(s.terminals).length > 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function sortSubjectsWithGradeAtBottom(subjects = []) {
+  if (!Array.isArray(subjects)) return [];
+  return [...subjects].sort((a, b) => {
+    const aGrade = isSubjectGradeBased(a);
+    const bGrade = isSubjectGradeBased(b);
+    if (aGrade !== bGrade) {
+      return aGrade ? 1 : -1;
+    }
+    if (a.subject_id && b.subject_id && a.subject_id !== b.subject_id) {
+      return a.subject_id - b.subject_id;
+    }
+    return 0;
+  });
+}
+
 export function compileReportCardData(card = {}, schoolProfile = {}, currentYear = {}, exam = {}, gradeScales = []) {
   const gradeScalesList = Array.isArray(gradeScales) && gradeScales.length > 0
     ? gradeScales
@@ -65,11 +107,12 @@ export function compileReportCardData(card = {}, schoolProfile = {}, currentYear
     type: exam?.type || 'Summative Assessment',
     is_final_session_report: Boolean(exam?.is_final_session_report || card.is_final_session_report)
   };
-
   // If card is already marked as final session report
   if (card.is_final_session_report) {
+    const rawSubs = Array.isArray(card.subjects) ? card.subjects : [];
     return {
       ...card,
+      subjects: sortSubjectsWithGradeAtBottom(rawSubs),
       student,
       school,
       academic_year,
@@ -148,7 +191,8 @@ export function compileReportCardData(card = {}, schoolProfile = {}, currentYear
     ? `Promoted to ${getNextClassName(student.class_name)}`
     : `Retained in ${student.class_name}`;
 
-  const teacherRemark = card.report_card_remark ?? schoolProfile?.report_card_remark ?? card.teacher_remark ?? '';
+  const remarkSetting = card.report_card_remark ?? schoolProfile?.report_card_remark ?? card.teacher_remark ?? '';
+  const teacherRemark = resolveTeacherRemarkFromScales(percentage, gradeScalesList, remarkSetting);
 
   const attData = (typeof card.attendance === 'object' && card.attendance !== null) ? card.attendance : {};
   const attRateComputed = attData.attendance_rate ?? card.attendance_pct ?? card.attendance_percentage ?? (typeof card.attendance === 'number' ? card.attendance : null);
@@ -357,7 +401,8 @@ export function compileFinalSessionReportCardData(examCards = [], weightagePolic
     ? parseFloat(((totalPresentDays / totalWorkingDays) * 100).toFixed(1))
     : (baseCard.attendance?.attendance_rate || 94.55);
 
-  const teacherRemark = schoolProfile?.report_card_remark ?? baseCard.report_card_remark ?? '';
+  const remarkSetting = schoolProfile?.report_card_remark ?? baseCard.report_card_remark ?? '';
+  const teacherRemark = resolveTeacherRemarkFromScales(percentage, gradeScalesList, remarkSetting);
 
   return {
     is_final_session_report: true,
@@ -369,8 +414,9 @@ export function compileFinalSessionReportCardData(examCards = [], weightagePolic
       type: 'Annual Session Summary',
       is_final_session_report: true
     },
+    terminals: baseCard.terminals || null,
     session_exams,
-    subjects: finalSubjects,
+    subjects: (baseCard.terminals && baseCard.subjects) ? sortSubjectsWithGradeAtBottom(baseCard.subjects) : finalSubjects,
     exam_totals: examTotalsMap,
     summary: {
       total_obtained: grandTotalObtained,
@@ -396,20 +442,61 @@ export function calculateGradeFromScales(pct, gradeScales = []) {
   const numericPct = parseFloat(pct) || 0;
 
   if (Array.isArray(gradeScales) && gradeScales.length > 0) {
-    for (const s of gradeScales) {
+    const sortedScales = [...gradeScales].sort((a, b) => {
+      const minA = parseFloat(a.min_percentage ?? a.min_percent ?? 0);
+      const minB = parseFloat(b.min_percentage ?? b.min_percent ?? 0);
+      return minB - minA;
+    });
+
+    for (const s of sortedScales) {
       const min = parseFloat(s.min_percentage ?? s.min_percent ?? 0);
       const max = parseFloat(s.max_percentage ?? s.max_percent ?? 100);
-      if (numericPct >= min && numericPct <= max) {
+      const effectiveMax = max < 100 ? max + 0.999 : max;
+      if (numericPct >= min && numericPct <= effectiveMax) {
         return s.grade || s.grade_code || 'B';
       }
     }
   }
 
-  // Fallback matching default Grade Configuration Scale: A (75-100), B (60-74.99), C (40-59.99), D (0-39.99)
+  // Fallback matching default Grade Configuration Scale: A (75-100), B (60-74), C (40-59), D (0-39)
   if (numericPct >= 75) return 'A';
   if (numericPct >= 60) return 'B';
   if (numericPct >= 40) return 'C';
   return 'D';
+}
+
+export function resolveTeacherRemarkFromScales(pct, gradeScales = [], defaultRemarkSetting = '') {
+  const settingStr = (defaultRemarkSetting || '').toString().trim();
+  if (!settingStr) {
+    return '';
+  }
+
+  const numericPct = parseFloat(pct) || 0;
+
+  if (Array.isArray(gradeScales) && gradeScales.length > 0) {
+    const sortedScales = [...gradeScales].sort((a, b) => {
+      const minA = parseFloat(a.min_percentage ?? a.min_percent ?? 0);
+      const minB = parseFloat(b.min_percentage ?? b.min_percent ?? 0);
+      return minB - minA;
+    });
+
+    for (const s of sortedScales) {
+      const min = parseFloat(s.min_percentage ?? s.min_percent ?? 0);
+      const max = parseFloat(s.max_percentage ?? s.max_percent ?? 100);
+      const effectiveMax = max < 100 ? max + 0.999 : max;
+      if (numericPct >= min && numericPct <= effectiveMax) {
+        if (s.remark && s.remark.trim() !== '') {
+          return s.remark.trim();
+        }
+      }
+    }
+  }
+
+  // Fallback defaults matching percentage ranges if remarks are enabled
+  if (numericPct >= 75) return 'It was excellent performance by you really appreciable work you have done.';
+  if (numericPct >= 60) return 'Good performance in examinations, keep working hard to excel further.';
+  if (numericPct >= 40) return 'Average performance, needs to pay more attention and practice in studies.';
+  return 'Poor performance, requires immediate attention and improvement.';
 }
 
 function getNextClassName(currentClass) {

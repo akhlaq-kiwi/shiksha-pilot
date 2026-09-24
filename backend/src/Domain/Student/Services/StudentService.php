@@ -370,7 +370,10 @@ class StudentService extends BaseService
         // Helper to resolve grade
         $resolveGrade = function($pct) use ($gradeScales) {
             foreach ($gradeScales as $s) {
-                if ($pct >= (float)$s['min_percentage'] && $pct <= (float)$s['max_percentage']) {
+                $min = (float)($s['min_percentage'] ?? 0);
+                $max = (float)($s['max_percentage'] ?? 100);
+                $effectiveMax = $max < 100 ? $max + 0.999 : $max;
+                if ($pct >= $min && $pct <= $effectiveMax) {
                     return $s['grade'];
                 }
             }
@@ -401,7 +404,66 @@ class StudentService extends BaseService
             ? (str_starts_with($logoPath, 'http') ? $logoPath : $baseUrl . '/' . ltrim($logoPath, '/')) 
             : null;
 
-        $tplCode = $school['template_code'] ?? 'traditional';
+        // Resolve academic year's assigned report card template code
+        $tplCode = null;
+        if ($academicYearId > 0) {
+            $stmtAyTpl = $pdo->prepare("
+                SELECT rct.code 
+                FROM academic_years ay 
+                JOIN report_card_templates rct ON ay.report_card_template_id = rct.id 
+                WHERE ay.id = :ayid AND ay.school_id = :sid 
+                LIMIT 1
+            ");
+            $stmtAyTpl->execute([':ayid' => $academicYearId, ':sid' => $schoolId]);
+            $tplCode = $stmtAyTpl->fetchColumn();
+
+            if (!$tplCode) {
+                $stmtExTpl = $pdo->prepare("
+                    SELECT template_code 
+                    FROM examinations 
+                    WHERE school_id = :sid AND academic_year_id = :ayid AND template_code IS NOT NULL AND template_code != '' 
+                    LIMIT 1
+                ");
+                $stmtExTpl->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+                $tplCode = $stmtExTpl->fetchColumn();
+            }
+        }
+        if (!$tplCode && isset($school['template_code'])) {
+            $tplCode = $school['template_code'];
+        }
+        $tplCode = strtolower((string)($tplCode ?: 'traditional'));
+        $schoolRemarkSetting = trim((string)($school['report_card_remark'] ?? ''));
+
+        $resolveTeacherRemark = function($pct) use ($gradeScales, $schoolRemarkSetting) {
+            if ($schoolRemarkSetting === '') {
+                return '';
+            }
+            $teacherRemark = '';
+            if (!empty($gradeScales)) {
+                foreach ($gradeScales as $gs) {
+                    $min = (float)($gs['min_percentage'] ?? $gs['min_percent'] ?? 0);
+                    $max = (float)($gs['max_percentage'] ?? $gs['max_percent'] ?? 100);
+                    $effectiveMax = $max < 100 ? $max + 0.999 : $max;
+                    if ($pct >= $min && $pct <= $effectiveMax) {
+                        if (!empty($gs['remark']) && trim($gs['remark']) !== '') {
+                            $teacherRemark = trim($gs['remark']);
+                            break;
+                        }
+                    }
+                }
+            }
+            if ($teacherRemark === '') {
+                if (strtoupper($schoolRemarkSetting) !== 'DYNAMIC') {
+                    $teacherRemark = $schoolRemarkSetting;
+                } else {
+                    if ($pct >= 75) $teacherRemark = 'It was excellent performance by you really appreciable work you have done.';
+                    else if ($pct >= 60) $teacherRemark = 'Good performance in examinations, keep working hard to excel further.';
+                    else if ($pct >= 40) $teacherRemark = 'Average performance, needs to pay more attention and practice in studies.';
+                    else $teacherRemark = 'Poor performance, requires immediate attention and improvement.';
+                }
+            }
+            return $teacherRemark;
+        };
 
         foreach ($publishedExams as $ex) {
             $examId = (int)$ex['id'];
@@ -581,7 +643,7 @@ class StudentService extends BaseService
             $att = $stmtAtt->fetch(\PDO::FETCH_ASSOC);
             $attTotal = (int)($att['total'] ?? 0);
             $attPresent = (int)($att['present'] ?? 0);
-            $attRate = $attTotal > 0 ? round(($attPresent / $attTotal) * 100, 2) : 100.00;
+            $attRate = $attTotal > 0 ? round(($attPresent / $attTotal) * 100, 2) : 0.00;
 
             $percentage = $totalMax > 0 ? round(($totalObtained / $totalMax) * 100, 2) : 0.0;
             $overallGrade = $resolveGrade($percentage);
@@ -608,7 +670,8 @@ class StudentService extends BaseService
                 'school_name' => $school['name'] ?? 'Academic Portal',
                 'school_address' => $schoolAddress,
                 'school_logo' => $schoolLogoUrl,
-                'report_card_remark' => $school['report_card_remark'] ?? null,
+                'report_card_remark' => $resolveTeacherRemark($percentage),
+                'teacher_remark' => $resolveTeacherRemark($percentage),
                 'template_code' => $tplCode,
                 'subjects' => $subjectMarks,
                 'total_max' => $totalMax,
@@ -807,7 +870,33 @@ class StudentService extends BaseService
         $att = $stmtAtt->fetch(\PDO::FETCH_ASSOC);
         $attTotal = (int)($att['total'] ?? 0);
         $attPresent = (int)($att['present'] ?? 0);
-        $attRate = $attTotal > 0 ? round(($attPresent / $attTotal) * 100, 2) : 100.00;
+        $attRate = $attTotal > 0 ? round(($attPresent / $attTotal) * 100, 2) : 0.00;
+
+        $teacherRemark = '';
+        $schoolRemarkSetting = trim((string)($school['report_card_remark'] ?? ''));
+        if ($schoolRemarkSetting !== '') {
+            foreach ($gradeScales as $gs) {
+                $min = (float)($gs['min_percentage'] ?? $gs['min_percent'] ?? 0);
+                $max = (float)($gs['max_percentage'] ?? $gs['max_percent'] ?? 100);
+                $effectiveMax = $max < 100 ? $max + 0.999 : $max;
+                if ($overallPct >= $min && $overallPct <= $effectiveMax) {
+                    if (!empty($gs['remark']) && trim($gs['remark']) !== '') {
+                        $teacherRemark = trim($gs['remark']);
+                        break;
+                    }
+                }
+            }
+            if ($teacherRemark === '') {
+                if (strtoupper($schoolRemarkSetting) !== 'DYNAMIC') {
+                    $teacherRemark = $schoolRemarkSetting;
+                } else {
+                    if ($overallPct >= 75) $teacherRemark = 'It was excellent performance by you really appreciable work you have done.';
+                    else if ($overallPct >= 60) $teacherRemark = 'Good performance in examinations, keep working hard to excel further.';
+                    else if ($overallPct >= 40) $teacherRemark = 'Average performance, needs to pay more attention and practice in studies.';
+                    else $teacherRemark = 'Poor performance, requires immediate attention and improvement.';
+                }
+            }
+        }
 
         return [
             'is_final_session_report' => true,
@@ -828,7 +917,8 @@ class StudentService extends BaseService
             'school_name' => $school['name'] ?? 'Academic Portal',
             'school_address' => $schoolAddress,
             'school_logo' => $schoolLogoUrl,
-            'report_card_remark' => $school['report_card_remark'] ?? null,
+            'report_card_remark' => $teacherRemark,
+            'teacher_remark' => $teacherRemark,
             'template_code' => $tplCode,
             'session_exams' => $sessionExams,
             'subjects' => $finalSubjects,
@@ -1362,15 +1452,152 @@ class StudentService extends BaseService
         $academicYearId = (int) ($student['academic_year_id'] ?? 0);
         $pdo = $this->repo->getPdo();
 
+        // 1. Resolve academic year's assigned report card template code
+        $tplCode = null;
+        if ($academicYearId > 0) {
+            $stmtAyTpl = $pdo->prepare("
+                SELECT rct.code 
+                FROM academic_years ay 
+                JOIN report_card_templates rct ON ay.report_card_template_id = rct.id 
+                WHERE ay.id = :ayid AND ay.school_id = :sid 
+                LIMIT 1
+            ");
+            $stmtAyTpl->execute([':ayid' => $academicYearId, ':sid' => $schoolId]);
+            $tplCode = $stmtAyTpl->fetchColumn();
+
+            if (!$tplCode) {
+                $stmtExTpl = $pdo->prepare("
+                    SELECT template_code 
+                    FROM examinations 
+                    WHERE school_id = :sid AND academic_year_id = :ayid AND template_code IS NOT NULL AND template_code != '' 
+                    LIMIT 1
+                ");
+                $stmtExTpl->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+                $tplCode = $stmtExTpl->fetchColumn();
+            }
+        }
+        if (!$tplCode) {
+            $stmtSchoolTpl = $pdo->prepare("
+                SELECT rct.code 
+                FROM schools s 
+                LEFT JOIN report_card_templates rct ON s.report_card_template_id = rct.id 
+                WHERE s.id = :sid 
+                LIMIT 1
+            ");
+            $stmtSchoolTpl->execute([':sid' => $schoolId]);
+            $tplCode = $stmtSchoolTpl->fetchColumn();
+        }
+        $tplCode = strtolower((string)($tplCode ?: 'modern'));
+
+        if ($tplCode === 'cbse_classic') {
+            // Ensure terminal exams are seeded for this school session if missing
+            $refSA = new \ReflectionClass(\App\Domain\SchoolAdmin\Services\SchoolAdminService::class);
+            $schoolAdminService = $refSA->newInstanceWithoutConstructor();
+            $schoolAdminService->autoSeedDefaultSessionExams($pdo, $schoolId, $academicYearId);
+
+            // Fetch top level terminal exams (FIRST TERM EXAMINATION, SECOND TERM EXAMINATION)
+            $sqlTerm = "
+                SELECT e.id, e.name, e.description
+                FROM examinations e
+                WHERE e.school_id = :school_id
+                  AND e.parent_id IS NULL
+                  AND (e.template_code = 'cbse_classic' OR (e.template_code IS NULL AND (LOWER(e.name) LIKE '%first term%' OR LOWER(e.name) LIKE '%second term%')))
+            ";
+            $paramsTerm = [':school_id' => $schoolId];
+            if ($academicYearId > 0) {
+                $sqlTerm .= " AND (e.academic_year_id = :ayid OR e.academic_year_id IS NULL)";
+                $paramsTerm[':ayid'] = $academicYearId;
+            }
+            $sqlTerm .= " ORDER BY 
+                CASE 
+                  WHEN LOWER(e.name) LIKE '%first%' THEN 1 
+                  WHEN LOWER(e.name) LIKE '%second%' THEN 2 
+                  ELSE 3 
+                END ASC, e.id ASC";
+
+            $stmtTerm = $pdo->prepare($sqlTerm);
+            $stmtTerm->execute($paramsTerm);
+            $termExams = $stmtTerm->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+            // Fetch all PUBLISHED sub-tests under these terms for this school & class
+            $sqlSubs = "
+                SELECT e.id, e.parent_id, e.name, e.start_date, e.end_date, e.max_marks, e.status AS exam_status,
+                       COALESCE(ecs.scheme_published, 0) AS scheme_published,
+                       COALESCE(ecs.admit_card_published, 0) AS admit_card_published,
+                       COALESCE(ecs.status, 'Draft') AS result_status
+                FROM examinations e
+                LEFT JOIN examination_class_status ecs ON e.id = ecs.exam_id AND ecs.class_id = :class_id
+                LEFT JOIN examinations p ON e.parent_id = p.id
+                WHERE e.school_id = :school_id 
+                  AND e.parent_id IS NOT NULL
+                  AND e.status = 'Published'
+                  AND (e.template_code = 'cbse_classic' OR p.template_code = 'cbse_classic' OR e.template_code IS NULL)
+            ";
+            $paramsSubs = [
+                ':class_id' => $classId,
+                ':school_id' => $schoolId
+            ];
+            if ($academicYearId > 0) {
+                $sqlSubs .= " AND (e.academic_year_id = :ayid OR e.academic_year_id IS NULL)";
+                $paramsSubs[':ayid'] = $academicYearId;
+            }
+            $sqlSubs .= " ORDER BY e.start_date ASC, e.id ASC";
+
+            $stmtSubs = $pdo->prepare($sqlSubs);
+            $stmtSubs->execute($paramsSubs);
+            $subTests = $stmtSubs->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+            $today = date('Y-m-d');
+            $subTestsByParent = [];
+            foreach ($subTests as $st) {
+                $st['id'] = (int)$st['id'];
+                $st['parent_id'] = (int)$st['parent_id'];
+                $st['scheme_published'] = (int)$st['scheme_published'];
+                $st['admit_card_published'] = (int)$st['admit_card_published'];
+                $st['result_published'] = ($st['result_status'] === 'Published') ? 1 : 0;
+                
+                if (!empty($st['start_date']) && $st['start_date'] > $today) {
+                    $st['status'] = 'Upcoming';
+                } elseif (!empty($st['start_date']) && !empty($st['end_date']) && $st['start_date'] <= $today && $st['end_date'] >= $today) {
+                    $st['status'] = 'Current';
+                } else {
+                    $st['status'] = 'Completed';
+                }
+                
+                $subTestsByParent[$st['parent_id']][] = $st;
+            }
+
+            $resultList = [];
+            foreach ($termExams as $term) {
+                $termId = (int)$term['id'];
+                $subs = $subTestsByParent[$termId] ?? [];
+                
+                $resultList[] = [
+                    'id' => $termId,
+                    'name' => $term['name'],
+                    'description' => $term['description'] ?? '',
+                    'template_code' => 'cbse_classic',
+                    'is_terminal' => true,
+                    'sub_tests' => $subs
+                ];
+            }
+
+            return $resultList;
+        }
+
+        // Modern School Report (or default flat template flow):
         $sql = "
             SELECT DISTINCT e.id, e.name, e.start_date, e.end_date,
                    COALESCE(ecs.scheme_published, 0) AS scheme_published,
                    COALESCE(ecs.admit_card_published, 0) AS admit_card_published,
-                   COALESCE(ecs.status, 'Draft') AS result_status
+                   COALESCE(ecs.status, 'Draft') AS result_status,
+                   COALESCE(e.template_code, 'modern') AS template_code
             FROM examinations e
             LEFT JOIN examination_class_status ecs ON e.id = ecs.exam_id AND ecs.class_id = :class_id
             WHERE e.school_id = :school_id 
               AND e.status = 'Published'
+              AND e.parent_id IS NULL
+              AND (e.template_code = 'modern' OR (e.template_code IS NULL AND (LOWER(e.name) LIKE '%quarterly%' OR LOWER(e.name) LIKE '%half%' OR LOWER(e.name) LIKE '%annual%')))
         ";
         $params = [
             ':class_id' => $classId,
@@ -1400,6 +1627,7 @@ class StudentService extends BaseService
             $e['scheme_published'] = (int)$e['scheme_published'];
             $e['admit_card_published'] = (int)$e['admit_card_published'];
             $e['result_published'] = $e['result_status'] === 'Published' ? 1 : 0;
+            $e['template_code'] = $e['template_code'] ?: 'modern';
             
             if ($e['start_date'] > $today) {
                 $e['status'] = 'Upcoming';
@@ -1519,7 +1747,7 @@ class StudentService extends BaseService
         $stmtExam = $pdo->prepare("
             SELECT e.name, e.start_date, e.end_date 
             FROM examinations e
-            WHERE e.id = :id AND e.school_id = :sid AND e.status = 'Published'
+            WHERE e.id = :id AND e.school_id = :sid
             LIMIT 1
         ");
         $stmtExam->execute([':id' => $examId, ':sid' => $schoolId]);
@@ -1683,6 +1911,8 @@ class StudentService extends BaseService
                         break;
                     }
                 }
+            } else {
+                $response['result_published'] = 0;
             }
         }
 
