@@ -1839,11 +1839,19 @@ class TeacherService extends BaseService
     public function getMarksSheet(array $user, int $examId, int $subjectId, ?int $passedClassId = null): array
     {
         $pdo = $this->teacherRepo->getPdo();
-        $classId = $this->getTeacherClassId($pdo, $user, null, $passedClassId);
+        $schoolId = (int)$user['school_id'];
+        $classId = ($passedClassId !== null && $passedClassId > 0)
+            ? (int)$passedClassId
+            : $this->getTeacherClassId($pdo, $user, null, $passedClassId);
+
+        if (!$classId) {
+            $stmtFirstClass = $pdo->prepare("SELECT class_id FROM examination_papers WHERE exam_id = :exam_id AND class_id IS NOT NULL AND class_id > 0 LIMIT 1");
+            $stmtFirstClass->execute([':exam_id' => $examId]);
+            $classId = (int)($stmtFirstClass->fetchColumn() ?: 0);
+        }
         if (!$classId) {
             throw new \App\Shared\Exceptions\ForbiddenException("You have no assigned class.");
         }
-        $schoolId = (int)$user['school_id'];
 
         // Fetch Exam
         $stmtCheck = $pdo->prepare("SELECT name FROM examinations WHERE id = :id AND school_id = :sid LIMIT 1");
@@ -1854,9 +1862,16 @@ class TeacherService extends BaseService
         }
 
         // Fetch Paper Details
-        $stmtPaper = $pdo->prepare("SELECT ep.*, s.name AS subject_name FROM examination_papers ep JOIN subjects s ON ep.subject_id = s.id WHERE ep.exam_id = :exam_id AND ep.class_id = :class_id AND ep.subject_id = :subid LIMIT 1");
+        $stmtPaper = $pdo->prepare("SELECT ep.*, s.name AS subject_name FROM examination_papers ep JOIN subjects s ON ep.subject_id = s.id WHERE ep.exam_id = :exam_id AND (ep.class_id = :class_id OR ep.class_id IS NULL OR :class_id = 0) AND ep.subject_id = :subid LIMIT 1");
         $stmtPaper->execute([':exam_id' => $examId, ':class_id' => $classId, ':subid' => $subjectId]);
         $paper = $stmtPaper->fetch(PDO::FETCH_ASSOC);
+
+        if (!$paper) {
+            $stmtPaperFallback = $pdo->prepare("SELECT ep.*, s.name AS subject_name FROM examination_papers ep JOIN subjects s ON ep.subject_id = s.id WHERE ep.exam_id = :exam_id AND ep.subject_id = :subid LIMIT 1");
+            $stmtPaperFallback->execute([':exam_id' => $examId, ':subid' => $subjectId]);
+            $paper = $stmtPaperFallback->fetch(PDO::FETCH_ASSOC);
+        }
+
         if (!$paper) {
             throw new ValidationException(['subject_id' => 'This subject is not scheduled in the exam timetable for your class.']);
         }
@@ -1938,8 +1953,15 @@ class TeacherService extends BaseService
     {
         $pdo = $this->teacherRepo->getPdo();
         $passedClassId = isset($data['class_id']) ? (int)$data['class_id'] : null;
-        $classId = $this->getTeacherClassId($pdo, $user, null, $passedClassId);
+        $classId = ($passedClassId !== null && $passedClassId > 0)
+            ? (int)$passedClassId
+            : $this->getTeacherClassId($pdo, $user, null, $passedClassId);
         $subjectId = isset($data['subject_id']) ? (int)$data['subject_id'] : 0;
+        if (!$classId) {
+            $stmtFirstClass = $pdo->prepare("SELECT class_id FROM examination_papers WHERE exam_id = :exam_id AND class_id IS NOT NULL AND class_id > 0 LIMIT 1");
+            $stmtFirstClass->execute([':exam_id' => $examId]);
+            $classId = (int)($stmtFirstClass->fetchColumn() ?: 0);
+        }
         if (!$classId) {
             throw new \App\Shared\Exceptions\ForbiddenException("You have no assigned class.");
         }
@@ -1959,9 +1981,16 @@ class TeacherService extends BaseService
         $subjectId = (int)$data['subject_id'];
 
         // Fetch Paper Details
-        $stmtPaper = $pdo->prepare("SELECT * FROM examination_papers WHERE exam_id = :exam_id AND class_id = :class_id AND subject_id = :subid LIMIT 1");
+        $stmtPaper = $pdo->prepare("SELECT * FROM examination_papers WHERE exam_id = :exam_id AND (class_id = :class_id OR class_id IS NULL OR :class_id = 0) AND subject_id = :subid LIMIT 1");
         $stmtPaper->execute([':exam_id' => $examId, ':class_id' => $classId, ':subid' => $subjectId]);
         $paper = $stmtPaper->fetch(PDO::FETCH_ASSOC);
+
+        if (!$paper) {
+            $stmtPaperFallback = $pdo->prepare("SELECT * FROM examination_papers WHERE exam_id = :exam_id AND subject_id = :subid LIMIT 1");
+            $stmtPaperFallback->execute([':exam_id' => $examId, ':subid' => $subjectId]);
+            $paper = $stmtPaperFallback->fetch(PDO::FETCH_ASSOC);
+        }
+
         if (!$paper) {
             throw new ValidationException(['subject_id' => 'Subject is not scheduled in the exam timetable.']);
         }
