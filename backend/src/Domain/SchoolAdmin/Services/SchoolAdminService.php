@@ -14036,9 +14036,8 @@ Only approve the settlement after reviewing all financial records.
             }
         }
 
-        $stmtSchoolTpl = $pdo->prepare("SELECT rct.code FROM schools s LEFT JOIN report_card_templates rct ON s.report_card_template_id = rct.id WHERE s.id = :sid LIMIT 1");
-        $stmtSchoolTpl->execute([':sid' => $schoolId]);
-        $tplCode = strtolower((string)($stmtSchoolTpl->fetchColumn() ?: 'modern'));
+        $activeTpl = $this->getWorkingAcademicYearReportCardTemplate($pdo, $schoolId);
+        $tplCode = strtolower((string)($activeTpl['code'] ?? 'modern'));
 
         $stmtInsert = $pdo->prepare("
             INSERT INTO examinations (school_id, academic_year_id, template_code, parent_id, name, start_date, end_date, publish_date, max_marks, weightage_percent, description, status)
@@ -15462,16 +15461,9 @@ Only approve the settlement after reviewing all financial records.
         $exam['class_name'] = $classInfo['name'] ?? '';
         $exam['class_section'] = $classInfo['section'] ?? '';
 
-        // Check if school has cbse_classic template assigned
-        $stmtSchoolTpl = $pdo->prepare("
-            SELECT rct.code 
-            FROM schools s 
-            LEFT JOIN report_card_templates rct ON s.report_card_template_id = rct.id 
-            WHERE s.id = :sid 
-            LIMIT 1
-        ");
-        $stmtSchoolTpl->execute([':sid' => $schoolId]);
-        $tplCode = strtolower((string)($stmtSchoolTpl->fetchColumn() ?: ''));
+        // Check if working academic year or exam has cbse_classic template
+        $activeTpl = $this->getWorkingAcademicYearReportCardTemplate($pdo, $schoolId);
+        $tplCode = strtolower((string)($exam['template_code'] ?? $activeTpl['code'] ?? ''));
         if ($tplCode === 'cbse_classic' && empty($exam['parent_id'])) {
             return $this->getCBSEClassicReportCards($pdo, $schoolId, $exam, $classId, $studentId, $user);
         }
