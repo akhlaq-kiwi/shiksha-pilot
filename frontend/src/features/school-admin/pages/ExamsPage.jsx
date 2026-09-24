@@ -826,6 +826,15 @@ export default function ExamsPage() {
       }
     } catch (err) {
       console.error(err);
+      try {
+        const profile = await schoolService.getSchoolProfile();
+        if (profile) {
+          setSchoolProfile(profile);
+          setReportCardRemark(profile.report_card_remark ?? '');
+        }
+      } catch (pErr) {
+        console.error('Failed to fetch fallback school profile:', pErr);
+      }
       setError('Failed to load examinations dashboard.');
     } finally {
       setLoading(false);
@@ -902,6 +911,8 @@ export default function ExamsPage() {
 
   const hasReportCardTemplate = Boolean(schoolProfile?.report_card_template_id || schoolProfile?.report_card_template);
   const isCBSEClassic = (schoolProfile?.report_card_template?.code === 'cbse_classic');
+  const isModernReport = (schoolProfile?.report_card_template?.code === 'modern');
+  const isStandardTemplate = isCBSEClassic || isModernReport;
 
   // Quick Action counts
   const countableExams = isCBSEClassic ? exams.flatMap(e => e.sub_tests || []) : exams;
@@ -2665,7 +2676,7 @@ export default function ExamsPage() {
         </div>
         {effectiveActiveView === 'dashboard' && hasReportCardTemplate && (
           <div className="flex gap-2 sm:items-center">
-            {!isReadOnly && !isCBSEClassic && (
+            {!isReadOnly && !isStandardTemplate && (
               <Button 
                 className="flex items-center gap-2 font-bold bg-primary text-white" 
                 onClick={() => {

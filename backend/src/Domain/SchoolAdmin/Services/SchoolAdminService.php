@@ -13847,6 +13847,12 @@ Only approve the settlement after reviewing all financial records.
             return;
         }
 
+        $defaultExams = [
+            ['name' => 'Quarterly Examination', 'description' => 'Quarterly academic evaluation.'],
+            ['name' => 'Half Yearly Examination', 'description' => 'Half yearly academic evaluation.'],
+            ['name' => 'Annual Examination', 'description' => 'Final annual academic evaluation.']
+        ];
+
         $stmtInsert = $pdo->prepare("
             INSERT INTO examinations (school_id, academic_year_id, template_code, name, start_date, end_date, publish_date, description, status)
             VALUES (:sid, :ayid, :tpl_code, :name, :start_date, :end_date, :publish_date, :description, 'Draft')
