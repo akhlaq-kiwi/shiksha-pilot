@@ -114,12 +114,6 @@ export default function ClassicCBSEReportCardTemplate({ data, config = {} }) {
           <tr className="border-b border-zinc-300">
             <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold bg-zinc-100 whitespace-nowrap w-[18%]">Student Name</td>
             <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold uppercase text-zinc-900 w-[32%]">{student.name}</td>
-            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold bg-zinc-100 whitespace-nowrap w-[18%]">Roll No</td>
-            <td style={{ padding: metaPadding }} className="font-mono font-bold w-[32%]">{student.roll_no}</td>
-          </tr>
-          <tr className="border-b border-zinc-300">
-            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold bg-zinc-100 whitespace-nowrap w-[18%]">Admission No</td>
-            <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-mono w-[32%]">{student.admission_no}</td>
             <td style={{ padding: metaPadding }} className="border-r border-zinc-300 font-bold bg-zinc-100 whitespace-nowrap w-[18%]">Class & Sec</td>
             <td style={{ padding: metaPadding }} className="font-bold w-[32%]">{student.class_name} {student.section ? `(${student.section})` : ''}</td>
           </tr>
