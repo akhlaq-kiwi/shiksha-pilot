@@ -1399,16 +1399,42 @@ class TeacherService extends BaseService
         $stmtAy->execute([':sid' => $schoolId]);
         $academicYearId = (int)($stmtAy->fetchColumn() ?: 0);
 
-        // Resolve school's assigned report card template code
-        $stmtSchoolTpl = $pdo->prepare("
-            SELECT rct.code 
-            FROM schools s 
-            LEFT JOIN report_card_templates rct ON s.report_card_template_id = rct.id 
-            WHERE s.id = :sid 
-            LIMIT 1
-        ");
-        $stmtSchoolTpl->execute([':sid' => $schoolId]);
-        $tplCode = strtolower((string)($stmtSchoolTpl->fetchColumn() ?: 'modern'));
+        // Resolve academic year's assigned report card template code
+        $tplCode = null;
+        if ($academicYearId > 0) {
+            $stmtAyTpl = $pdo->prepare("
+                SELECT rct.code 
+                FROM academic_years ay 
+                JOIN report_card_templates rct ON ay.report_card_template_id = rct.id 
+                WHERE ay.id = :ayid AND ay.school_id = :sid 
+                LIMIT 1
+            ");
+            $stmtAyTpl->execute([':ayid' => $academicYearId, ':sid' => $schoolId]);
+            $tplCode = $stmtAyTpl->fetchColumn();
+
+            if (!$tplCode) {
+                $stmtExTpl = $pdo->prepare("
+                    SELECT template_code 
+                    FROM examinations 
+                    WHERE school_id = :sid AND academic_year_id = :ayid AND template_code IS NOT NULL AND template_code != '' 
+                    LIMIT 1
+                ");
+                $stmtExTpl->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+                $tplCode = $stmtExTpl->fetchColumn();
+            }
+        }
+        if (!$tplCode) {
+            $stmtSchoolTpl = $pdo->prepare("
+                SELECT rct.code 
+                FROM schools s 
+                LEFT JOIN report_card_templates rct ON s.report_card_template_id = rct.id 
+                WHERE s.id = :sid 
+                LIMIT 1
+            ");
+            $stmtSchoolTpl->execute([':sid' => $schoolId]);
+            $tplCode = $stmtSchoolTpl->fetchColumn();
+        }
+        $tplCode = strtolower((string)($tplCode ?: 'modern'));
 
         if ($tplCode === 'cbse_classic') {
             $refSA = new \ReflectionClass(\App\Domain\SchoolAdmin\Services\SchoolAdminService::class);

@@ -267,6 +267,9 @@ class ReportCardTemplateController extends BaseController
         $upd = $this->db->prepare("UPDATE schools SET report_card_template_id = ? WHERE id = ?");
         $upd->execute([$templateId, $schoolId]);
 
+        $updAY = $this->db->prepare("UPDATE academic_years SET report_card_template_id = ? WHERE school_id = ? AND (status = 'ACTIVE' OR status = 'Draft' OR is_current = 1)");
+        $updAY->execute([$templateId, $schoolId]);
+
         return $this->success($response, ['message' => 'Report card template assigned to school successfully.']);
     }
 }

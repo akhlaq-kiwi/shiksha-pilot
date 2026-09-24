@@ -230,6 +230,55 @@ class SchoolAdminService extends BaseService
         return $draft ?: null;
     }
 
+    public function getWorkingAcademicYearReportCardTemplate(PDO $pdo, int $schoolId): ?array
+    {
+        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+        $academicYearId = $workingYear ? (int)$workingYear['id'] : 0;
+
+        $templateId = null;
+
+        // 1. Check if academic_years row has report_card_template_id
+        if ($academicYearId > 0 && !empty($workingYear['report_card_template_id'])) {
+            $templateId = (int)$workingYear['report_card_template_id'];
+        }
+
+        // 2. If not set on academic_years, check examinations in this academic year for template_code
+        if (!$templateId && $academicYearId > 0) {
+            $stmtExTpl = $pdo->prepare("
+                SELECT rct.id 
+                FROM examinations e
+                JOIN report_card_templates rct ON LOWER(e.template_code) = LOWER(rct.code)
+                WHERE e.school_id = :sid AND e.academic_year_id = :ayid AND e.template_code IS NOT NULL AND e.template_code != ''
+                LIMIT 1
+            ");
+            $stmtExTpl->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+            $templateId = (int)($stmtExTpl->fetchColumn() ?: 0);
+        }
+
+        // 3. Fallback to school's global report_card_template_id
+        if (!$templateId) {
+            $stmtSchoolTpl = $pdo->prepare("SELECT report_card_template_id FROM schools WHERE id = :sid LIMIT 1");
+            $stmtSchoolTpl->execute([':sid' => $schoolId]);
+            $templateId = (int)($stmtSchoolTpl->fetchColumn() ?: 0);
+        }
+
+        // 4. Default fallback to 1 (Modern) if still empty
+        if (!$templateId) {
+            $templateId = 1;
+        }
+
+        // Fetch template object
+        $stmtTpl = $pdo->prepare("SELECT id, name, code, description, layout_config FROM report_card_templates WHERE id = :tid LIMIT 1");
+        $stmtTpl->execute([':tid' => $templateId]);
+        $tpl = $stmtTpl->fetch(PDO::FETCH_ASSOC);
+        if ($tpl) {
+            $tpl['layout_config'] = json_decode($tpl['layout_config'] ?? '{}', true) ?? [];
+            return $tpl;
+        }
+
+        return null;
+    }
+
     private function getActiveAcademicYear(PDO $pdo, int $schoolId): ?array
     {
         $stmt = $pdo->prepare("SELECT * FROM academic_years WHERE school_id = :sid AND is_current = 1 LIMIT 1");
@@ -8009,14 +8058,10 @@ class SchoolAdminService extends BaseService
             $school['subscription_duration_unit'] = null;
         }
 
-        if (!empty($school['report_card_template_id'])) {
-            $stmtTpl = $pdo->prepare("SELECT id, name, code, description, layout_config FROM report_card_templates WHERE id = :tid LIMIT 1");
-            $stmtTpl->execute([':tid' => (int)$school['report_card_template_id']]);
-            $tpl = $stmtTpl->fetch(\PDO::FETCH_ASSOC);
-            if ($tpl) {
-                $tpl['layout_config'] = json_decode($tpl['layout_config'] ?? '{}', true) ?? [];
-                $school['report_card_template'] = $tpl;
-            }
+        $tpl = $this->getWorkingAcademicYearReportCardTemplate($pdo, $schoolId);
+        if ($tpl) {
+            $school['report_card_template_id'] = $tpl['id'];
+            $school['report_card_template'] = $tpl;
         }
 
         return $school;
@@ -13667,15 +13712,8 @@ Only approve the settlement after reviewing all financial records.
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
         $academicYearId = $workingYear ? (int)$workingYear['id'] : 0;
 
-        $stmtSchoolTpl = $pdo->prepare("
-            SELECT rct.code 
-            FROM schools s 
-            LEFT JOIN report_card_templates rct ON s.report_card_template_id = rct.id 
-            WHERE s.id = :sid 
-            LIMIT 1
-        ");
-        $stmtSchoolTpl->execute([':sid' => $schoolId]);
-        $activeTplCode = strtolower((string)($stmtSchoolTpl->fetchColumn() ?: 'modern'));
+        $activeTpl = $this->getWorkingAcademicYearReportCardTemplate($pdo, $schoolId);
+        $activeTplCode = strtolower((string)($activeTpl['code'] ?? 'modern'));
 
         if ($academicYearId > 0) {
             $this->autoSeedDefaultSessionExams($pdo, $schoolId, $academicYearId);
@@ -13733,15 +13771,8 @@ Only approve the settlement after reviewing all financial records.
 
     public function autoSeedDefaultSessionExams(\PDO $pdo, int $schoolId, int $academicYearId): void
     {
-        $stmtSchoolTpl = $pdo->prepare("
-            SELECT rct.code 
-            FROM schools s 
-            LEFT JOIN report_card_templates rct ON s.report_card_template_id = rct.id 
-            WHERE s.id = :sid 
-            LIMIT 1
-        ");
-        $stmtSchoolTpl->execute([':sid' => $schoolId]);
-        $tplCode = strtolower((string)($stmtSchoolTpl->fetchColumn() ?: ''));
+        $activeTpl = $this->getWorkingAcademicYearReportCardTemplate($pdo, $schoolId);
+        $tplCode = strtolower((string)($activeTpl['code'] ?? ''));
 
         try {
             $pdo->exec("ALTER TABLE examinations MODIFY start_date DATE NULL, MODIFY end_date DATE NULL, MODIFY publish_date DATE NULL");
