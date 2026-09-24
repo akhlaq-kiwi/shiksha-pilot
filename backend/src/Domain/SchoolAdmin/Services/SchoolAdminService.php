@@ -234,59 +234,53 @@ class SchoolAdminService extends BaseService
     {
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
         $academicYearId = $workingYear ? (int)$workingYear['id'] : 0;
+        $isWorkingYearActive = $workingYear ? (strtolower((string)($workingYear['status'] ?? '')) === 'active' || !empty($workingYear['is_current'])) : false;
+
+        // Fetch school's assigned template from SuperAdmin setting
+        $stmtSchoolTpl = $pdo->prepare("SELECT report_card_template_id FROM schools WHERE id = :sid LIMIT 1");
+        $stmtSchoolTpl->execute([':sid' => $schoolId]);
+        $schoolTplId = (int)($stmtSchoolTpl->fetchColumn() ?: 0);
 
         $templateId = null;
 
-        // 1. Priority 1: Check existing examinations in this academic year for template_code or exam name pattern
-        if ($academicYearId > 0) {
-            $stmtExTpl = $pdo->prepare("
-                SELECT rct.id 
-                FROM examinations e
-                JOIN report_card_templates rct ON LOWER(e.template_code) = LOWER(rct.code)
-                WHERE e.school_id = :sid AND e.academic_year_id = :ayid AND e.template_code IS NOT NULL AND e.template_code != ''
-                ORDER BY e.id ASC
-                LIMIT 1
-            ");
-            $stmtExTpl->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
-            $templateId = (int)($stmtExTpl->fetchColumn() ?: 0);
+        if ($isWorkingYearActive) {
+            // For ACTIVE academic year: School's assigned template takes precedence
+            if ($schoolTplId > 0) {
+                $templateId = $schoolTplId;
 
-            if (!$templateId) {
-                $stmtCheckCbse = $pdo->prepare("
-                    SELECT COUNT(*) FROM examinations 
-                    WHERE school_id = :sid AND academic_year_id = :ayid AND (LOWER(name) LIKE '%first term%' OR LOWER(name) LIKE '%second term%')
-                ");
-                $stmtCheckCbse->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
-                if (((int)$stmtCheckCbse->fetchColumn()) > 0) {
-                    $stmtGetCbseId = $pdo->prepare("SELECT id FROM report_card_templates WHERE code = 'cbse_classic' LIMIT 1");
-                    $stmtGetCbseId->execute();
-                    $templateId = (int)($stmtGetCbseId->fetchColumn() ?: 2);
+                // Sync active academic year's report_card_template_id if NULL or mismatched
+                if ($academicYearId > 0 && (empty($workingYear['report_card_template_id']) || (int)$workingYear['report_card_template_id'] !== $templateId)) {
+                    try {
+                        $stmtSyncAy = $pdo->prepare("UPDATE academic_years SET report_card_template_id = :tid WHERE id = :ayid AND school_id = :sid");
+                        $stmtSyncAy->execute([':tid' => $templateId, ':ayid' => $academicYearId, ':sid' => $schoolId]);
+
+                        // Clean up old mismatched exams in active year so active year starts fresh
+                        $stmtTplCode = $pdo->prepare("SELECT code FROM report_card_templates WHERE id = ?");
+                        $stmtTplCode->execute([$templateId]);
+                        $newTplCode = strtolower((string)($stmtTplCode->fetchColumn() ?: ''));
+
+                        if ($newTplCode) {
+                            $pdo->prepare("DELETE FROM seating_plans WHERE exam_id IN (SELECT id FROM examinations WHERE school_id = ? AND academic_year_id = ? AND (template_code != ? OR template_code IS NULL))")->execute([$schoolId, $academicYearId, $newTplCode]);
+                            $pdo->prepare("DELETE FROM exam_marks WHERE exam_paper_id IN (SELECT ep.id FROM exam_papers ep JOIN examinations e ON ep.exam_id = e.id WHERE e.school_id = ? AND e.academic_year_id = ? AND (e.template_code != ? OR e.template_code IS NULL))")->execute([$schoolId, $academicYearId, $newTplCode]);
+                            $pdo->prepare("DELETE FROM exam_papers WHERE exam_id IN (SELECT id FROM examinations WHERE school_id = ? AND academic_year_id = ? AND (template_code != ? OR template_code IS NULL))")->execute([$schoolId, $academicYearId, $newTplCode]);
+                            $pdo->prepare("DELETE FROM examinations WHERE school_id = ? AND academic_year_id = ? AND (template_code != ? OR template_code IS NULL)")->execute([$schoolId, $academicYearId, $newTplCode]);
+                        }
+                    } catch (\Throwable $t) {}
                 }
+            } else if (!empty($workingYear['report_card_template_id'])) {
+                $templateId = (int)$workingYear['report_card_template_id'];
+            }
+        } else {
+            // For ARCHIVED academic year: Strictly use academic_years.report_card_template_id (100% ISOLATED!)
+            if (!empty($workingYear['report_card_template_id'])) {
+                $templateId = (int)$workingYear['report_card_template_id'];
+            } else if ($schoolTplId > 0) {
+                $templateId = $schoolTplId;
             }
         }
 
-        // 2. Priority 2: Check if academic_years row has report_card_template_id
-        if (!$templateId && $academicYearId > 0 && !empty($workingYear['report_card_template_id'])) {
-            $templateId = (int)$workingYear['report_card_template_id'];
-        }
-
-        // 3. Priority 3: Fallback to school's global report_card_template_id
-        if (!$templateId) {
-            $stmtSchoolTpl = $pdo->prepare("SELECT report_card_template_id FROM schools WHERE id = :sid LIMIT 1");
-            $stmtSchoolTpl->execute([':sid' => $schoolId]);
-            $templateId = (int)($stmtSchoolTpl->fetchColumn() ?: 0);
-        }
-
-        // 4. Default fallback to 1 (Modern) if still empty
         if (!$templateId) {
             $templateId = 1;
-        }
-
-        // Auto-sync academic_years.report_card_template_id if it was NULL or mismatched
-        if ($academicYearId > 0 && (empty($workingYear['report_card_template_id']) || (int)$workingYear['report_card_template_id'] !== $templateId)) {
-            try {
-                $stmtSyncAy = $pdo->prepare("UPDATE academic_years SET report_card_template_id = :tid WHERE id = :ayid AND school_id = :sid");
-                $stmtSyncAy->execute([':tid' => $templateId, ':ayid' => $academicYearId, ':sid' => $schoolId]);
-            } catch (\Throwable $t) {}
         }
 
         // Fetch template object

@@ -267,9 +267,62 @@ class ReportCardTemplateController extends BaseController
         $upd = $this->db->prepare("UPDATE schools SET report_card_template_id = ? WHERE id = ?");
         $upd->execute([$templateId, $schoolId]);
 
-        $updAY = $this->db->prepare("UPDATE academic_years SET report_card_template_id = ? WHERE school_id = ? AND (status = 'ACTIVE' OR status = 'Draft' OR is_current = 1)");
-        $updAY->execute([$templateId, $schoolId]);
+        // Find current ACTIVE / current working academic year for this school
+        $stmtActiveAy = $this->db->prepare("
+            SELECT id FROM academic_years 
+            WHERE school_id = :sid AND (status = 'ACTIVE' OR is_current = 1) 
+            ORDER BY is_current DESC, id DESC LIMIT 1
+        ");
+        $stmtActiveAy->execute([':sid' => $schoolId]);
+        $activeAyId = (int)($stmtActiveAy->fetchColumn() ?: 0);
 
-        return $this->success($response, ['message' => 'Report card template assigned to school successfully.']);
+        if ($activeAyId > 0) {
+            // Update active academic year's report_card_template_id ONLY (archived years stay isolated)
+            $updAY = $this->db->prepare("UPDATE academic_years SET report_card_template_id = ? WHERE id = ? AND school_id = ?");
+            $updAY->execute([$templateId, $activeAyId, $schoolId]);
+
+            // Reset/clear active academic year exams, papers, marks & seating plans
+            try {
+                // Delete seating plans for active year exams
+                $this->db->prepare("
+                    DELETE FROM seating_plans 
+                    WHERE exam_id IN (SELECT id FROM examinations WHERE school_id = ? AND academic_year_id = ?)
+                ")->execute([$schoolId, $activeAyId]);
+
+                // Delete marks for active year papers
+                $this->db->prepare("
+                    DELETE FROM exam_marks 
+                    WHERE exam_paper_id IN (
+                        SELECT ep.id FROM exam_papers ep 
+                        JOIN examinations e ON ep.exam_id = e.id 
+                        WHERE e.school_id = ? AND e.academic_year_id = ?
+                    )
+                ")->execute([$schoolId, $activeAyId]);
+
+                // Delete exam papers for active year
+                $this->db->prepare("
+                    DELETE FROM exam_papers 
+                    WHERE exam_id IN (SELECT id FROM examinations WHERE school_id = ? AND academic_year_id = ?)
+                ")->execute([$schoolId, $activeAyId]);
+
+                // Delete examinations for active year
+                $this->db->prepare("
+                    DELETE FROM examinations 
+                    WHERE school_id = ? AND academic_year_id = ?
+                ")->execute([$schoolId, $activeAyId]);
+            } catch (\Throwable $t) {
+                // Log/ignore table schema differences if any
+            }
+
+            // Auto-seed default exams for newly assigned template if applicable
+            try {
+                $schoolAdminService = new \App\Domain\SchoolAdmin\Services\SchoolAdminService();
+                $schoolAdminService->autoSeedDefaultSessionExams($this->db, $schoolId, $activeAyId);
+            } catch (\Throwable $t) {
+                // Ignore seeding errors
+            }
+        }
+
+        return $this->success($response, ['message' => 'Report card template assigned to active academic year successfully. Active year exam data reset for fresh start; archived years remain 100% isolated.']);
     }
 }
