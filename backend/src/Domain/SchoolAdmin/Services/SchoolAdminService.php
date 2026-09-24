@@ -237,46 +237,19 @@ class SchoolAdminService extends BaseService
 
         $templateId = null;
 
-        // 1. Priority 1: Check existing examinations in this academic year for template_code or exam name pattern
-        if ($academicYearId > 0) {
-            $stmtExTpl = $pdo->prepare("
-                SELECT rct.id 
-                FROM examinations e
-                JOIN report_card_templates rct ON LOWER(e.template_code) = LOWER(rct.code)
-                WHERE e.school_id = :sid AND e.academic_year_id = :ayid AND e.template_code IS NOT NULL AND e.template_code != ''
-                ORDER BY e.id ASC
-                LIMIT 1
-            ");
-            $stmtExTpl->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
-            $templateId = (int)($stmtExTpl->fetchColumn() ?: 0);
-
-            if (!$templateId) {
-                $stmtCheckCbse = $pdo->prepare("
-                    SELECT COUNT(*) FROM examinations 
-                    WHERE school_id = :sid AND academic_year_id = :ayid AND (LOWER(name) LIKE '%first term%' OR LOWER(name) LIKE '%second term%')
-                ");
-                $stmtCheckCbse->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
-                if (((int)$stmtCheckCbse->fetchColumn()) > 0) {
-                    $stmtGetCbseId = $pdo->prepare("SELECT id FROM report_card_templates WHERE code = 'cbse_classic' LIMIT 1");
-                    $stmtGetCbseId->execute();
-                    $templateId = (int)($stmtGetCbseId->fetchColumn() ?: 2);
-                }
-            }
-        }
-
-        // 2. Priority 2: Check if academic_years row has report_card_template_id
-        if (!$templateId && $academicYearId > 0 && !empty($workingYear['report_card_template_id'])) {
+        // 1. Priority 1: Check if academic_years row has report_card_template_id assigned
+        if ($academicYearId > 0 && !empty($workingYear['report_card_template_id'])) {
             $templateId = (int)$workingYear['report_card_template_id'];
         }
 
-        // 3. Priority 3: Fallback to school's global report_card_template_id
+        // 2. Priority 2: Fallback to school's global report_card_template_id
         if (!$templateId) {
             $stmtSchoolTpl = $pdo->prepare("SELECT report_card_template_id FROM schools WHERE id = :sid LIMIT 1");
             $stmtSchoolTpl->execute([':sid' => $schoolId]);
             $templateId = (int)($stmtSchoolTpl->fetchColumn() ?: 0);
         }
 
-        // 4. Default fallback to 1 (Modern) if still empty
+        // 3. Priority 3: Default fallback to 1 (Modern) if still empty
         if (!$templateId) {
             $templateId = 1;
         }
