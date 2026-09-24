@@ -1200,19 +1200,19 @@ export default function ExamsPage() {
     setSubmitting(true);
     setError('');
     setSuccess('');
-    setIsEditExamOpen(false);
-    setIsResetPapersConfirmOpen(false);
     try {
       await schoolService.updateExamination(editExamData.id, {
         ...editExamData,
         reset_papers: shouldResetPapers
       });
+      await loadDashboard();
+      setIsEditExamOpen(false);
+      setIsResetPapersConfirmOpen(false);
       setSuccess(
         shouldResetPapers 
           ? 'Examination dates updated successfully. Added papers and timetable scheme have been reset for new dates.' 
           : 'Examination updated successfully.'
       );
-      await loadDashboard();
     } catch (err) {
       console.error(err);
       setError(err.message || 'Failed to update examination.');
@@ -4491,8 +4491,16 @@ export default function ExamsPage() {
         title={editExamData?.parent_id ? "Edit Test" : (isCBSEClassic ? "Edit Terminal Examination" : "Edit Examination")}
         description={editExamData?.parent_id ? "Update details for this test or component." : (isCBSEClassic ? "Update details for this terminal examination." : "Update details for this school-wide examination.")}
         footer={<>
-          <Button variant="secondary" onClick={() => setIsEditExamOpen(false)}>Cancel</Button>
-          <Button onClick={handleUpdateExam} disabled={submitting}>{submitting ? 'Saving...' : 'Save Changes'}</Button>
+          <Button variant="secondary" onClick={() => setIsEditExamOpen(false)} disabled={submitting}>Cancel</Button>
+          <Button onClick={handleUpdateExam} disabled={submitting}>
+            {submitting ? (
+              <span className="flex items-center gap-1.5">
+                <Loader2 className="h-4 w-4 animate-spin" /> Saving...
+              </span>
+            ) : (
+              'Save Changes'
+            )}
+          </Button>
         </>}>
         <form onSubmit={handleUpdateExam} className="space-y-4">
           <div className="space-y-1.5">
@@ -4554,9 +4562,15 @@ export default function ExamsPage() {
       <Dialog isOpen={isResetPapersConfirmOpen} onClose={() => setIsResetPapersConfirmOpen(false)}
         title="Modify Examination Dates & Reset Papers?"
         footer={<>
-          <Button variant="secondary" onClick={() => { setIsResetPapersConfirmOpen(false); setIsEditExamOpen(true); }}>Cancel</Button>
+          <Button variant="secondary" onClick={() => { setIsResetPapersConfirmOpen(false); setIsEditExamOpen(true); }} disabled={submitting}>Cancel</Button>
           <Button className="bg-amber-600 hover:bg-amber-700 text-white font-bold" onClick={() => executeExamUpdate(true)} disabled={submitting}>
-            {submitting ? 'Updating & Resetting...' : 'Yes, Update Dates & Reset Papers'}
+            {submitting ? (
+              <span className="flex items-center gap-1.5">
+                <Loader2 className="h-4 w-4 animate-spin" /> Updating & Resetting...
+              </span>
+            ) : (
+              'Yes, Update Dates & Reset Papers'
+            )}
           </Button>
         </>}>
         <div className="space-y-3 p-1">
