@@ -8,7 +8,7 @@ import 'package:school_hub/main.dart';
 
 export 'package:http/http.dart' hide get, post, put, delete;
 
-const String _kWifiBaseUrl = 'http://10.145.85.71:8000';
+const String _kWifiBaseUrl = 'http://10.184.196.71:8000';
 const String _kUsbBaseUrl = 'http://127.0.0.1:8000';
 
 Future<void> _saveWorkingBaseUrl(String base) async {
@@ -24,11 +24,15 @@ Future<http.Response> _executeWithFallback(
   Uri originalUrl,
   Future<http.Response> Function(Uri targetUri) requestFn,
 ) async {
-  final List<String> candidateBaseUrls = [
-    _kUsbBaseUrl,
-    originalUrl.origin,
-    _kWifiBaseUrl,
-  ];
+  final origin = originalUrl.origin;
+  final bool isProductionOrQa = origin.contains('shikshapilot.com');
+  final List<String> candidateBaseUrls = isProductionOrQa
+      ? [origin]
+      : [
+          origin,
+          _kUsbBaseUrl,
+          _kWifiBaseUrl,
+        ];
 
   // Remove duplicates while preserving order
   final List<String> uniqueBases = [];
@@ -45,7 +49,11 @@ Future<http.Response> _executeWithFallback(
       final pathAndQuery = originalUrl.hasQuery ? '${originalUrl.path}?${originalUrl.query}' : originalUrl.path;
       final targetUri = Uri.parse('$base$pathAndQuery');
 
-      final response = await requestFn(targetUri).timeout(const Duration(seconds: 15));
+      final timeoutDuration = (base.contains('127.0.0.1') || base.contains('10.') || base.contains('localhost'))
+          ? const Duration(seconds: 4)
+          : const Duration(seconds: 15);
+
+      final response = await requestFn(targetUri).timeout(timeoutDuration);
       _checkUnauthorized(response);
 
       // Save working base URL for subsequent calls

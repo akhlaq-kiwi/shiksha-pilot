@@ -1222,6 +1222,15 @@ export default function ExamsPage() {
   };
 
   const handleToggleExamPublishStatus = (exam) => {
+    const isCurrentlyPublished = String(exam?.status || '').toLowerCase() === 'published';
+    if (!isCurrentlyPublished) {
+      const s = String(exam?.start_date || '').trim();
+      const e = String(exam?.end_date || '').trim();
+      if (!s || s === '-' || !e || e === '-') {
+        setError('Start Date and End Date are required to publish an examination or test. Please edit and set dates first.');
+        return;
+      }
+    }
     setTogglePublishTarget(exam);
     setShowTogglePublishModal(true);
   };
@@ -2892,9 +2901,17 @@ export default function ExamsPage() {
                                         <DropdownItem onClick={() => handleEditExamClick(st)}>
                                           Edit Test
                                         </DropdownItem>
-                                        <DropdownItem onClick={() => handleToggleExamPublishStatus(st)}>
-                                          {String(st?.status || '').toLowerCase() === 'published' ? 'Move to Draft' : 'Publish'}
-                                        </DropdownItem>
+                                        {String(st?.status || '').toLowerCase() === 'published' ? (
+                                          <DropdownItem onClick={() => handleToggleExamPublishStatus(st)} className="text-rose-600 font-semibold hover:bg-rose-50 dark:hover:bg-rose-950/30">
+                                            Move to Draft
+                                          </DropdownItem>
+                                        ) : (
+                                          (st?.start_date && st?.end_date && String(st.start_date).trim() !== '' && String(st.start_date).trim() !== '-' && String(st.end_date).trim() !== '' && String(st.end_date).trim() !== '-') && (
+                                            <DropdownItem onClick={() => handleToggleExamPublishStatus(st)} className="text-emerald-600 font-semibold hover:bg-emerald-50 dark:hover:bg-emerald-950/30">
+                                              Publish Test
+                                            </DropdownItem>
+                                          )
+                                        )}
                                         {!isCBSEClassic && (
                                           <DropdownItem 
                                             className="text-rose-600 font-semibold hover:bg-rose-50 dark:hover:bg-rose-950/30"
@@ -3292,27 +3309,6 @@ export default function ExamsPage() {
                   </CardContent>
                 </Card>
 
-                {/* CARD 5: Final Academic Report Cards (Combined Session Summary) - Hidden for CBSE Classic */}
-                {!isCBSEClassic && (
-                  <Card className="hover:border-primary/20 transition-all shadow-xs flex flex-col justify-between">
-                    <CardContent className="p-6 space-y-4 flex-1 flex flex-col justify-between">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
-                          <Award className="h-5 w-5" />
-                          <h4 className="text-base font-bold text-text-primary">Final Academic Report Card</h4>
-                        </div>
-                        <p className="text-xs text-text-secondary leading-relaxed">
-                          Generate consolidated session report cards combining marks from all conducted terminal examinations and tests.
-                        </p>
-                      </div>
-                      <div className="pt-2">
-                        <Button className="w-full flex items-center justify-center gap-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => handleOpenFinalSessionReportCards(currentClass.id)}>
-                          <Award className="h-4 w-4" /> Open Final Session Reports
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
 
                 {/* CARD 4: Result Status / Publish */}
                 <Card className="hover:border-primary/20 transition-all shadow-xs flex flex-col justify-between">

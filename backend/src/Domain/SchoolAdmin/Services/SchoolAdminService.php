@@ -261,8 +261,8 @@ class SchoolAdminService extends BaseService
 
                         if ($newTplCode) {
                             $pdo->prepare("DELETE FROM seating_plans WHERE exam_id IN (SELECT id FROM examinations WHERE school_id = ? AND academic_year_id = ? AND (template_code != ? OR template_code IS NULL))")->execute([$schoolId, $academicYearId, $newTplCode]);
-                            $pdo->prepare("DELETE FROM exam_marks WHERE exam_paper_id IN (SELECT ep.id FROM exam_papers ep JOIN examinations e ON ep.exam_id = e.id WHERE e.school_id = ? AND e.academic_year_id = ? AND (e.template_code != ? OR e.template_code IS NULL))")->execute([$schoolId, $academicYearId, $newTplCode]);
-                            $pdo->prepare("DELETE FROM exam_papers WHERE exam_id IN (SELECT id FROM examinations WHERE school_id = ? AND academic_year_id = ? AND (template_code != ? OR template_code IS NULL))")->execute([$schoolId, $academicYearId, $newTplCode]);
+                            $pdo->prepare("DELETE FROM examination_marks WHERE paper_id IN (SELECT ep.id FROM examination_papers ep JOIN examinations e ON ep.exam_id = e.id WHERE e.school_id = ? AND e.academic_year_id = ? AND (e.template_code != ? OR e.template_code IS NULL))")->execute([$schoolId, $academicYearId, $newTplCode]);
+                            $pdo->prepare("DELETE FROM examination_papers WHERE exam_id IN (SELECT id FROM examinations WHERE school_id = ? AND academic_year_id = ? AND (template_code != ? OR template_code IS NULL))")->execute([$schoolId, $academicYearId, $newTplCode]);
                             $pdo->prepare("DELETE FROM examinations WHERE school_id = ? AND academic_year_id = ? AND (template_code != ? OR template_code IS NULL)")->execute([$schoolId, $academicYearId, $newTplCode]);
                         }
                     } catch (\Throwable $t) {}
@@ -13891,58 +13891,58 @@ Only approve the settlement after reviewing all financial records.
                     }
                 }
             }
-            return;
-        }
+        } else {
+            $defaultExams = [
+                ['name' => 'Quarterly Examination', 'description' => 'Quarterly academic evaluation.'],
+                ['name' => 'Half Yearly Examination', 'description' => 'Half yearly academic evaluation.'],
+                ['name' => 'Annual Examination', 'description' => 'Final annual academic evaluation.']
+            ];
 
-        $defaultExams = [
-            ['name' => 'Quarterly Examination', 'description' => 'Quarterly academic evaluation.'],
-            ['name' => 'Half Yearly Examination', 'description' => 'Half yearly academic evaluation.'],
-            ['name' => 'Annual Examination', 'description' => 'Final annual academic evaluation.']
-        ];
-
-        $stmtInsert = $pdo->prepare("
-            INSERT INTO examinations (school_id, academic_year_id, template_code, name, start_date, end_date, publish_date, description, status)
-            VALUES (:sid, :ayid, :tpl_code, :name, :start_date, :end_date, :publish_date, :description, 'Draft')
-        ");
-
-        foreach ($defaultExams as $ex) {
-            $keyword = explode(' ', $ex['name'])[0];
-            $stmtCheck = $pdo->prepare("
-                SELECT COUNT(*) FROM examinations 
-                WHERE school_id = :sid AND academic_year_id = :ayid AND (template_code = :tpl_code OR template_code IS NULL) AND LOWER(name) LIKE LOWER(:name)
+            $stmtInsert = $pdo->prepare("
+                INSERT INTO examinations (school_id, academic_year_id, template_code, name, start_date, end_date, publish_date, description, status)
+                VALUES (:sid, :ayid, :tpl_code, :name, :start_date, :end_date, :publish_date, :description, 'Draft')
             ");
-            $stmtCheck->execute([
-                ':sid' => $schoolId,
-                ':ayid' => $academicYearId,
-                ':tpl_code' => $tplCode,
-                ':name' => '%' . $keyword . '%'
-            ]);
-            if ((int)$stmtCheck->fetchColumn() === 0) {
-                $stmtInsert->execute([
+
+            foreach ($defaultExams as $ex) {
+                $keyword = explode(' ', $ex['name'])[0];
+                $stmtCheck = $pdo->prepare("
+                    SELECT COUNT(*) FROM examinations 
+                    WHERE school_id = :sid AND academic_year_id = :ayid AND (template_code = :tpl_code OR template_code IS NULL) AND LOWER(name) LIKE LOWER(:name)
+                ");
+                $stmtCheck->execute([
                     ':sid' => $schoolId,
                     ':ayid' => $academicYearId,
                     ':tpl_code' => $tplCode,
-                    ':name' => $ex['name'],
-                    ':start_date' => null,
-                    ':end_date' => null,
-                    ':publish_date' => null,
-                    ':description' => $ex['description']
+                    ':name' => '%' . $keyword . '%'
                 ]);
+                if ((int)$stmtCheck->fetchColumn() === 0) {
+                    $stmtInsert->execute([
+                        ':sid' => $schoolId,
+                        ':ayid' => $academicYearId,
+                        ':tpl_code' => $tplCode,
+                        ':name' => $ex['name'],
+                        ':start_date' => null,
+                        ':end_date' => null,
+                        ':publish_date' => null,
+                        ':description' => $ex['description']
+                    ]);
+                }
             }
+
+            // Reset old hardcoded default dates to NULL if unedited
+            $stmtReset = $pdo->prepare("
+                UPDATE examinations 
+                SET start_date = NULL, end_date = NULL, publish_date = NULL
+                WHERE school_id = :sid AND academic_year_id = :ayid 
+                  AND (
+                    (name = 'Quarterly Examination' AND start_date LIKE '%-08-01') OR
+                    (name = 'Half Yearly Examination' AND start_date LIKE '%-11-01') OR
+                    (name = 'Annual Examination' AND start_date LIKE '%-03-01')
+                  )
+            ");
+            $stmtReset->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
         }
 
-        // Reset old hardcoded default dates to NULL if unedited
-        $stmtReset = $pdo->prepare("
-            UPDATE examinations 
-            SET start_date = NULL, end_date = NULL, publish_date = NULL
-            WHERE school_id = :sid AND academic_year_id = :ayid 
-              AND (
-                (name = 'Quarterly Examination' AND start_date LIKE '%-08-01') OR
-                (name = 'Half Yearly Examination' AND start_date LIKE '%-11-01') OR
-                (name = 'Annual Examination' AND start_date LIKE '%-03-01')
-              )
-        ");
-        $stmtReset->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
     }
 
     public function createExamination(array $user, array $data): array
@@ -14113,8 +14113,8 @@ Only approve the settlement after reviewing all financial records.
         if (strcasecmp((string)$status, 'Published') === 0) {
             $s = trim((string)($startDate ?? ''));
             $e = trim((string)($endDate ?? ''));
-            if (($s === '' || $s === '-' || $e === '' || $e === '-') && $parentId === null) {
-                throw new ValidationException(['start_date' => 'Start Date and End Date are required to publish an examination.'], 'Start Date and End Date are required to publish an examination.');
+            if ($s === '' || $s === '-' || $s === '0000-00-00' || $e === '' || $e === '-' || $e === '0000-00-00') {
+                throw new ValidationException(['start_date' => 'Start Date and End Date are required to publish an examination or test.'], 'Start Date and End Date are required to publish an examination or test.');
             }
         }
 

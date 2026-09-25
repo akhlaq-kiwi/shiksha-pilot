@@ -1353,17 +1353,84 @@ class TeacherService extends BaseService
             return [];
         }
 
+        // Fetch active working academic year ID
+        $stmtAy = $pdo->prepare("SELECT id FROM academic_years WHERE school_id = :sid AND (status = 'ACTIVE' OR is_current = 1) ORDER BY start_date DESC LIMIT 1");
+        $stmtAy->execute([':sid' => $schoolId]);
+        $activeAyId = (int)($stmtAy->fetchColumn() ?: 0);
+
         $inClause = implode(',', array_map('intval', $staffIds));
 
+        // 1. Fetch direct class assignments belonging to active academic year
         $stmtAssign = $pdo->prepare("
-            SELECT DISTINCT c.id, c.name, c.section
+            SELECT DISTINCT c.id, c.name, c.section, c.academic_year_id
             FROM class_teacher_assignments cta
             JOIN classes c ON cta.class_id = c.id
+            JOIN academic_years ay ON c.academic_year_id = ay.id
             WHERE cta.school_id = :sid AND cta.teacher_id IN ({$inClause})
+              AND (ay.status = 'ACTIVE' OR ay.is_current = 1)
             ORDER BY c.name ASC, c.section ASC
         ");
         $stmtAssign->execute([':sid' => $schoolId]);
-        return $stmtAssign->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $activeClasses = $stmtAssign->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        if (!empty($activeClasses)) {
+            return $activeClasses;
+        }
+
+        // 2. Auto-heal: If teacher has assignments in older academic year classes, resolve corresponding class in active academic year
+        if ($activeAyId > 0) {
+            $stmtOlder = $pdo->prepare("
+                SELECT DISTINCT cta.teacher_id, c.name, c.section
+                FROM class_teacher_assignments cta
+                JOIN classes c ON cta.class_id = c.id
+                WHERE cta.school_id = :sid AND cta.teacher_id IN ({$inClause})
+            ");
+            $stmtOlder->execute([':sid' => $schoolId]);
+            $olderAssignments = $stmtOlder->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+            if (!empty($olderAssignments)) {
+                $stmtFindActive = $pdo->prepare("
+                    SELECT id, name, section, academic_year_id
+                    FROM classes
+                    WHERE school_id = :sid AND academic_year_id = :ayid
+                      AND LOWER(name) = LOWER(:name)
+                      AND (section = :sec OR (section IS NULL AND :sec_null = 1))
+                    LIMIT 1
+                ");
+                $stmtInsCta = $pdo->prepare("
+                    INSERT INTO class_teacher_assignments (school_id, class_id, teacher_id)
+                    VALUES (:sid, :cid, :tid)
+                    ON DUPLICATE KEY UPDATE teacher_id = VALUES(teacher_id)
+                ");
+
+                $resolvedClasses = [];
+                foreach ($olderAssignments as $oa) {
+                    $cName = trim((string)$oa['name']);
+                    $cSec = $oa['section'];
+                    $stmtFindActive->execute([
+                        ':sid' => $schoolId,
+                        ':ayid' => $activeAyId,
+                        ':name' => $cName,
+                        ':sec' => $cSec,
+                        ':sec_null' => ($cSec === null || $cSec === '') ? 1 : 0
+                    ]);
+                    $activeClassRow = $stmtFindActive->fetch(PDO::FETCH_ASSOC);
+                    if ($activeClassRow) {
+                        $cid = (int)$activeClassRow['id'];
+                        $tid = (int)$oa['teacher_id'];
+                        try {
+                            $stmtInsCta->execute([':sid' => $schoolId, ':cid' => $cid, ':tid' => $tid]);
+                        } catch (\Throwable $t) {}
+
+                        $resolvedClasses[$cid] = $activeClassRow;
+                    }
+                }
+                if (!empty($resolvedClasses)) {
+                    return array_values($resolvedClasses);
+                }
+            }
+        }
+
+        return [];
     }
 
     private function getTeacherClassId(PDO $pdo, array $user, ?int $requestAyId = null, ?int $passedClassId = null): ?int
@@ -1436,11 +1503,13 @@ class TeacherService extends BaseService
         }
         $tplCode = strtolower((string)($tplCode ?: 'modern'));
 
-        if ($tplCode === 'cbse_classic') {
+        if ($academicYearId > 0) {
             $refSA = new \ReflectionClass(\App\Domain\SchoolAdmin\Services\SchoolAdminService::class);
             $schoolAdminService = $refSA->newInstanceWithoutConstructor();
             $schoolAdminService->autoSeedDefaultSessionExams($pdo, $schoolId, $academicYearId);
+        }
 
+        if ($tplCode === 'cbse_classic') {
             $sqlTerm = "
                 SELECT e.id, e.name, e.description
                 FROM examinations e
@@ -1450,7 +1519,7 @@ class TeacherService extends BaseService
             ";
             $paramsTerm = [':school_id' => $schoolId];
             if ($academicYearId > 0) {
-                $sqlTerm .= " AND (e.academic_year_id = :ayid OR e.academic_year_id IS NULL)";
+                $sqlTerm .= " AND e.academic_year_id = :ayid";
                 $paramsTerm[':ayid'] = $academicYearId;
             }
             $sqlTerm .= " ORDER BY 
@@ -1467,7 +1536,7 @@ class TeacherService extends BaseService
             $sqlSubs = "
                 SELECT e.id, e.parent_id, e.name, e.start_date, e.end_date, e.max_marks, e.status AS exam_status,
                        COALESCE(MAX(ecs.scheme_published), 0) AS scheme_published,
-                       (SELECT COUNT(*) FROM examination_papers ep WHERE ep.exam_id = e.id) AS papers_count,
+                       (SELECT COUNT(*) FROM examination_papers ep WHERE ep.exam_id = e.id " . ($classId ? "AND (ep.class_id = :class_id_ep1 OR ep.class_id IS NULL OR ep.class_id = 0)" : "") . ") AS papers_count,
                        COALESCE(MAX(CASE WHEN ecs.status = 'Published' THEN 1 ELSE 0 END), 0) AS result_status_val
                 FROM examinations e
                 LEFT JOIN examination_class_status ecs ON e.id = ecs.exam_id " . ($classId ? "AND ecs.class_id = :class_id" : "") . "
@@ -1475,18 +1544,24 @@ class TeacherService extends BaseService
                 WHERE e.school_id = :school_id 
                   AND e.parent_id IS NOT NULL
                   AND e.status = 'Published'
+                  AND (
+                    (e.start_date IS NOT NULL AND e.start_date != '' AND e.start_date != '0000-00-00')
+                    OR (SELECT COUNT(*) FROM examination_papers ep WHERE ep.exam_id = e.id " . ($classId ? "AND (ep.class_id = :class_id_ep2 OR ep.class_id IS NULL OR ep.class_id = 0)" : "") . ") > 0
+                  )
                   AND (e.template_code = 'cbse_classic' OR p.template_code = 'cbse_classic' OR e.template_code IS NULL)
             ";
             $paramsSubs = [':school_id' => $schoolId];
             if ($classId) {
                 $paramsSubs[':class_id'] = $classId;
+                $paramsSubs[':class_id_ep1'] = $classId;
+                $paramsSubs[':class_id_ep2'] = $classId;
             }
             if ($academicYearId > 0) {
-                $sqlSubs .= " AND (e.academic_year_id = :ayid OR e.academic_year_id IS NULL)";
+                $sqlSubs .= " AND e.academic_year_id = :ayid";
                 $paramsSubs[':ayid'] = $academicYearId;
             }
             $sqlSubs .= " GROUP BY e.id, e.parent_id, e.name, e.start_date, e.end_date, e.max_marks, e.status";
-            $sqlSubs .= " ORDER BY e.start_date ASC, e.id ASC";
+            $sqlSubs .= " ORDER BY e.id ASC";
 
             $stmtSubs = $pdo->prepare($sqlSubs);
             $stmtSubs->execute($paramsSubs);
@@ -1498,8 +1573,8 @@ class TeacherService extends BaseService
                 $st['id'] = (int)$st['id'];
                 $st['parent_id'] = (int)$st['parent_id'];
                 $hasAddedPapers = ((int)($st['papers_count'] ?? 0)) > 0;
-                $st['scheme_published'] = ((int)$st['scheme_published'] === 1 || $hasAddedPapers) ? 1 : 0;
-                $st['admit_card_published'] = 1; // Teachers can access admit cards / seatings
+                $st['scheme_published'] = (((int)$st['scheme_published'] === 1) && $hasAddedPapers) ? 1 : 0;
+                $st['admit_card_published'] = $hasAddedPapers ? 1 : 0;
                 $st['result_published'] = (int)($st['result_status_val'] ?? 0);
                 unset($st['result_status_val']);
                 unset($st['papers_count']);
@@ -1508,8 +1583,10 @@ class TeacherService extends BaseService
                     $st['status'] = 'Upcoming';
                 } elseif (!empty($st['start_date']) && !empty($st['end_date']) && $st['start_date'] <= $today && $st['end_date'] >= $today) {
                     $st['status'] = 'Current';
-                } else {
+                } elseif (!empty($st['end_date']) && $st['end_date'] < $today) {
                     $st['status'] = 'Completed';
+                } else {
+                    $st['status'] = 'Upcoming';
                 }
 
                 $subTestsByParent[$st['parent_id']][] = $st;
@@ -1533,18 +1610,18 @@ class TeacherService extends BaseService
             return $resultList;
         }
 
-        // Fetch all Published examinations for this school (Modern School Report / flat flow)
+        // Fetch all examinations for this school (Modern School Report / flat flow)
         $sql = "
-            SELECT DISTINCT e.id, e.name, e.start_date, e.end_date,
+            SELECT DISTINCT e.id, e.name, e.start_date, e.end_date, e.status AS exam_status,
                    COALESCE(MAX(ecs.scheme_published), 0) AS scheme_published,
                    COALESCE(MAX(CASE WHEN ecs.status = 'Published' THEN 1 ELSE 0 END), 0) AS result_status_val,
                    COALESCE(e.template_code, 'modern') AS template_code
             FROM examinations e
             LEFT JOIN examination_class_status ecs ON e.id = ecs.exam_id " . ($classId ? "AND ecs.class_id = :class_id" : "") . "
             WHERE e.school_id = :school_id
-              AND e.status = 'Published'
               AND e.parent_id IS NULL
-              AND (e.template_code = 'modern' OR (e.template_code IS NULL AND (LOWER(e.name) LIKE '%quarterly%' OR LOWER(e.name) LIKE '%half%' OR LOWER(e.name) LIKE '%annual%')))
+              AND e.status = 'Published'
+              AND (e.template_code != 'cbse_classic' OR e.template_code IS NULL)
         ";
         $params = [':school_id' => $schoolId];
         if ($classId) {
@@ -1552,14 +1629,8 @@ class TeacherService extends BaseService
         }
 
         if ($academicYearId > 0) {
-            $stmtCheckCurrent = $pdo->prepare("SELECT COUNT(*) FROM examinations WHERE school_id = :sid AND status = 'Published' AND (academic_year_id = :ayid OR academic_year_id IS NULL)");
-            $stmtCheckCurrent->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
-            $countCurrent = (int)$stmtCheckCurrent->fetchColumn();
-
-            if ($countCurrent > 0) {
-                $sql .= " AND (e.academic_year_id = :ayid OR e.academic_year_id IS NULL)";
-                $params[':ayid'] = $academicYearId;
-            }
+            $sql .= " AND e.academic_year_id = :ayid";
+            $params[':ayid'] = $academicYearId;
         }
 
         $sql .= " GROUP BY e.id, e.name, e.start_date, e.end_date";
@@ -1569,7 +1640,7 @@ class TeacherService extends BaseService
               WHEN LOWER(e.name) LIKE '%half%' THEN 2 
               WHEN LOWER(e.name) LIKE '%annual%' THEN 3 
               ELSE 4 
-            END ASC, e.start_date ASC, e.id ASC";
+            END ASC, e.id ASC";
 
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
@@ -1707,28 +1778,10 @@ class TeacherService extends BaseService
         $stmtScheme->execute([':exam_id' => $examId, ':class_id' => $classId]);
         $schemePapers = $stmtScheme->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-        // Fallback: If no papers for teacher's default assigned class, check if papers exist for ANY class in this exam
-        if (empty($schemePapers)) {
-            $stmtSchemeAll = $pdo->prepare("
-                SELECT ep.id, ep.subject_id, ep.exam_date, ep.start_time, ep.end_time, ep.max_marks, ep.passing_marks, ep.room,
-                       CASE WHEN ep.max_marks = 0 THEN 'grade' ELSE 'marks' END AS evaluation_type,
-                       s.name AS subject_name, ep.class_id
-                FROM examination_papers ep
-                JOIN subjects s ON ep.subject_id = s.id
-                WHERE ep.exam_id = :exam_id
-                ORDER BY ep.exam_date ASC, ep.start_time ASC
-            ");
-            $stmtSchemeAll->execute([':exam_id' => $examId]);
-            $schemePapers = $stmtSchemeAll->fetchAll(PDO::FETCH_ASSOC) ?: [];
-            if (!empty($schemePapers)) {
-                $response['class_id'] = (int)$schemePapers[0]['class_id'];
-            }
-        }
-
         $response['scheme'] = $schemePapers;
         $response['has_papers'] = !empty($schemePapers) ? 1 : 0;
-        if (!empty($schemePapers)) {
-            $response['scheme_published'] = 1;
+        if (empty($schemePapers)) {
+            $response['scheme_published'] = 0;
         }
 
         // Fetch all published class examination schemes for the school (sorted in logical class order)
@@ -1862,15 +1915,14 @@ class TeacherService extends BaseService
         }
 
         // Fetch Paper Details
-        $stmtPaper = $pdo->prepare("SELECT ep.*, s.name AS subject_name FROM examination_papers ep JOIN subjects s ON ep.subject_id = s.id WHERE ep.exam_id = :exam_id AND (ep.class_id = :class_id OR ep.class_id IS NULL OR :class_id = 0) AND ep.subject_id = :subid LIMIT 1");
-        $stmtPaper->execute([':exam_id' => $examId, ':class_id' => $classId, ':subid' => $subjectId]);
-        $paper = $stmtPaper->fetch(PDO::FETCH_ASSOC);
-
-        if (!$paper) {
-            $stmtPaperFallback = $pdo->prepare("SELECT ep.*, s.name AS subject_name FROM examination_papers ep JOIN subjects s ON ep.subject_id = s.id WHERE ep.exam_id = :exam_id AND ep.subject_id = :subid LIMIT 1");
-            $stmtPaperFallback->execute([':exam_id' => $examId, ':subid' => $subjectId]);
-            $paper = $stmtPaperFallback->fetch(PDO::FETCH_ASSOC);
+        if ($classId > 0) {
+            $stmtPaper = $pdo->prepare("SELECT ep.*, s.name AS subject_name FROM examination_papers ep JOIN subjects s ON ep.subject_id = s.id WHERE ep.exam_id = :exam_id AND (ep.class_id = :class_id OR ep.class_id IS NULL OR ep.class_id = 0) AND ep.subject_id = :subid LIMIT 1");
+            $stmtPaper->execute([':exam_id' => $examId, ':class_id' => $classId, ':subid' => $subjectId]);
+        } else {
+            $stmtPaper = $pdo->prepare("SELECT ep.*, s.name AS subject_name FROM examination_papers ep JOIN subjects s ON ep.subject_id = s.id WHERE ep.exam_id = :exam_id AND ep.subject_id = :subid LIMIT 1");
+            $stmtPaper->execute([':exam_id' => $examId, ':subid' => $subjectId]);
         }
+        $paper = $stmtPaper->fetch(PDO::FETCH_ASSOC);
 
         if (!$paper) {
             throw new ValidationException(['subject_id' => 'This subject is not scheduled in the exam timetable for your class.']);
@@ -1892,7 +1944,7 @@ class TeacherService extends BaseService
         $stmtStudents = $pdo->prepare("
             SELECT id, roll_no, name 
             FROM students 
-            WHERE class_id = :cid AND school_id = :sid 
+            WHERE class_id = :cid AND school_id = :sid AND (status = 'ACTIVE' OR status IS NULL)
             ORDER BY CAST(roll_no AS UNSIGNED) ASC, name ASC
         ");
         $stmtStudents->execute([':cid' => $classId, ':sid' => $schoolId]);
@@ -1981,8 +2033,8 @@ class TeacherService extends BaseService
         $subjectId = (int)$data['subject_id'];
 
         // Fetch Paper Details
-        $stmtPaper = $pdo->prepare("SELECT * FROM examination_papers WHERE exam_id = :exam_id AND (class_id = :class_id OR class_id IS NULL OR :class_id = 0) AND subject_id = :subid LIMIT 1");
-        $stmtPaper->execute([':exam_id' => $examId, ':class_id' => $classId, ':subid' => $subjectId]);
+        $stmtPaper = $pdo->prepare("SELECT * FROM examination_papers WHERE exam_id = :exam_id AND (class_id = :class_id OR class_id IS NULL OR :class_id2 = 0) AND subject_id = :subid LIMIT 1");
+        $stmtPaper->execute([':exam_id' => $examId, ':class_id' => $classId, ':class_id2' => $classId, ':subid' => $subjectId]);
         $paper = $stmtPaper->fetch(PDO::FETCH_ASSOC);
 
         if (!$paper) {
