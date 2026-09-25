@@ -862,10 +862,15 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                         : sheetError != null
                             ? (() {
                                 final bool isNoClassError = sheetError!.contains('No class Assigned') || sheetError!.contains('Forbidden');
-                                final String title = isNoClassError ? 'No class Assigned to you yet' : 'No paper added yet';
+                                final bool isNoPaperError = sheetError!.contains('No paper added') || sheetError!.contains('not scheduled');
+                                final String title = isNoClassError
+                                    ? 'No class Assigned to you yet'
+                                    : (isNoPaperError ? 'No paper added yet' : 'Error Loading Marks Sheet');
                                 final String subtitle = isNoClassError
                                     ? 'Please contact school administrator to assign a class to your teacher profile.'
-                                    : 'No exam paper has been added for this class yet.';
+                                    : (isNoPaperError
+                                        ? 'No exam paper has been added for this class yet.'
+                                        : sheetError!);
                                 final IconData icon = isNoClassError ? Icons.assignment_ind_outlined : Icons.note_alt_outlined;
 
                                 return Center(

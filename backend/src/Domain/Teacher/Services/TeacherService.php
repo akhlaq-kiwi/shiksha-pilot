@@ -1862,8 +1862,13 @@ class TeacherService extends BaseService
         }
 
         // Fetch Paper Details
-        $stmtPaper = $pdo->prepare("SELECT ep.*, s.name AS subject_name FROM examination_papers ep JOIN subjects s ON ep.subject_id = s.id WHERE ep.exam_id = :exam_id AND (ep.class_id = :class_id OR ep.class_id IS NULL OR :class_id = 0) AND ep.subject_id = :subid LIMIT 1");
-        $stmtPaper->execute([':exam_id' => $examId, ':class_id' => $classId, ':subid' => $subjectId]);
+        if ($classId > 0) {
+            $stmtPaper = $pdo->prepare("SELECT ep.*, s.name AS subject_name FROM examination_papers ep JOIN subjects s ON ep.subject_id = s.id WHERE ep.exam_id = :exam_id AND (ep.class_id = :class_id OR ep.class_id IS NULL OR ep.class_id = 0) AND ep.subject_id = :subid LIMIT 1");
+            $stmtPaper->execute([':exam_id' => $examId, ':class_id' => $classId, ':subid' => $subjectId]);
+        } else {
+            $stmtPaper = $pdo->prepare("SELECT ep.*, s.name AS subject_name FROM examination_papers ep JOIN subjects s ON ep.subject_id = s.id WHERE ep.exam_id = :exam_id AND ep.subject_id = :subid LIMIT 1");
+            $stmtPaper->execute([':exam_id' => $examId, ':subid' => $subjectId]);
+        }
         $paper = $stmtPaper->fetch(PDO::FETCH_ASSOC);
 
         if (!$paper) {
