@@ -332,6 +332,7 @@ class StudentService extends BaseService
         $studentId = (int) $student['id'];
         $classId = (int) $student['class_id'];
         $schoolId = (int) ($user['school_id'] ?? 0);
+        $academicYearId = (int) ($student['academic_year_id'] ?? 0);
         $pdo = $this->repo->getPdo();
 
         // Fetch all exams the student has marks in and that are published for their class
@@ -1489,12 +1490,13 @@ class StudentService extends BaseService
         }
         $tplCode = strtolower((string)($tplCode ?: 'modern'));
 
-        if ($tplCode === 'cbse_classic') {
-            // Ensure terminal exams are seeded for this school session if missing
+        if ($academicYearId > 0) {
             $refSA = new \ReflectionClass(\App\Domain\SchoolAdmin\Services\SchoolAdminService::class);
             $schoolAdminService = $refSA->newInstanceWithoutConstructor();
             $schoolAdminService->autoSeedDefaultSessionExams($pdo, $schoolId, $academicYearId);
+        }
 
+        if ($tplCode === 'cbse_classic') {
             // Fetch top level terminal exams (FIRST TERM EXAMINATION, SECOND TERM EXAMINATION)
             $sqlTerm = "
                 SELECT e.id, e.name, e.description
@@ -1505,7 +1507,7 @@ class StudentService extends BaseService
             ";
             $paramsTerm = [':school_id' => $schoolId];
             if ($academicYearId > 0) {
-                $sqlTerm .= " AND (e.academic_year_id = :ayid OR e.academic_year_id IS NULL)";
+                $sqlTerm .= " AND e.academic_year_id = :ayid";
                 $paramsTerm[':ayid'] = $academicYearId;
             }
             $sqlTerm .= " ORDER BY 
@@ -1531,17 +1533,22 @@ class StudentService extends BaseService
                 WHERE e.school_id = :school_id 
                   AND e.parent_id IS NOT NULL
                   AND e.status = 'Published'
+                  AND (
+                    (e.start_date IS NOT NULL AND e.start_date != '' AND e.start_date != '0000-00-00')
+                    OR (SELECT COUNT(*) FROM examination_papers ep WHERE ep.exam_id = e.id AND (ep.class_id = :class_id_ep OR ep.class_id IS NULL OR ep.class_id = 0)) > 0
+                  )
                   AND (e.template_code = 'cbse_classic' OR p.template_code = 'cbse_classic' OR e.template_code IS NULL)
             ";
             $paramsSubs = [
                 ':class_id' => $classId,
+                ':class_id_ep' => $classId,
                 ':school_id' => $schoolId
             ];
             if ($academicYearId > 0) {
-                $sqlSubs .= " AND (e.academic_year_id = :ayid OR e.academic_year_id IS NULL)";
+                $sqlSubs .= " AND e.academic_year_id = :ayid";
                 $paramsSubs[':ayid'] = $academicYearId;
             }
-            $sqlSubs .= " ORDER BY e.start_date ASC, e.id ASC";
+            $sqlSubs .= " ORDER BY e.id ASC";
 
             $stmtSubs = $pdo->prepare($sqlSubs);
             $stmtSubs->execute($paramsSubs);
@@ -1560,8 +1567,10 @@ class StudentService extends BaseService
                     $st['status'] = 'Upcoming';
                 } elseif (!empty($st['start_date']) && !empty($st['end_date']) && $st['start_date'] <= $today && $st['end_date'] >= $today) {
                     $st['status'] = 'Current';
-                } else {
+                } elseif (!empty($st['end_date']) && $st['end_date'] < $today) {
                     $st['status'] = 'Completed';
+                } else {
+                    $st['status'] = 'Upcoming';
                 }
                 
                 $subTestsByParent[$st['parent_id']][] = $st;
@@ -1597,7 +1606,7 @@ class StudentService extends BaseService
             WHERE e.school_id = :school_id 
               AND e.status = 'Published'
               AND e.parent_id IS NULL
-              AND (e.template_code = 'modern' OR (e.template_code IS NULL AND (LOWER(e.name) LIKE '%quarterly%' OR LOWER(e.name) LIKE '%half%' OR LOWER(e.name) LIKE '%annual%')))
+              AND (e.template_code != 'cbse_classic' OR e.template_code IS NULL)
         ";
         $params = [
             ':class_id' => $classId,
@@ -1605,7 +1614,7 @@ class StudentService extends BaseService
         ];
 
         if ($academicYearId > 0) {
-            $sql .= " AND (e.academic_year_id = :ayid OR e.academic_year_id IS NULL)";
+            $sql .= " AND e.academic_year_id = :ayid";
             $params[':ayid'] = $academicYearId;
         }
 
