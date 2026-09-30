@@ -14473,6 +14473,158 @@ Only approve the settlement after reviewing all financial records.
         $stmt->execute([':id' => $id, ':sid' => $schoolId]);
     }
 
+    public function getAllExamSchemes(array $user, int $examId): array
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        // 1. Verify exam belongs to school & fetch details
+        $stmtCheck = $pdo->prepare("
+            SELECT e.*, ay.name AS academic_year_name
+            FROM examinations e
+            LEFT JOIN academic_years ay ON e.academic_year_id = ay.id
+            WHERE e.id = :id AND e.school_id = :sid 
+            LIMIT 1
+        ");
+        $stmtCheck->execute([':id' => $examId, ':sid' => $schoolId]);
+        $exam = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+        if (!$exam) {
+            throw new NotFoundException('Examination not found.');
+        }
+
+        // 2. Fetch school profile
+        $stmtSchool = $pdo->prepare("SELECT * FROM schools WHERE id = :sid LIMIT 1");
+        $stmtSchool->execute([':sid' => $schoolId]);
+        $schoolProfile = $stmtSchool->fetch(PDO::FETCH_ASSOC) ?: ['name' => 'SCHOOL TIMETABLE'];
+
+        // 3. Fetch classes that actually have papers configured for this exam
+        $stmtClasses = $pdo->prepare("
+            SELECT DISTINCT c.id, c.name, c.section
+            FROM classes c
+            JOIN examination_papers ep ON ep.class_id = c.id
+            WHERE ep.exam_id = :exam_id AND c.school_id = :sid AND c.academic_year_id = :ayid
+        ");
+        $stmtClasses->execute([
+            ':exam_id' => $examId,
+            ':sid' => $schoolId,
+            ':ayid' => $exam['academic_year_id']
+        ]);
+        $rawClasses = $stmtClasses->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        if (empty($rawClasses)) {
+            return [
+                'exam' => [
+                    'id' => (int)$exam['id'],
+                    'name' => $exam['name'],
+                    'academic_year_name' => $exam['academic_year_name'] ?? ''
+                ],
+                'school_profile' => $schoolProfile,
+                'dates' => [],
+                'classes' => []
+            ];
+        }
+
+        // Sort classes based on MASTER_CLASSES catalog order
+        $masterOrderMap = [];
+        foreach (self::MASTER_CLASSES as $index => $mc) {
+            $masterOrderMap[strtolower(trim($mc['name']))] = $index;
+        }
+
+        usort($rawClasses, function($a, $b) use ($masterOrderMap) {
+            $nameA = strtolower(trim($a['name']));
+            $nameB = strtolower(trim($b['name']));
+            $orderA = $masterOrderMap[$nameA] ?? 999;
+            $orderB = $masterOrderMap[$nameB] ?? 999;
+
+            if ($orderA !== $orderB) {
+                return $orderA <=> $orderB;
+            }
+            $cmpName = strcmp($nameA, $nameB);
+            if ($cmpName !== 0) return $cmpName;
+
+            $secA = strtolower(trim($a['section'] ?? ''));
+            $secB = strtolower(trim($b['section'] ?? ''));
+            return strcmp($secA, $secB);
+        });
+
+        // 4. Fetch papers & instructions per class and collect all dates
+        $allDates = [];
+        $classesData = [];
+
+        $stmtPapers = $pdo->prepare("
+            SELECT 
+                ep.*, 
+                s.name AS subject_name
+            FROM examination_papers ep
+            JOIN subjects s ON ep.subject_id = s.id
+            WHERE ep.exam_id = :exam_id AND ep.class_id = :class_id
+            ORDER BY ep.exam_date ASC, ep.start_time ASC
+        ");
+
+        $stmtInstructions = $pdo->prepare("
+            SELECT instruction 
+            FROM examination_instructions 
+            WHERE exam_id = :exam_id AND class_id = :class_id 
+            ORDER BY id ASC
+        ");
+
+        foreach ($rawClasses as $cls) {
+            $classId = (int)$cls['id'];
+            $shortClassName = $cls['name'];
+            if (preg_match('/\(([^)]+)\)/', $cls['name'], $m)) {
+                $shortClassName = trim($m[1]);
+            }
+            $classNameStr = $shortClassName . ($cls['section'] ? ' - ' . $cls['section'] : '');
+
+            $stmtPapers->execute([':exam_id' => $examId, ':class_id' => $classId]);
+            $papers = $stmtPapers->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+            $stmtInstructions->execute([':exam_id' => $examId, ':class_id' => $classId]);
+            $instructionsRows = $stmtInstructions->fetchAll(PDO::FETCH_COLUMN) ?: [];
+
+            $datePaperMap = [];
+            foreach ($papers as $paper) {
+                if (!empty($paper['exam_date'])) {
+                    $d = $paper['exam_date'];
+                    $allDates[$d] = true;
+                    $datePaperMap[$d] = [
+                        'subject_name' => $paper['subject_name'],
+                        'start_time' => $paper['start_time'],
+                        'end_time' => $paper['end_time'],
+                        'max_marks' => $paper['max_marks'],
+                        'passing_marks' => $paper['passing_marks'],
+                        'evaluation_type' => $paper['evaluation_type'] ?? 'marks'
+                    ];
+                }
+            }
+
+            $classesData[] = [
+                'id' => $classId,
+                'name' => $cls['name'],
+                'section' => $cls['section'],
+                'display_name' => $classNameStr,
+                'papers' => $papers,
+                'instructions' => $instructionsRows,
+                'date_paper_map' => $datePaperMap
+            ];
+        }
+
+        // Sort unique dates chronologically
+        $sortedDates = array_keys($allDates);
+        sort($sortedDates);
+
+        return [
+            'exam' => [
+                'id' => (int)$exam['id'],
+                'name' => $exam['name'],
+                'academic_year_name' => $exam['academic_year_name'] ?? ''
+            ],
+            'school_profile' => $schoolProfile,
+            'dates' => $sortedDates,
+            'classes' => $classesData
+        ];
+    }
+
     public function getExamTimetable(array $user, int $examId, int $classId): array
     {
         $pdo = $this->classRepo->getPdo();

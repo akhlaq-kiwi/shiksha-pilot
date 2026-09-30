@@ -173,6 +173,10 @@ export const schoolService = {
     return apiClient.put(`/api/school/exams-new/${id}`, data);
   },
 
+  getAllExamSchemes(examId) {
+    return apiClient.get(`/api/school/exams-new/${examId}/all-schemes`);
+  },
+
   getExamTimetable(examId, classId) {
     const url = buildUrl(`/api/school/exams-new/${examId}/timetable`, { class_id: classId });
     return apiClient.get(url);

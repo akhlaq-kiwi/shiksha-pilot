@@ -466,6 +466,15 @@ class SchoolAdminController extends BaseController
         return $this->success($response, null, 'Examination updated successfully');
     }
 
+    public function getAllExamSchemes(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $examId = (int)$args['id'];
+        $data = $this->service->getAllExamSchemes($user, $examId);
+        return $this->success($response, $data);
+    }
+
     public function getExamTimetable(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);

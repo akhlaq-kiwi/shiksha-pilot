@@ -21,6 +21,20 @@ import ReportCardRenderer from '../../report-card-templates/ReportCardRenderer';
 import { compileReportCardData, compileFinalSessionReportCardData } from '../../../common/services/reportCardEngine';
 import { ContactSuperAdminDialog } from '../index';
 
+const formatGridHeaderDate = (dateStr) => {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    const monthIndex = parseInt(parts[1], 10) - 1;
+    const day = String(parseInt(parts[2], 10)).padStart(2, '0');
+    const shortMonths = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+    if (monthIndex >= 0 && monthIndex < 12) {
+      return `${day} ${shortMonths[monthIndex]}`;
+    }
+  }
+  return dateStr;
+};
+
 const formatDateString = (dateStr) => {
   if (!dateStr) return '—';
   const parts = dateStr.split('-');
@@ -625,6 +639,8 @@ export default function ExamsPage() {
   const [selectedReportCard, setSelectedReportCard] = useState(null);
   const [schoolProfile, setSchoolProfile] = useState(null);
   const [isSchemeOpen, setIsSchemeOpen] = useState(false);
+  const [allSchemesData, setAllSchemesData] = useState(null);
+  const [loadingSchemes, setLoadingSchemes] = useState(false);
   const [pendingSubjects, setPendingSubjects] = useState([]);
   const [showPendingAlert, setShowPendingAlert] = useState(false);
   const [pendingValidationSource, setPendingValidationSource] = useState(''); // 'reports' or 'publish'
@@ -1576,8 +1592,19 @@ export default function ExamsPage() {
     }
   };
 
-  const handleDownloadSchemeClick = () => {
+  const handleDownloadSchemeClick = async () => {
+    if (!selectedExam) return;
     setIsSchemeOpen(true);
+    setLoadingSchemes(true);
+    try {
+      const res = await schoolService.getAllExamSchemes(selectedExam.id);
+      setAllSchemesData(res.data || res);
+    } catch (err) {
+      console.error('Failed to load all class schemes:', err);
+      setError(err.message || 'Failed to load examination schemes.');
+    } finally {
+      setLoadingSchemes(false);
+    }
   };
 
   const triggerDownloadPdf = (e) => {
@@ -1586,21 +1613,23 @@ export default function ExamsPage() {
     if (!element) return;
 
     setSubmitting(true);
-    const clsObj = classes.find(c => c.id === parseInt(selectedClassId)) || examClassStatuses.find(c => c.id === parseInt(selectedClassId));
-    const classNameStr = clsObj ? `${clsObj.name}${clsObj.section ? ` - ${clsObj.section}` : ''}` : 'Scheme';
+    const examName = selectedExam?.name || 'Examination';
+    const ayName = allSchemesData?.exam?.academic_year_name || '';
+    const filenameStr = `${examName}_Examination_Scheme_${ayName}`.replace(/[^a-zA-Z0-9_-]/g, '_').replace(/_+/g, '_') + '.pdf';
+
     schoolAdminService.logClientAudit({
       module: 'Examinations',
       action: 'Scheme Downloaded',
-      description: `Exam scheme downloaded as PDF for ${selectedExam?.name} (${classNameStr})`
+      description: `Exam scheme downloaded as PDF for ${examName} (All Classes)`
     }).catch(console.error);
 
     const opt = {
-      margin: 10,
-      filename: `${selectedExam.name}_Class_${classNameStr}_Exam_Scheme`.replace(/\s+/g, '_') + '.pdf',
+      margin: 8,
+      filename: filenameStr,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
+      html2canvas: { scale: 2, useCORS: true, letterRendering: true, scrollY: 0, scrollX: 0 },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
-      pagebreak: { mode: ['css', 'avoid-all'] }
+      pagebreak: { mode: ['css', 'avoid-all'], avoid: '.class-scheme-section' }
     };
 
     html2pdf().from(element).set(opt).save().then(() => {
@@ -1616,15 +1645,12 @@ export default function ExamsPage() {
     const printElement = document.getElementById('printable-scheme');
     if (!printElement) return;
 
-    const clsObj = classes.find(c => c.id === parseInt(selectedClassId)) || examClassStatuses.find(c => c.id === parseInt(selectedClassId));
-    const classNameStr = clsObj ? `${clsObj.name}${clsObj.section ? ` - ${clsObj.section}` : ''}` : 'Scheme';
     schoolAdminService.logClientAudit({
       module: 'Examinations',
       action: 'Scheme Printed',
-      description: `Exam scheme printed for ${selectedExam?.name} (${classNameStr})`
+      description: `Exam scheme printed for ${selectedExam?.name} (All Classes)`
     }).catch(console.error);
 
-    // Create an isolated iframe for clean printing
     const iframe = document.createElement('iframe');
     iframe.style.position = 'fixed';
     iframe.style.right = '0';
@@ -1636,54 +1662,47 @@ export default function ExamsPage() {
 
     const doc = iframe.contentWindow.document;
     doc.open();
-    doc.write('<html><head><title>Print Examination Scheme</title>');
-    
-    // Copy stylesheets
-    Array.from(document.querySelectorAll('link[rel="stylesheet"], style')).forEach(el => {
-      doc.write(el.outerHTML);
-    });
-
-    const documentTitle = `${selectedExam.name}_Class_${classNameStr}_Exam_Scheme`.replace(/\s+/g, '_');
-
     doc.write(`
-      <style>
-        @page {
-          size: landscape !important;
-          margin: 8mm !important;
-        }
-        body {
-          background-color: white !important;
-          color: black !important;
-          padding: 0 !important;
-          margin: 0 !important;
-          -webkit-print-color-adjust: exact !important;
-          print-color-adjust: exact !important;
-        }
-        #printable-scheme {
-          width: 268mm !important;
-          max-width: 268mm !important;
-          box-sizing: border-box !important;
-          margin: 0 auto !important;
-          box-shadow: none !important;
-        }
-      </style>
-    </head>
-    <body class="bg-white text-black">
-      <div id="printable-scheme-container" style="width: 100%;">
-        ${printElement.outerHTML}
-      </div>
-    </body>
-    </html>
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${selectedExam?.name || 'Examination'} Scheme</title>
+          <link rel="stylesheet" href="${window.location.origin}/src/index.css" />
+          <style>
+            @media print {
+              @page {
+                size: landscape !important;
+                margin: 8mm !important;
+              }
+              body {
+                margin: 0 !important;
+                padding: 0 !important;
+                background: white !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+              }
+              .class-scheme-section {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+              }
+            }
+            body { font-family: system-ui, -apple-system, sans-serif; padding: 15px; }
+            .class-scheme-section { page-break-inside: avoid; break-inside: avoid; }
+          </style>
+        </head>
+        <body>
+          ${printElement.outerHTML}
+        </body>
+      </html>
     `);
     doc.close();
 
-    // Trigger printing from the iframe context
-    iframe.contentWindow.focus();
     setTimeout(() => {
-      iframe.contentWindow.document.title = documentTitle;
+      iframe.contentWindow.focus();
       iframe.contentWindow.print();
-      // Clean up the iframe after printing
-      document.body.removeChild(iframe);
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+      }, 1000);
     }, 500);
   };
 
@@ -4780,8 +4799,8 @@ export default function ExamsPage() {
         </div>
       </Dialog>
 
-      {/* DETAILED EXAMINATION SCHEME DIALOG MODAL (A4 PRINTABLE) */}
-      <Dialog isOpen={isSchemeOpen} onClose={() => setIsSchemeOpen(false)} size="lg">
+      {/* DETAILED EXAMINATION SCHEME DIALOG MODAL (ALL CLASSES COMBINED A4 PRINTABLE) */}
+      <Dialog isOpen={isSchemeOpen} onClose={() => setIsSchemeOpen(false)} maxWidth="max-w-[95vw] lg:max-w-[1250px]">
         {selectedExam && (
           <div id="printable-scheme-container" className="space-y-6">
             {isSchemeOpen && (
@@ -4810,93 +4829,198 @@ export default function ExamsPage() {
                     overflow: hidden !important;
                   }
                 }
+                .class-scheme-section {
+                  page-break-inside: avoid;
+                  break-inside: avoid;
+                }
               `}} />
             )}
             {/* Action Bar (Not printed) */}
-            <div className="flex justify-between items-center bg-zinc-50 border-b border-border p-4 -m-6 mb-6 no-print">
-              <span className="text-xs font-bold text-text-secondary">Examination Scheme Preview</span>
+            <div className="flex justify-end items-center bg-zinc-50 border-b border-border p-4 -m-6 mb-6 no-print">
               <div className="flex items-center gap-2">
-                <Button type="button" onClick={triggerDownloadPdf} className="flex items-center gap-2 font-bold py-1.5 px-3">
+                <Button type="button" onClick={triggerDownloadPdf} disabled={loadingSchemes || !allSchemesData || !allSchemesData.classes?.length} className="flex items-center gap-2 font-bold py-1.5 px-3">
                   <Download className="h-4 w-4" /> Download PDF
                 </Button>
-                <Button type="button" variant="outline" onClick={triggerPrintScheme} className="flex items-center gap-2 font-bold py-1.5 px-3 border-border hover:bg-zinc-100 dark:hover:bg-zinc-900">
+                <Button type="button" variant="outline" onClick={triggerPrintScheme} disabled={loadingSchemes || !allSchemesData || !allSchemesData.classes?.length} className="flex items-center gap-2 font-bold py-1.5 px-3 border-border hover:bg-zinc-100 dark:hover:bg-zinc-900">
                   <Printer className="h-4 w-4" /> Print Scheme
                 </Button>
               </div>
             </div>
 
-            {/* A4 Scheme document (Landscape style with horizontal scroll for screen layout) */}
-            {(() => {
-              const scaling = getDynamicScalingStyles(timetablePapers.length, instructions.length);
-              const showInstructions = timetablePapers.length < 14 && instructions.length > 0;
+            {loadingSchemes ? (
+              <div className="p-12 text-center text-zinc-500 font-medium">
+                Loading examination scheme data...
+              </div>
+            ) : !allSchemesData || !allSchemesData.classes || allSchemesData.classes.length === 0 ? (
+              <div className="p-12 text-center text-zinc-500 font-medium">
+                No examination papers have been added or configured for any class in this examination.
+              </div>
+            ) : (
+              (() => {
+                const numClasses = allSchemesData.classes.length;
+                const numDates = allSchemesData.dates?.length || 0;
+                const maxDim = Math.max(numClasses, numDates);
 
-              return (
-                <div className="w-full overflow-x-auto py-2 bg-zinc-100 dark:bg-zinc-800 rounded-lg flex justify-start lg:justify-center p-2 no-print-scroll">
-                  <div id="printable-scheme" className="border-4 border-double border-zinc-400 p-8 bg-white text-zinc-900 rounded-sm font-sans relative space-y-6 w-full max-w-[268mm]" style={{ width: '268mm', boxSizing: 'border-box' }}>
-                    
-                    {/* Header */}
-                    <div className={`text-center border-b-2 border-zinc-800 text-zinc-900 ${scaling.headerPadding}`}>
-                      <h2 className="text-2xl font-bold uppercase tracking-tight font-display">
-                        {schoolProfile?.name || 'SCHOOL TIMETABLE'}
-                      </h2>
-                      <h3 className="text-xl font-bold uppercase tracking-wide mt-1">
-                        {selectedExam.name} Examination Scheme
-                      </h3>
-                      <h4 className="text-sm font-semibold text-zinc-600 mt-1">
-                        Class: {(() => {
-                          const cls = classes.find(c => c.id === parseInt(selectedClassId)) || examClassStatuses.find(c => c.id === parseInt(selectedClassId));
-                          if (!cls) return '';
-                          return `${cls.name}${cls.section ? ` - ${cls.section}` : ''}`;
-                        })()}
-                      </h4>
-                    </div>
+                let fontSize = 'text-xs';
+                let padding = 'py-3 px-2.5';
+                let headerPadding = 'pb-3';
+                let containerPadding = 'p-6';
+                let spaceY = 'space-y-4';
+                let schoolTitleSize = 'text-2xl';
+                let examTitleSize = 'text-xl';
 
-                    {/* Timetable Scheme Table */}
-                    <div className={scaling.tableMargin}>
-                      <table className="w-full text-left border border-zinc-400 border-collapse text-zinc-900">
-                        <thead>
-                          <tr className="bg-zinc-100 border-b border-zinc-400 text-zinc-900">
-                            <th className={`border-r border-zinc-400 font-bold uppercase text-zinc-900 whitespace-nowrap w-[25%] ${scaling.tableFontSize} ${scaling.tablePadding}`}>Subject</th>
-                            <th className={`border-r border-zinc-400 font-bold uppercase text-center text-zinc-900 whitespace-nowrap w-[25%] ${scaling.tableFontSize} ${scaling.tablePadding}`}>Date</th>
-                            <th className={`border-r border-zinc-400 font-bold uppercase text-center text-zinc-900 whitespace-nowrap w-[35%] ${scaling.tableFontSize} ${scaling.tablePadding}`}>Time</th>
-                            <th className={`font-bold uppercase text-center text-zinc-900 whitespace-nowrap w-[15%] ${scaling.tableFontSize} ${scaling.tablePadding}`}>Max Marks</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {timetablePapers.map((paper, idx) => {
-                            const isGrade = paper.evaluation_type === 'grade' || parseFloat(paper.max_marks) === 0;
-                            return (
-                              <tr key={idx} className="border-b border-zinc-300 text-zinc-900">
-                                <td className={`border-r border-zinc-400 font-semibold whitespace-nowrap ${scaling.tableFontSize} ${scaling.tablePadding}`}>{paper.subject_name}</td>
-                                <td className={`border-r border-zinc-400 text-center font-mono whitespace-nowrap ${scaling.tableFontSize} ${scaling.tablePadding}`}>{formatDateString(paper.exam_date)}</td>
-                                <td className={`border-r border-zinc-400 text-center font-mono whitespace-nowrap ${scaling.tableFontSize} ${scaling.tablePadding}`}>
-                                  {formatTimeString(paper.start_time)} – {formatTimeString(paper.end_time)}
-                                </td>
-                                <td className={`text-center font-mono whitespace-nowrap font-bold ${isGrade ? 'text-amber-800 dark:text-amber-300' : ''} ${scaling.tableFontSize} ${scaling.tablePadding}`}>
-                                  {isGrade ? 'GRADE' : paper.max_marks}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
+                if (maxDim > 14 || numClasses > 12) {
+                  fontSize = 'text-[9px] leading-tight';
+                  padding = 'py-1.5 px-1';
+                  headerPadding = 'pb-1.5';
+                  containerPadding = 'p-4';
+                  spaceY = 'space-y-2';
+                  schoolTitleSize = 'text-lg';
+                  examTitleSize = 'text-sm';
+                } else if (maxDim > 9 || numClasses > 8) {
+                  fontSize = 'text-[10px] leading-snug';
+                  padding = 'py-2 px-1.5';
+                  headerPadding = 'pb-2';
+                  containerPadding = 'p-5';
+                  spaceY = 'space-y-3';
+                  schoolTitleSize = 'text-xl';
+                  examTitleSize = 'text-base';
+                } else if (maxDim > 6 || numClasses > 5) {
+                  fontSize = 'text-[11px]';
+                  padding = 'py-2.5 px-2';
+                  headerPadding = 'pb-2.5';
+                  containerPadding = 'p-6';
+                  spaceY = 'space-y-4';
+                  schoolTitleSize = 'text-2xl';
+                  examTitleSize = 'text-lg';
+                }
 
-                    {/* Footer Guidelines */}
-                    {showInstructions && (
-                      <div className={`border-t border-zinc-200 text-zinc-800 text-left ${scaling.instructionsMargin} ${scaling.instructionsFontSize}`}>
-                        <p className="font-bold uppercase text-zinc-900">Important Instructions:</p>
-                        <ol className={`list-decimal list-inside ${scaling.instructionsSpacing}`}>
-                          {instructions.map((inst, idx) => (
-                            <li key={idx} className="font-medium text-zinc-800">{inst}</li>
-                          ))}
-                        </ol>
+                // Format Short Class Name helper (e.g. "Lower Kindergarten (LKG)" -> "LKG")
+                const formatShortClassName = (rawName) => {
+                  if (!rawName) return '';
+                  let str = rawName.trim();
+                  let section = '';
+                  if (str.includes(' - ')) {
+                    const parts = str.split(' - ');
+                    str = parts[0].trim();
+                    section = ' - ' + parts.slice(1).join(' - ').trim();
+                  }
+
+                  const parenMatch = str.match(/\(([^)]+)\)/);
+                  if (parenMatch && parenMatch[1]) {
+                    const inside = parenMatch[1].trim();
+                    if (inside.length <= 8) {
+                      str = inside;
+                    }
+                  } else {
+                    const lower = str.toLowerCase();
+                    if (lower.includes('lower kindergarten') || lower.includes('lower kg')) {
+                      str = 'LKG';
+                    } else if (lower.includes('upper kindergarten') || lower.includes('upper kg')) {
+                      str = 'UKG';
+                    } else if (lower.includes('pre-nursery') || lower.includes('pre nursery')) {
+                      str = 'Pre-NUR';
+                    } else if (lower.includes('kindergarten')) {
+                      str = 'KG';
+                    } else if (lower.includes('play group') || lower.includes('playgroup')) {
+                      str = 'PG';
+                    }
+                  }
+
+                  return str + section;
+                };
+
+                // Format Exam Title string cleanly without duplicate "EXAMINATION"
+                const rawName = selectedExam?.name || '';
+                const examTitleStr = (() => {
+                  if (/scheme$/i.test(rawName)) return rawName;
+                  if (/examination$/i.test(rawName)) return `${rawName} SCHEME`;
+                  return `${rawName} EXAMINATION SCHEME`;
+                })();
+
+                return (
+                  <div className="w-full overflow-x-auto py-2 bg-zinc-100 dark:bg-zinc-800 rounded-lg flex justify-start lg:justify-center p-2 no-print-scroll">
+                    <div id="printable-scheme" className={`border-4 border-double border-zinc-400 ${containerPadding} bg-white text-zinc-900 rounded-sm font-sans relative ${spaceY} w-full max-w-[268mm]`} style={{ width: '268mm', boxSizing: 'border-box' }}>
+                      <style dangerouslySetInnerHTML={{__html: `
+                        #printable-scheme table {
+                          border-collapse: collapse !important;
+                          width: 100% !important;
+                          text-align: center !important;
+                        }
+                        #printable-scheme th,
+                        #printable-scheme td {
+                          vertical-align: middle !important;
+                          text-align: center !important;
+                          line-height: 1.35 !important;
+                        }
+                        #printable-scheme th span,
+                        #printable-scheme td span {
+                          vertical-align: middle !important;
+                          display: inline-block !important;
+                        }
+                      `}} />
+                      
+                      {/* Main Header */}
+                      <div className={`text-center border-b-2 border-zinc-800 text-zinc-900 ${headerPadding}`}>
+                        <h2 className={`${schoolTitleSize} font-bold uppercase tracking-tight font-display`}>
+                          {allSchemesData.school_profile?.name || schoolProfile?.name || 'SCHOOL TIMETABLE'}
+                        </h2>
+                        <h3 className={`${examTitleSize} font-bold uppercase tracking-wide mt-1`}>
+                          {examTitleStr}
+                        </h3>
+                        {allSchemesData.exam?.academic_year_name && (
+                          <h4 className="text-xs font-semibold text-zinc-600 mt-0.5">
+                            Academic Year: {allSchemesData.exam.academic_year_name}
+                          </h4>
+                        )}
                       </div>
-                    )}
+
+                      {/* CONSOLIDATED CLASS x DATE GRID (Uniform Borders & Dynamic Sizing) */}
+                      {allSchemesData.dates && allSchemesData.dates.length > 0 && (
+                        <div className="w-full overflow-x-auto">
+                          <table className={`w-full text-center border-collapse border border-zinc-400 text-zinc-900 ${fontSize}`}>
+                            <thead>
+                              <tr className="bg-zinc-200 text-zinc-900">
+                                <th className={`border border-zinc-400 ${padding} font-bold uppercase text-center align-middle text-zinc-900 whitespace-nowrap bg-zinc-300 w-[12%]`} style={{ verticalAlign: 'middle' }}>
+                                  <span>CLASS</span>
+                                </th>
+                                {allSchemesData.dates.map((dStr, idx) => (
+                                  <th key={idx} className={`border border-zinc-400 ${padding} font-bold uppercase text-center align-middle text-zinc-900 whitespace-nowrap`} style={{ verticalAlign: 'middle' }}>
+                                    <span>{formatGridHeaderDate(dStr)}</span>
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {allSchemesData.classes.map((clsItem, cIdx) => (
+                                <tr key={cIdx} className="hover:bg-zinc-50">
+                                  <td className={`border border-zinc-400 ${padding} font-bold text-center align-middle bg-zinc-100 whitespace-nowrap text-zinc-900`} style={{ verticalAlign: 'middle' }}>
+                                    <span>{formatShortClassName(clsItem.display_name)}</span>
+                                  </td>
+                                  {allSchemesData.dates.map((dStr, dIdx) => {
+                                    const pData = clsItem.date_paper_map?.[dStr];
+                                    return (
+                                      <td key={dIdx} className={`border border-zinc-400 ${padding} text-center align-middle font-medium whitespace-nowrap text-zinc-900`} style={{ verticalAlign: 'middle' }}>
+                                        {pData ? (
+                                          <span className="font-bold text-zinc-900">{pData.subject_name}</span>
+                                        ) : (
+                                          <span className="text-zinc-400">-</span>
+                                        )}
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+
+                    </div>
                   </div>
-                </div>
-              );
-            })()}
+                );
+              })()
+            )}
           </div>
         )}
       </Dialog>
