@@ -134,6 +134,16 @@ class SchoolAdminController extends BaseController
         return $this->success($response, ['exists' => $exists]);
     }
 
+    public function getNextSrNo(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $data = $this->service->getNextSrNo($user);
+
+        return $this->success($response, $data);
+    }
+
     public function uploadDocument(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
