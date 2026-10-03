@@ -1287,7 +1287,7 @@ class SchoolAdminService extends BaseService
     public function isFirstAcademicYear(int $schoolId, int $academicYearId): bool
     {
         $pdo = $this->studentRepo->getPdo();
-        $stmt = $pdo->prepare("SELECT id FROM academic_years WHERE school_id = :school_id ORDER BY start_date ASC");
+        $stmt = $pdo->prepare("SELECT id FROM academic_years WHERE school_id = :school_id ORDER BY start_date ASC, id ASC");
         $stmt->execute([':school_id' => $schoolId]);
         $ids = $stmt->fetchAll(PDO::FETCH_COLUMN);
         
@@ -1312,6 +1312,17 @@ class SchoolAdminService extends BaseService
             }
         }
         return $maxVal;
+    }
+
+    public function getNextSrNo(array $user): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $highest = $this->getHighestSrNo($schoolId);
+        $nextSrNo = (string)($highest > 0 ? $highest + 1 : 1001);
+        return [
+            'highest_sr_no' => $highest,
+            'next_sr_no' => $nextSrNo
+        ];
     }
 
     public function createStudent(array $user, array $data): array
@@ -10635,6 +10646,7 @@ Only approve the settlement after reviewing all financial records.
                 s.roll_no, 
                 CONCAT('Monthly Fee (', fp.fee_month, ')') AS fee_type, 
                 fp.fee_month AS months_covered, 
+                COALESCE(fp.discount_amount, 0) AS discount_amount,
                 fp.amount_paid AS amount,
                 fp.academic_year_id,
                 s.academic_year_id AS student_academic_year_id,
@@ -10671,6 +10683,7 @@ Only approve the settlement after reviewing all financial records.
                 s.roll_no, 
                 aft.name AS fee_type, 
                 'N/A' AS months_covered, 
+                COALESCE(afph.discount_amount, afp.discount_amount, 0) AS discount_amount,
                 afph.amount_paid AS amount,
                 aft.academic_year_id,
                 s.academic_year_id AS student_academic_year_id,
@@ -10772,7 +10785,8 @@ Only approve the settlement after reviewing all financial records.
                 'description' => $spr['staff_name'],
                 'category' => $categoryStr,
                 'expense_date' => $spr['expense_date'],
-                'amount' => $spr['amount']
+                'amount' => $spr['amount'],
+                'added_by' => 'School Admin'
             ];
         }
 
@@ -10784,8 +10798,15 @@ Only approve the settlement after reviewing all financial records.
         }
 
         $stmtExpenseList = $pdo->prepare("
-            SELECT description, 'School Expense' AS category, expense_date, amount
+            SELECT 
+                se.description, 
+                'School Expense' AS category, 
+                se.expense_date, 
+                se.amount,
+                COALESCE(u.phone, '') AS added_by_phone,
+                COALESCE(u.name, 'School Admin') AS added_by
             FROM school_expenses se
+            LEFT JOIN users u ON u.id = se.created_by
             WHERE se.school_id = :sid 
               {$ayClauseExp}
               {$createdClauseExp}
@@ -10902,6 +10923,7 @@ Only approve the settlement after reviewing all financial records.
                 s.roll_no, 
                 CONCAT('Monthly Fee (', fp.fee_month, ')') AS fee_type, 
                 fp.fee_month AS months_covered, 
+                COALESCE(fp.discount_amount, 0) AS discount_amount,
                 fp.amount_paid AS amount,
                 fp.academic_year_id,
                 s.academic_year_id AS student_academic_year_id,
@@ -10947,6 +10969,7 @@ Only approve the settlement after reviewing all financial records.
                 s.roll_no, 
                 aft.name AS fee_type, 
                 'N/A' AS months_covered, 
+                COALESCE(afph.discount_amount, afp.discount_amount, 0) AS discount_amount,
                 afph.amount_paid AS amount,
                 aft.academic_year_id,
                 s.academic_year_id AS student_academic_year_id,
@@ -11056,7 +11079,8 @@ Only approve the settlement after reviewing all financial records.
                 'description' => $spr['staff_name'],
                 'category' => $categoryStr,
                 'expense_date' => $spr['expense_date'],
-                'amount' => $spr['amount']
+                'amount' => $spr['amount'],
+                'added_by' => 'School Admin'
             ];
         }
 
@@ -11074,8 +11098,15 @@ Only approve the settlement after reviewing all financial records.
         }
 
         $stmtExpenseList = $pdo->prepare("
-            SELECT description, 'School Expense' AS category, expense_date, amount
+            SELECT 
+                se.description, 
+                'School Expense' AS category, 
+                se.expense_date, 
+                se.amount,
+                COALESCE(u.phone, '') AS added_by_phone,
+                COALESCE(u.name, 'School Admin') AS added_by
             FROM school_expenses se
+            LEFT JOIN users u ON u.id = se.created_by
             WHERE se.school_id = :sid 
               {$ayClauseExp}
               {$cutoffClauseExp}

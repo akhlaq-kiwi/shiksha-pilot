@@ -351,6 +351,10 @@ export const schoolService = {
     return apiClient.get(buildUrl('/api/school/students/check-sr-no', params));
   },
 
+  getNextSrNo() {
+    return apiClient.get('/api/school/students/next-sr-no');
+  },
+
   createAcademicYear(data) {
     return apiClient.post('/api/school/academic-years', data);
   },

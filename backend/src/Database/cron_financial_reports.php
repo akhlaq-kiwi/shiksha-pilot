@@ -255,6 +255,7 @@ try {
                     s.roll_no, 
                     'Tuition Fee' AS fee_type, 
                     fp.fee_month AS months_covered, 
+                    COALESCE(fp.discount_amount, 0) AS discount_amount,
                     fp.amount_paid AS amount,
                     COALESCE(u.phone, '') AS collector_phone,
                     COALESCE(fp.collected_by, 'School Admin') AS collected_by
@@ -280,6 +281,7 @@ try {
                     s.roll_no, 
                     aft.name AS fee_type, 
                     'N/A' AS months_covered, 
+                    COALESCE(afp.discount_amount, 0) AS discount_amount,
                     afp.amount AS amount,
                     COALESCE(u.phone, '') AS collector_phone,
                     COALESCE(afp.collected_by, 'School Admin') AS collected_by
@@ -328,7 +330,8 @@ try {
                         END
                     ) AS category, 
                     sp.payment_date AS expense_date, 
-                    sp.amount_paid AS amount
+                    sp.amount_paid AS amount,
+                    'School Admin' AS added_by
                 FROM staff_payments sp
                 JOIN staff st ON sp.staff_id = st.id
                 LEFT JOIN academic_years ay ON sp.academic_year_id = ay.id
@@ -340,11 +343,18 @@ try {
             $salaryPayments = $stmtSalaryList->fetchAll();
 
             $stmtExpenseList = $pdo->prepare("
-                SELECT description, 'School Expense' AS category, expense_date, amount
-                FROM school_expenses
-                WHERE school_id = :sid 
-                  AND created_at {$operator} :from_ts 
-                  AND created_at <= :to_ts
+                SELECT 
+                    se.description, 
+                    'School Expense' AS category, 
+                    se.expense_date, 
+                    se.amount,
+                    COALESCE(u.phone, '') AS added_by_phone,
+                    COALESCE(u.name, 'School Admin') AS added_by
+                FROM school_expenses se
+                LEFT JOIN users u ON u.id = se.created_by
+                WHERE se.school_id = :sid 
+                  AND se.created_at {$operator} :from_ts 
+                  AND se.created_at <= :to_ts
             ");
             $stmtExpenseList->execute([':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts]);
             $expensesItems = $stmtExpenseList->fetchAll();

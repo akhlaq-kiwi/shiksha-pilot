@@ -36,14 +36,19 @@ class ExcelGenerator
                 'Roll Number',
                 'Fee Type',
                 'Months Covered',
+                'Discount',
                 'Fee Amount'
             ]
         ];
 
         $totalFee = 0.0;
+        $totalDiscount = 0.0;
         foreach ($feeCollections as $row) {
             $amt = round((float)($row['amount'] ?? 0), 2);
             $totalFee = round($totalFee + $amt, 2);
+
+            $disc = round((float)($row['discount_amount'] ?? 0), 2);
+            $totalDiscount = round($totalDiscount + $disc, 2);
 
             $depTime = '';
             if (!empty($row['deposit_time'])) {
@@ -67,6 +72,7 @@ class ExcelGenerator
                     (string)($row['roll_no'] ?? ''),
                     $row['fee_type'] ?? '',
                     $row['months_covered'] ?? '',
+                    $disc,
                     $amt
                 ]
             ];
@@ -78,6 +84,7 @@ class ExcelGenerator
             'cells' => [
                 'Total Fee Collection',
                 '', '', '', '', '', '',
+                $totalDiscount,
                 $totalFee
             ]
         ];
@@ -96,6 +103,7 @@ class ExcelGenerator
         $rows[] = [
             'isHeader' => true,
             'cells' => [
+                'Added By',
                 'Expense Description',
                 'Category',
                 'Expense Date',
@@ -113,9 +121,12 @@ class ExcelGenerator
                 $expDate = date('j M Y', strtotime((string)$row['expense_date']));
             }
 
+            $addedBy = !empty($row['added_by_phone']) ? (string)$row['added_by_phone'] : (!empty($row['added_by']) ? (string)$row['added_by'] : 'School Admin');
+
             $rows[] = [
                 'isHeader' => false,
                 'cells' => [
+                    $addedBy,
                     $row['description'] ?? '',
                     $row['category'] ?? '',
                     $expDate,
@@ -129,7 +140,7 @@ class ExcelGenerator
             'isHeader' => true,
             'cells' => [
                 'Total Expenses',
-                '', '',
+                '', '', '',
                 $totalExp
             ]
         ];
