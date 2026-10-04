@@ -4,6 +4,7 @@ import { ArrowLeft, Users, ShieldAlert, FileText, ChevronRight, User } from 'luc
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
 import { Button } from '../../../common/ui/button';
+import { Select } from '../../../common/ui/select';
 import { platformService } from '../../../common/services/platformService';
 
 // Self-healing avatar image component to handle loading errors gracefully
@@ -36,6 +37,8 @@ export default function SchoolTeachersPage() {
   const { id } = useParams();
   const nav = useNavigate();
   const [teachers, setTeachers] = useState([]);
+  const [academicYears, setAcademicYears] = useState([]);
+  const [selectedYearId, setSelectedYearId] = useState('');
   const [schoolName, setSchoolName] = useState('School');
   const [loading, setLoading] = useState(true);
   const [selectedTeacher, setSelectedTeacher] = useState(null);
@@ -50,6 +53,14 @@ export default function SchoolTeachersPage() {
           setSchoolName(sc.name);
         }
 
+        const years = await platformService.getSchoolAcademicYears(id);
+        setAcademicYears(years || []);
+
+        const currentYear = (years || []).find(y => y.status === 'Current') || (years || [])[0];
+        if (currentYear) {
+          setSelectedYearId(String(currentYear.id));
+        }
+
         const data = await platformService.getSchoolTeachers(id);
         setTeachers(Array.isArray(data) ? data : []);
       } catch {}
@@ -58,7 +69,13 @@ export default function SchoolTeachersPage() {
     fetchData();
   }, [id]);
 
-  const activeCount = teachers.filter(t => t.status === 'ACTIVE').length;
+  const filteredTeachers = teachers.filter(t => {
+    if (!selectedYearId) return true;
+    if (!t.academic_year_id) return true;
+    return String(t.academic_year_id) === String(selectedYearId);
+  });
+
+  const activeCount = filteredTeachers.filter(t => t.status === 'ACTIVE' || !t.status).length;
 
   const formatDate = (dateStr) => {
     if (!dateStr) return '—';
@@ -227,37 +244,40 @@ export default function SchoolTeachersPage() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">{schoolName} — Staff Directory</h2>
-          <p className="text-text-secondary text-sm mt-1">Platform-wide overview of registered teachers and academic administrators.</p>
+          <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">{schoolName} — {activeCount} Teacher{activeCount !== 1 ? 's' : ''}</h2>
+          <p className="text-text-secondary text-sm mt-1">Total {activeCount} active teacher{activeCount !== 1 ? 's' : ''} registered for selected academic year.</p>
         </div>
       </div>
 
-      {/* Summary count */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="shadow-sm border border-border bg-surface rounded-2xl">
-          <CardContent className="p-6 flex items-center gap-4">
-            <div className="p-3.5 bg-primary/10 text-primary rounded-2xl">
-              <Users className="h-6 w-6" />
-            </div>
-            <div>
-              <p className="text-text-muted text-[11px] font-bold uppercase tracking-wider">Active Teachers</p>
-              <p className="text-3xl font-bold text-text-primary mt-1 font-display">{activeCount} Active Teacher{activeCount !== 1 ? 's' : ''}</p>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Academic Year Filter Toolbar */}
+      <div className="bg-surface border border-border rounded-2xl p-4 flex flex-col sm:flex-row gap-4 items-center justify-between shadow-sm">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <span className="text-xs font-bold text-text-muted uppercase tracking-wider whitespace-nowrap">Academic Year:</span>
+          <Select
+            value={selectedYearId}
+            onChange={e => setSelectedYearId(e.target.value)}
+            className="w-full sm:w-48"
+          >
+            {academicYears.map(y => (
+              <option key={y.id} value={y.id}>
+                {y.name} {y.status === 'Current' ? '(Current)' : ''}
+              </option>
+            ))}
+          </Select>
+        </div>
       </div>
 
       {/* Roster Listing Grid of Cards - simplified to ONLY display Photo, Name, and Subject */}
       {loading ? (
         <div className="py-12 text-center text-xs text-text-muted">Loading teachers directory…</div>
-      ) : teachers.length === 0 ? (
+      ) : filteredTeachers.length === 0 ? (
         <div className="py-16 text-center text-text-muted text-sm flex flex-col items-center gap-2 justify-center border border-dashed border-border rounded-2xl bg-surface/50">
           <ShieldAlert className="h-8 w-8 text-text-muted animate-pulse" />
-          <span>No staff members registered for this school yet.</span>
+          <span>No staff members registered for this academic year yet.</span>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {teachers.map(t => (
+          {filteredTeachers.map(t => (
             <div
               key={t.id}
               onClick={() => setSelectedTeacher(t)}

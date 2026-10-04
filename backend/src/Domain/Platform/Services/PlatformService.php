@@ -1074,22 +1074,28 @@ class PlatformService extends BaseService
         $stmtActiveSchools = $pdo->query("SELECT COUNT(*) FROM schools WHERE status = 'ACTIVE'");
         $totalActiveSchoolsCount = (int)$stmtActiveSchools->fetchColumn();
 
-        // 2. Count Active Teachers across Active schools
+        // 2. Count Active Teachers across Active schools (in active academic year)
         $stmtTeachers = $pdo->query("
-            SELECT COUNT(*) 
-            FROM staff 
-            WHERE status = 'ACTIVE' 
-              AND LOWER(role) = 'teacher' 
-              AND school_id IN (SELECT id FROM schools WHERE status = 'ACTIVE')
+            SELECT COUNT(DISTINCT st.id) 
+            FROM staff st
+            JOIN schools sch ON st.school_id = sch.id
+            LEFT JOIN academic_years ay ON st.academic_year_id = ay.id
+            WHERE st.status = 'ACTIVE' 
+              AND LOWER(st.role) = 'teacher' 
+              AND sch.status = 'ACTIVE'
+              AND (st.academic_year_id IS NULL OR ay.is_current = 1 OR UPPER(ay.status) = 'ACTIVE')
         ");
         $totalTeachers = (int)$stmtTeachers->fetchColumn();
 
-        // 3. Count Active Students across Active schools
+        // 3. Count Active Students across Active schools (in active academic year)
         $stmtStudents = $pdo->query("
-            SELECT COUNT(*) 
-            FROM students 
-            WHERE status = 'ACTIVE' 
-              AND school_id IN (SELECT id FROM schools WHERE status = 'ACTIVE')
+            SELECT COUNT(DISTINCT s.id) 
+            FROM students s
+            JOIN schools sch ON s.school_id = sch.id
+            LEFT JOIN academic_years ay ON s.academic_year_id = ay.id
+            WHERE s.status = 'ACTIVE' 
+              AND sch.status = 'ACTIVE'
+              AND (s.academic_year_id IS NULL OR ay.is_current = 1 OR UPPER(ay.status) = 'ACTIVE')
         ");
         $totalStudents = (int)$stmtStudents->fetchColumn();
 
