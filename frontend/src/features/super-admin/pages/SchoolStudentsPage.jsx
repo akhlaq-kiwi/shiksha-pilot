@@ -350,19 +350,28 @@ export default function SchoolStudentsPage() {
     );
   }
 
+  const selectedYearStudents = students.filter(s => String(s.academic_year_id) === String(selectedYearId));
+  const activeYearStudentsCount = selectedYearStudents.length;
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       
       {/* Listing Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-border/60 pb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/60 pb-6">
         <div className="flex items-center gap-4">
           <Button variant="outline" size="sm" onClick={() => nav('/super-admin/schools')} className="p-2 rounded-xl">
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">{schoolName} — Class Directory</h2>
-            <p className="text-text-secondary text-sm mt-1">Select an academic year and browse student counts by class.</p>
+            <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">{schoolName} — {activeYearStudentsCount} Student{activeYearStudentsCount !== 1 ? 's' : ''}</h2>
+            <p className="text-text-secondary text-sm mt-1">Total {activeYearStudentsCount} student{activeYearStudentsCount !== 1 ? 's' : ''} enrolled in selected academic year.</p>
           </div>
+        </div>
+
+        {/* Total Students Counter Badge */}
+        <div className="flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-primary/10 border border-primary/20 text-primary font-bold text-sm shadow-xs flex-shrink-0">
+          <GraduationCap className="h-5 w-5" />
+          <span>Total Students: <strong className="text-base font-extrabold">{activeYearStudentsCount}</strong></span>
         </div>
       </div>
 
