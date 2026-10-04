@@ -512,6 +512,17 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
     return String(formData.academic_year_id) === String(earliestAcademicYear.id);
   }, [academicYears, formData.academic_year_id, earliestAcademicYear]);
 
+  const shouldShowAdmissionFee = useMemo(() => {
+    const cat = (formData.student_category || '').trim().toLowerCase();
+    if (cat.includes('existing')) {
+      return false;
+    }
+    if (studentId && cat !== 'new admission') {
+      return false;
+    }
+    return true;
+  }, [formData.student_category, studentId]);
+
   // Pre-fetch next available SR number for subsequent academic years
   useEffect(() => {
     const fetchNextSrNo = async () => {
@@ -570,13 +581,15 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
 
     setErrors(prev => {
       const nextErrs = { ...prev };
-      const currentCategory = name === 'student_category' ? value : updatedForm.student_category;
+      const cat = (name === 'student_category' ? value : updatedForm.student_category || '').trim().toLowerCase();
       const currentFeeStr = name === 'admission_fee' ? value : updatedForm.admission_fee;
       const feeVal = (currentFeeStr !== '' && currentFeeStr !== null && currentFeeStr !== undefined) ? parseFloat(currentFeeStr) : 0;
 
-      if (currentCategory === 'Existing Student' && feeVal > 0) {
-        nextErrs.admission_fee = 'Not allowed for existing student';
-      } else if (nextErrs.admission_fee === 'Not allowed for existing student') {
+      if (cat.includes('existing') || (studentId && cat !== 'new admission')) {
+        nextErrs.admission_fee = null;
+      } else if (feeVal < 0) {
+        nextErrs.admission_fee = 'Admission Fee cannot be negative.';
+      } else if (nextErrs.admission_fee) {
         nextErrs.admission_fee = null;
       }
 
@@ -796,10 +809,12 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
       if (!formData.admission_date) {
         errs.admission_date = 'Admission Date is required';
       }
-      if (formData.admission_fee !== '' && formData.admission_fee !== null && parseFloat(formData.admission_fee) < 0) {
-        errs.admission_fee = 'Admission Fee cannot be negative.';
-      } else if (formData.student_category === 'Existing Student' && formData.admission_fee !== '' && formData.admission_fee !== null && parseFloat(formData.admission_fee) > 0) {
-        errs.admission_fee = 'Not allowed for existing student';
+      if (shouldShowAdmissionFee) {
+        if (formData.admission_fee !== '' && formData.admission_fee !== null && parseFloat(formData.admission_fee) < 0) {
+          errs.admission_fee = 'Admission Fee cannot be negative.';
+        }
+      } else {
+        delete errs.admission_fee;
       }
       const isFirstYearSession = isFirstYear;
       if (isFirstYearSession && !studentId && !formData.student_category) {
@@ -971,6 +986,10 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
         class_id: formData.class_id,
         class_name: selectedClassName
       };
+
+      if (!shouldShowAdmissionFee) {
+        delete submitPayload.admission_fee;
+      }
 
       if (studentId) {
         await schoolService.updateStudent(studentId, submitPayload);
@@ -1166,23 +1185,25 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                       </div>
                       {errors.admission_date && <p className="text-[11px] text-red-500 font-semibold">{errors.admission_date}</p>}
                     </div>
-                    <div className="space-y-1.5">
-                      <label htmlFor="admission_fee" className="text-xs font-bold text-text-secondary uppercase">Admission Fee</label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-2 text-xs font-bold text-text-muted">₹</span>
-                        <Input id="admission_fee"
-                          type="number"
-                          name="admission_fee"
-                          placeholder="0.00"
-                          value={formData.admission_fee}
-                          onChange={handleTextChange}
-                          min="0"
-                          step="any"
-                          className="pl-7 text-text-primary text-sm"
-                        />
+                    {shouldShowAdmissionFee && (
+                      <div className="space-y-1.5">
+                        <label htmlFor="admission_fee" className="text-xs font-bold text-text-secondary uppercase">Admission Fee</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2 text-xs font-bold text-text-muted">₹</span>
+                          <Input id="admission_fee"
+                            type="number"
+                            name="admission_fee"
+                            placeholder="0.00"
+                            value={formData.admission_fee}
+                            onChange={handleTextChange}
+                            min="0"
+                            step="any"
+                            className="pl-7 text-text-primary text-sm"
+                          />
+                        </div>
+                        {errors.admission_fee && <p className="text-[11px] text-red-500 font-semibold">{errors.admission_fee}</p>}
                       </div>
-                      {errors.admission_fee && <p className="text-[11px] text-red-500 font-semibold">{errors.admission_fee}</p>}
-                    </div>
+                    )}
 
                     {isFirstYear && (
                       <div className="space-y-1.5">
