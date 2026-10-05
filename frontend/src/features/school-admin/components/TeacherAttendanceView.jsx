@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Calendar, Users, Check, AlertCircle, Save, Download, Clock, QrCode, UserCheck, ShieldAlert, Award, RotateCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, Users, Check, AlertCircle, Save, Download, Clock, QrCode, UserCheck, ShieldAlert, Award, RotateCw, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
@@ -1063,24 +1063,34 @@ export function TeacherAttendanceView() {
       <Dialog
         isOpen={!!detailModalInfo}
         onClose={() => setDetailModalInfo(null)}
-        title={detailModalInfo ? `${detailModalInfo.typeName} — ${detailModalInfo.teacherName}` : ''}
-        description={detailModalInfo ? `${detailModalInfo.monthName} ${detailModalInfo.year} • Total: ${detailModalInfo.count} Days` : ''}
+        hideHeader={true}
         maxWidth="max-w-lg"
       >
         {detailModalInfo && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-100 dark:bg-zinc-800/60 border border-border">
+            {/* Header bar */}
+            <div className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-100 dark:bg-zinc-800/60 border border-border">
               <span className="text-xs font-bold text-text-secondary uppercase tracking-wider">
                 Teacher: <strong className="text-text-primary">{detailModalInfo.teacherName}</strong> ({detailModalInfo.empId})
               </span>
-              <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
-                detailModalInfo.type === 'absent' ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300' :
-                detailModalInfo.type === 'late' ? 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300' :
-                detailModalInfo.type === 'leave' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300' :
-                'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
-              }`}>
-                {detailModalInfo.count} {detailModalInfo.typeName}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                  detailModalInfo.type === 'absent' ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300' :
+                  detailModalInfo.type === 'late' ? 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300' :
+                  detailModalInfo.type === 'leave' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300' :
+                  'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+                }`}>
+                  {detailModalInfo.count} {detailModalInfo.typeName}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setDetailModalInfo(null)}
+                  className="h-7 w-7 rounded-full inline-flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                  title="Close"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
             {(!detailModalInfo.dates || detailModalInfo.dates.length === 0) ? (
@@ -1107,31 +1117,16 @@ export function TeacherAttendanceView() {
                           {item.is_late && <span className="text-rose-500 font-bold ml-1">(Late)</span>}
                         </div>
                       )}
-                      {item.unmarked && (
-                        <div className="text-xs text-text-muted italic">
-                          Unmarked working day
-                        </div>
-                      )}
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <span className={`px-2.5 py-1 text-xs font-bold rounded-lg border ${
-                        detailModalInfo.type === 'absent' ? 'bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400' :
-                        detailModalInfo.type === 'late' ? 'bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-950/40 dark:text-orange-400' :
-                        detailModalInfo.type === 'leave' ? 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400' :
-                        'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400'
-                      }`}>
-                        {detailModalInfo.type === 'late' ? 'Late Entry' : item.status}
-                      </span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="text-xs font-bold text-primary group-hover:bg-primary group-hover:text-white transition-all h-8 px-2.5"
-                      >
-                        View <ChevronRight className="h-3.5 w-3.5 ml-1" />
-                      </Button>
-                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs font-bold text-primary group-hover:bg-primary group-hover:text-white transition-all h-8 px-3"
+                    >
+                      View <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                    </Button>
                   </div>
                 ))}
               </div>
