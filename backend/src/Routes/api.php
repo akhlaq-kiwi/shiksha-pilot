@@ -245,6 +245,7 @@ return function (App $app) {
     $app->get('/api/school/timetable', [SchoolAdminController::class, 'getTimetable']);
     $app->post('/api/school/timetable', [SchoolAdminController::class, 'addTimetablePeriod']);
     $app->delete('/api/school/timetable/{id}', [SchoolAdminController::class, 'deleteTimetablePeriod']);
+    $app->post('/api/school/timetable/delete-day', [SchoolAdminController::class, 'deleteDayTimetable']);
     $app->post('/api/school/timetable/backup', [SchoolAdminController::class, 'assignBackupTeacher']);
     $app->post('/api/school/timetable/replace', [SchoolAdminController::class, 'replaceTeacher']);
     $app->post('/api/school/timetable/publish', [SchoolAdminController::class, 'publishTimetable']);

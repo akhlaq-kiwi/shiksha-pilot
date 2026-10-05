@@ -104,6 +104,9 @@ export const schoolAdminService = {
   async deleteTimetableEntry(id, data = {}) {
     return apiClient.delete(`/api/school/timetable/${id}`, { body: data });
   },
+  async deleteDayTimetable(data) {
+    return apiClient.post('/api/school/timetable/delete-day', data);
+  },
   async assignBackupTeacher(data) {
     return apiClient.post('/api/school/timetable/backup', data);
   },
