@@ -1344,17 +1344,26 @@ class StudentService extends BaseService
         $role = strtoupper($user['role'] ?? '');
         $limit = isset($params['limit']) ? max(1, (int)$params['limit']) : 10;
         $offset = isset($params['offset']) ? max(0, (int)$params['offset']) : 0;
+        $studentId = isset($params['student_id']) ? (int)$params['student_id'] : (isset($_SERVER['HTTP_X_STUDENT_ID']) && is_numeric($_SERVER['HTTP_X_STUDENT_ID']) ? (int)$_SERVER['HTTP_X_STUDENT_ID'] : null);
         $pdo = $this->repo->getPdo();
 
-        $stmt = $pdo->prepare("
+        $query = "
             SELECT * FROM dashboard_notifications
             WHERE school_id = :school_id AND (user_id = :user_id OR (user_role = :role AND user_id IS NULL))
-            ORDER BY id DESC
-            LIMIT :limit OFFSET :offset
-        ");
+        ";
+        if ($studentId !== null && $studentId > 0) {
+            $query .= " AND (student_id = :student_id OR student_id IS NULL)";
+        }
+
+        $query .= " ORDER BY id DESC LIMIT :limit OFFSET :offset";
+
+        $stmt = $pdo->prepare($query);
         $stmt->bindValue(':school_id', $schoolId, PDO::PARAM_INT);
         $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
         $stmt->bindValue(':role', $role, PDO::PARAM_STR);
+        if ($studentId !== null && $studentId > 0) {
+            $stmt->bindValue(':student_id', $studentId, PDO::PARAM_INT);
+        }
         $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
         $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
         $stmt->execute();
