@@ -641,7 +641,24 @@ class TeacherService extends BaseService
     {
         if (empty($absentStudentIds)) return;
         try {
-            $inPlaceholders = implode(',', array_fill(0, count($absentStudentIds), '?'));
+            $dispatcher = new \App\Shared\Notifications\PushDispatcher(
+                $pdo,
+                new \App\Shared\Notifications\FcmClient($pdo)
+            );
+
+            $stmtStudent = $pdo->prepare("
+                SELECT id,
+                       CASE 
+                         WHEN last_name = '.' OR last_name IS NULL OR TRIM(last_name) = '' THEN 
+                           TRIM(CONCAT(first_name, ' ', COALESCE(middle_name, '')))
+                         ELSE 
+                           TRIM(CONCAT(first_name, ' ', COALESCE(middle_name, ''), ' ', last_name))
+                       END AS name
+                FROM students 
+                WHERE id = :id AND school_id = :sid 
+                LIMIT 1
+            ");
+
             $stmtUsers = $pdo->prepare("
                 SELECT DISTINCT u.id AS user_id, u.role
                 FROM students s
@@ -653,27 +670,36 @@ class TeacherService extends BaseService
                     u.phone = s.guardian_phone OR 
                     (u.email IS NOT NULL AND u.email = s.email AND u.email != '')
                 )
-                WHERE s.id IN ($inPlaceholders) 
-                  AND s.school_id = ? 
+                WHERE s.id = :st_id
+                  AND s.school_id = :sid 
                   AND u.role IN ('STUDENT', 'PARENT')
             ");
-            $params = array_merge($absentStudentIds, [$schoolId]);
-            $stmtUsers->execute($params);
-            $recipients = $stmtUsers->fetchAll(PDO::FETCH_ASSOC);
 
-            if (!empty($recipients)) {
-                $dispatcher = new \App\Shared\Notifications\PushDispatcher(
-                    $pdo,
-                    new \App\Shared\Notifications\FcmClient($pdo)
-                );
-                $dispatcher->toUsers(
-                    $schoolId,
-                    $recipients,
-                    'ATTENDANCE_MARKED_ABSENT',
-                    'You are absent today.',
-                    'Attendance has been marked for today, You can check the attendance.',
-                    '/attendance'
-                );
+            $uniqueAbsentIds = array_unique(array_map('intval', $absentStudentIds));
+
+            foreach ($uniqueAbsentIds as $stId) {
+                if ($stId <= 0) continue;
+
+                $stmtStudent->execute([':id' => $stId, ':sid' => $schoolId]);
+                $stRow = $stmtStudent->fetch(PDO::FETCH_ASSOC);
+                $studentName = !empty($stRow['name']) ? $stRow['name'] : 'Student';
+
+                $stmtUsers->execute([':st_id' => $stId, ':sid' => $schoolId]);
+                $recipients = $stmtUsers->fetchAll(PDO::FETCH_ASSOC);
+
+                if (!empty($recipients)) {
+                    $title = "{$studentName} is Absent Today";
+                    $message = "{$studentName} has been marked absent for today. Tap to view details.";
+                    $dispatcher->toUsers(
+                        $schoolId,
+                        $recipients,
+                        'ATTENDANCE_MARKED_ABSENT',
+                        $title,
+                        $message,
+                        '/attendance',
+                        $stId
+                    );
+                }
             }
         } catch (\Throwable $ne) {
             // Suppress notification errors so attendance commit is preserved

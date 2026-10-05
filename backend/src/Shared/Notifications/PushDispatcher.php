@@ -58,9 +58,10 @@ final class PushDispatcher
         string $eventKey,
         string $title,
         string $message,
-        ?string $link = null
+        ?string $link = null,
+        ?int $studentId = null
     ): void {
-        $notifId = $this->insertRow($schoolId, $role, null, $eventKey, $title, $message, $link);
+        $notifId = $this->insertRow($schoolId, $role, null, $eventKey, $title, $message, $link, $studentId);
 
         $this->guard(function () use ($schoolId, $role, $eventKey, $title, $message, $link, $notifId) {
             $this->fcm->sendToTopic(
@@ -83,9 +84,10 @@ final class PushDispatcher
         string $eventKey,
         string $title,
         string $message,
-        ?string $link = null
+        ?string $link = null,
+        ?int $studentId = null
     ): void {
-        $notifId = $this->insertRow($schoolId, $role, $userId, $eventKey, $title, $message, $link);
+        $notifId = $this->insertRow($schoolId, $role, $userId, $eventKey, $title, $message, $link, $studentId);
 
         $this->guard(function () use ($schoolId, $userId, $eventKey, $title, $message, $link, $notifId) {
             $tokens = $this->activeTokensForUser($schoolId, $userId);
@@ -100,7 +102,7 @@ final class PushDispatcher
      * cost stops being worth it and the in-app notification centre will show
      * it on next open anyway.
      *
-     * @param array<int,array{user_id:int,role:string}> $recipients
+     * @param array<int,array{user_id:int,role:string,student_id?:int}> $recipients
      */
     public function toUsers(
         int $schoolId,
@@ -108,7 +110,8 @@ final class PushDispatcher
         string $eventKey,
         string $title,
         string $message,
-        ?string $link = null
+        ?string $link = null,
+        ?int $studentId = null
     ): void {
         $userIds = [];
         foreach ($recipients as $r) {
@@ -116,7 +119,8 @@ final class PushDispatcher
             if ($uid <= 0) {
                 continue;
             }
-            $this->insertRow($schoolId, (string) ($r['role'] ?? 'STUDENT'), $uid, $eventKey, $title, $message, $link);
+            $stId = isset($r['student_id']) ? (int)$r['student_id'] : $studentId;
+            $this->insertRow($schoolId, (string) ($r['role'] ?? 'STUDENT'), $uid, $eventKey, $title, $message, $link, $stId);
             $userIds[] = $uid;
         }
 
@@ -199,17 +203,19 @@ final class PushDispatcher
         string $eventKey,
         string $title,
         string $message,
-        ?string $link
+        ?string $link,
+        ?int $studentId = null
     ): int {
         $stmt = $this->pdo->prepare("
             INSERT INTO dashboard_notifications
-                (school_id, user_role, user_id, title, message, link, category, event_key, is_read)
-            VALUES (:sid, :role, :uid, :title, :msg, :link, :cat, :ekey, 0)
+                (school_id, user_role, user_id, student_id, title, message, link, category, event_key, is_read)
+            VALUES (:sid, :role, :uid, :stid, :title, :msg, :link, :cat, :ekey, 0)
         ");
         $stmt->execute([
             ':sid'   => $schoolId,
             ':role'  => $role,
             ':uid'   => $userId,
+            ':stid'  => $studentId,
             ':title' => $title,
             ':msg'   => $message,
             ':link'  => $link,

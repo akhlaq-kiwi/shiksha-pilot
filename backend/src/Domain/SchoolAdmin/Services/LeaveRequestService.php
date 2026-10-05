@@ -155,22 +155,21 @@ class LeaveRequestService extends BaseService
             $applicantRole = 'TEACHER';
         } elseif ($role === 'PARENT' || $role === 'STUDENT') {
             $applicantRole = 'STUDENT';
-            if ($role === 'PARENT') {
-                if (empty($data['student_id'])) {
-                    throw new ValidationException(['student_id' => 'Please select a child.']);
-                }
-                $studentId = (int)$data['student_id'];
-                // Verify student belongs to parent
-                $students = $this->resolveStudentsForUser($user);
-                $allowedIds = array_map(fn($s) => (int)$s['id'], $students);
-                if (!in_array($studentId, $allowedIds, true)) {
+            $students = $this->resolveStudentsForUser($user);
+            if (empty($students)) {
+                throw new NotFoundException('Student record not found.');
+            }
+            $allowedIds = array_map(fn($s) => (int)$s['id'], $students);
+
+            if (!empty($data['student_id'])) {
+                $requestedId = (int)$data['student_id'];
+                if (!in_array($requestedId, $allowedIds, true)) {
                     throw new ForbiddenException('You are not authorized to apply leave for this student.');
                 }
+                $studentId = $requestedId;
+            } elseif ($role === 'PARENT') {
+                throw new ValidationException(['student_id' => 'Please select a child.']);
             } else {
-                $students = $this->resolveStudentsForUser($user);
-                if (empty($students)) {
-                    throw new NotFoundException('Student record not found.');
-                }
                 $studentId = (int)$students[0]['id'];
             }
         } else {
@@ -281,15 +280,14 @@ class LeaveRequestService extends BaseService
                     $classId = (int)($stmtClass->fetchColumn() ?: 0);
 
                     $stmtStAttUpsert = $pdo->prepare("
-                        INSERT INTO attendance (school_id, academic_year_id, class_id, student_id, date, status, created_at, updated_at)
-                        VALUES (:sid, :ayid, :cid, :student_id, :date, 'LEAVE', NOW(), NOW())
-                        ON DUPLICATE KEY UPDATE status = 'LEAVE', updated_at = NOW()
+                        INSERT INTO attendance (school_id, class_id, student_id, date, status, created_at)
+                        VALUES (:sid, :cid, :student_id, :date, 'LEAVE', NOW())
+                        ON DUPLICATE KEY UPDATE status = 'LEAVE'
                     ");
                     foreach ($period as $dt) {
                         $dateStr = $dt->format('Y-m-d');
                         $stmtStAttUpsert->execute([
                             ':sid' => $schoolId,
-                            ':ayid' => (int)$leave['academic_year_id'],
                             ':cid' => $classId,
                             ':student_id' => $studentId,
                             ':date' => $dateStr
