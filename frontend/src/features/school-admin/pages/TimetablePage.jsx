@@ -96,6 +96,8 @@ export default function TimetablePage() {
   const [copiedSchedule, setCopiedSchedule] = useState(null);
   const [isPasteConfirmOpen, setIsPasteConfirmOpen] = useState(false);
   const [pasteDestinationDay, setPasteDestinationDay] = useState('');
+  const [isDeleteDayConfirmOpen, setIsDeleteDayConfirmOpen] = useState(false);
+  const [dayToDelete, setDayToDelete] = useState('');
 
   // Inline forms for adding period per day
   const [addPeriodForm, setAddPeriodForm] = useState({
@@ -590,6 +592,39 @@ export default function TimetablePage() {
     }
   };
 
+  const handleOpenDeleteDayConfirm = (dayName) => {
+    setError('');
+    setDayToDelete(dayName);
+    setIsDeleteDayConfirmOpen(true);
+  };
+
+  const handleDeleteDayTimetable = async () => {
+    if (!dayToDelete || !selectedClassId) return;
+    const weekDates = getWeekDates(currentDate);
+    const dateStr = timetableData[dayToDelete]?.date || weekDates[dayToDelete] || '';
+
+    setActionLoading('delete-day-' + dayToDelete);
+    setError('');
+    setIsDeleteDayConfirmOpen(false);
+
+    try {
+      await schoolAdminService.deleteDayTimetable({
+        class_id: parseInt(selectedClassId, 10),
+        day_of_week: dayToDelete,
+        date: dateStr
+      });
+      toast.success(`Timetable for ${dayToDelete} deleted successfully.`);
+      setDayToDelete('');
+      await loadTimetable();
+      await loadStaff();
+    } catch (err) {
+      console.error(err);
+      setError(err.response?.data?.message || err.message || `Failed to delete timetable for ${dayToDelete}.`);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleOpenSubjectModal = async () => {
     setNewSubject({ id: '', name: '' });
     setSubjectError('');
@@ -984,6 +1019,13 @@ export default function TimetablePage() {
                               >
                                 Paste Schedule
                               </DropdownItem>
+                              <DropdownItem 
+                                destructive
+                                disabled={periodsList.length === 0}
+                                onClick={() => handleOpenDeleteDayConfirm(dayName)}
+                              >
+                                Delete Timetable
+                              </DropdownItem>
                             </DropdownMenu>
                           </div>
                         )}
@@ -1317,6 +1359,47 @@ export default function TimetablePage() {
           )}
           <p className="text-xs text-text-secondary leading-relaxed">
             Do you want to continue?
+          </p>
+        </div>
+      </Dialog>
+
+      {/* Modal: Delete Day Timetable Confirmation */}
+      <Dialog
+        isOpen={isDeleteDayConfirmOpen}
+        onClose={() => {
+          setIsDeleteDayConfirmOpen(false);
+          setDayToDelete('');
+        }}
+        title="Delete Timetable?"
+        description=""
+        className="w-[95vw] md:max-w-md"
+        footer={
+          <div className="flex justify-end gap-3 w-full">
+            <Button 
+              variant="secondary" 
+              onClick={() => {
+                setIsDeleteDayConfirmOpen(false);
+                setDayToDelete('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleDeleteDayTimetable} 
+              disabled={Boolean(actionLoading && typeof actionLoading === 'string' && actionLoading.startsWith('delete-day'))}
+            >
+              {actionLoading && typeof actionLoading === 'string' && actionLoading.startsWith('delete-day') ? 'Deleting...' : 'Delete Timetable'}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-3 pt-2">
+          <p className="text-xs text-text-secondary leading-relaxed">
+            Are you sure you want to delete all scheduled periods for <strong className="text-text-primary">{dayToDelete}</strong>?
+          </p>
+          <p className="text-xs text-text-muted leading-relaxed">
+            This action will remove all periods scheduled for this day. Teachers assigned to these periods will become available for new assignments.
           </p>
         </div>
       </Dialog>

@@ -706,6 +706,17 @@ class SchoolAdminController extends BaseController
         return $this->success($response, null, 'Timetable period deleted successfully');
     }
 
+    public function deleteDayTimetable(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body = RequestParser::body($request);
+        $data = $this->service->deleteDayTimetable($user, $body);
+
+        return $this->success($response, $data, 'Timetable for the day deleted successfully');
+    }
+
     public function assignBackupTeacher(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);

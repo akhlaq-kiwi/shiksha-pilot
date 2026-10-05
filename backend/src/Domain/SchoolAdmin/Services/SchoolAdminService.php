@@ -85,6 +85,7 @@ class SchoolAdminService extends BaseService
             $periodNum = (int)$p['period_number'];
 
             // 1. Conflict Check: is the teacher already assigned to ANOTHER class during this period on the destination day?
+            $today = date('Y-m-d');
             $stmtConflict = $pdo->prepare("
                 SELECT t.id, c.name AS class_name FROM timetable t
                 JOIN classes c ON t.class_id = c.id
@@ -92,13 +93,18 @@ class SchoolAdminService extends BaseService
                   AND t.day_of_week = :day 
                   AND t.period_number = :pnum 
                   AND t.class_id != :cid 
-                  AND t.end_date IS NULL
+                  AND t.school_id = :sid
+                  AND t.start_date <= :date1
+                  AND (t.end_date IS NULL OR t.end_date >= :date2)
             ");
             $stmtConflict->execute([
                 ':tid' => $teacherId,
                 ':day' => $destDay,
                 ':pnum' => $periodNum,
-                ':cid' => $classId
+                ':cid' => $classId,
+                ':sid' => $schoolId,
+                ':date1' => $today,
+                ':date2' => $today
             ]);
             $conflict = $stmtConflict->fetch(\PDO::FETCH_ASSOC);
             if ($conflict) {
@@ -1560,7 +1566,7 @@ class SchoolAdminService extends BaseService
             }
         }
 
-        if ($studentCategory === 'Existing Student' && $admissionFee !== null && $admissionFee > 0) {
+        if (strcasecmp($studentCategory ?? '', 'Existing Student') === 0 && $admissionFee !== null && $admissionFee > 0) {
             throw new ValidationException(['admission_fee' => 'Not allowed for existing student']);
         }
 
@@ -1995,7 +2001,7 @@ class SchoolAdminService extends BaseService
                 throw new ValidationException(['admission_fee' => 'Admission Fee cannot be negative.']);
             }
             $updatedCategoryCheck = array_key_exists('student_category', $data) ? $data['student_category'] : ($student['student_category'] ?? null);
-            if ($updatedCategoryCheck === 'Existing Student' && $admFee !== null && $admFee > 0) {
+            if (empty($id) && strcasecmp($updatedCategoryCheck ?? '', 'Existing Student') === 0 && $admFee !== null && $admFee > 0) {
                 throw new ValidationException(['admission_fee' => 'Not allowed for existing student']);
             }
             $this->syncAdmissionFeePayment($pdo, $schoolId, $id, $academicYearId, $admFee);
@@ -6396,6 +6402,44 @@ class SchoolAdminService extends BaseService
         $this->syncTeacherAssignedPeriods($pdo, (int)$entry['teacher_id'], $schoolId);
     }
 
+    public function deleteDayTimetable(array $user, array $data): array
+    {
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        $classId = !empty($data['class_id']) ? (int)$data['class_id'] : 0;
+        $dayOfWeek = !empty($data['day_of_week']) ? trim((string)$data['day_of_week']) : '';
+        $date = !empty($data['date']) ? trim((string)$data['date']) : date('Y-m-d');
+
+        if ($classId <= 0 || empty($dayOfWeek)) {
+            throw new ValidationException(['fields' => 'Class ID and Day of Week are required.']);
+        }
+
+        if ($this->isDateHoliday($schoolId, $date)) {
+            throw new ValidationException(['date' => 'Cannot modify timetable on a school holiday.']);
+        }
+
+        $stmt = $pdo->prepare("
+            SELECT id FROM timetable
+            WHERE school_id = :sid AND class_id = :cid AND day_of_week = :day
+              AND start_date <= :date1 AND (end_date IS NULL OR end_date >= :date2)
+        ");
+        $stmt->execute([
+            ':sid' => $schoolId,
+            ':cid' => $classId,
+            ':day' => $dayOfWeek,
+            ':date1' => $date,
+            ':date2' => $date
+        ]);
+        $entries = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        foreach ($entries as $entry) {
+            $this->deleteTimetablePeriod($user, (int)$entry['id'], $date);
+        }
+
+        return ['success' => true, 'deleted_count' => count($entries)];
+    }
+
     public function assignBackupTeacher(array $user, array $data): array
     {
         $pdo = $this->classRepo->getPdo();
@@ -6424,18 +6468,27 @@ class SchoolAdminService extends BaseService
             throw new ValidationException(['backup_teacher_id' => 'The backup teacher cannot be the same as the main teacher.']);
         }
 
-        $dayOfWeek = (new \DateTime($data['date']))->format('l');
+        $targetDate = !empty($data['date']) ? $data['date'] : date('Y-m-d');
+        $dayOfWeek = (new \DateTime($targetDate))->format('l');
         $stmtConflict = $pdo->prepare("
             SELECT t.id, c.name AS class_name FROM timetable t
             JOIN classes c ON t.class_id = c.id
-            WHERE t.teacher_id = :tid AND t.day_of_week = :day AND t.period_number = :pnum
+            WHERE t.teacher_id = :tid 
+              AND t.day_of_week = :day 
+              AND t.period_number = :pnum
               AND t.id != :timetable_id
+              AND t.school_id = :sid
+              AND t.start_date <= :date1
+              AND (t.end_date IS NULL OR t.end_date >= :date2)
         ");
         $stmtConflict->execute([
             ':tid' => $data['backup_teacher_id'],
             ':day' => $dayOfWeek,
             ':pnum' => $entry['period_number'],
-            ':timetable_id' => $entry['id']
+            ':timetable_id' => $entry['id'],
+            ':sid' => $schoolId,
+            ':date1' => $targetDate,
+            ':date2' => $targetDate
         ]);
         $conflict = $stmtConflict->fetch(\PDO::FETCH_ASSOC);
         if ($conflict) {
@@ -6521,18 +6574,27 @@ class SchoolAdminService extends BaseService
 
         $dayOfWeek = $entry['day_of_week'];
         $periodNumber = $entry['period_number'];
+        $targetDate = !empty($data['date']) ? $data['date'] : date('Y-m-d');
 
         $stmtConflict = $pdo->prepare("
             SELECT t.id, c.name AS class_name FROM timetable t
             JOIN classes c ON t.class_id = c.id
-            WHERE t.teacher_id = :tid AND t.day_of_week = :day AND t.period_number = :pnum
+            WHERE t.teacher_id = :tid 
+              AND t.day_of_week = :day 
+              AND t.period_number = :pnum
               AND t.id != :timetable_id
+              AND t.school_id = :sid
+              AND t.start_date <= :date1
+              AND (t.end_date IS NULL OR t.end_date >= :date2)
         ");
         $stmtConflict->execute([
             ':tid' => $data['new_teacher_id'],
             ':day' => $dayOfWeek,
             ':pnum' => $periodNumber,
-            ':timetable_id' => $entry['id']
+            ':timetable_id' => $entry['id'],
+            ':sid' => $schoolId,
+            ':date1' => $targetDate,
+            ':date2' => $targetDate
         ]);
         $conflict = $stmtConflict->fetch(\PDO::FETCH_ASSOC);
         if ($conflict) {
@@ -6541,9 +6603,16 @@ class SchoolAdminService extends BaseService
 
         $stmtCount = $pdo->prepare("
             SELECT COUNT(*) FROM timetable 
-            WHERE teacher_id = :tid AND school_id = :sid AND day_of_week = :day AND end_date IS NULL
+            WHERE teacher_id = :tid AND school_id = :sid AND day_of_week = :day 
+              AND start_date <= :date1 AND (end_date IS NULL OR end_date >= :date2)
         ");
-        $stmtCount->execute([':tid' => $data['new_teacher_id'], ':sid' => $schoolId, ':day' => $dayOfWeek]);
+        $stmtCount->execute([
+            ':tid' => $data['new_teacher_id'], 
+            ':sid' => $schoolId, 
+            ':day' => $dayOfWeek,
+            ':date1' => $targetDate,
+            ':date2' => $targetDate
+        ]);
         $assigned = (int)$stmtCount->fetchColumn();
         
         $stmtMax = $pdo->prepare("SELECT max_periods, status FROM staff WHERE id = :tid AND school_id = :sid");
