@@ -472,7 +472,7 @@ class TeacherAttendanceService
 
         // Fetch all attendance for this month
         $stmtAtt = $this->pdo->prepare("
-            SELECT staff_id, status, is_late, date
+            SELECT staff_id, status, is_late, entry_time, official_entry_time, reach_time, date
             FROM teacher_attendance
             WHERE school_id = :sid AND academic_year_id = :ayid AND date >= :sdate AND date <= :edate
         ");
@@ -511,6 +511,11 @@ class TeacherAttendanceService
             $late = 0;
             $workingDaysCount = 0;
 
+            $presentDates = [];
+            $absentDates = [];
+            $leaveDates = [];
+            $lateDates = [];
+
             for ($d = 1; $d <= $daysInMonth; $d++) {
                 $dtStr = sprintf('%04d-%02d-%02d', $year, $month, $d);
                 
@@ -531,20 +536,45 @@ class TeacherAttendanceService
 
                 $attRow = $staffAttMap[$stId][$dtStr] ?? null;
                 if ($attRow) {
-                    if ($attRow['status'] === 'Present') {
+                    $stStatus = $attRow['status'];
+                    if ($stStatus === 'Present') {
                         $present++;
-                        if ($attRow['is_late']) {
+                        $entryT = $attRow['entry_time'] ?? '—';
+                        $pItem = [
+                            'date' => $dtStr,
+                            'status' => 'Present',
+                            'entry_time' => $entryT,
+                            'reach_time' => $attRow['reach_time'] ?? null,
+                            'is_late' => (bool)$attRow['is_late'],
+                        ];
+                        $presentDates[] = $pItem;
+
+                        if ((int)$attRow['is_late'] === 1) {
                             $late++;
+                            $lateDates[] = $pItem;
                         }
-                    } elseif ($attRow['status'] === 'Leave') {
+                    } elseif ($stStatus === 'Leave') {
                         $leave++;
+                        $leaveDates[] = [
+                            'date' => $dtStr,
+                            'status' => 'Leave',
+                        ];
                     } else {
                         $absent++;
+                        $absentDates[] = [
+                            'date' => $dtStr,
+                            'status' => 'Absent',
+                        ];
                     }
                 } else {
                     // Past unmarked working day -> count as Absent
                     if ($dtStr <= $todayStr) {
                         $absent++;
+                        $absentDates[] = [
+                            'date' => $dtStr,
+                            'status' => 'Absent',
+                            'unmarked' => true,
+                        ];
                     }
                 }
             }
@@ -563,7 +593,11 @@ class TeacherAttendanceService
                 'absent_days' => $absent,
                 'leave_days' => $leave,
                 'late_days' => $late,
-                'attendance_percentage' => $attPercentage
+                'attendance_percentage' => $attPercentage,
+                'present_dates' => $presentDates,
+                'absent_dates' => $absentDates,
+                'leave_dates' => $leaveDates,
+                'late_dates' => $lateDates,
             ];
         }
 
