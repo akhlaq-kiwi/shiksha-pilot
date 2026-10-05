@@ -189,9 +189,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _fetchChildrenList() async {
     try {
       final childrenList = await widget.leaveService.getChildren();
-      setState(() {
-        _children = childrenList;
-      });
+      if (mounted) {
+        setState(() {
+          _children = childrenList;
+          if (_activeStudentId != null) {
+            final active = _children.firstWhere(
+              (c) {
+                final cId = c['id'] is int ? c['id'] as int : int.parse(c['id'].toString());
+                return cId == _activeStudentId;
+              },
+              orElse: () => null,
+            );
+            if (active != null) {
+              _userName = active['name']?.toString() ?? _userName;
+              _userPhoto = active['photo_path']?.toString() ?? _userPhoto;
+            }
+          }
+        });
+      }
     } catch (e) {
       debugPrint('Error loading children in settings: $e');
     }
@@ -202,12 +217,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await prefs.setInt('selected_student_id', childId);
     
     final active = _children.firstWhere(
-      (c) => c['id'] == childId,
+      (c) {
+        final cId = c['id'] is int ? c['id'] as int : int.parse(c['id'].toString());
+        return cId == childId;
+      },
       orElse: () => null,
     );
     
     if (active != null) {
-      final name = active['name'] ?? '';
+      final name = active['name']?.toString() ?? '';
       final photo = active['photo_path']?.toString() ?? '';
       await prefs.setString('user_name', name);
       await prefs.setString('user_photo', photo);
