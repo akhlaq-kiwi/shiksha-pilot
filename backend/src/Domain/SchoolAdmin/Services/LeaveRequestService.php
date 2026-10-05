@@ -83,12 +83,18 @@ class LeaveRequestService extends BaseService
                 return [];
             }
 
-            $studentIds = array_map(fn($s) => (int)$s['id'], $students);
+            $allowedIds = array_map(fn($s) => (int)$s['id'], $students);
+            if (!empty($filters['student_id'])) {
+                $reqId = (int)$filters['student_id'];
+                if (in_array($reqId, $allowedIds, true)) {
+                    $allowedIds = [$reqId];
+                }
+            }
             $filters['applicant_role'] = 'STUDENT';
             $allLeaves = $this->repo->findWithDetails($schoolId, $filters);
 
-            return array_values(array_filter($allLeaves, function($lr) use ($studentIds) {
-                return in_array((int)($lr['student_id'] ?? 0), $studentIds, true);
+            return array_values(array_filter($allLeaves, function($lr) use ($allowedIds) {
+                return in_array((int)($lr['student_id'] ?? 0), $allowedIds, true);
             }));
         }
 
