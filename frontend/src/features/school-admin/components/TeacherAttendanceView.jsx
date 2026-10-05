@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Calendar, Users, Check, AlertCircle, Save, Download, Clock, QrCode, UserCheck, ShieldAlert, Award, RotateCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, Users, Check, AlertCircle, Save, Download, Clock, QrCode, UserCheck, ShieldAlert, Award, RotateCw, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
@@ -130,6 +130,67 @@ export function TeacherAttendanceView() {
   const [loadingQr, setLoadingQr] = useState(false);
   const [refreshingQr, setRefreshingQr] = useState(false);
   const [showConfirmQrModal, setShowConfirmQrModal] = useState(false);
+
+  // Breakdown Modal State
+  const [detailModalInfo, setDetailModalInfo] = useState(null);
+
+  const handleOpenBreakdown = (teacherRow, type) => {
+    const monthName = ACADEMIC_MONTHS.find(m => m.value === reportMonth)?.name || 'Month';
+    let typeName = 'Absent Days';
+    let dates = [];
+    let count = 0;
+
+    if (type === 'absent') {
+      typeName = 'Absent Days';
+      dates = teacherRow.absent_dates || [];
+      count = teacherRow.absent_days || 0;
+    } else if (type === 'late') {
+      typeName = 'Late Days';
+      dates = teacherRow.late_dates || [];
+      count = teacherRow.late_days || 0;
+    } else if (type === 'present') {
+      typeName = 'Present Days';
+      dates = teacherRow.present_dates || [];
+      count = teacherRow.present_days || 0;
+    } else if (type === 'leave') {
+      typeName = 'Leave Days';
+      dates = teacherRow.leave_dates || [];
+      count = teacherRow.leave_days || 0;
+    }
+
+    setDetailModalInfo({
+      teacherName: teacherRow.name,
+      empId: teacherRow.emp_id,
+      type,
+      typeName,
+      monthName,
+      year: reportYear,
+      count,
+      dates,
+    });
+  };
+
+  const handleNavigateToDateAttendance = (dateStr) => {
+    setDetailModalInfo(null);
+    setSelectedDate(dateStr);
+    setTeacherTab('daily');
+    toast.success(`Switched to Daily Attendance for ${dateStr}`);
+  };
+
+  const formatDateWithDayName = (dateStr) => {
+    try {
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        const dt = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        return `${dt.getDate().toString().padStart(2, '0')} ${months[dt.getMonth()]} ${dt.getFullYear()}, ${days[dt.getDay()]}`;
+      }
+      return dateStr;
+    } catch (_) {
+      return dateStr;
+    }
+  };
 
   // Load Daily Data
   const loadDailyData = useCallback(async () => {
@@ -668,10 +729,46 @@ export function TeacherAttendanceView() {
                           <TableCell className="font-mono text-xs font-bold text-text-secondary">{t.emp_id}</TableCell>
                           <TableCell className="font-medium text-text-primary">{t.name}</TableCell>
                           <TableCell className="text-center font-semibold">{t.total_working_days}</TableCell>
-                          <TableCell className="text-center font-semibold text-emerald-600 dark:text-emerald-400">{t.present_days}</TableCell>
-                          <TableCell className="text-center font-semibold text-rose-600 dark:text-rose-400">{t.absent_days}</TableCell>
-                          <TableCell className="text-center font-semibold text-amber-600 dark:text-amber-400">{t.leave_days}</TableCell>
-                          <TableCell className="text-center font-semibold text-orange-600 dark:text-orange-400">{t.late_days}</TableCell>
+                          <TableCell className="text-center font-semibold">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenBreakdown(t, 'present')}
+                              className="inline-flex items-center justify-center min-w-[2.25rem] px-2.5 py-1 rounded-full text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 font-bold transition-all cursor-pointer hover:scale-105 hover:shadow-sm"
+                              title="Click to view present dates"
+                            >
+                              {t.present_days}
+                            </button>
+                          </TableCell>
+                          <TableCell className="text-center font-semibold">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenBreakdown(t, 'absent')}
+                              className="inline-flex items-center justify-center min-w-[2.25rem] px-2.5 py-1 rounded-full text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 font-bold transition-all cursor-pointer hover:scale-105 hover:shadow-sm"
+                              title="Click to view absent dates"
+                            >
+                              {t.absent_days}
+                            </button>
+                          </TableCell>
+                          <TableCell className="text-center font-semibold">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenBreakdown(t, 'leave')}
+                              className="inline-flex items-center justify-center min-w-[2.25rem] px-2.5 py-1 rounded-full text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/60 font-bold transition-all cursor-pointer hover:scale-105 hover:shadow-sm"
+                              title="Click to view leave dates"
+                            >
+                              {t.leave_days}
+                            </button>
+                          </TableCell>
+                          <TableCell className="text-center font-semibold">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenBreakdown(t, 'late')}
+                              className="inline-flex items-center justify-center min-w-[2.25rem] px-2.5 py-1 rounded-full text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/40 hover:bg-orange-100 dark:hover:bg-orange-900/60 font-bold transition-all cursor-pointer hover:scale-105 hover:shadow-sm"
+                              title="Click to view late dates"
+                            >
+                              {t.late_days}
+                            </button>
+                          </TableCell>
                           <TableCell className="text-right font-bold text-primary">{t.attendance_percentage}%</TableCell>
                         </TableRow>
                       ))}
@@ -960,6 +1057,82 @@ export function TeacherAttendanceView() {
             </p>
           </div>
         </div>
+      </Dialog>
+
+      {/* Detailed Breakdown Dates Modal */}
+      <Dialog
+        isOpen={!!detailModalInfo}
+        onClose={() => setDetailModalInfo(null)}
+        hideHeader={true}
+        maxWidth="max-w-lg"
+      >
+        {detailModalInfo && (
+          <div className="space-y-4">
+            {/* Header bar */}
+            <div className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-100 dark:bg-zinc-800/60 border border-border">
+              <span className="text-xs font-bold text-text-secondary uppercase tracking-wider">
+                Teacher: <strong className="text-text-primary">{detailModalInfo.teacherName}</strong> ({detailModalInfo.empId})
+              </span>
+              <div className="flex items-center gap-2">
+                <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                  detailModalInfo.type === 'absent' ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300' :
+                  detailModalInfo.type === 'late' ? 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300' :
+                  detailModalInfo.type === 'leave' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300' :
+                  'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+                }`}>
+                  {detailModalInfo.count} {detailModalInfo.typeName}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setDetailModalInfo(null)}
+                  className="h-7 w-7 rounded-full inline-flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                  title="Close"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {(!detailModalInfo.dates || detailModalInfo.dates.length === 0) ? (
+              <div className="py-8 text-center text-text-muted text-sm font-medium">
+                No {detailModalInfo.typeName.toLowerCase()} recorded for {detailModalInfo.teacherName} in {detailModalInfo.monthName}.
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+                {detailModalInfo.dates.map((item, idx) => (
+                  <div
+                    key={item.date + '-' + idx}
+                    onClick={() => handleNavigateToDateAttendance(item.date)}
+                    className="flex items-center justify-between p-3.5 rounded-xl border border-border bg-background hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-all cursor-pointer group hover:border-primary/40 hover:shadow-sm"
+                  >
+                    <div className="space-y-1">
+                      <div className="font-semibold text-sm text-text-primary group-hover:text-primary transition-colors flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-text-muted group-hover:text-primary transition-colors" />
+                        {formatDateWithDayName(item.date)}
+                      </div>
+                      {item.entry_time && item.entry_time !== '—' && (
+                        <div className="text-xs text-text-muted flex items-center gap-1.5 font-mono">
+                          <Clock className="h-3.5 w-3.5 text-text-muted" />
+                          Entry: <span className="font-bold text-text-primary">{item.entry_time}</span>
+                          {item.is_late && <span className="text-rose-500 font-bold ml-1">(Late)</span>}
+                        </div>
+                      )}
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs font-bold text-primary group-hover:bg-primary group-hover:text-white transition-all h-8 px-3"
+                    >
+                      View <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </Dialog>
     </div>
   );
