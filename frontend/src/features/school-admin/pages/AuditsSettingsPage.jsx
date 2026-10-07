@@ -281,16 +281,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
 
   // Class Fee Configuration States
   const [selectedClassId, setSelectedClassId] = useState('');
-  const [showSelectClassNotice, setShowSelectClassNotice] = useState(true);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
-
-  useEffect(() => {
-    setShowSelectClassNotice(true);
-    const timer = setTimeout(() => {
-      setShowSelectClassNotice(false);
-    }, 5000);
-    return () => clearTimeout(timer);
-  }, []);
   const [configuredClassIds, setConfiguredClassIds] = useState([]);
   const [feeMode, setFeeMode] = useState('SAME'); // 'SAME' or 'DIFFERENT'
   const [sameFeeAmount, setSameFeeAmount] = useState('');
@@ -315,21 +306,12 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
 
   // Course Fee Configuration States
   const [courseSelectedClassId, setCourseSelectedClassId] = useState('');
-  const [showSelectCourseClassNotice, setShowSelectCourseClassNotice] = useState(true);
   const [downloadingCoursePdf, setDownloadingCoursePdf] = useState(false);
   const [courseConfiguredClassIds, setCourseConfiguredClassIds] = useState([]);
   const [courseFeeAmount, setCourseFeeAmount] = useState('');
   const [courseFeeError, setCourseFeeError] = useState('');
   const [courseFeeSuccess, setCourseFeeSuccess] = useState('');
   const [courseFeeSaving, setCourseFeeSaving] = useState(false);
-
-  useEffect(() => {
-    setShowSelectCourseClassNotice(true);
-    const timer = setTimeout(() => {
-      setShowSelectCourseClassNotice(false);
-    }, 5000);
-    return () => clearTimeout(timer);
-  }, []);
 
   useEffect(() => {
     if (!courseFeeSuccess) return;
@@ -1660,7 +1642,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
     <div className="space-y-6 animate-in fade-in duration-300">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border pb-4">
         <div>
-          <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Audits & Settings</h2>
+          <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">AUDITS & SETTINGS</h2>
           <p className="text-text-secondary text-sm mt-1">Manage school academic sessions, audit logs, and promotions.</p>
         </div>
       </div>
@@ -1678,7 +1660,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
       )}
 
       {/* Academic Years list */}
-      <Card className="shadow-sm">
+      <Card className="shadow-sm rounded-2xl overflow-hidden">
         <CardHeader className="py-3 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-bold text-text-primary">Academic Years</CardTitle>
           {!isReadOnly && !academicYears.some(y => y.status === 'Draft') && (
@@ -1688,7 +1670,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
           )}
         </CardHeader>
         <CardContent className="p-0">
-          <Table>
+          <Table containerClassName="border-0 shadow-none rounded-none bg-transparent">
             <TableHeader>
               <TableRow>
                 <TableHead>Academic Year</TableHead>
@@ -1753,7 +1735,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
       </Card>
 
       {/* Class Fee Configuration Panel */}
-      <Card id="class-fee-config-panel" className="shadow-sm">
+      <Card id="class-fee-config-panel" className="shadow-sm rounded-2xl overflow-hidden">
         <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-bold text-text-primary">Class Fee Configuration</CardTitle>
           <Button
@@ -1784,13 +1766,6 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
             </div>
           )}
 
-          {!selectedClassId && showSelectClassNotice && (
-            <div className="p-3.5 bg-primary/5 border border-primary/10 rounded-xl flex items-center gap-2.5 text-xs text-primary font-bold animate-in fade-in duration-300">
-              <ShieldAlert className="h-4 w-4 text-primary flex-shrink-0" />
-              <span>Please select a class to configure its fee structure.</span>
-            </div>
-          )}
-
           <div className="flex flex-col sm:flex-row items-start sm:items-end gap-6">
             <div className="w-full sm:w-[240px]">
               <label className="text-xs font-bold text-text-secondary uppercase block mb-2">Class *</label>
@@ -1798,7 +1773,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                 value={selectedClassId}
                 onChange={e => setSelectedClassId(e.target.value)}
                 disabled={classes.length === 0}
-                className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs"
+                className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-xs font-semibold focus:outline-none focus:ring-0 focus:border-border shadow-2xs"
               >
                 <option value="">Select Class</option>
                 {uniqueClassGroups.map(group => (
@@ -1857,7 +1832,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
       </Card>
 
       {/* Course Fee Configuration Panel */}
-      <Card id="course-fee-config-panel" className="shadow-sm">
+      <Card id="course-fee-config-panel" className="shadow-sm rounded-2xl overflow-hidden">
         <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-bold text-text-primary">Course Fee Configuration</CardTitle>
           <Button
@@ -1888,13 +1863,6 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
             </div>
           )}
 
-          {!courseSelectedClassId && showSelectCourseClassNotice && (
-            <div className="p-3.5 bg-primary/5 border border-primary/10 rounded-xl flex items-center gap-2.5 text-xs text-primary font-bold animate-in fade-in duration-300">
-              <ShieldAlert className="h-4 w-4 text-primary flex-shrink-0" />
-              <span>Please select a class to configure its course fee structure.</span>
-            </div>
-          )}
-
           <div className="flex flex-col sm:flex-row items-start sm:items-end gap-6">
             <div className="w-full sm:w-[240px]">
               <label className="text-xs font-bold text-text-secondary uppercase block mb-2">Class *</label>
@@ -1902,7 +1870,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                 value={courseSelectedClassId}
                 onChange={e => setCourseSelectedClassId(e.target.value)}
                 disabled={classes.length === 0}
-                className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs"
+                className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-xs font-semibold focus:outline-none focus:ring-0 focus:border-border shadow-2xs"
               >
                 <option value="">Select Class</option>
                 {uniqueCourseClassGroups.map(group => (
@@ -1965,7 +1933,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
       </Card>
 
       {/* Period Time Configuration Panel */}
-      <Card className="shadow-sm">
+      <Card className="shadow-sm rounded-2xl overflow-hidden">
         <CardHeader className="py-5 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
           <CardTitle className="text-lg font-bold text-text-primary tracking-tight">School Settings & Timetable Configuration</CardTitle>
           <p className="text-xs text-text-secondary mt-1">Define structural settings for classroom schedulers and faculty workload computation.</p>
@@ -2061,14 +2029,14 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
 
           {/* Generated Timetable Preview */}
           {showPreview && periods.length > 0 && (
-            <div className="border border-border/80 p-5 rounded-2xl bg-zinc-950/5 dark:bg-black/5 space-y-4 pt-4 mt-6">
+            <div className="border border-border-strong p-5 rounded-2xl bg-surface-sunken space-y-4 pt-4 mt-6">
               <h4 className="text-xs font-bold text-text-secondary uppercase tracking-wider">Generated Timetable Preview</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 {periods.map((p) => {
                   const isAfterPeriod = p.period_number === parseInt(intervalAfterPeriod);
                   return (
                     <React.Fragment key={p.period_number}>
-                      <div className="flex items-center justify-between px-4 py-3 bg-zinc-50 dark:bg-zinc-900/30 border border-border/60 rounded-xl">
+                      <div className="flex items-center justify-between px-4 py-3 bg-surface border border-border-strong rounded-xl shadow-2xs">
                         <span className="text-xs font-bold text-text-secondary">Period {p.period_number}</span>
                         <span className="text-xs font-bold text-text-primary font-mono ml-4 whitespace-nowrap">
                           {formatTime12h(p.start_time)} – {formatTime12h(p.end_time)}
@@ -2120,165 +2088,165 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
         </div>
       )}
 
-      {/* Assign User Role Panel (Accessible ONLY to School Admin) */}
+      {/* Assign User Role & Class Teacher Assignment Panels (Accessible ONLY to School Admin) */}
       {isSchoolAdmin && (
-        <Card className="shadow-sm">
-          <CardHeader className="py-5 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
-            <CardTitle className="text-lg font-bold text-text-primary tracking-tight">Assign User Role</CardTitle>
-            <p className="text-xs text-text-secondary mt-1">Configure teacher menu permissions and assign class teachers.</p>
-          </CardHeader>
-          <CardContent className="p-6 space-y-8">
-            
-            {/* Section 1: Teacher Menu Permissions */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-bold text-text-primary border-b border-border pb-2">Teacher Menu Permissions</h3>
+        <div className="space-y-6">
+          <Card className="shadow-sm rounded-2xl overflow-hidden">
+            <CardHeader className="py-5 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
+              <CardTitle className="text-lg font-bold text-text-primary tracking-tight">Assign User Role</CardTitle>
+              <p className="text-xs text-text-secondary mt-1">Configure teacher menu permissions for active staff.</p>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
               
-              {permSuccess && (
-                <div className="p-3 bg-green-500/10 border border-green-500/20 text-green-600 rounded-xl text-xs font-semibold flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4" /> {permSuccess}
-                </div>
-              )}
-              {permError && (
-                <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl text-xs font-semibold">
-                  {permError}
-                </div>
-              )}
+              {/* Section 1: Teacher Menu Permissions */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-bold text-text-primary border-b border-border pb-2">Teacher Menu Permissions</h3>
+                
+                {permSuccess && (
+                  <div className="p-3 bg-green-500/10 border border-green-500/20 text-green-600 rounded-xl text-xs font-semibold flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4" /> {permSuccess}
+                  </div>
+                )}
+                {permError && (
+                  <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl text-xs font-semibold">
+                    {permError}
+                  </div>
+                )}
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="space-y-1.5 md:col-span-1">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-text-secondary uppercase">Select Teacher</label>
-                    {savingPermissions && (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="space-y-1.5 md:col-span-1">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-text-secondary uppercase">Select Teacher</label>
+                      {savingPermissions && (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                      )}
+                    </div>
+                    <select
+                      value={selectedPermTeacherId}
+                      disabled={savingPermissions}
+                      onChange={e => handleTeacherSelectForPermissions(e.target.value)}
+                      className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-xs font-semibold focus:outline-none focus:ring-0 focus:border-border shadow-2xs cursor-pointer text-text-primary"
+                    >
+                      <option value="">-- Choose Teacher --</option>
+                      {teachersWithPerms.map(t => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}{t.department ? ` (${t.department})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[11px] text-text-muted">Choose an active teacher to assign their School Admin Portal permissions.</p>
+                  </div>
+
+                  <div className="space-y-1.5 md:col-span-2">
+                    <label className="text-xs font-bold text-text-secondary uppercase block mb-2">Menus Access</label>
+                    {selectedPermTeacherId ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 border border-border rounded-xl p-4 bg-surface-sunken/50">
+                        {MENU_OPTIONS.map(menu => {
+                          const isChecked = selectedPermMenus.includes(menu);
+                          return (
+                            <button
+                              key={menu}
+                              type="button"
+                              disabled={savingPermissions}
+                              onClick={() => handleMenuCheckboxChange(menu)}
+                              className={`flex items-center justify-start gap-2.5 px-3 py-2.5 rounded-xl border text-left text-xs font-bold tracking-tight transition-all duration-150 ${
+                                savingPermissions ? 'opacity-70 cursor-not-allowed' : ''
+                              } ${
+                                isChecked
+                                  ? 'bg-primary/5 border-primary text-primary font-bold shadow-3xs'
+                                  : 'bg-surface border-border text-text-secondary hover:border-text-secondary/35'
+                              }`}
+                            >
+                              <div className={`h-4 w-4 rounded-md border flex items-center justify-center transition-all ${
+                                isChecked ? 'bg-primary border-primary text-surface' : 'border-zinc-300 bg-surface'
+                              }`}>
+                                {isChecked && <Check className="h-3 w-3 stroke-[3]" />}
+                              </div>
+                              <span className="truncate">{menu}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-8 border border-dashed border-border rounded-xl text-text-muted text-xs font-semibold bg-surface-sunken/40">
+                        Please select a teacher to configure menu permissions.
+                      </div>
                     )}
                   </div>
-                  <select
-                    value={selectedPermTeacherId}
-                    disabled={savingPermissions}
-                    onChange={e => handleTeacherSelectForPermissions(e.target.value)}
-                    className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs cursor-pointer text-text-primary"
-                  >
-                    <option value="">-- Choose Teacher --</option>
-                    {teachersWithPerms.map(t => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}{t.department ? ` (${t.department})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-[11px] text-text-muted">Choose an active teacher to assign their School Admin Portal permissions.</p>
-                </div>
-
-                <div className="space-y-1.5 md:col-span-2">
-                  <label className="text-xs font-bold text-text-secondary uppercase block mb-2">Menus Access</label>
-                  {selectedPermTeacherId ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 border border-border rounded-xl p-4 bg-zinc-50/35 dark:bg-zinc-900/35">
-                      {MENU_OPTIONS.map(menu => {
-                        const isChecked = selectedPermMenus.includes(menu);
-                        return (
-                          <button
-                            key={menu}
-                            type="button"
-                            disabled={savingPermissions}
-                            onClick={() => handleMenuCheckboxChange(menu)}
-                            className={`flex items-center justify-start gap-2.5 px-3 py-2.5 rounded-xl border text-left text-xs font-bold tracking-tight transition-all duration-150 ${
-                              savingPermissions ? 'opacity-70 cursor-not-allowed' : ''
-                            } ${
-                              isChecked
-                                ? 'bg-primary/5 border-primary text-primary font-bold shadow-3xs'
-                                : 'bg-surface border-border text-text-secondary hover:border-text-secondary/35'
-                            }`}
-                          >
-                            <div className={`h-4 w-4 rounded-md border flex items-center justify-center transition-all ${
-                              isChecked ? 'bg-primary border-primary text-surface' : 'border-zinc-300 bg-surface'
-                            }`}>
-                              {isChecked && <Check className="h-3 w-3 stroke-[3]" />}
-                            </div>
-                            <span className="truncate">{menu}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-8 border border-dashed border-border rounded-xl text-text-muted text-xs font-semibold bg-zinc-50/20">
-                      Please select a teacher to configure menu permissions.
-                    </div>
-                  )}
                 </div>
               </div>
-            </div>
+            </CardContent>
+          </Card>
 
-            <hr className="border-border" />
-
-            {/* Section 2: Class Teacher Assignment */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-bold text-text-primary border-b border-border pb-2">Class Teacher Assignment</h3>
-
+          <Card className="shadow-sm rounded-2xl overflow-hidden">
+            <CardHeader className="py-5 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
+              <CardTitle className="text-lg font-bold text-text-primary tracking-tight">Class Teacher Assignment</CardTitle>
+              <p className="text-xs text-text-secondary mt-1">Assign primary class teachers to active classrooms.</p>
+            </CardHeader>
+            <CardContent className="p-0">
               {assignSuccess && (
-                <div className="p-3 bg-green-500/10 border border-green-500/20 text-green-600 rounded-xl text-xs font-semibold flex items-center gap-2">
+                <div className="m-4 p-3 bg-green-500/10 border border-green-500/20 text-green-600 rounded-xl text-xs font-semibold flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4" /> {assignSuccess}
                 </div>
               )}
               {assignError && (
-                <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl text-xs font-semibold">
+                <div className="m-4 p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl text-xs font-semibold">
                   {assignError}
                 </div>
               )}
 
-              <div className="border border-border rounded-xl overflow-hidden shadow-3xs bg-surface w-full">
-                <Table>
-                  <TableHeader className="bg-zinc-50/50 dark:bg-zinc-900/50">
+              <Table containerClassName="border-0 shadow-none rounded-none bg-transparent">
+                <TableHeader className="bg-surface-sunken">
+                  <TableRow>
+                    <TableHead className="w-1/2">Class</TableHead>
+                    <TableHead className="w-1/2">Assigned Teacher</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {classesWithTeachers.length === 0 ? (
                     <TableRow>
-                      <TableHead className="w-1/2">Class</TableHead>
-                      <TableHead className="w-1/2">Assigned Teacher</TableHead>
+                      <TableCell colSpan={2} className="text-center py-6 text-text-muted text-xs font-semibold">
+                        No classes found in active academic year.
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {classesWithTeachers.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={2} className="text-center py-6 text-text-muted text-xs font-semibold">
-                          No classes found in active academic year.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      classesWithTeachers.map(c => {
-                        const classLabel = c.name + (c.section ? `-${c.section}` : '');
-                        const val = localAssignments[c.id] || '';
-                        return (
-                          <TableRow key={c.id}>
-                            <TableCell className="font-bold text-text-primary text-xs tracking-tight">
-                              {classLabel}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-3">
-                                <select
-                                  value={val}
-                                  disabled={isReadOnly || savingClassId === c.id}
-                                  onChange={e => handleClassTeacherChange(c.id, e.target.value)}
-                                  className="w-full max-w-md h-9 px-2 rounded-lg border border-border bg-surface text-xs font-bold focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer text-text-primary"
-                                >
-                                  <option value="">-- Unassigned --</option>
-                                  {teachersWithPerms.map(t => (
-                                    <option key={t.id} value={t.id}>
-                                      {t.name}{t.department ? ` (${t.department})` : ''}
-                                    </option>
-                                  ))}
-                                </select>
-                                {savingClassId === c.id && (
-                                  <Loader2 className="h-4 w-4 animate-spin text-primary flex-shrink-0" />
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-
-          </CardContent>
-        </Card>
+                  ) : (
+                    classesWithTeachers.map(c => {
+                      const classLabel = c.name + (c.section ? `-${c.section}` : '');
+                      const val = localAssignments[c.id] || '';
+                      return (
+                        <TableRow key={c.id}>
+                          <TableCell className="font-bold text-text-primary text-xs tracking-tight">
+                            {classLabel}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <select
+                                value={val}
+                                disabled={isReadOnly || savingClassId === c.id}
+                                onChange={e => handleClassTeacherChange(c.id, e.target.value)}
+                                className="w-full max-w-md h-9 px-2 rounded-lg border border-border bg-surface text-xs font-bold focus:outline-none focus:ring-0 focus:border-border cursor-pointer text-text-primary"
+                              >
+                                <option value="">-- Unassigned --</option>
+                                {teachersWithPerms.map(t => (
+                                  <option key={t.id} value={t.id}>
+                                    {t.name}{t.department ? ` (${t.department})` : ''}
+                                  </option>
+                                ))}
+                              </select>
+                              {savingClassId === c.id && (
+                                <Loader2 className="h-4 w-4 animate-spin text-primary flex-shrink-0" />
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* Replace Class Teacher Confirmation Dialog */}

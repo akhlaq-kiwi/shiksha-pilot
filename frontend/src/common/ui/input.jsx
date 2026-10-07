@@ -8,7 +8,7 @@ import { useFieldContext } from './field';
  * flat text on some screens.
  */
 export const controlBase =
-  'flex w-full rounded-lg border border-border-strong bg-surface px-3 text-body-md text-text-primary ' +
+  'flex w-full rounded-full border border-border-strong bg-surface px-4 text-body-md text-text-primary ' +
   'shadow-sm transition-colors placeholder:text-text-muted ' +
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary ' +
   'disabled:cursor-not-allowed disabled:opacity-60 disabled:bg-secondary';

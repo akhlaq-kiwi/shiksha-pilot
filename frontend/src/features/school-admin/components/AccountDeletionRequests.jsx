@@ -108,21 +108,15 @@ export default function AccountDeletionRequests() {
     <Card className="overflow-hidden">
       <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-start gap-2">
-            <UserMinus className="h-4 w-4 mt-0.5 text-rose-500 shrink-0" />
-            <div>
-              <CardTitle className="text-sm font-bold text-text-primary">Account Deletion Requests</CardTitle>
-              <CardDescription className="text-xs text-text-secondary mt-0.5">
-                Parents and staff can request account deletion from the mobile app. Completing a
-                request permanently removes their sign-in details; school records are kept.
-              </CardDescription>
-            </div>
-          </div>
           <div className="flex items-center gap-2">
+            <UserMinus className="h-4 w-4 text-rose-500 shrink-0" />
+            <CardTitle className="text-sm font-bold text-text-primary">Account Deletion Requests</CardTitle>
+          </div>
+          <div>
             <Select
               value={status}
               onChange={(e) => setStatus(e.target.value)}
-              className="h-8 text-xs"
+              className="h-8 text-xs min-w-[120px]"
               aria-label="Filter by status"
             >
               <option value="PENDING">Pending</option>
@@ -131,9 +125,6 @@ export default function AccountDeletionRequests() {
               <option value="CANCELLED">Withdrawn</option>
               <option value="">All</option>
             </Select>
-            <Button variant="outline" size="sm" onClick={load} disabled={loading} className="h-8">
-              <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-            </Button>
           </div>
         </div>
       </CardHeader>

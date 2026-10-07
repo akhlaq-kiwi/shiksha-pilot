@@ -426,35 +426,43 @@ export default function ClassesPage() {
     }
   };
 
-  // Group classes by name for the card grid view
+  // Group classes by short name for the card grid view to avoid duplicates (e.g. Upper Kindergarten (UKG) vs UKG)
   const getGroupedClasses = () => {
     const groups = {};
     classes.forEach(c => {
-      if (!groups[c.name]) {
-        const preObj = PREDEFINED_CLASSES.find(p => p.name.trim().toLowerCase() === c.name.trim().toLowerCase());
-        groups[c.name] = {
-          name: c.name,
+      const shortName = getShortClassName(c.name);
+      if (!groups[shortName]) {
+        const preObj = PREDEFINED_CLASSES.find(p => p.name.trim().toLowerCase() === c.name.trim().toLowerCase() || getShortClassName(p.name) === shortName);
+        groups[shortName] = {
+          name: shortName,
+          originalNames: [c.name],
           category: preObj ? preObj.category : 'Academic Class',
           sections: [],
           studentCount: 0,
           minId: c.id
         };
+      } else {
+        if (!groups[shortName].originalNames.includes(c.name)) {
+          groups[shortName].originalNames.push(c.name);
+        }
       }
-      if (c.section) {
-        groups[c.name].sections.push(c.section);
+      if (c.section && !groups[shortName].sections.includes(c.section)) {
+        groups[shortName].sections.push(c.section);
       }
-      if (c.id < groups[c.name].minId) {
-        groups[c.name].minId = c.id;
+      if (c.id < groups[shortName].minId) {
+        groups[shortName].minId = c.id;
       }
     });
 
     // Populate student counts by grouping matching class names
-    Object.keys(groups).forEach(name => {
-      groups[name].sections.sort();
-      const matchingClassIds = classes.filter(c => c.name && c.name.trim().toLowerCase() === name.trim().toLowerCase()).map(c => c.id);
+    Object.keys(groups).forEach(shortName => {
+      groups[shortName].sections.sort();
+      const matchingOrigNames = groups[shortName].originalNames.map(n => n.trim().toLowerCase());
+      const matchingClassIds = classes.filter(c => c.name && matchingOrigNames.includes(c.name.trim().toLowerCase())).map(c => c.id);
       
-      groups[name].studentCount = students.filter(s => {
-        const matchesName = s.class_name && s.class_name.trim().toLowerCase() === name.trim().toLowerCase();
+      groups[shortName].studentCount = students.filter(s => {
+        const sShort = getShortClassName(s.class_name);
+        const matchesName = sShort === shortName || (s.class_name && matchingOrigNames.includes(s.class_name.trim().toLowerCase()));
         const matchesId = s.class_id && matchingClassIds.includes(s.class_id);
         return matchesName || matchesId;
       }).length;
@@ -659,7 +667,7 @@ export default function ClassesPage() {
           </div>
 
           {/* Combined Filter Toolbar */}
-          <div className="bg-surface border border-border rounded-xl p-4 shadow-xs flex flex-col md:flex-row gap-4 items-center justify-between">
+          <div className="!bg-zinc-100/80 dark:!bg-zinc-900/50 border border-border rounded-2xl p-4 shadow-2xs flex flex-col md:flex-row gap-4 items-center justify-between">
             <div className="relative w-full md:max-w-xs">
               <Search className="absolute left-3 top-3 h-4 w-4 text-text-muted" />
               <Input aria-label="Search roster by name or roll number..." 
@@ -713,7 +721,7 @@ export default function ClassesPage() {
                 <div 
                   key={s.id}
                   onClick={() => { setSelectedStudentId(s.id); setView('details'); }}
-                  className="relative flex flex-col items-center justify-center p-6 bg-surface border border-border rounded-2xl hover:border-primary/50 hover:shadow-md cursor-pointer transition-all duration-200 text-center select-none"
+                  className="group relative flex flex-col items-center justify-center p-6 bg-surface border border-border rounded-2xl hover:border-primary/50 hover:shadow-md cursor-pointer transition-all duration-200 text-center select-none"
                 >
                   <div className="absolute top-3 right-3 z-10" onClick={(e) => e.stopPropagation()}>
                     <DropdownMenu>
@@ -769,7 +777,7 @@ export default function ClassesPage() {
                   </div>
                   
                   {/* Name */}
-                  <h3 className="font-bold text-text-primary text-base hover:text-primary transition-colors leading-tight truncate w-full px-1">
+                  <h3 className="font-bold text-text-primary text-base group-hover:text-primary transition-colors leading-tight truncate w-full px-1">
                     {s.name}
                   </h3>
                   
@@ -1120,13 +1128,14 @@ export default function ClassesPage() {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       
-      {/* Page Header */}
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Classes</h2>
-        </div>
+      {/* Page Header Container */}
+      <div className="p-5 rounded-2xl border border-border bg-zinc-50/50 dark:bg-zinc-900/50 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <h1 className="text-xl md:text-2xl font-bold text-text-primary tracking-tight font-display uppercase leading-none">
+          CLASSES
+        </h1>
+
         {!isReadOnly && (
-          <Button className="flex items-center gap-2 font-bold" onClick={() => setShowCreateForm(true)}>
+          <Button className="flex items-center gap-1.5 font-bold text-xs uppercase tracking-wider h-10 px-4 shadow-2xs whitespace-nowrap shrink-0" onClick={() => setShowCreateForm(true)}>
             <Plus className="h-4 w-4" /> Add Class
           </Button>
         )}
@@ -1149,9 +1158,9 @@ export default function ClassesPage() {
             <div 
               key={gc.name}
               onClick={() => { setSelectedClassName(gc.name); setRosterSearch(''); setView('roster'); }}
-              className="relative flex items-center justify-center p-6 bg-surface border border-border hover:border-primary/50 hover:shadow-md rounded-2xl cursor-pointer transition-all duration-200 select-none h-28 md:h-32 text-center"
+              className="group relative flex items-center justify-center p-6 bg-surface border border-border hover:border-primary/50 hover:shadow-md rounded-2xl cursor-pointer transition-all duration-200 select-none h-28 md:h-32 text-center"
             >
-              <h3 className="font-bold text-text-primary text-xl tracking-tight font-display px-6 text-center truncate">
+              <h3 className="font-bold text-text-primary text-xl group-hover:text-primary transition-colors tracking-tight font-display px-6 text-center truncate">
                 {getShortClassName(gc.name)}
               </h3>
 

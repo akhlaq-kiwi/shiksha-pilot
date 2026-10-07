@@ -19,35 +19,35 @@
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-display: 'Outfit', var(--font-sans);
 
-  /* ---- 1. Brand: Scholar Emerald Green ------------------------------- */
-  --brand-50:  #ECFDF5;
-  --brand-100: #D1FAE5;
-  --brand-200: #A7F3D0;
-  --brand-300: #6EE7B7;
-  --brand-400: #34D399;
-  --brand-500: #10B981;
-  --brand-600: #059669;
-  --brand-700: #047857;
-  --brand-800: #065F46;
-  --brand-900: #064E3B;
+  /* ---- 1. Brand: Golden Amber Yellow --------------------------------- */
+  --brand-50:  #FFFBEB;
+  --brand-100: #FEF3C7;
+  --brand-200: #FDE68A;
+  --brand-300: #FCD34D;
+  --brand-400: #FBBF24;
+  --brand-500: #F59E0B;
+  --brand-600: #D97706;
+  --brand-700: #B45309;
+  --brand-800: #92400E;
+  --brand-900: #78350F;
 
   /* Primary is an alias of the brand ramp so school themes can remap it. */
   --color-primary: var(--brand-600);
   --color-primary-hover: var(--brand-700);
   --color-primary-active: var(--brand-800);
-  --color-primary-subtle: var(--brand-50);
-  --color-primary-rgb: 5, 150, 105;
+  --color-primary-subtle: var(--brand-100);
+  --color-primary-rgb: 217, 119, 6;
 
   /* Text/icon colour that sits ON a primary fill. */
   --color-on-primary: #ffffff;
 
   /* ---- 2. Semantic ramps --------------------------------------------- */
   /* Each has a -500 fill (bars, dots, icons) and a -700 text-safe step.   */
-  --success-50:  #ECFDF5;
-  --success-200: #A7F3D0;
-  --success-500: #10B981;
-  --success-600: #059669;
-  --success-700: #047857;
+  --success-50:  #FFFBEB;
+  --success-200: #FDE68A;
+  --success-500: #F59E0B;
+  --success-600: #D97706;
+  --success-700: #B45309;
 
   --danger-50:  #FFF1F2;
   --danger-200: #FECDD3;
@@ -61,41 +61,41 @@
   --warning-600: #D97706;
   --warning-700: #B45309;
 
-  --info-50:  #F0F9FF;
-  --info-200: #BAE6FD;
-  --info-500: #0EA5E9;
-  --info-600: #0284C7;
-  --info-700: #0369A1;
+  --info-50:  #FFFBEB;
+  --info-200: #FEF3C7;
+  --info-500: #F59E0B;
+  --info-600: #D97706;
+  --info-700: #B45309;
 
   /* ---- 3. Domain accents -------------------------------------------- */
-  --academics-500: #14B8A6;   /* teal — classes, subjects, timetable          */
-  --academics-600: #0D9488;
-  --academics-700: #0F766E;   /* text-safe (teal-500 on white is only 3.7:1)  */
-  --finance-500: #8B5CF6;     /* violet — fees, salary, collections           */
-  --finance-600: #7C3AED;
-  --finance-700: #6D28D9;
+  --academics-500: #F59E0B;   /* warm golden amber                            */
+  --academics-600: #D97706;
+  --academics-700: #B45309;
+  --finance-500: #F59E0B;     /* warm golden amber                            */
+  --finance-600: #D97706;
+  --finance-700: #B45309;
 
   /* Secondary/accent kept as aliases for backwards compatibility. */
-  --color-secondary: #EFEEEB;
+  --color-secondary: #FEF7E0;
   --color-accent: var(--brand-600);
 
   /* ---- 4. Surfaces, borders, text ----------------------------------- */
-  /* Warm paper-on-stone neutrals — deliberately not pure white.          */
-  --surface-canvas: #FAF9F6;   /* app background — Soft Stone               */
-  --surface-sunken: #F4F3F1;   /* sidebar, table headers                    */
-  --surface-raised: #FFFFFF;   /* cards                                     */
-  --surface-overlay: #FFFFFF;  /* dialogs, dropdowns                        */
+  /* Sidebar, navbar header, and all pages background use exact same color #FEF7E0 */
+  --surface-canvas: #FEF7E0;   /* all pages background                       */
+  --surface-sunken: #FEF7E0;   /* sidebar background                        */
+  --surface-raised: #FEF7E0;   /* cards & listing surface (same as canvas)   */
+  --surface-overlay: #FEF7E0;  /* dialogs, dropdowns background             */
 
-  --bg-app: var(--surface-canvas);
-  --bg-sidebar: var(--surface-sunken);
-  --bg-surface: var(--surface-raised);
-  --bg-card: var(--surface-raised);
+  --bg-app: #FEF7E0;
+  --bg-sidebar: #FEF7E0;
+  --bg-surface: #FEF7E0;
+  --bg-card: #FEF7E0;
 
-  --border-subtle: #EBEAE8;
-  --border-strong: #D6D4D0;    /* input borders — subtle fails AA on canvas  */
+  --border-subtle: rgba(15, 23, 42, 0.55);
+  --border-strong: rgba(15, 23, 42, 0.80);    /* strong dark crisp border definition        */
   --border-color: var(--border-subtle);
-  --border-sidebar: #E5E5E1;
-  --border-divider: #E5E5E1;
+  --border-sidebar: rgba(15, 23, 42, 0.40);
+  --border-divider: rgba(15, 23, 42, 0.40);
   --border-glow: rgba(17, 24, 39, 0.02);
 
   --text-primary: #0F172A;     /* Onyx Navy headings                         */
@@ -218,55 +218,55 @@
    writes inline custom properties onto <html>.
    ------------------------------------------------------------------- */
 [data-portal='teacher'] {
-  --color-primary: var(--academics-600);
-  --color-primary-hover: var(--academics-700);
-  --color-primary-subtle: #F0FDFA;
-  --color-primary-rgb: 13, 148, 136;
+  --color-primary: var(--brand-600);
+  --color-primary-hover: var(--brand-700);
+  --color-primary-subtle: var(--brand-100);
+  --color-primary-rgb: 217, 119, 6;
 }
 .dark [data-portal='teacher'] {
-  --color-primary: var(--academics-500);
-  --color-primary-hover: var(--academics-600);
-  --color-primary-subtle: rgba(45, 212, 191, 0.15);
-  --color-primary-rgb: 45, 212, 191;
+  --color-primary: var(--brand-500);
+  --color-primary-hover: var(--brand-400);
+  --color-primary-subtle: rgba(245, 158, 11, 0.15);
+  --color-primary-rgb: 245, 158, 11;
 }
 
 [data-portal='student'] {
-  --color-primary: var(--info-600);
-  --color-primary-hover: var(--info-700);
-  --color-primary-subtle: var(--info-50);
-  --color-primary-rgb: 2, 132, 199;
+  --color-primary: var(--brand-600);
+  --color-primary-hover: var(--brand-700);
+  --color-primary-subtle: var(--brand-100);
+  --color-primary-rgb: 217, 119, 6;
 }
 .dark [data-portal='student'] {
-  --color-primary: var(--info-500);
-  --color-primary-hover: var(--info-600);
-  --color-primary-rgb: 56, 189, 248;
+  --color-primary: var(--brand-500);
+  --color-primary-hover: var(--brand-400);
+  --color-primary-rgb: 245, 158, 11;
 }
 
 [data-portal='parent'] {
-  --color-primary: var(--finance-600);
-  --color-primary-hover: var(--finance-700);
-  --color-primary-subtle: #F5F3FF;
-  --color-primary-rgb: 124, 58, 237;
+  --color-primary: var(--brand-600);
+  --color-primary-hover: var(--brand-700);
+  --color-primary-subtle: var(--brand-100);
+  --color-primary-rgb: 217, 119, 6;
 }
 .dark [data-portal='parent'] {
-  --color-primary: var(--finance-500);
-  --color-primary-hover: var(--finance-600);
-  --color-primary-rgb: 167, 139, 250;
+  --color-primary: var(--brand-500);
+  --color-primary-hover: var(--brand-400);
+  --color-primary-rgb: 245, 158, 11;
 }
 
 [data-portal='super-admin'] {
   --color-primary: var(--brand-600);
   --color-primary-hover: var(--brand-700);
   --color-primary-active: var(--brand-800);
-  --color-primary-subtle: var(--brand-50);
-  --color-primary-rgb: 5, 150, 105;
+  --color-primary-subtle: var(--brand-100);
+  --color-primary-rgb: 217, 119, 6;
 }
 .dark [data-portal='super-admin'] {
   --color-primary: var(--brand-500);
   --color-primary-hover: var(--brand-400);
   --color-primary-active: var(--brand-300);
-  --color-primary-subtle: rgba(16, 185, 129, 0.15);
-  --color-primary-rgb: 16, 185, 129;
+  --color-primary-subtle: rgba(245, 158, 11, 0.15);
+  --color-primary-rgb: 245, 158, 11;
 }
 
 /* ============================================================================

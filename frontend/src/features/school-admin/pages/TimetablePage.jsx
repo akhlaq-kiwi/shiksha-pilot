@@ -777,7 +777,7 @@ export default function TimetablePage() {
       {/* Top Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Academic Timetable</h2>
+          <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display uppercase">ACADEMIC TIMETABLE</h2>
           <p className="text-text-secondary text-sm mt-1">Manage weekly recurring schedules and track workloads.</p>
         </div>
         
@@ -860,7 +860,7 @@ export default function TimetablePage() {
       ) : (
         <>
           {/* Control Panel Filter bar */}
-          <Card className="p-4 shadow-2xs border border-border flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="p-5 bg-zinc-50/50 dark:bg-zinc-900/50 border border-border rounded-2xl shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex flex-col gap-1">
                 <span className="text-[11px] font-bold text-text-secondary uppercase">Class Selection</span>
@@ -913,7 +913,7 @@ export default function TimetablePage() {
               <span className="text-[11px] font-bold text-text-secondary uppercase">Active Range</span>
               <span className="text-sm font-bold text-text-primary font-sans">{getWeekRangeStr()}</span>
             </div>
-          </Card>
+          </div>
 
           {/* Week Locked Banner */}
           {isWeekLocked && (
@@ -956,7 +956,7 @@ export default function TimetablePage() {
                       handleToggleDaySelection(dayName);
                     }
                   }}
-                  className={`flex flex-col justify-between border-2 rounded-3xl p-6 transition-all duration-300 min-h-[460px] bg-zinc-50 dark:bg-zinc-950/40 ${
+                  className={`flex flex-col justify-between border-2 rounded-3xl p-6 transition-all duration-300 min-h-[460px] bg-surface-sunken ${
                     isSelectionMode ? 'cursor-pointer select-none' : ''
                   } ${
                     isToday 
@@ -1049,7 +1049,7 @@ export default function TimetablePage() {
                           return (
                             <div 
                               key={p.id} 
-                              className="flex items-center justify-between py-2 px-3 bg-zinc-100/60 dark:bg-zinc-900/40 border border-border/80 rounded-xl relative transition-all group"
+                              className="flex items-center justify-between py-2 px-3 bg-surface border border-border-strong rounded-xl relative transition-all group"
                             >
                               <div className="space-y-0.5 min-w-0 flex-1">
                                 <h4 className="text-xs font-bold text-text-primary truncate">

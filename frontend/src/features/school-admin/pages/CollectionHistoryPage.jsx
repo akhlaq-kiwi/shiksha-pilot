@@ -28,11 +28,11 @@ export default function CollectionHistoryPage() {
     total: 0,
     pages: 1
   });
-  const defaultPeriods = ['All Periods', '3 Months', '6 Months', '9 Months', '12 Months', '15 Months', '18 Months', '21 Months', '24 Months'];
+  const defaultPeriods = ['ALL TIME', 'SINCE LAST REPORT'];
   const [availablePeriods, setAvailablePeriods] = useState(defaultPeriods);
   const [availableCollectors, setAvailableCollectors] = useState([]);
   
-  const [selectedPeriod, setSelectedPeriod] = useState('All Periods');
+  const [selectedPeriod, setSelectedPeriod] = useState('ALL TIME');
   const [selectedCollector, setSelectedCollector] = useState('All Users');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -227,20 +227,14 @@ export default function CollectionHistoryPage() {
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       
-      {/* Navigation and Title */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="space-y-1">
-          <button 
-            onClick={() => navigate('/school-admin')} 
-            className="flex items-center gap-1.5 text-xs font-bold text-text-secondary hover:text-text-primary transition-colors mb-2 uppercase tracking-wider"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" /> Back to Dashboard
-          </button>
-          <h1 className="text-2xl font-bold text-text-primary tracking-tight font-display">Collection History</h1>
-          <p className="text-xs text-text-secondary">
-            View every fee collection transaction with complete payment history.
-          </p>
-        </div>
+      {/* Header Container */}
+      <div className="p-5 rounded-2xl border border-border bg-zinc-50/50 dark:bg-zinc-900/50 shadow-2xs flex flex-col justify-between gap-1">
+        <h1 className="text-xl md:text-2xl font-bold text-text-primary tracking-tight font-display uppercase leading-none">
+          COLLECTION HISTORY
+        </h1>
+        <p className="text-xs text-text-secondary mt-1 font-medium">
+          View every fee collection transaction with complete payment history.
+        </p>
       </div>
 
       {/* Summary Cards */}
@@ -269,7 +263,7 @@ export default function CollectionHistoryPage() {
       </div>
 
       {/* Filters and Search Control Box */}
-      <div className="bg-surface border border-border rounded-2xl p-5 shadow-xs flex flex-col md:flex-row gap-4 justify-between items-center">
+      <div className="bg-zinc-50/50 dark:bg-zinc-900/50 border border-border rounded-2xl p-5 shadow-2xs flex flex-col md:flex-row gap-4 justify-between items-center">
         
         {/* Search */}
         <div className="relative w-full md:w-72">
@@ -278,7 +272,7 @@ export default function CollectionHistoryPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search student, receipt, class..."
-            className="pl-10 text-xs font-semibold py-2.5 h-10"
+            className="pl-10 text-xs font-semibold py-2.5 h-10 focus:outline-none focus:ring-0 focus:border-border"
           />
         </div>
 
@@ -295,7 +289,7 @@ export default function CollectionHistoryPage() {
                 setSelectedCollector(e.target.value);
                 setPage(1);
               }}
-              className="w-full sm:w-48 rounded-xl border border-border bg-surface text-text-primary px-3 py-2 text-xs font-bold focus:border-primary focus:ring-primary outline-none h-10 cursor-pointer"
+              className="w-full sm:w-48 rounded-xl border border-border bg-surface text-text-primary px-3 py-2 text-xs font-bold focus:outline-none focus:ring-0 focus:border-border outline-none h-10 cursor-pointer"
             >
               {(availableCollectors.length > 0 ? availableCollectors : [{ name: 'All Users', label: 'All Users' }]).map((c) => (
                 <option key={c.name} value={c.name}>
@@ -316,7 +310,7 @@ export default function CollectionHistoryPage() {
                 setSelectedPeriod(e.target.value);
                 setPage(1);
               }}
-              className="w-full sm:w-44 rounded-xl border border-border bg-surface text-text-primary px-3 py-2 text-xs font-bold focus:border-primary focus:ring-primary outline-none h-10 cursor-pointer"
+              className="w-full sm:w-44 rounded-xl border border-border bg-surface text-text-primary px-3 py-2 text-xs font-bold focus:outline-none focus:ring-0 focus:border-border outline-none h-10 cursor-pointer"
             >
               {(availablePeriods.length > 0 ? availablePeriods : defaultPeriods).map((p) => (
                 <option key={p} value={p}>
@@ -329,7 +323,7 @@ export default function CollectionHistoryPage() {
       </div>
 
       {/* Transaction History Log table */}
-      <Card className="shadow-xs border border-border bg-surface overflow-hidden">
+      <div className="rounded-2xl border border-border bg-surface overflow-hidden shadow-2xs">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
             <RefreshCw className="h-7 w-7 text-primary animate-spin" />
@@ -351,7 +345,7 @@ export default function CollectionHistoryPage() {
           <>
             {/* Desktop Table View */}
             <div className="hidden md:block overflow-x-auto">
-              <Table>
+              <Table containerClassName="border-0 rounded-none shadow-none bg-transparent">
                 <TableHeader>
                   <TableRow className="bg-zinc-50/50 dark:bg-zinc-900/20">
                     <TableHead className="font-bold text-xs whitespace-nowrap">Deposit By</TableHead>
@@ -399,12 +393,12 @@ export default function CollectionHistoryPage() {
 
                         {/* Balance flow (Bank Statements Style) */}
                         <TableCell className="text-center text-xs py-3 whitespace-nowrap">
-                          <div className="flex items-center justify-center gap-1 text-sm font-semibold text-text-secondary bg-zinc-50 dark:bg-zinc-900/50 py-1.5 px-3 rounded-lg border border-border max-w-[340px] mx-auto">
-                            <span className="text-text-muted font-mono">₹{parseFloat(t.previous_total).toLocaleString('en-IN')}</span>
-                            <span className="text-text-muted">→</span>
-                            <span className="text-emerald-600 font-bold font-mono">+₹{t.amount.toLocaleString('en-IN')}</span>
-                            <span className="text-text-muted">→</span>
-                            <span className="font-bold text-text-primary font-mono">₹{parseFloat(t.updated_total).toLocaleString('en-IN')}</span>
+                          <div className="flex items-center justify-center gap-1.5 text-xs font-semibold bg-amber-500/10 dark:bg-amber-500/20 border border-amber-500/30 py-1.5 px-4 rounded-full max-w-[340px] mx-auto">
+                            <span className="text-amber-800/80 dark:text-amber-300/80 font-mono">₹{parseFloat(t.previous_total).toLocaleString('en-IN')}</span>
+                            <span className="text-amber-600/70 dark:text-amber-400/70">→</span>
+                            <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono">+₹{t.amount.toLocaleString('en-IN')}</span>
+                            <span className="text-amber-600/70 dark:text-amber-400/70">→</span>
+                            <span className="font-bold text-amber-950 dark:text-amber-100 font-mono">₹{parseFloat(t.updated_total).toLocaleString('en-IN')}</span>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -454,12 +448,12 @@ export default function CollectionHistoryPage() {
                     </div>
 
                     {/* Bottom Row - Running balance */}
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-text-secondary pt-1">
-                      <span className="text-text-muted font-mono">₹{parseFloat(t.previous_total).toLocaleString('en-IN')}</span>
-                      <span>→</span>
-                      <span className="text-emerald-600 font-bold font-mono">+₹{t.amount.toLocaleString('en-IN')}</span>
-                      <span>→</span>
-                      <span className="font-bold text-text-primary font-mono">₹{parseFloat(t.updated_total).toLocaleString('en-IN')}</span>
+                    <div className="flex items-center justify-center gap-1.5 text-xs font-semibold bg-amber-500/10 dark:bg-amber-500/20 border border-amber-500/30 py-1.5 px-3 rounded-full">
+                      <span className="text-amber-800/80 dark:text-amber-300/80 font-mono">₹{parseFloat(t.previous_total).toLocaleString('en-IN')}</span>
+                      <span className="text-amber-600/70 dark:text-amber-400/70">→</span>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono">+₹{t.amount.toLocaleString('en-IN')}</span>
+                      <span className="text-amber-600/70 dark:text-amber-400/70">→</span>
+                      <span className="font-bold text-amber-950 dark:text-amber-100 font-mono">₹{parseFloat(t.updated_total).toLocaleString('en-IN')}</span>
                     </div>
 
                   </div>
@@ -489,7 +483,7 @@ export default function CollectionHistoryPage() {
             )}
           </>
         )}
-      </Card>
+      </div>
 
       {/* Fee Payment Receipt Popup */}
       {viewingReceipt && (

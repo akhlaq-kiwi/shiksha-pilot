@@ -364,15 +364,20 @@ export default function LeaveRequestsPage() {
     rejected: teacherLeaves.filter(l => l.status === 'REJECTED').length
   };
 
-  // Holidays dates sort
+  // Holidays dates sort & academic year filtering
   const dToday = new Date();
   const todayStr = `${dToday.getFullYear()}-${String(dToday.getMonth() + 1).padStart(2, '0')}-${String(dToday.getDate()).padStart(2, '0')}`;
-  const sortedHolidays = [...holidays].sort((a, b) => a.date.localeCompare(b.date));
+  const filteredHolidays = holidays.filter(h => {
+    if (!currentYear?.start_date || !currentYear?.end_date) return true;
+    return h.date >= currentYear.start_date && h.date <= currentYear.end_date;
+  });
+  const sortedHolidays = [...filteredHolidays].sort((a, b) => a.date.localeCompare(b.date));
 
   return (
     <div className="flex flex-col gap-6 w-full">
-      <div className="flex items-center justify-between border-b border-border pb-4">
-        <PageTitle title="Manage Leaves" subtitle="Manage school holidays, student leaves, and teacher leaves." />
+      <div className="p-5 rounded-2xl border border-border !bg-zinc-100/80 dark:!bg-zinc-900/50 shadow-2xs">
+        <h2 className="text-xl md:text-2xl font-bold text-text-primary tracking-tight font-display uppercase">MANAGE LEAVES</h2>
+        <p className="text-text-secondary text-xs mt-1 font-medium">Manage school holidays, student leaves, and teacher leaves.</p>
       </div>
 
       {/* Tabs */}
@@ -410,13 +415,13 @@ export default function LeaveRequestsPage() {
 
         {/* Add Holiday Form */}
         {!isReadOnly && (
-          <Card className="border border-border shadow-sm bg-surface">
-            <CardHeader className="pb-3 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
+          <Card className="border border-border shadow-sm bg-surface overflow-hidden">
+            <CardHeader className="py-3 px-5 border-b border-border !bg-zinc-100/80 dark:!bg-zinc-800/80">
               <CardTitle className="text-sm font-bold text-text-primary flex items-center gap-1.5">
-                <Plus className="h-4 w-4" /> Add Holiday / Leave Day
+                <Plus className="h-4 w-4 text-primary" /> Add Holiday / Leave Day
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-4">
+            <CardContent className="pt-4 p-5">
               <form onSubmit={handleCreateHoliday} className="grid grid-cols-1 md:grid-cols-7 gap-4 items-end">
                 <div className="md:col-span-3 space-y-1.5">
                   <label htmlFor="leave-title" className="text-xs font-bold text-text-secondary uppercase">Leave Title</label>
@@ -471,11 +476,11 @@ export default function LeaveRequestsPage() {
         )}
 
         {/* Holidays List */}
-        <Card className="border border-border shadow-sm bg-surface">
-          <CardHeader className="pb-3 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
+        <Card className="border border-border shadow-sm bg-surface overflow-hidden">
+          <CardHeader className="py-3 px-5 border-b border-border !bg-zinc-100/80 dark:!bg-zinc-800/80">
             <CardTitle className="text-sm font-bold text-text-primary">School Holidays List</CardTitle>
           </CardHeader>
-          <CardContent className="pt-4">
+          <CardContent className="pt-4 p-5">
             {loadingHolidays ? (
               <div className="flex flex-col items-center justify-center py-10 gap-2">
                 <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
@@ -497,7 +502,7 @@ export default function LeaveRequestsPage() {
                   });
 
                   return (
-                    <Card key={h.id} className="border border-border hover:border-zinc-300 dark:hover:border-zinc-800 transition-all shadow-sm rounded-xl relative bg-surface">
+                    <Card key={h.id} className="border border-border-strong hover:border-primary/40 transition-all shadow-2xs rounded-xl relative bg-surface-sunken/60">
                       <CardContent className="p-4">
                         {isEditingThis ? (
                           <div className="space-y-3">
@@ -617,7 +622,7 @@ export default function LeaveRequestsPage() {
         </div>
 
         {/* Student Filters */}
-        <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between bg-surface border border-border p-4 rounded-xl w-full">
+        <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between !bg-zinc-100/80 dark:!bg-zinc-900/50 border border-border p-4 rounded-2xl w-full shadow-2xs">
           <div className="flex flex-col sm:flex-row flex-1 items-stretch sm:items-center gap-3 w-full">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />
@@ -793,7 +798,7 @@ export default function LeaveRequestsPage() {
         </div>
 
         {/* Teacher Filters */}
-        <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between bg-surface border border-border p-4 rounded-xl w-full">
+        <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between !bg-zinc-100/80 dark:!bg-zinc-900/50 border border-border p-4 rounded-2xl w-full shadow-2xs">
           <div className="flex flex-col sm:flex-row flex-1 items-stretch sm:items-center gap-3 w-full">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />

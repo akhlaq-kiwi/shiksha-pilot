@@ -417,12 +417,12 @@ export default function FeeFollowUpPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto px-4 py-6 min-h-[calc(100vh-140px)] flex flex-col animate-in fade-in duration-200">
+    <div className="space-y-6 w-full flex flex-col animate-in fade-in duration-200">
       
       {/* Page Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-4">
+      <div className="p-5 rounded-2xl border border-border !bg-zinc-100/80 dark:!bg-zinc-900/50 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-text-primary tracking-tight font-display">Fee Follow-ups</h2>
+          <h2 className="text-xl font-bold text-text-primary tracking-tight font-display uppercase">FEE FOLLOW-UPS</h2>
           <p className="text-xs text-text-secondary mt-1 font-medium">Track and manage future payment commitments from parents.</p>
         </div>
         <div className="flex items-center gap-2">
@@ -478,56 +478,53 @@ export default function FeeFollowUpPage() {
       </div>
 
       {/* Filters Section */}
-      <Card className="shadow-2xs border border-border bg-surface p-4">
-        <CardContent className="p-0">
-          <div className="flex flex-col md:flex-row items-end gap-4 max-w-xl">
-            <div className="flex-1 space-y-1.5 w-full">
-              <label htmlFor="search-student" className="text-[11px] text-text-secondary font-bold uppercase">Search Student</label>
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-text-muted" />
-                <Input id="search-student"
-                  type="text"
-                  placeholder="Search by name, admission no or roll no..."
-                  value={filters.student_search}
-                  onChange={e => setFilters(prev => ({ ...prev, student_search: e.target.value }))}
-                  className="pl-8 text-xs font-semibold text-text-primary border border-border bg-surface rounded-lg w-full focus:outline-hidden"
-                />
-              </div>
-            </div>
-
-            <div className="w-full md:w-48 space-y-1.5">
-              <label className="text-[11px] text-text-secondary font-bold uppercase">Status Filter</label>
-              <select
-                value={filters.status}
-                onChange={e => setFilters(prev => ({ ...prev, status: e.target.value }))}
-                className="w-full bg-surface border border-border rounded-lg p-2 text-xs font-semibold focus:outline-hidden text-text-primary"
-              >
-                <option value="ALL">All Commitments</option>
-                <option value="COMPLETED">Completed</option>
-                <option value="DUE_TODAY">Due Today</option>
-                <option value="UPCOMING">Upcoming</option>
-                <option value="OVERDUE">Overdue</option>
-              </select>
+      <div className="rounded-2xl border border-border bg-zinc-50/50 dark:bg-zinc-900/50 p-4 shadow-2xs">
+        <div className="flex flex-col md:flex-row items-end gap-4 max-w-xl">
+          <div className="flex-1 space-y-1.5 w-full">
+            <label htmlFor="search-student" className="text-[11px] text-text-secondary font-bold uppercase">Search Student</label>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-text-muted" />
+              <Input id="search-student"
+                type="text"
+                placeholder="Search by name, admission no or roll no..."
+                value={filters.student_search}
+                onChange={e => setFilters(prev => ({ ...prev, student_search: e.target.value }))}
+                className="pl-8 text-xs font-semibold text-text-primary border border-border bg-surface rounded-lg w-full focus:outline-hidden"
+              />
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Main Listing Grid */}
-      <Card className="shadow-2xs border border-border bg-surface flex-1 min-h-[480px] overflow-visible flex flex-col">
-        <CardContent className="p-0 flex-1 flex flex-col overflow-visible">
-          
-          <div id="followup-report-area" className="overflow-x-auto w-full bg-surface p-4 flex-1 flex flex-col min-h-[420px]">
-            <div className="hidden pdf-only flex justify-between items-center border-b border-border pb-4 mb-4">
-              <div>
-                <h1 className="text-lg font-bold text-black">Fee Follow-ups Report</h1>
-                <p className="text-xs text-gray-500">Generated on: {new Date().toLocaleDateString()}</p>
-              </div>
-              <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Shiksha Pilot</span>
+          <div className="w-full md:w-48 space-y-1.5">
+            <label className="text-[11px] text-text-secondary font-bold uppercase">Status Filter</label>
+            <select
+              value={filters.status}
+              onChange={e => setFilters(prev => ({ ...prev, status: e.target.value }))}
+              className="w-full bg-surface border border-border rounded-lg p-2 text-xs font-semibold focus:outline-hidden text-text-primary"
+            >
+              <option value="ALL">All Commitments</option>
+              <option value="COMPLETED">Completed</option>
+              <option value="DUE_TODAY">Due Today</option>
+              <option value="UPCOMING">Upcoming</option>
+              <option value="OVERDUE">Overdue</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Listing Grid (Single Fixed-Height Container) */}
+      <div className="border border-border rounded-2xl bg-surface shadow-2xs flex flex-col h-[520px] overflow-hidden">
+        <div id="followup-report-area" className="flex-1 flex flex-col overflow-hidden min-h-0">
+          <div className="hidden pdf-only flex justify-between items-center border-b border-border p-4">
+            <div>
+              <h1 className="text-lg font-bold text-black">Fee Follow-ups Report</h1>
+              <p className="text-xs text-gray-500">Generated on: {new Date().toLocaleDateString()}</p>
             </div>
-            
+            <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Shiksha Pilot</span>
+          </div>
+          
+          <div className="flex-1 overflow-x-auto overflow-y-auto min-h-0">
             <table className="w-full text-left text-xs border-collapse">
-              <thead>
+              <thead className="sticky top-0 z-10 bg-zinc-50/50 dark:bg-zinc-900/50 backdrop-blur-xs">
                 <tr className="border-b border-border text-[11px] text-text-muted font-bold uppercase tracking-wider">
                   <th className="py-3 px-4 whitespace-nowrap">Student Name</th>
                   <th className="py-3 px-4 whitespace-nowrap">Class</th>
@@ -558,7 +555,7 @@ export default function FeeFollowUpPage() {
                     <tr 
                       key={item.id} 
                       onClick={() => navigate(`/school-admin/classes?studentId=${item.student_id}`, { state: { from: location.pathname + location.search } })}
-                      className="hover:bg-hover transition-colors font-medium text-text-secondary cursor-pointer"
+                      className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/50 transition-colors font-medium text-text-secondary cursor-pointer"
                     >
                       <td className="py-3.5 px-4 font-bold text-text-primary whitespace-nowrap">{item.student_name}</td>
                       <td className="py-3.5 px-4 text-text-primary uppercase font-bold whitespace-nowrap">{item.class_name || '—'}</td>
@@ -599,36 +596,35 @@ export default function FeeFollowUpPage() {
               </tbody>
             </table>
           </div>
+        </div>
 
-          {/* Pagination Footer */}
-          {pagination.total_pages > 1 && (
-            <div className="p-4 border-t border-border flex items-center justify-between text-xs font-semibold text-text-secondary bg-surface select-none">
-              <span>Showing Page <strong className="text-text-primary">{pagination.page}</strong> of <strong className="text-text-primary">{pagination.total_pages}</strong></span>
-              <div className="flex items-center gap-1.5">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={pagination.page <= 1 || loading}
-                  onClick={() => fetchFollowUps(pagination.page - 1)}
-                  className="px-3 py-1 font-bold text-xs"
-                >
-                  Previous
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={pagination.page >= pagination.total_pages || loading}
-                  onClick={() => fetchFollowUps(pagination.page + 1)}
-                  className="px-3 py-1 font-bold text-xs"
-                >
-                  Next
-                </Button>
-              </div>
+        {/* Pagination Footer */}
+        {pagination.total_pages > 1 && (
+          <div className="p-3.5 border-t border-border flex items-center justify-between text-xs font-semibold text-text-secondary bg-surface select-none flex-shrink-0">
+            <span>Showing Page <strong className="text-text-primary">{pagination.page}</strong> of <strong className="text-text-primary">{pagination.total_pages}</strong></span>
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={pagination.page <= 1 || loading}
+                onClick={() => fetchFollowUps(pagination.page - 1)}
+                className="px-3 py-1 font-bold text-xs"
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={pagination.page >= pagination.total_pages || loading}
+                onClick={() => fetchFollowUps(pagination.page + 1)}
+                className="px-3 py-1 font-bold text-xs"
+              >
+                Next
+              </Button>
             </div>
-          )}
-
-        </CardContent>
-      </Card>
+          </div>
+        )}
+      </div>
 
       {/* ADD / EDIT FOLLOW-UP MODAL */}
       {showAddEditModal && (

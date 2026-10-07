@@ -20,7 +20,7 @@ const formatCurrency = (val) => {
 
 const getStatusBadgeStyles = (status) => {
   const map = {
-    PAID: 'bg-green-100 text-green-800 dark:bg-green-950/30 dark:text-green-400 border-green-200 dark:border-green-900/30',
+    PAID: 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30',
     PENDING: 'bg-amber-100 text-amber-800 dark:bg-amber-950/30 dark:text-amber-400 border-amber-200 dark:border-amber-900/30',
     PARTIAL: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/30 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900/30',
     '—': 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700',
@@ -353,14 +353,13 @@ export default function FinancePage() {
     <div className="flex flex-col h-[calc(100vh-80px)] space-y-4 max-h-[calc(100vh-80px)] animate-in fade-in duration-300">
       
       {/* Sticky Header Panel */}
-      <div className="flex-shrink-0 bg-surface border border-border p-6 rounded-2xl shadow-2xs space-y-4">
+      <div className="flex-shrink-0 bg-zinc-50/50 dark:bg-zinc-900/50 border border-border p-6 rounded-2xl shadow-2xs space-y-4">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-primary/10 text-primary rounded-xl">
             <Landmark className="h-6 w-6" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-text-primary tracking-tight font-display">Fees Portal</h2>
-            <p className="text-text-secondary text-xs mt-1">Monitor fee statuses, calculate dynamic outstanding monthly balances, and collect dues.</p>
+            <h2 className="text-xl md:text-2xl font-bold text-text-primary tracking-tight font-display uppercase leading-none">FEES PORTAL</h2>
           </div>
         </div>
 
@@ -422,48 +421,37 @@ export default function FinancePage() {
       )}
 
       {/* Scrollable Table Area */}
-      <div 
-        ref={scrollContainerRef}
-        onScroll={handleScroll}
-        className="flex-1 min-h-0 overflow-y-auto border border-border rounded-2xl bg-surface shadow-2xs"
-      >
+      <div className="flex-1 min-h-0 border border-border rounded-2xl bg-surface shadow-2xs overflow-hidden flex flex-col">
         {loading ? (
-          <Table>
-            <TableHeader className="sticky top-0 bg-surface z-10">
-              <TableRow>
-                <TableHead className="text-xs uppercase font-bold text-text-secondary">Student Name</TableHead>
-                <TableHead className="text-xs uppercase font-bold text-text-secondary">Class</TableHead>
-                <TableHead className="text-xs uppercase font-bold text-text-secondary">Roll No.</TableHead>
-                <TableHead className="text-xs uppercase font-bold text-text-secondary">Outstanding</TableHead>
-                <TableHead className="text-xs uppercase font-bold text-text-secondary">Status</TableHead>
-                <TableHead className="text-right text-xs uppercase font-bold text-text-secondary">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {[...Array(5)].map((_, i) => <SkeletonRow key={i} />)}
-            </TableBody>
-          </Table>
+          <div className="flex flex-col items-center justify-center py-24 gap-3 text-center flex-1">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <p className="text-xs font-bold text-text-primary uppercase tracking-wider">Loading Fees Portal...</p>
+          </div>
         ) : filteredStudents.length === 0 ? (
-          <div className="p-12 text-center text-text-muted text-xs font-bold leading-relaxed space-y-1">
+          <div className="p-12 text-center text-text-muted text-xs font-bold leading-relaxed space-y-1 flex-1 flex flex-col justify-center">
             <p>No students found.</p>
             <p className="text-[11px] text-text-muted font-normal">Try another student name.</p>
           </div>
         ) : (
-          <>
-            <Table>
-              <TableHeader className="sticky top-0 bg-surface z-10 shadow-3xs border-b border-border">
-                <TableRow>
-                  <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Student Name</TableHead>
-                  <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Class</TableHead>
-                  <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Roll No.</TableHead>
-                  <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Outstanding</TableHead>
-                  <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Status</TableHead>
-                  <TableHead className="text-right text-xs uppercase font-bold text-text-secondary bg-surface">Action</TableHead>
+          <div 
+            ref={scrollContainerRef}
+            onScroll={handleScroll}
+            className="flex-1 min-h-0 overflow-y-auto"
+          >
+            <Table containerClassName="border-0 rounded-none shadow-none bg-transparent">
+              <TableHeader className="sticky top-0 bg-zinc-50/50 dark:bg-zinc-900/50 z-10 shadow-3xs border-b border-border">
+                <TableRow className="bg-zinc-50/50 dark:bg-zinc-900/50">
+                  <TableHead className="text-xs uppercase font-bold text-text-secondary bg-transparent">Student Name</TableHead>
+                  <TableHead className="text-xs uppercase font-bold text-text-secondary bg-transparent">Class</TableHead>
+                  <TableHead className="text-xs uppercase font-bold text-text-secondary bg-transparent">Roll No.</TableHead>
+                  <TableHead className="text-xs uppercase font-bold text-text-secondary bg-transparent">Outstanding</TableHead>
+                  <TableHead className="text-xs uppercase font-bold text-text-secondary bg-transparent">Status</TableHead>
+                  <TableHead className="text-right text-xs uppercase font-bold text-text-secondary bg-transparent">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paginatedStudents.map((s) => (
-                  <TableRow key={s.id}>
+                  <TableRow key={s.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/50 transition-colors cursor-pointer">
                     <TableCell className="font-semibold text-text-primary text-xs py-3.5">
                       {s.name}
                     </TableCell>
@@ -486,7 +474,7 @@ export default function FinancePage() {
                         onClick={() => {
                           navigate(`/school-admin/classes?studentId=${s.id}`, { state: { from: location.pathname + location.search } });
                         }}
-                        className="px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-text-primary border border-border transition-all inline-flex items-center gap-1 leading-none h-[22px]"
+                        className="px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30 transition-all inline-flex items-center gap-1 leading-none h-[22px] shadow-2xs"
                       >
                         Open Ledger <ChevronRight className="h-3 w-3 text-text-muted" />
                       </button>
@@ -503,7 +491,7 @@ export default function FinancePage() {
                 <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Loading more students...</span>
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
       

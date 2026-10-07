@@ -2697,16 +2697,16 @@ export default function ExamsPage() {
       `}} />
 
       {/* Header section */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 no-print">
+      <div className="p-5 rounded-2xl border border-border !bg-zinc-100/80 dark:!bg-zinc-900/50 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 no-print">
         <div>
-          <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Examinations</h2>
-          <p className="text-text-secondary text-sm mt-1">Configure exams, manage timetables, enter marks, and generate student report cards.</p>
+          <h2 className="text-xl md:text-2xl font-bold text-text-primary tracking-tight font-display uppercase">Examinations</h2>
+          <p className="text-text-secondary text-xs mt-1 font-medium">Configure exams, manage timetables, enter marks, and generate student report cards.</p>
         </div>
         {effectiveActiveView === 'dashboard' && hasReportCardTemplate && (
-          <div className="flex gap-2 sm:items-center">
+          <div className="flex flex-wrap gap-2 items-center">
             {!isReadOnly && !isStandardTemplate && (
               <Button 
-                className="flex items-center gap-2 font-bold bg-primary text-white" 
+                className="flex items-center gap-2 font-bold bg-primary text-white text-xs h-10 px-4" 
                 onClick={() => {
                   setNewExam({ name: '', parent_id: null, max_marks: '', start_date: '', end_date: '', publish_date: '', description: '' });
                   setIsCreateOpen(true);
@@ -2716,12 +2716,12 @@ export default function ExamsPage() {
               </Button>
             )}
             <Button 
-              className="flex items-center gap-2 font-bold bg-emerald-600 hover:bg-emerald-700 text-white" 
+              className="flex items-center gap-2 font-bold text-xs h-10 px-4" 
               onClick={() => setIsSelectClassForFinalReportOpen(true)}
             >
               <Award className="h-4 w-4" /> Final Academic Report Card
             </Button>
-            <Button className="flex items-center gap-2 font-bold" onClick={() => { setActiveView('grade_scale'); setGradeError(''); setGradeSuccess(''); }}>
+            <Button className="flex items-center gap-2 font-bold text-xs h-10 px-4" onClick={() => { setActiveView('grade_scale'); setGradeError(''); setGradeSuccess(''); }}>
               Grade Configuration Scale
             </Button>
           </div>
@@ -2816,13 +2816,12 @@ export default function ExamsPage() {
               ) : (
                 filteredExams.map(term => (
                   <Card key={term.id} className="border border-border shadow-sm overflow-hidden">
-                    <CardHeader className="py-4 border-b border-border bg-zinc-100/70 dark:bg-zinc-800/50 flex flex-row items-center justify-between">
+                    <CardHeader className="py-4 border-b border-border !bg-zinc-100/80 dark:!bg-zinc-800/80 flex flex-row items-center justify-between">
                       <div>
                         <CardTitle className="text-base font-bold text-text-primary uppercase tracking-wide flex items-center gap-2">
                           <FileText className="h-5 w-5 text-primary" />
                           {term.name}
                         </CardTitle>
-                        {term.description && <p className="text-xs text-text-secondary mt-0.5">{term.description}</p>}
                       </div>
                       <div className="flex items-center gap-2">
                         {!isReadOnly && !isCBSEClassic && (
@@ -2886,7 +2885,7 @@ export default function ExamsPage() {
                             {term.sub_tests.map(st => (
                               <TableRow 
                                 key={st.id} 
-                                className="group cursor-pointer hover:bg-primary/5 transition-colors"
+                                className="group cursor-pointer hover:!bg-zinc-200/50 dark:hover:!bg-zinc-800/60 transition-colors"
                                 onClick={() => handleOpenClassWorkspace(st)}
                               >
                                 <TableCell className="font-bold text-text-primary whitespace-nowrap">
@@ -2955,7 +2954,7 @@ export default function ExamsPage() {
             </div>
           ) : (
             <Card>
-              <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
+              <CardHeader className="py-4 border-b border-border !bg-zinc-100/80 dark:!bg-zinc-800/80">
                 <CardTitle className="text-sm font-bold text-text-primary">Scheduled Examinations</CardTitle>
               </CardHeader>
               <Table>

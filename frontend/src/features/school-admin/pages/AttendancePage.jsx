@@ -514,7 +514,7 @@ export default function AttendancePage() {
       {/* Title section */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Attendance</h2>
+          <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">ATTENDANCE</h2>
           <p className="text-text-secondary text-sm mt-1">
             {userType === 'Student' 
               ? 'Mark student daily attendance and review reports.' 

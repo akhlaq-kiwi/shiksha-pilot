@@ -43,10 +43,11 @@ class SmtpMailer
         }
 
         // Connect to server
-        $socket = @fsockopen($host, $port, $errno, $errstr, 15);
+        $socket = @fsockopen($host, $port, $errno, $errstr, 4);
         if (!$socket) {
             throw new RuntimeException("Failed to connect to SMTP server {$host}:{$port}. Error: {$errstr} ({$errno})");
         }
+        @stream_set_timeout($socket, 4);
 
         try {
             self::expect($socket, '220');

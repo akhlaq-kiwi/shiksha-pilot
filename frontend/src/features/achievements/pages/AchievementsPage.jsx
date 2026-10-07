@@ -234,45 +234,47 @@ export default function AchievementsPage() {
   return (
     <div className="space-y-8 animate-in fade-in duration-300 pb-12">
       {/* Page Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/80 pb-6">
-        <div>
-          <div className="flex items-center gap-3">
-            {(selectedCategory || selectedYearCardId) && (
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => {
-                  if (selectedCategory) {
-                    setSelectedCategory(null);
-                  } else {
-                    setSelectedYearCardId(null);
-                  }
-                }}
-                className="h-9 w-9 rounded-xl border border-border hover:bg-secondary/80"
-              >
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            )}
-            <div>
-              <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display flex items-center gap-2.5">
-                <Trophy className="h-7 w-7 text-amber-500" />
-                {selectedCategory === 'attendance_champions'
-                  ? 'Attendance Champions'
-                  : selectedCategory === 'academic_excellence'
-                  ? 'Academic Excellence'
-                  : selectedYearCardId && currentYearObj
-                  ? `Achievements for ${currentYearObj.name}`
-                  : 'Hall of Fame & Achievements'}
-              </h2>
-              <p className="text-text-secondary text-sm mt-1">
-                {selectedCategory === 'attendance_champions'
-                  ? 'Recognizing students with outstanding school attendance and commitment.'
-                  : selectedCategory === 'academic_excellence'
-                  ? 'Honoring top academic performers in examination results.'
-                  : selectedYearCardId && currentYearObj
-                  ? `Celebrating excellence in attendance and academic performance for ${currentYearObj.name}.`
-                  : 'Celebrating excellence in attendance and academic performance across academic sessions.'}
-              </p>
+      <div className="!bg-zinc-100/80 dark:!bg-zinc-900/50 border border-border rounded-2xl p-6 shadow-2xs">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-3">
+              {(selectedCategory || selectedYearCardId) && (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => {
+                    if (selectedCategory) {
+                      setSelectedCategory(null);
+                    } else {
+                      setSelectedYearCardId(null);
+                    }
+                  }}
+                  className="h-9 w-9 rounded-xl border border-border hover:bg-secondary/80"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+              )}
+              <div>
+                <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display flex items-center gap-2.5">
+                  <Trophy className="h-7 w-7 text-amber-500" />
+                  {selectedCategory === 'attendance_champions'
+                    ? 'Attendance Champions'
+                    : selectedCategory === 'academic_excellence'
+                    ? 'Academic Excellence'
+                    : selectedYearCardId && currentYearObj
+                    ? `Achievements for ${currentYearObj.name}`
+                    : 'Hall of Fame & Achievements'}
+                </h2>
+                <p className="text-text-secondary text-sm mt-1">
+                  {selectedCategory === 'attendance_champions'
+                    ? 'Recognizing students with outstanding school attendance and commitment.'
+                    : selectedCategory === 'academic_excellence'
+                    ? 'Honoring top academic performers in examination results.'
+                    : selectedYearCardId && currentYearObj
+                    ? `Celebrating excellence in attendance and academic performance for ${currentYearObj.name}.`
+                    : 'Celebrating excellence in attendance and academic performance across academic sessions.'}
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -311,9 +313,6 @@ export default function AchievementsPage() {
               <Calendar className="h-5 w-5 text-amber-500" />
               Academic Year Achievement History
             </h3>
-            <span className="text-xs text-text-secondary font-medium">
-              Select an Academic Year to view achievements
-            </span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

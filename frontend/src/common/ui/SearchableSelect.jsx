@@ -147,14 +147,31 @@ export const INDIAN_STATES_AND_CITIES = {
   "Puducherry": ["Karaikal", "Mahe", "Puducherry", "Yanam"]
 };
 
-export function SearchableSelect({ label, placeholder, value, onChange, options, disabled, required, error }) {
+export function SearchableSelect({ label, placeholder, value, onChange, options, disabled, required, error, dropUp = false }) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [shouldDropUp, setShouldDropUp] = useState(dropUp);
   const containerRef = useRef(null);
 
   useEffect(() => {
     setSearch(value || '');
   }, [value]);
+
+  const handleOpen = () => {
+    if (disabled) return;
+    if (dropUp) {
+      setShouldDropUp(true);
+    } else if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      if (spaceBelow < 220 && rect.top > 180) {
+        setShouldDropUp(true);
+      } else {
+        setShouldDropUp(false);
+      }
+    }
+    setIsOpen(true);
+  };
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -182,14 +199,14 @@ export function SearchableSelect({ label, placeholder, value, onChange, options,
         value={search}
         onChange={e => {
           setSearch(e.target.value);
-          setIsOpen(true);
+          handleOpen();
         }}
-        onFocus={() => setIsOpen(true)}
+        onFocus={handleOpen}
         disabled={disabled}
-        className="flex h-9 w-full rounded-lg border border-border bg-surface px-3 py-1 text-sm shadow-xs transition-all placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex h-9 w-full rounded-lg border border-border-strong bg-surface px-3 py-1 text-sm shadow-xs transition-all placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary disabled:cursor-not-allowed disabled:opacity-50"
       />
       {isOpen && !disabled && (
-        <div className="absolute left-0 right-0 top-[60px] max-h-40 overflow-y-auto bg-surface border border-border rounded-xl shadow-lg z-50 py-1 bg-white dark:bg-zinc-950 animate-in fade-in slide-in-from-top-1 duration-200">
+        <div className={`absolute left-0 right-0 ${shouldDropUp ? 'bottom-full mb-1' : 'top-full mt-1'} max-h-48 overflow-y-auto bg-surface border border-border-strong rounded-xl shadow-xl z-50 py-1 animate-in fade-in duration-150`}>
           {filteredOptions.length === 0 ? (
             <div className="px-3 py-2 text-xs text-text-muted">No options found</div>
           ) : (
@@ -201,7 +218,7 @@ export function SearchableSelect({ label, placeholder, value, onChange, options,
                   onChange(opt);
                   setIsOpen(false);
                 }}
-                className="w-full text-left px-3 py-2 text-xs font-semibold text-text-primary hover:bg-secondary border-b border-border last:border-b-0"
+                className="w-full text-left px-3 py-2 text-xs font-semibold text-text-primary hover:bg-secondary border-b border-border/60 last:border-b-0"
               >
                 {opt}
               </button>

@@ -239,6 +239,34 @@ class SchoolAdminController extends BaseController
         return $this->success($response, $member);
     }
 
+    public function requestPrincipalOtp(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int)$args['id'];
+        $body = RequestParser::body($request);
+        $action = $body['action'] ?? $request->getQueryParams()['action'] ?? 'assign';
+        $result = $this->service->requestPrincipalOtp($user, $id, $action);
+
+        return $this->success($response, $result, 'OTP sent to school admin email address.');
+    }
+
+    public function assignPrincipalRole(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int)$args['id'];
+        $body = RequestParser::body($request);
+        $otpCode = $body['otp_code'] ?? null;
+        $action = $body['action'] ?? 'assign';
+
+        $result = $this->service->assignPrincipalRole($user, $id, $otpCode, $action);
+
+        return $this->success($response, $result, $result['message'] ?? 'Principal role updated successfully.');
+    }
+
     // -------------------------------------------------------------------------
     // Classes
     // -------------------------------------------------------------------------
