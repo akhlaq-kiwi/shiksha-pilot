@@ -137,9 +137,9 @@ export default function AccountDeletionRequests() {
       )}
 
       <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
+        <Table containerClassName="border-0 rounded-none shadow-none bg-transparent">
+          <TableHeader className="bg-zinc-50/50 dark:bg-zinc-900/50 border-b border-border">
+            <TableRow className="bg-zinc-50/50 dark:bg-zinc-900/50">
               <TableHead className="text-xs">Requested by</TableHead>
               <TableHead className="text-xs">Role</TableHead>
               <TableHead className="text-xs">Reason</TableHead>
@@ -168,7 +168,7 @@ export default function AccountDeletionRequests() {
             )}
 
             {!loading && requests.map((r) => (
-              <TableRow key={r.id}>
+              <TableRow key={r.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/50 transition-colors">
                 <TableCell className="text-xs">
                   <div className="font-semibold text-text-primary">{r.contact_name || '—'}</div>
                   <div className="text-text-secondary tabular-nums">{r.contact_phone}</div>

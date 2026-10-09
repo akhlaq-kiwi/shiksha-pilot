@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Plus, CheckCircle2, ChevronRight, UserCog, Users, ShieldAlert, Award, FileSpreadsheet, ArrowLeft, RefreshCw, Check, Lock, Save, Trash2, Loader2, AlertTriangle, AlertCircle, X, Download, GraduationCap } from 'lucide-react';
+import { Plus, CheckCircle2, ChevronRight, ChevronDown, UserCog, Users, ShieldAlert, Award, FileSpreadsheet, ArrowLeft, RefreshCw, Check, Lock, Save, Trash2, Loader2, AlertTriangle, AlertCircle, X, Download, GraduationCap } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
@@ -11,8 +11,87 @@ import { schoolAdminService } from '../../../common/services/schoolAdminService'
 import { authService } from '../../../common/services/authService';
 import { apiClient } from '../../../common/services/apiClient';
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
-import { getClassIndex, PREDEFINED_CLASSES } from '../../../common/constants/predefinedClasses';
+import { getClassIndex, getShortClassName, PREDEFINED_CLASSES } from '../../../common/constants/predefinedClasses';
 import { jsPDF } from 'jspdf';
+
+const CustomSelect = ({
+  value,
+  onChange,
+  options = [],
+  placeholder = "Select...",
+  disabled = false,
+  className = "",
+  buttonClassName = "",
+  dropdownClassName = ""
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  const selectedOption = options.find(o => String(o.value) === String(value));
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={containerRef} className={`relative w-full ${isOpen ? 'z-40' : ''} ${className}`}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={`flex w-full items-center justify-between rounded-lg border border-border bg-surface px-3 py-2 text-xs font-semibold text-text-primary shadow-2xs outline-none focus:outline-none focus:ring-0 focus-visible:outline-none active:outline-none select-none ${
+          disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
+        } ${buttonClassName}`}
+      >
+        <span className="truncate">
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <ChevronDown className={`h-4 w-4 text-text-muted transition-transform duration-200 flex-shrink-0 ml-1 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && !disabled && (
+        <div className={`absolute left-0 right-0 top-full mt-1.5 rounded-xl border border-border bg-surface shadow-xl z-50 overflow-hidden animate-in fade-in duration-150 ${dropdownClassName}`}>
+          <div className="max-h-60 overflow-y-auto py-1 scrollbar-thin">
+            {placeholder && (
+              <button
+                type="button"
+                onClick={() => {
+                  onChange('');
+                  setIsOpen(false);
+                }}
+                className={`w-full text-left px-3 py-2 text-xs font-semibold outline-none focus:outline-none select-none transition-colors hover:bg-primary/10 ${!value ? 'bg-primary/10 text-primary font-bold' : 'text-text-secondary'}`}
+              >
+                {placeholder}
+              </button>
+            )}
+            {options.map((opt) => {
+              const isSelected = String(opt.value) === String(value);
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(String(opt.value));
+                    setIsOpen(false);
+                  }}
+                  className={`w-full text-left px-3 py-2 text-xs font-semibold outline-none focus:outline-none select-none transition-colors hover:bg-primary/10 ${isSelected ? 'bg-primary/10 text-primary font-bold' : 'text-text-primary'}`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default function AuditsSettingsPage({ onYearsUpdated }) {
   const location = useLocation();
@@ -64,6 +143,16 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
     }
   }, [assignSuccess]);
 
+  // Auto-clear success message for Teacher Menu Permissions after 5 seconds
+  useEffect(() => {
+    if (permSuccess) {
+      const timer = setTimeout(() => {
+        setPermSuccess('');
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [permSuccess]);
+
   const MENU_OPTIONS = [
     'Dashboard',
     'Classes',
@@ -81,48 +170,17 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
   ];
 
   const sortClassesNaturally = (classes) => {
-    const getPrePrimaryRank = (name) => {
-      const lower = (name || '').toLowerCase();
-      if (lower.includes('play')) return 1;
-      if (lower.includes('nurs')) return 2;
-      if (lower.includes('lkg')) return 3;
-      if (lower.includes('ukg')) return 4;
-      if (lower.includes('kg')) return 5;
-      if (lower.includes('prep')) return 6;
-      return 999;
-    };
-
     return [...classes].sort((a, b) => {
-      const nameA = (a.name || '').trim();
-      const nameB = (b.name || '').trim();
+      const idxA = getClassIndex(a.name);
+      const idxB = getClassIndex(b.name);
+      if (idxA !== -1 && idxB !== -1 && idxA !== idxB) return idxA - idxB;
+      if (idxA !== -1 && idxB === -1) return -1;
+      if (idxA === -1 && idxB !== -1) return 1;
+
       const secA = (a.section || '').trim();
       const secB = (b.section || '').trim();
-
-      const rankA = getPrePrimaryRank(nameA);
-      const rankB = getPrePrimaryRank(nameB);
-
-      if (rankA !== 999 || rankB !== 999) {
-        if (rankA !== rankB) return rankA - rankB;
-      }
-
-      const matchA = nameA.match(/\d+/);
-      const matchB = nameB.match(/\d+/);
-
-      const numA = matchA ? parseInt(matchA[0], 10) : null;
-      const numB = matchB ? parseInt(matchB[0], 10) : null;
-
-      if (numA !== null && numB !== null) {
-        if (numA !== numB) return numA - numB;
-      } else if (numA !== null && numB === null) {
-        return 1;
-      } else if (numA === null && numB !== null) {
-        return -1;
-      }
-
-      const cmpName = nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
-      if (cmpName !== 0) return cmpName;
-
-      return secA.localeCompare(secB, undefined, { numeric: true, sensitivity: 'base' });
+      if (secA !== secB) return secA.localeCompare(secB, undefined, { numeric: true, sensitivity: 'base' });
+      return (a.name || '').localeCompare(b.name || '', undefined, { numeric: true, sensitivity: 'base' });
     });
   };
 
@@ -136,7 +194,16 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
       const teachers = permData.teachers || [];
       setTeachersWithPerms(teachers);
 
-      const clsList = sortClassesNaturally(assignData.classes || []);
+      const rawClsList = assignData.classes || [];
+      const uniqueMap = new Map();
+      rawClsList.forEach(c => {
+        const shortName = getShortClassName(c.name);
+        const key = `${shortName}_${c.section || ''}`;
+        if (!uniqueMap.has(key)) {
+          uniqueMap.set(key, c);
+        }
+      });
+      const clsList = sortClassesNaturally(Array.from(uniqueMap.values()));
       setClassesWithTeachers(clsList);
       
       const localMap = {};
@@ -570,64 +637,56 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
     const map = new Map();
     (classes || []).forEach(c => {
       if (!c.name) return;
-      if (!map.has(c.name)) {
-        map.set(c.name, []);
+      const shortName = getShortClassName(c.name);
+      if (!map.has(shortName)) {
+        map.set(shortName, { shortName, items: [] });
       }
-      map.get(c.name).push(c);
+      map.get(shortName).items.push(c);
     });
 
-    return Array.from(map.entries())
-      .map(([className, items]) => {
+    return Array.from(map.values())
+      .map(({ shortName, items }) => {
         const hasConfiguredName = (configuredClassIds || []).some(cid => {
           const found = (classes || []).find(cl => String(cl.id) === String(cid));
-          return found && found.name === className;
+          return found && getShortClassName(found.name) === shortName;
         });
 
         return {
-          name: className,
+          name: shortName,
           primaryId: String(items[0].id),
           allIds: items.map(item => String(item.id)),
           isConfigured: items.some(item => configuredClassIds.includes(String(item.id))) || hasConfiguredName
         };
       })
-      .sort((a, b) => {
-        const idxA = getClassIndex(a.name);
-        const idxB = getClassIndex(b.name);
-        if (idxA !== idxB) return idxA - idxB;
-        return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
-      });
+      .sort((a, b) => getClassIndex(a.name) - getClassIndex(b.name));
   }, [classes, configuredClassIds]);
 
   const uniqueCourseClassGroups = useMemo(() => {
     const map = new Map();
     (classes || []).forEach(c => {
       if (!c.name) return;
-      if (!map.has(c.name)) {
-        map.set(c.name, []);
+      const shortName = getShortClassName(c.name);
+      if (!map.has(shortName)) {
+        map.set(shortName, { shortName, items: [] });
       }
-      map.get(c.name).push(c);
+      map.get(shortName).items.push(c);
     });
 
-    return Array.from(map.entries())
-      .map(([className, items]) => {
+    return Array.from(map.values())
+      .map(({ shortName, items }) => {
         const hasConfiguredName = (courseConfiguredClassIds || []).some(cid => {
           const found = (classes || []).find(cl => String(cl.id) === String(cid));
-          return found && found.name === className;
+          return found && getShortClassName(found.name) === shortName;
         });
 
         return {
-          name: className,
+          name: shortName,
           primaryId: String(items[0].id),
           allIds: items.map(item => String(item.id)),
           isConfigured: items.some(item => courseConfiguredClassIds.includes(String(item.id))) || hasConfiguredName
         };
       })
-      .sort((a, b) => {
-        const idxA = getClassIndex(a.name);
-        const idxB = getClassIndex(b.name);
-        if (idxA !== idxB) return idxA - idxB;
-        return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
-      });
+      .sort((a, b) => getClassIndex(a.name) - getClassIndex(b.name));
   }, [classes, courseConfiguredClassIds]);
 
   // Pre-select class from router state redirect if redirecting from Finance or StudentDetails
@@ -1638,6 +1697,15 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
 
   const reviewCounts = getReviewCounts();
 
+  if (loading) {
+    return (
+      <div className="flex-1 flex flex-col justify-center items-center py-24 min-h-[400px] gap-3">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <p className="text-xs font-bold text-text-primary uppercase tracking-wider">LOADING AUDITS & SETTINGS...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border pb-4">
@@ -1735,8 +1803,8 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
       </Card>
 
       {/* Class Fee Configuration Panel */}
-      <Card id="class-fee-config-panel" className="shadow-sm rounded-2xl overflow-hidden">
-        <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-row items-center justify-between">
+      <Card id="class-fee-config-panel" className="shadow-sm rounded-2xl overflow-visible relative z-30">
+        <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 rounded-t-2xl flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-bold text-text-primary">Class Fee Configuration</CardTitle>
           <Button
             onClick={handleDownloadFeeStructurePdf}
@@ -1769,20 +1837,17 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
           <div className="flex flex-col sm:flex-row items-start sm:items-end gap-6">
             <div className="w-full sm:w-[240px]">
               <label className="text-xs font-bold text-text-secondary uppercase block mb-2">Class *</label>
-              <select
+              <CustomSelect
                 value={selectedClassId}
-                onChange={e => setSelectedClassId(e.target.value)}
+                onChange={val => setSelectedClassId(val)}
                 disabled={classes.length === 0}
-                className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-xs font-semibold focus:outline-none focus:ring-0 focus:border-border shadow-2xs"
-              >
-                <option value="">Select Class</option>
-                {uniqueClassGroups.map(group => (
-                  <option key={group.name} value={group.primaryId}>
-                    {group.name}
-                    {group.isConfigured ? ' (Configured)' : ''}
-                  </option>
-                ))}
-              </select>
+                placeholder="Select Class"
+                options={uniqueClassGroups.map(group => ({
+                  value: group.primaryId,
+                  label: `${group.name}${group.isConfigured ? ' (Configured)' : ''}`
+                }))}
+                buttonClassName="h-10"
+              />
             </div>
           </div>
 
@@ -1832,8 +1897,8 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
       </Card>
 
       {/* Course Fee Configuration Panel */}
-      <Card id="course-fee-config-panel" className="shadow-sm rounded-2xl overflow-hidden">
-        <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-row items-center justify-between">
+      <Card id="course-fee-config-panel" className="shadow-sm rounded-2xl overflow-visible relative z-20">
+        <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 rounded-t-2xl flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-bold text-text-primary">Course Fee Configuration</CardTitle>
           <Button
             onClick={handleDownloadCourseFeeStructurePdf}
@@ -1866,20 +1931,17 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
           <div className="flex flex-col sm:flex-row items-start sm:items-end gap-6">
             <div className="w-full sm:w-[240px]">
               <label className="text-xs font-bold text-text-secondary uppercase block mb-2">Class *</label>
-              <select
+              <CustomSelect
                 value={courseSelectedClassId}
-                onChange={e => setCourseSelectedClassId(e.target.value)}
+                onChange={val => setCourseSelectedClassId(val)}
                 disabled={classes.length === 0}
-                className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-xs font-semibold focus:outline-none focus:ring-0 focus:border-border shadow-2xs"
-              >
-                <option value="">Select Class</option>
-                {uniqueCourseClassGroups.map(group => (
-                  <option key={group.name} value={group.primaryId}>
-                    {group.name}
-                    {group.isConfigured ? ' (Configured)' : ''}
-                  </option>
-                ))}
-              </select>
+                placeholder="Select Class"
+                options={uniqueCourseClassGroups.map(group => ({
+                  value: group.primaryId,
+                  label: `${group.name}${group.isConfigured ? ' (Configured)' : ''}`
+                }))}
+                buttonClassName="h-10"
+              />
             </div>
           </div>
 
@@ -2091,8 +2153,8 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
       {/* Assign User Role & Class Teacher Assignment Panels (Accessible ONLY to School Admin) */}
       {isSchoolAdmin && (
         <div className="space-y-6">
-          <Card className="shadow-sm rounded-2xl overflow-hidden">
-            <CardHeader className="py-5 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
+          <Card className="shadow-sm rounded-2xl overflow-visible relative z-20">
+            <CardHeader className="py-5 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 rounded-t-2xl">
               <CardTitle className="text-lg font-bold text-text-primary tracking-tight">Assign User Role</CardTitle>
               <p className="text-xs text-text-secondary mt-1">Configure teacher menu permissions for active staff.</p>
             </CardHeader>
@@ -2121,19 +2183,17 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                         <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
                       )}
                     </div>
-                    <select
+                    <CustomSelect
                       value={selectedPermTeacherId}
                       disabled={savingPermissions}
-                      onChange={e => handleTeacherSelectForPermissions(e.target.value)}
-                      className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-xs font-semibold focus:outline-none focus:ring-0 focus:border-border shadow-2xs cursor-pointer text-text-primary"
-                    >
-                      <option value="">-- Choose Teacher --</option>
-                      {teachersWithPerms.map(t => (
-                        <option key={t.id} value={t.id}>
-                          {t.name}{t.department ? ` (${t.department})` : ''}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={val => handleTeacherSelectForPermissions(val)}
+                      placeholder="-- Choose Teacher --"
+                      options={teachersWithPerms.map(t => ({
+                        value: t.id,
+                        label: `${t.name}${t.department ? ` (${t.department})` : ''}`
+                      }))}
+                      buttonClassName="h-10"
+                    />
                     <p className="text-[11px] text-text-muted">Choose an active teacher to assign their School Admin Portal permissions.</p>
                   </div>
 
@@ -2178,8 +2238,8 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm rounded-2xl overflow-hidden">
-            <CardHeader className="py-5 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
+          <Card className="shadow-sm rounded-2xl overflow-visible relative z-10">
+            <CardHeader className="py-5 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 rounded-t-2xl">
               <CardTitle className="text-lg font-bold text-text-primary tracking-tight">Class Teacher Assignment</CardTitle>
               <p className="text-xs text-text-secondary mt-1">Assign primary class teachers to active classrooms.</p>
             </CardHeader>
@@ -2195,7 +2255,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                 </div>
               )}
 
-              <Table containerClassName="border-0 shadow-none rounded-none bg-transparent">
+              <Table containerClassName="border-0 shadow-none rounded-none bg-transparent overflow-visible">
                 <TableHeader className="bg-surface-sunken">
                   <TableRow>
                     <TableHead className="w-1/2">Class</TableHead>
@@ -2211,28 +2271,27 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                     </TableRow>
                   ) : (
                     classesWithTeachers.map(c => {
-                      const classLabel = c.name + (c.section ? `-${c.section}` : '');
+                      const classLabel = getShortClassName(c.name) + (c.section ? `-${c.section}` : '');
                       const val = localAssignments[c.id] || '';
                       return (
                         <TableRow key={c.id}>
                           <TableCell className="font-bold text-text-primary text-xs tracking-tight">
                             {classLabel}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="overflow-visible">
                             <div className="flex items-center gap-3">
-                              <select
+                              <CustomSelect
                                 value={val}
                                 disabled={isReadOnly || savingClassId === c.id}
-                                onChange={e => handleClassTeacherChange(c.id, e.target.value)}
-                                className="w-full max-w-md h-9 px-2 rounded-lg border border-border bg-surface text-xs font-bold focus:outline-none focus:ring-0 focus:border-border cursor-pointer text-text-primary"
-                              >
-                                <option value="">-- Unassigned --</option>
-                                {teachersWithPerms.map(t => (
-                                  <option key={t.id} value={t.id}>
-                                    {t.name}{t.department ? ` (${t.department})` : ''}
-                                  </option>
-                                ))}
-                              </select>
+                                onChange={newTeacherId => handleClassTeacherChange(c.id, newTeacherId)}
+                                placeholder="-- Unassigned --"
+                                options={teachersWithPerms.map(t => ({
+                                  value: t.id,
+                                  label: `${t.name}${t.department ? ` (${t.department})` : ''}`
+                                }))}
+                                className="w-full max-w-md"
+                                buttonClassName="h-9"
+                              />
                               {savingClassId === c.id && (
                                 <Loader2 className="h-4 w-4 animate-spin text-primary flex-shrink-0" />
                               )}

@@ -231,10 +231,19 @@ export default function AchievementsPage() {
   const availableYears = data.available_achievement_years || [];
   const currentYearObj = availableYears.find(y => String(y.id) === String(selectedYearCardId));
 
+  if (loading) {
+    return (
+      <div className="flex-1 flex flex-col justify-center items-center py-24 min-h-[400px] gap-3">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <p className="text-xs font-bold text-text-primary uppercase tracking-wider">LOADING ACHIEVEMENTS...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 animate-in fade-in duration-300 pb-12">
       {/* Page Header */}
-      <div className="!bg-zinc-100/80 dark:!bg-zinc-900/50 border border-border rounded-2xl p-6 shadow-2xs">
+      <div className="bg-zinc-50/50 dark:bg-zinc-900/50 border border-border rounded-2xl p-6 shadow-2xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
@@ -308,13 +317,6 @@ export default function AchievementsPage() {
       {/* ========================================================================= */}
       {availableYears.length > 0 && !selectedYearCardId && !selectedCategory && (
         <div className="space-y-6 animate-in fade-in duration-300">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xl font-bold text-text-primary font-display flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-amber-500" />
-              Academic Year Achievement History
-            </h3>
-          </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {availableYears.map((year) => (
               <Card

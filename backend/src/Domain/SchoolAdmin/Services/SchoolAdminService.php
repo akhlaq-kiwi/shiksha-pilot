@@ -7695,6 +7695,7 @@ class SchoolAdminService extends BaseService
         $stmtMonthly = $pdo->prepare("
             SELECT 
                 fp.id,
+                fp.student_id AS student_id,
                 'monthly' AS type,
                 fp.receipt_no,
                 CASE 
@@ -7742,6 +7743,7 @@ class SchoolAdminService extends BaseService
                 afph.id AS id,
                 afph.id AS history_id,
                 afp.id AS payment_id,
+                afp.student_id AS student_id,
                 'additional' AS type,
                 COALESCE(afph.receipt_no, afp.receipt_no) AS receipt_no,
                 CASE 
@@ -8671,10 +8673,33 @@ class SchoolAdminService extends BaseService
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->classRepo->getPdo();
 
-        // Find all class IDs for this class name in this school
-        $stmtFind = $pdo->prepare("SELECT id FROM classes WHERE school_id = :sid AND LOWER(TRIM(name)) = LOWER(TRIM(:name))");
-        $stmtFind->execute([':sid' => $schoolId, ':name' => $className]);
-        $classIds = $stmtFind->fetchAll(PDO::FETCH_COLUMN);
+        $cleanName = strtolower(trim($className));
+
+        // Fetch all classes for this school to match flexibly in PHP (avoiding PDO duplicate parameter limits)
+        $stmtAll = $pdo->prepare("SELECT id, name FROM classes WHERE school_id = :sid");
+        $stmtAll->execute([':sid' => $schoolId]);
+        $allClasses = $stmtAll->fetchAll(PDO::FETCH_ASSOC);
+
+        $classIds = [];
+        foreach ($allClasses as $c) {
+            $cName = strtolower(trim($c['name']));
+            if ($cName === $cleanName || str_contains($cName, "({$cleanName})") || str_contains($cName, "{$cleanName} (")) {
+                $classIds[] = (int)$c['id'];
+                continue;
+            }
+            if ($cleanName === 'pnc' && (str_contains($cName, 'pnc') || str_contains($cName, 'pre') || str_contains($cName, 'nursery'))) {
+                $classIds[] = (int)$c['id'];
+            } elseif ($cleanName === 'nc' && (str_contains($cName, 'nc') || str_contains($cName, 'nursery'))) {
+                $classIds[] = (int)$c['id'];
+            } elseif ($cleanName === 'lkg' && (str_contains($cName, 'lkg') || str_contains($cName, 'lower'))) {
+                $classIds[] = (int)$c['id'];
+            } elseif ($cleanName === 'ukg' && (str_contains($cName, 'ukg') || str_contains($cName, 'upper'))) {
+                $classIds[] = (int)$c['id'];
+            } elseif ($cleanName === 'kg' && (str_contains($cName, 'kg') || str_contains($cName, 'kindergarten'))) {
+                $classIds[] = (int)$c['id'];
+            }
+        }
+        $classIds = array_values(array_unique($classIds));
 
         if (empty($classIds)) {
             throw new NotFoundException("Class '{$className}' not found.");
@@ -8711,8 +8736,8 @@ class SchoolAdminService extends BaseService
             $stmtDelSnapshots = $pdo->prepare("DELETE FROM academic_achievement_snapshots WHERE class_id IN ({$inClause})");
             $stmtDelSnapshots->execute();
 
-            $stmtDelete = $pdo->prepare("DELETE FROM classes WHERE school_id = :sid AND name = :name");
-            $stmtDelete->execute([':sid' => $schoolId, ':name' => $className]);
+            $stmtDelete = $pdo->prepare("DELETE FROM classes WHERE school_id = :sid AND id IN ({$inClause})");
+            $stmtDelete->execute([':sid' => $schoolId]);
 
             $pdo->commit();
         } catch (\Exception $e) {

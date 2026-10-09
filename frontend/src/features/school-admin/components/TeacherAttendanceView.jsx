@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Calendar, Users, Check, AlertCircle, Save, Download, Clock, QrCode, UserCheck, ShieldAlert, Award, RotateCw, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Calendar, Users, Check, AlertCircle, Save, Download, Clock, QrCode, UserCheck, ShieldAlert, Award, RotateCw, ChevronLeft, ChevronRight, ChevronDown, X } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
@@ -8,6 +8,64 @@ import { Select } from '../../../common/ui/select';
 import { Dialog } from '../../../common/ui/dialog';
 import { schoolService } from '../../../common/services/schoolService';
 import { useToast } from '../../../common/components/Toast';
+
+function CustomSelect({ options, value, onChange, placeholder = "Select...", disabled = false, className = "", buttonClassName = "", dropdownClassName = "" }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  const selectedOption = options.find(o => String(o.value) === String(value));
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={containerRef} className={`relative ${isOpen ? 'z-50' : 'z-10'} ${className}`}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={`flex h-10 items-center justify-between gap-2.5 rounded-full border border-border bg-surface px-4 py-2 text-xs font-bold text-text-primary shadow-2xs outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border active:outline-none select-none transition-colors min-w-[120px] ${
+          disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-border-strong'
+        } ${buttonClassName}`}
+      >
+        <span className="truncate">
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <ChevronDown className={`h-4 w-4 text-text-muted transition-transform duration-200 flex-shrink-0 ml-1 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && !disabled && (
+        <div className={`absolute left-0 right-0 top-full mt-1.5 min-w-[140px] rounded-2xl border border-border bg-surface shadow-2xl z-50 overflow-hidden animate-in fade-in duration-150 ${dropdownClassName}`}>
+          <div className="max-h-60 overflow-y-auto p-1.5 space-y-0.5 scrollbar-thin">
+            {options.map((opt) => {
+              const isSelected = String(opt.value) === String(value);
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(opt.value);
+                    setIsOpen(false);
+                  }}
+                  className={`w-full text-left px-3.5 py-2 rounded-xl text-xs font-semibold outline-none focus:outline-none select-none transition-colors hover:bg-primary/10 ${isSelected ? 'bg-primary/10 text-primary font-bold' : 'text-text-primary'}`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const getTodayLocalDateString = () => {
   const d = new Date();
@@ -689,13 +747,12 @@ export function TeacherAttendanceView() {
 
             <div className="flex items-center gap-3">
               <label className="text-xs font-bold text-text-secondary uppercase whitespace-nowrap">Select Month</label>
-              <Select value={reportMonth} onChange={(e) => setReportMonth(parseInt(e.target.value, 10))} className="w-44 cursor-pointer">
-                {ACADEMIC_MONTHS.map(m => (
-                  <option key={m.value} value={m.value}>
-                    {m.name}
-                  </option>
-                ))}
-              </Select>
+              <CustomSelect
+                value={reportMonth}
+                onChange={val => setReportMonth(parseInt(val, 10))}
+                options={ACADEMIC_MONTHS.map(m => ({ value: m.value, label: m.name }))}
+                buttonClassName="w-44 h-9"
+              />
             </div>
           </div>
 
@@ -799,34 +856,29 @@ export function TeacherAttendanceView() {
                       Official Teacher Entry Time
                     </label>
                     <div className="grid grid-cols-3 gap-2">
-                      <select
+                      <CustomSelect
                         value={entryHour}
-                        onChange={(e) => setEntryHour(e.target.value)}
-                        className="h-10 px-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-surface font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
-                      >
-                        {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map(h => (
-                          <option key={h} value={h}>{h}</option>
-                        ))}
-                      </select>
+                        onChange={val => setEntryHour(val)}
+                        options={Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map(h => ({ value: h, label: h }))}
+                        buttonClassName="w-full h-10 min-w-0"
+                      />
 
-                      <select
+                      <CustomSelect
                         value={entryMinute}
-                        onChange={(e) => setEntryMinute(e.target.value)}
-                        className="h-10 px-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-surface font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
-                      >
-                        {Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0')).map(m => (
-                          <option key={m} value={m}>{m}</option>
-                        ))}
-                      </select>
+                        onChange={val => setEntryMinute(val)}
+                        options={Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0')).map(m => ({ value: m, label: m }))}
+                        buttonClassName="w-full h-10 min-w-0"
+                      />
 
-                      <select
+                      <CustomSelect
                         value={entryPeriod}
-                        onChange={(e) => setEntryPeriod(e.target.value)}
-                        className="h-10 px-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-surface font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
-                      >
-                        <option value="AM">AM</option>
-                        <option value="PM">PM</option>
-                      </select>
+                        onChange={val => setEntryPeriod(val)}
+                        options={[
+                          { value: 'AM', label: 'AM' },
+                          { value: 'PM', label: 'PM' }
+                        ]}
+                        buttonClassName="w-full h-10 min-w-0"
+                      />
                     </div>
                     <p className="text-xs text-text-secondary">
                       Teachers scanning after this time will be automatically flagged as <strong className="text-rose-500">Late</strong>.
@@ -842,7 +894,7 @@ export function TeacherAttendanceView() {
                       value={allowedLeaves}
                       onChange={(e) => setAllowedLeaves(e.target.value)}
                       placeholder="0"
-                      className="h-10"
+                      className="h-10 outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
                       min="0"
                     />
                     <p className="text-xs text-text-secondary">
@@ -859,7 +911,7 @@ export function TeacherAttendanceView() {
                       value={latePenaltyAmount}
                       onChange={(e) => setLatePenaltyAmount(e.target.value)}
                       placeholder="0"
-                      className="h-10"
+                      className="h-10 outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
                       min="0"
                       step="any"
                     />

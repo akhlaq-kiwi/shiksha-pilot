@@ -334,6 +334,15 @@ export default function AnnouncementsPage() {
     { label: 'Teachers & Students', value: 'Both' }
   ];
 
+  if (loading) {
+    return (
+      <div className="flex-1 flex flex-col justify-center items-center py-24 min-h-[400px] gap-3">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <p className="text-xs font-bold text-text-primary uppercase tracking-wider">LOADING ANNOUNCEMENTS...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 flex flex-col min-h-[calc(100vh-140px)] animate-in fade-in duration-200">
       {/* Top Header Container */}
@@ -368,11 +377,7 @@ export default function AnnouncementsPage() {
       {/* Grid Table Layout with standard columns */}
       <div className="border border-border rounded-2xl bg-surface shadow-2xs flex-1 min-h-[560px] overflow-hidden flex flex-col">
         <div className="p-0 flex-1 flex flex-col min-h-0">
-          {loading ? (
-            <div className="flex justify-center items-center py-24 flex-1">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-            </div>
-          ) : filteredAnnouncements.length === 0 ? (
+          {filteredAnnouncements.length === 0 ? (
             /* Empty State Layout */
             <div className="text-center py-20 px-6 max-w-md mx-auto space-y-5 flex-1 flex flex-col justify-center items-center animate-in fade-in duration-300">
               <div className="mx-auto w-14 h-14 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-text-muted">

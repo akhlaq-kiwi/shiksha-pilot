@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Plus, ArrowLeft, Calendar, Clock, BookOpen, UserCheck, 
   Settings, Award, Printer, Trash, FileText, CheckCircle, 
-  XCircle, Save, AlertCircle, Edit3, Trash2, LayoutDashboard, ChevronRight, Download, X,
+  XCircle, Save, AlertCircle, Edit3, Trash2, LayoutDashboard, ChevronRight, ChevronDown, Download, X,
   Users, Check, RotateCcw, Phone, Loader2, MoreVertical, Eye
 } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
@@ -20,6 +20,7 @@ import html2pdf from 'html2pdf.js';
 import ReportCardRenderer from '../../report-card-templates/ReportCardRenderer';
 import { compileReportCardData, compileFinalSessionReportCardData } from '../../../common/services/reportCardEngine';
 import { ContactSuperAdminDialog } from '../index';
+import { getClassIndex, getShortClassName } from '../../../common/constants/predefinedClasses';
 
 const formatGridHeaderDate = (dateStr) => {
   if (!dateStr) return '';
@@ -451,7 +452,7 @@ const CalendarDatePicker = ({ value, onChange, min, max, required, className, on
             setIsOpen(true);
           }}
           required={required}
-          className={`pr-10 ${className || ''}`}
+          className={`focus:ring-0 focus-visible:ring-0 focus:outline-none focus:border-border-strong pr-10 ${className || ''}`}
         />
         <button
           type="button"
@@ -531,6 +532,113 @@ const CalendarDatePicker = ({ value, onChange, min, max, required, className, on
         </div>
       )}
     </div>
+  );
+};
+
+const CustomSelect = ({
+  value,
+  onChange,
+  options = [],
+  placeholder = "Select...",
+  disabled = false,
+  className = "",
+  buttonClassName = "",
+  dropdownClassName = ""
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  const selectedOption = options.find(o => String(o.value) === String(value));
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={containerRef} className={`relative w-full ${isOpen ? 'z-40' : ''} ${className}`}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={`flex w-full items-center justify-between rounded-xl border border-border bg-surface px-4 py-2 text-xs font-semibold text-text-primary shadow-2xs outline-none focus:outline-none focus:ring-0 focus-visible:outline-none active:outline-none select-none ${
+          disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-border-strong'
+        } ${buttonClassName}`}
+      >
+        <span className="truncate">
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <ChevronDown className={`h-4 w-4 text-text-muted transition-transform duration-200 flex-shrink-0 ml-1 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && !disabled && (
+        <div className={`absolute left-0 right-0 top-full mt-1.5 rounded-xl border border-border bg-surface shadow-xl z-50 overflow-hidden animate-in fade-in duration-150 ${dropdownClassName}`}>
+          <div className="max-h-60 overflow-y-auto py-1 scrollbar-thin">
+            {placeholder && (
+              <button
+                type="button"
+                onClick={() => {
+                  onChange('');
+                  setIsOpen(false);
+                }}
+                className={`w-full text-left px-4 py-2 text-xs font-semibold outline-none focus:outline-none select-none transition-colors hover:bg-primary/10 ${!value ? 'bg-primary/10 text-primary font-bold' : 'text-text-secondary'}`}
+              >
+                {placeholder}
+              </button>
+            )}
+            {options.map((opt) => {
+              const isSelected = String(opt.value) === String(value);
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(String(opt.value));
+                    setIsOpen(false);
+                  }}
+                  className={`w-full text-left px-4 py-2 text-xs font-semibold outline-none focus:outline-none select-none transition-colors hover:bg-primary/10 ${isSelected ? 'bg-primary/10 text-primary font-bold' : 'text-text-primary'}`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const sortAndDeduplicateClasses = (rawClasses) => {
+  const uniqueMap = new Map();
+  (rawClasses || []).forEach(c => {
+    const shortName = getShortClassName(c.name);
+    const key = `${shortName}_${c.section || ''}`;
+    if (!uniqueMap.has(key)) {
+      uniqueMap.set(key, c);
+    }
+  });
+  return Array.from(uniqueMap.values()).sort((a, b) => getClassIndex(a.name) - getClassIndex(b.name));
+};
+
+const CustomClassSelect = ({ value, onChange, options = [], placeholder = "Select class..." }) => {
+  const sortedOptions = sortAndDeduplicateClasses(options);
+  return (
+    <CustomSelect
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      options={sortedOptions.map(c => ({
+        value: String(c.id),
+        label: `${getShortClassName(c.name)}${c.section ? ` (${c.section})` : ''}`
+      }))}
+      buttonClassName="h-9 focus:ring-0 focus-visible:ring-0 focus:outline-none focus:border-border"
+    />
   );
 };
 
@@ -832,7 +940,17 @@ export default function ExamsPage() {
         schoolService.getGradeConfigurations().catch(() => [])
       ]);
       setExams(examsList || []);
-      setClasses(classesList || []);
+      const rawClasses = classesList || [];
+      const uniqueClassesMap = new Map();
+      rawClasses.forEach(c => {
+        const shortName = getShortClassName(c.name);
+        const key = `${shortName}_${c.section || ''}`;
+        if (!uniqueClassesMap.has(key)) {
+          uniqueClassesMap.set(key, c);
+        }
+      });
+      const sortedClassesList = Array.from(uniqueClassesMap.values()).sort((a, b) => getClassIndex(a.name) - getClassIndex(b.name));
+      setClasses(sortedClassesList);
       setSubjects(subjectsList || []);
       setHolidays(holidaysList || []);
       setGradeScales(gradesList || []);
@@ -959,10 +1077,11 @@ export default function ExamsPage() {
         schoolService.getExamClassStatuses(exam.id),
         schoolService.getSeatingPlan(exam.id).catch(() => null)
       ]);
-      setExamClassStatuses(statuses || []);
+      const sortedStatuses = sortAndDeduplicateClasses(statuses || []);
+      setExamClassStatuses(sortedStatuses);
       setHasSeatingPlan(!!(planDetails && planDetails.plan));
-      if (statuses && statuses.length > 0) {
-        setSelectedClassId(statuses[0].id.toString());
+      if (sortedStatuses && sortedStatuses.length > 0) {
+        setSelectedClassId(sortedStatuses[0].id.toString());
       }
       setActiveView('classes');
     } catch (err) {
@@ -1106,13 +1225,24 @@ export default function ExamsPage() {
 
   // Form Handlers
   const handleCreateExam = async (e) => {
-    e.preventDefault();
-    if (!newExam.name) {
-      setError('Please fill in Exam/Test Name.');
+    if (e) e.preventDefault();
+    if (!newExam.name?.trim()) {
+      setError('Please enter test/examination name.');
       return;
     }
-    if (!isCBSEClassic && newExam.parent_id === null && (!newExam.start_date || !newExam.end_date || !newExam.publish_date)) {
-      setError('Please fill in all required date fields.');
+    if (newExam.max_marks !== '' && newExam.max_marks !== null && newExam.max_marks !== undefined) {
+      const maxMarksStr = String(newExam.max_marks).trim();
+      if (maxMarksStr.includes('.') || !Number.isInteger(Number(maxMarksStr))) {
+        setError('Max Marks must be a whole number. Decimal marks are not allowed.');
+        return;
+      }
+      if (Number(maxMarksStr) <= 0) {
+        setError('Max Marks must be greater than 0.');
+        return;
+      }
+    }
+    if (!newExam.start_date || !newExam.end_date) {
+      setError('Please select both Start Date and End Date.');
       return;
     }
     const minAllowedStart = getExamMinStartDate(null, exams, newExam.parent_id);
@@ -1138,12 +1268,19 @@ export default function ExamsPage() {
   };
 
   const handleEditExamClick = (exam) => {
+    setError('');
     setSelectedExamToEdit(exam);
+
+    let cleanMaxMarks = '';
+    if (exam.max_marks !== null && exam.max_marks !== undefined && String(exam.max_marks).trim() !== '') {
+      cleanMaxMarks = String(Math.round(parseFloat(exam.max_marks)));
+    }
+
     setEditExamData({
       id: exam.id,
       name: exam.name,
       parent_id: exam.parent_id !== undefined ? exam.parent_id : null,
-      max_marks: exam.max_marks || '',
+      max_marks: cleanMaxMarks,
       start_date: exam.start_date || '',
       end_date: exam.end_date || '',
       publish_date: exam.publish_date || '',
@@ -1174,8 +1311,23 @@ export default function ExamsPage() {
 
   const handleUpdateExam = async (e) => {
     if (e) e.preventDefault();
-    if (!editExamData.name) {
-      setError('Please enter examination name.');
+    if (!editExamData.name?.trim()) {
+      setError('Please enter test/examination name.');
+      return;
+    }
+    if (editExamData.max_marks !== '' && editExamData.max_marks !== null && editExamData.max_marks !== undefined) {
+      const maxMarksStr = String(editExamData.max_marks).trim();
+      if (maxMarksStr.includes('.') || !Number.isInteger(Number(maxMarksStr))) {
+        setError('Max Marks must be a whole number. Decimal marks are not allowed.');
+        return;
+      }
+      if (Number(maxMarksStr) <= 0) {
+        setError('Max Marks must be greater than 0.');
+        return;
+      }
+    }
+    if (!editExamData.start_date || !editExamData.end_date) {
+      setError('Please select both Start Date and End Date.');
       return;
     }
     const minAllowedStart = getExamMinStartDate(editExamData.id, exams, editExamData.parent_id);
@@ -2464,7 +2616,7 @@ export default function ExamsPage() {
       <div className="flex items-center justify-center min-h-[400px] w-full">
         <div className="flex flex-col items-center gap-3">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          <p className="text-xs font-bold text-text-muted uppercase tracking-wider">Loading Examinations Module...</p>
+          <p className="text-xs font-bold text-text-primary uppercase tracking-wider">LOADING EXAMINATIONS...</p>
         </div>
       </div>
     );
@@ -2697,7 +2849,7 @@ export default function ExamsPage() {
       `}} />
 
       {/* Header section */}
-      <div className="p-5 rounded-2xl border border-border !bg-zinc-100/80 dark:!bg-zinc-900/50 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 no-print">
+      <div className="p-5 rounded-2xl border border-border bg-zinc-50/50 dark:bg-zinc-900/50 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 no-print">
         <div>
           <h2 className="text-xl md:text-2xl font-bold text-text-primary tracking-tight font-display uppercase">Examinations</h2>
           <p className="text-text-secondary text-xs mt-1 font-medium">Configure exams, manage timetables, enter marks, and generate student report cards.</p>
@@ -2816,7 +2968,7 @@ export default function ExamsPage() {
               ) : (
                 filteredExams.map(term => (
                   <Card key={term.id} className="border border-border shadow-sm overflow-hidden">
-                    <CardHeader className="py-4 border-b border-border !bg-zinc-100/80 dark:!bg-zinc-800/80 flex flex-row items-center justify-between">
+                    <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-row items-center justify-between">
                       <div>
                         <CardTitle className="text-base font-bold text-text-primary uppercase tracking-wide flex items-center gap-2">
                           <FileText className="h-5 w-5 text-primary" />
@@ -2870,22 +3022,22 @@ export default function ExamsPage() {
                           No sub-tests/components added under this terminal yet. Click <strong>"+ Add Test"</strong> to add tests (e.g. Unit Test 1, Sub-Enrichment, Term Exam).
                         </div>
                       ) : (
-                        <Table>
-                          <TableHeader>
-                            <TableRow className="bg-zinc-50 dark:bg-zinc-900/30">
-                              <TableHead className="w-1/3 whitespace-nowrap">Test Name</TableHead>
-                              <TableHead className="whitespace-nowrap">Max Marks</TableHead>
-                              <TableHead className="whitespace-nowrap">Start Date</TableHead>
-                              <TableHead className="whitespace-nowrap">End Date</TableHead>
-                              <TableHead className="whitespace-nowrap">Status</TableHead>
-                              <TableHead className="text-right whitespace-nowrap">Actions</TableHead>
+                        <Table containerClassName="border-0 rounded-none shadow-none bg-transparent">
+                          <TableHeader className="bg-zinc-50/50 dark:bg-zinc-900/50 border-b border-border">
+                            <TableRow className="bg-zinc-50/50 dark:bg-zinc-900/50">
+                              <TableHead className="w-1/3 whitespace-nowrap text-xs uppercase font-bold text-text-secondary">Test Name</TableHead>
+                              <TableHead className="whitespace-nowrap text-xs uppercase font-bold text-text-secondary">Max Marks</TableHead>
+                              <TableHead className="whitespace-nowrap text-xs uppercase font-bold text-text-secondary">Start Date</TableHead>
+                              <TableHead className="whitespace-nowrap text-xs uppercase font-bold text-text-secondary">End Date</TableHead>
+                              <TableHead className="whitespace-nowrap text-xs uppercase font-bold text-text-secondary">Status</TableHead>
+                              <TableHead className="text-right whitespace-nowrap text-xs uppercase font-bold text-text-secondary">Actions</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {term.sub_tests.map(st => (
                               <TableRow 
                                 key={st.id} 
-                                className="group cursor-pointer hover:!bg-zinc-200/50 dark:hover:!bg-zinc-800/60 transition-colors"
+                                className="group cursor-pointer hover:bg-zinc-50/50 dark:hover:bg-zinc-900/50 transition-colors"
                                 onClick={() => handleOpenClassWorkspace(st)}
                               >
                                 <TableCell className="font-bold text-text-primary whitespace-nowrap">
@@ -2954,12 +3106,12 @@ export default function ExamsPage() {
             </div>
           ) : (
             <Card>
-              <CardHeader className="py-4 border-b border-border !bg-zinc-100/80 dark:!bg-zinc-800/80">
+              <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
                 <CardTitle className="text-sm font-bold text-text-primary">Scheduled Examinations</CardTitle>
               </CardHeader>
-              <Table>
-                <TableHeader>
-                  <TableRow>
+              <Table containerClassName="border-0 rounded-none shadow-none bg-transparent">
+                <TableHeader className="bg-zinc-50/50 dark:bg-zinc-900/50 border-b border-border">
+                  <TableRow className="bg-zinc-50/50 dark:bg-zinc-900/50">
                     <TableHead>Exam Name</TableHead>
                     <TableHead>Start Date</TableHead>
                     <TableHead>End Date</TableHead>
@@ -2977,7 +3129,7 @@ export default function ExamsPage() {
                   ) : filteredExams.map(e => (
                     <TableRow 
                       key={e.id} 
-                      className="group cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors"
+                      className="group cursor-pointer hover:bg-zinc-50/50 dark:hover:bg-zinc-900/50 transition-colors"
                       onClick={() => handleOpenClassWorkspace(e)}
                     >
                       <TableCell className="font-semibold text-text-primary">
@@ -3039,21 +3191,20 @@ export default function ExamsPage() {
           </div>
 
           {/* Class Filter Dropdown */}
-          <Card className="p-4 shadow-sm bg-zinc-50/50 dark:bg-zinc-900/50">
+          <Card className="p-4 shadow-sm bg-zinc-50/50 dark:bg-zinc-900/50 relative z-30">
             <div className="flex flex-col sm:flex-row sm:items-center gap-3">
               <div className="w-full sm:w-80 space-y-1.5">
                 <label className="text-xs font-bold text-text-secondary uppercase">Select Class</label>
-                <Select value={selectedClassId} onChange={e => {
-                  setSelectedClassId(e.target.value);
-                  setPendingSubjects([]);
-                  setShowPendingAlert(false);
-                  setPendingValidationSource('');
-                }}>
-                  <option value="">Select class...</option>
-                  {examClassStatuses.map(c => (
-                    <option key={c.id} value={c.id}>{c.name} {c.section ? `(${c.section})` : ''}</option>
-                  ))}
-                </Select>
+                <CustomClassSelect 
+                  value={selectedClassId} 
+                  options={examClassStatuses}
+                  onChange={(newVal) => {
+                    setSelectedClassId(newVal);
+                    setPendingSubjects([]);
+                    setShowPendingAlert(false);
+                    setPendingValidationSource('');
+                  }} 
+                />
               </div>
             </div>
           </Card>
@@ -3275,7 +3426,8 @@ export default function ExamsPage() {
                         onClick={() => navigate('/school-admin/exams/question-paper-designer', { 
                           state: { 
                             examId: selectedExam?.id,
-                            classId: currentClass?.id
+                            classId: currentClass?.id,
+                            examName: selectedExam?.name
                           } 
                         })}
                       >
@@ -3362,7 +3514,7 @@ export default function ExamsPage() {
                     </div>
                     <div className="pt-2">
                       {currentClass.status === 'Draft' ? (
-                        <Button className="w-full flex items-center justify-center gap-2 text-xs font-bold bg-green-600 hover:bg-green-700 text-white" onClick={() => handlePublishClassResults(selectedExam, currentClass.id)}>
+                        <Button className="w-full flex items-center justify-center gap-2 text-xs font-bold font-sans cursor-pointer" onClick={() => handlePublishClassResults(selectedExam, currentClass.id)}>
                           <CheckCircle className="h-4 w-4" /> Publish Result
                         </Button>
                       ) : (
@@ -3411,8 +3563,8 @@ export default function ExamsPage() {
           <div className="space-y-6">
             {/* 1. Add Paper block */}
             {isTimetableEditable ? (
-              <Card className="relative z-10">
-                <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-row justify-between items-center space-y-0">
+              <Card className="shadow-sm rounded-2xl overflow-visible relative z-30">
+                <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 rounded-t-2xl flex flex-row justify-between items-center space-y-0">
                   <CardTitle className="text-sm font-bold text-text-primary">
                     {editingPaper ? 'Edit Paper' : 'Add Paper'}
                   </CardTitle>
@@ -3465,22 +3617,20 @@ export default function ExamsPage() {
                       {/* Subject Select */}
                       <div className="space-y-1.5">
                         <label className="text-xs font-bold text-text-secondary uppercase">Select Subject</label>
-                        <Select 
+                        <CustomSelect 
                           value={newPaper.subject_id} 
-                          onChange={e => setNewPaper(p => ({ ...p, subject_id: e.target.value }))}
+                          onChange={val => setNewPaper(p => ({ ...p, subject_id: val }))}
                           disabled={Boolean(editingPaper)}
-                          required
-                        >
-                          <option value="">-- Choose Subject --</option>
-                          {classSubjects.map(s => {
+                          placeholder="-- Choose Subject --"
+                          options={classSubjects.map(s => {
                             const isCreated = timetablePapers.some(p => p.subject_id === s.id && (!editingPaper || editingPaper.subject_id !== s.id));
-                            return (
-                              <option key={s.id} value={s.id}>
-                                {s.name}{isCreated ? ' (Created)' : ''}
-                              </option>
-                            );
+                            return {
+                              value: String(s.id),
+                              label: `${s.name}${isCreated ? ' (Created)' : ''}`
+                            };
                           })}
-                        </Select>
+                          buttonClassName="h-9"
+                        />
                       </div>
 
                       {/* Exam Date */}
@@ -3507,47 +3657,50 @@ export default function ExamsPage() {
                       {/* Evaluation Type */}
                       <div className="space-y-1.5 md:col-span-1">
                         <label className="text-xs font-bold text-text-secondary uppercase">Evaluation Type</label>
-                        <Select 
+                        <CustomSelect 
                           value={newPaper.evaluation_type || 'marks'} 
-                          onChange={e => {
-                            const evalType = e.target.value;
+                          onChange={val => {
                             const defaultMax = parseFloat(selectedExam?.max_marks) || 30;
                             const defaultPass = Math.ceil(defaultMax * 0.33);
                             setNewPaper(p => ({
                               ...p,
-                              evaluation_type: evalType,
-                              max_marks: evalType === 'grade' ? '0' : (p.max_marks || String(defaultMax)),
-                              passing_marks: evalType === 'grade' ? '0' : (p.passing_marks || String(defaultPass))
+                              evaluation_type: val,
+                              max_marks: val === 'grade' ? '0' : (p.max_marks || String(defaultMax)),
+                              passing_marks: val === 'grade' ? '0' : (p.passing_marks || String(defaultPass))
                             }));
                           }}
-                        >
-                          <option value="marks">Marks Based (0-100)</option>
-                          <option value="grade">Grade Based (A, B, C, D)</option>
-                        </Select>
+                          options={[
+                            { value: 'marks', label: 'Marks Based (0-100)' },
+                            { value: 'grade', label: 'Grade Based (A, B, C, D)' }
+                          ]}
+                          buttonClassName="h-9"
+                        />
                       </div>
 
                       {/* Start Time */}
                       <div className="space-y-1.5 font-sans">
                         <label className="text-xs font-bold text-text-secondary uppercase">Start Time</label>
-                        <Input type="time" value={newPaper.start_time} onChange={e => setNewPaper(p => ({ ...p, start_time: e.target.value }))} required />
+                        <Input type="time" value={newPaper.start_time} onChange={e => setNewPaper(p => ({ ...p, start_time: e.target.value }))} required className="focus:ring-0 focus-visible:ring-0 focus:outline-none focus:border-border-strong" />
                       </div>
 
                       {/* End Time */}
                       <div className="space-y-1.5 font-sans">
                         <label className="text-xs font-bold text-text-secondary uppercase">End Time</label>
-                        <Input type="time" value={newPaper.end_time} onChange={e => setNewPaper(p => ({ ...p, end_time: e.target.value }))} required />
+                        <Input type="time" value={newPaper.end_time} onChange={e => setNewPaper(p => ({ ...p, end_time: e.target.value }))} required className="focus:ring-0 focus-visible:ring-0 focus:outline-none focus:border-border-strong" />
                       </div>
 
                       {newPaper.evaluation_type === 'grade' ? (
                         <div className="space-y-1.5 md:col-span-2">
                           <label className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase">Grading Scale (Direct Grade)</label>
-                          <Select 
+                          <CustomSelect 
                             value={newPaper.grading_scale || 'A,B,C,D,E'} 
-                            onChange={e => setNewPaper(p => ({ ...p, grading_scale: e.target.value }))}
-                          >
-                            <option value="A+,A,B,C,D,E">5-Tier Scale (A+, A, B, C, D, E)</option>
-                            <option value="A,B,C,D">4-Tier Scale (A, B, C, D)</option>
-                          </Select>
+                            onChange={val => setNewPaper(p => ({ ...p, grading_scale: val }))}
+                            options={[
+                              { value: 'A+,A,B,C,D,E', label: '5-Tier Scale (A+, A, B, C, D, E)' },
+                              { value: 'A,B,C,D', label: '4-Tier Scale (A, B, C, D)' }
+                            ]}
+                            buttonClassName="h-9"
+                          />
                         </div>
                       ) : (
                         <>
@@ -3556,6 +3709,8 @@ export default function ExamsPage() {
                             <label className="text-xs font-bold text-text-secondary uppercase">Maximum Marks</label>
                             <Input 
                               type="number" 
+                              step="1"
+                              min="1"
                               value={newPaper.max_marks} 
                               onChange={e => {
                                 const val = e.target.value;
@@ -3568,6 +3723,7 @@ export default function ExamsPage() {
                                 }));
                               }} 
                               required 
+                              className="focus:ring-0 focus-visible:ring-0 focus:outline-none focus:border-border-strong"
                             />
                           </div>
 
@@ -3576,6 +3732,8 @@ export default function ExamsPage() {
                             <label className="text-xs font-bold text-text-secondary uppercase">Passing Marks</label>
                             <Input 
                               type="number" 
+                              step="1"
+                              min="1"
                               value={newPaper.passing_marks} 
                               onChange={e => {
                                 const val = e.target.value;
@@ -3587,6 +3745,7 @@ export default function ExamsPage() {
                                 }));
                               }} 
                               required 
+                              className="focus:ring-0 focus-visible:ring-0 focus:outline-none focus:border-border-strong"
                             />
                           </div>
                         </>
@@ -3604,8 +3763,8 @@ export default function ExamsPage() {
             )}
 
             {/* 2. Paper Schedule list */}
-            <Card>
-              <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-row justify-between items-center space-y-0">
+            <Card className="shadow-sm rounded-2xl overflow-hidden relative z-10">
+              <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 rounded-t-2xl flex flex-row justify-between items-center space-y-0">
                 <CardTitle className="text-sm font-bold text-text-primary">Exam Papers</CardTitle>
                 {timetablePapers.length > 0 && (
                     <div className="flex items-center gap-2">
@@ -3648,20 +3807,20 @@ export default function ExamsPage() {
                     </div>
                 )}
               </CardHeader>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Subject</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Time</TableHead>
-                    <TableHead>Max Marks</TableHead>
-                    <TableHead>Passing Marks</TableHead>
-                    {isTimetableEditable && <TableHead className="text-right">Action</TableHead>}
+              <Table containerClassName="border-0 rounded-none shadow-none bg-transparent">
+                <TableHeader className="bg-zinc-50/50 dark:bg-zinc-900/50 border-b border-border">
+                  <TableRow className="bg-zinc-50/50 dark:bg-zinc-900/50 border-0 rounded-none">
+                    <TableHead className="text-xs font-semibold text-text-primary rounded-none border-0">Subject</TableHead>
+                    <TableHead className="text-xs font-semibold text-text-primary">Date</TableHead>
+                    <TableHead className="text-xs font-semibold text-text-primary">Time</TableHead>
+                    <TableHead className="text-xs font-semibold text-text-primary">Max Marks</TableHead>
+                    <TableHead className="text-xs font-semibold text-text-primary">Passing Marks</TableHead>
+                    {isTimetableEditable && <TableHead className="text-xs font-semibold text-text-primary text-right">Action</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {timetablePapers.length === 0 ? (
-                    <TableRow>
+                    <TableRow className="hover:bg-transparent">
                       <TableCell colSpan={6} className="text-center py-8 text-text-muted">
                         No papers scheduled for this examination yet. Use the form above to add papers.
                       </TableCell>
@@ -3669,7 +3828,7 @@ export default function ExamsPage() {
                   ) : timetablePapers.map((paper, idx) => {
                     const isGradePaper = paper.evaluation_type === 'grade' || parseFloat(paper.max_marks) === 0;
                     return (
-                      <TableRow key={idx}>
+                      <TableRow key={idx} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/50 transition-colors">
                         <TableCell className="font-semibold text-text-primary flex items-center gap-2">
                           <span>{paper.subject_name}</span>
                           {isGradePaper && (
@@ -4402,9 +4561,15 @@ export default function ExamsPage() {
           <Button onClick={handleCreateExam} disabled={submitting}>{submitting ? 'Creating...' : (newExam?.parent_id ? 'Add Test' : 'Create Terminal Examination')}</Button>
         </>}>
         <form onSubmit={handleCreateExam} className="space-y-4">
+          {error && (
+            <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl text-xs font-semibold flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
+              <span>{error}</span>
+            </div>
+          )}
           <div className="space-y-1.5">
             <label htmlFor="examination-name" className="text-xs font-bold text-text-secondary uppercase">
-              {newExam?.parent_id ? "Test Name" : (isCBSEClassic ? "Terminal Examination Name" : "Examination Name")}
+              {newExam?.parent_id ? "Test Name *" : (isCBSEClassic ? "Terminal Examination Name *" : "Examination Name *")}
             </label>
             <Input 
               id="examination-name" 
@@ -4412,6 +4577,7 @@ export default function ExamsPage() {
               value={newExam.name} 
               onChange={e => setNewExam(p => ({ ...p, name: e.target.value }))} 
               required 
+              className="focus:ring-0 focus-visible:ring-0 focus:outline-none focus:border-border-strong"
             />
           </div>
 
@@ -4420,41 +4586,41 @@ export default function ExamsPage() {
               <label className="text-xs font-bold text-text-secondary uppercase">Max Marks (Optional, e.g. 100, 50, 20)</label>
               <Input 
                 type="number"
+                step="1"
+                min="1"
                 placeholder="e.g. 100"
                 value={newExam.max_marks || ''} 
                 onChange={e => setNewExam(p => ({ ...p, max_marks: e.target.value }))} 
+                className="focus:ring-0 focus-visible:ring-0 focus:outline-none focus:border-border-strong"
               />
             </div>
           )}
 
-          {(!isCBSEClassic || newExam?.parent_id !== null) && (
-            <>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-text-secondary uppercase">Start Date {!isCBSEClassic && !newExam?.parent_id ? '' : '(Optional)'}</label>
-                  <Input 
-                    type="date" 
-                    min={getExamMinStartDate(null, exams, newExam?.parent_id)} 
-                    value={newExam.start_date || ''} 
-                    onChange={e => setNewExam(p => ({ ...p, start_date: e.target.value }))} 
-                    required={!isCBSEClassic && !newExam?.parent_id} 
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-text-secondary uppercase">End Date {!isCBSEClassic && !newExam?.parent_id ? '' : '(Optional)'}</label>
-                  <Input 
-                    type="date" 
-                    min={newExam.start_date || getExamMinStartDate(null, exams, newExam?.parent_id)} 
-                    max={getExamMaxEndDate(null, exams, newExam?.parent_id) || undefined}
-                    value={newExam.end_date || ''} 
-                    onChange={e => setNewExam(p => ({ ...p, end_date: e.target.value }))} 
-                    required={!isCBSEClassic && !newExam?.parent_id} 
-                  />
-                </div>
-              </div>
-            </>
-          )}
-
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-text-secondary uppercase">Start Date *</label>
+              <Input 
+                type="date" 
+                min={getExamMinStartDate(null, exams, newExam?.parent_id)} 
+                value={newExam.start_date || ''} 
+                onChange={e => setNewExam(p => ({ ...p, start_date: e.target.value }))} 
+                required 
+                className="focus:ring-0 focus-visible:ring-0 focus:outline-none focus:border-border-strong"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-text-secondary uppercase">End Date *</label>
+              <Input 
+                type="date" 
+                min={newExam.start_date || getExamMinStartDate(null, exams, newExam?.parent_id)} 
+                max={getExamMaxEndDate(null, exams, newExam?.parent_id) || undefined}
+                value={newExam.end_date || ''} 
+                onChange={e => setNewExam(p => ({ ...p, end_date: e.target.value }))} 
+                required 
+                className="focus:ring-0 focus-visible:ring-0 focus:outline-none focus:border-border-strong"
+              />
+            </div>
+          </div>
         </form>
       </Dialog>
 
@@ -4517,9 +4683,15 @@ export default function ExamsPage() {
           </Button>
         </>}>
         <form onSubmit={handleUpdateExam} className="space-y-4">
+          {error && (
+            <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl text-xs font-semibold flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
+              <span>{error}</span>
+            </div>
+          )}
           <div className="space-y-1.5">
             <label htmlFor="examination-name-2" className="text-xs font-bold text-text-secondary uppercase">
-              {editExamData?.parent_id ? "Test Name" : (isCBSEClassic ? "Terminal Examination Name" : "Examination Name")}
+              {editExamData?.parent_id ? "Test Name *" : (isCBSEClassic ? "Terminal Examination Name *" : "Examination Name *")}
             </label>
             <Input 
               id="examination-name-2" 
@@ -4527,6 +4699,7 @@ export default function ExamsPage() {
               value={editExamData.name} 
               onChange={e => setEditExamData(p => ({ ...p, name: e.target.value }))} 
               required 
+              className="focus:ring-0 focus-visible:ring-0 focus:outline-none focus:border-border-strong"
             />
           </div>
 
@@ -4535,39 +4708,42 @@ export default function ExamsPage() {
               <label className="text-xs font-bold text-text-secondary uppercase">Max Marks (Optional, e.g. 100, 50, 20)</label>
               <Input 
                 type="number"
+                step="1"
+                min="1"
                 placeholder="e.g. 100"
                 value={editExamData.max_marks || ''} 
                 onChange={e => setEditExamData(p => ({ ...p, max_marks: e.target.value }))} 
+                className="focus:ring-0 focus-visible:ring-0 focus:outline-none focus:border-border-strong"
               />
             </div>
           )}
 
-          {(!isCBSEClassic || editExamData?.parent_id !== null) && (
-            <>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                   <label className="text-xs font-bold text-text-secondary uppercase">Start Date</label>
-                   <Input 
-                     type="date" 
-                     min={getExamMinStartDate(editExamData.id, exams, editExamData.parent_id)} 
-                     max={getExamMaxEndDate(editExamData.id, exams, editExamData.parent_id) || undefined}
-                     value={editExamData.start_date || ''} 
-                     onChange={e => setEditExamData(p => ({ ...p, start_date: e.target.value }))} 
-                   />
-                </div>
-                <div className="space-y-1.5">
-                   <label className="text-xs font-bold text-text-secondary uppercase">End Date</label>
-                   <Input 
-                     type="date" 
-                     min={editExamData.start_date || getExamMinStartDate(editExamData.id, exams, editExamData.parent_id)} 
-                     max={getExamMaxEndDate(editExamData.id, exams, editExamData.parent_id) || undefined}
-                     value={editExamData.end_date || ''} 
-                     onChange={e => setEditExamData(p => ({ ...p, end_date: e.target.value }))} 
-                   />
-                </div>
-              </div>
-            </>
-          )}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-text-secondary uppercase">Start Date *</label>
+              <Input 
+                type="date" 
+                min={getExamMinStartDate(editExamData.id, exams, editExamData.parent_id)} 
+                max={getExamMaxEndDate(editExamData.id, exams, editExamData.parent_id) || undefined}
+                value={editExamData.start_date || ''} 
+                onChange={e => setEditExamData(p => ({ ...p, start_date: e.target.value }))} 
+                required
+                className="focus:ring-0 focus-visible:ring-0 focus:outline-none focus:border-border-strong"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-text-secondary uppercase">End Date *</label>
+              <Input 
+                type="date" 
+                min={editExamData.start_date || getExamMinStartDate(editExamData.id, exams, editExamData.parent_id)} 
+                max={getExamMaxEndDate(editExamData.id, exams, editExamData.parent_id) || undefined}
+                value={editExamData.end_date || ''} 
+                onChange={e => setEditExamData(p => ({ ...p, end_date: e.target.value }))} 
+                required
+                className="focus:ring-0 focus-visible:ring-0 focus:outline-none focus:border-border-strong"
+              />
+            </div>
+          </div>
 
         </form>
       </Dialog>

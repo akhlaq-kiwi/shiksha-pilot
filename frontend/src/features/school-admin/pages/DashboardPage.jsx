@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Users, UserCog, Banknote, FileText, UserPlus, ClipboardCheck,
-  CreditCard, BookMarked, PieChart
+  CreditCard, BookMarked, PieChart, ChevronDown
 } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { schoolService } from '../../../common/services/schoolService';
@@ -16,6 +16,73 @@ import { StatCard } from '../../../common/components/StatCard';
 import { formatCurrency } from '../../../common/utils/format';
 import { OnboardingChecklist } from '../../../common/components/OnboardingChecklist';
 import { getClassIndex, getShortClassName } from '../../../common/constants/predefinedClasses';
+
+const CustomSelect = ({
+  value,
+  onChange,
+  options = [],
+  placeholder = "Select...",
+  disabled = false,
+  className = "",
+  buttonClassName = "",
+  dropdownClassName = ""
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  const selectedOption = options.find(o => String(o.value) === String(value));
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={containerRef} className={`relative ${isOpen ? 'z-50' : 'z-10'} ${className}`}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={`flex items-center justify-between gap-2.5 rounded-xl border border-border bg-surface px-3.5 py-1.5 text-xs font-semibold text-text-primary shadow-2xs outline-none focus:outline-none focus:ring-0 focus-visible:outline-none active:outline-none select-none min-w-[140px] transition-colors ${
+          disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-border-strong'
+        } ${buttonClassName}`}
+      >
+        <span className="truncate">
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <ChevronDown className={`h-4 w-4 text-text-muted transition-transform duration-200 flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && !disabled && (
+        <div className={`absolute right-0 top-full mt-1.5 min-w-[160px] w-full rounded-2xl border border-border bg-surface shadow-2xl z-50 overflow-hidden animate-in fade-in duration-150 ${dropdownClassName}`}>
+          <div className="max-h-60 overflow-y-auto p-1.5 space-y-0.5 scrollbar-thin">
+            {options.map((opt) => {
+              const isSelected = String(opt.value) === String(value);
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(String(opt.value));
+                    setIsOpen(false);
+                  }}
+                  className={`w-full text-left px-3.5 py-2 rounded-xl text-xs font-semibold outline-none focus:outline-none select-none transition-colors hover:bg-primary/10 ${isSelected ? 'bg-primary/10 text-primary font-bold' : 'text-text-primary'}`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default function DashboardPage({ onNavigate }) {
   const { currentYear } = useAcademicYear();
@@ -280,7 +347,7 @@ export default function DashboardPage({ onNavigate }) {
       <div className="flex items-center justify-center min-h-[400px] w-full">
         <div className="flex flex-col items-center gap-3">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          <p className="text-xs font-bold text-text-muted uppercase tracking-wider">Loading Dashboard...</p>
+          <p className="text-xs font-bold text-text-primary uppercase tracking-wider">LOADING DASHBOARD...</p>
         </div>
       </div>
     );
@@ -368,7 +435,7 @@ export default function DashboardPage({ onNavigate }) {
         >
           <LineChart
             data={SALARY_DATA}
-            series={6}
+            series={2}
             formatValue={formatCurrency}
             onPointClick={(item) => onNavigate('salary-disbursement?month=' + encodeURIComponent(item.label))}
           />
@@ -376,25 +443,22 @@ export default function DashboardPage({ onNavigate }) {
       </div>
 
         {/* Today's Timetable Panel */}
-        <div className="bg-surface border border-border rounded-2xl overflow-hidden shadow-sm">
-          <div className="px-6 py-2.5 min-h-[56px] border-b border-border !bg-zinc-100/80 dark:!bg-zinc-900/50 flex items-center justify-between">
+        <div className="bg-surface border border-border rounded-2xl shadow-sm relative z-20">
+          <div className="px-6 py-2.5 min-h-[56px] border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex items-center justify-between rounded-t-2xl">
             <div>
               <h3 className="text-sm font-bold text-text-primary">TODAY&apos;S TIMETABLE</h3>
             </div>
             {classes.length > 0 && (
               <div className="flex items-center gap-3">
                 <span className="text-xs font-bold text-text-secondary">Class:</span>
-                <select
+                <CustomSelect
                   value={selectedClassId}
-                  onChange={e => setSelectedClassId(e.target.value)}
-                  className="h-8 px-3 rounded-lg border border-border bg-surface text-xs font-semibold focus:outline-none focus:ring-0 focus:border-border shadow-2xs cursor-pointer min-w-[140px]"
-                >
-                  {classes.map(cls => (
-                    <option key={cls.id} value={cls.id}>
-                      {getShortClassName(cls.name)} {cls.section ? `- ${cls.section}` : ''}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setSelectedClassId}
+                  options={classes.map(cls => ({
+                    value: cls.id,
+                    label: `${getShortClassName(cls.name)}${cls.section ? ` - ${cls.section}` : ''}`
+                  }))}
+                />
               </div>
             )}
           </div>

@@ -245,9 +245,9 @@ export default function SecurityPage() {
 
         {/* Audit Logs Table */}
         <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
+          <Table containerClassName="border-0 rounded-none shadow-none bg-transparent">
+            <TableHeader className="bg-zinc-50/50 dark:bg-zinc-900/50 border-b border-border">
+              <TableRow className="bg-zinc-50/50 dark:bg-zinc-900/50">
                 <TableHead className="w-[180px]">Module</TableHead>
                 <TableHead className="w-[200px]">Action</TableHead>
                 <TableHead>Description</TableHead>
@@ -362,9 +362,9 @@ export default function SecurityPage() {
           </div>
         </CardHeader>
         <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
+          <Table containerClassName="border-0 rounded-none shadow-none bg-transparent">
+            <TableHeader className="bg-zinc-50/50 dark:bg-zinc-900/50 border-b border-border">
+              <TableRow className="bg-zinc-50/50 dark:bg-zinc-900/50">
                 <TableHead>User Email</TableHead>
                 <TableHead>User Name</TableHead>
                 <TableHead>Role</TableHead>

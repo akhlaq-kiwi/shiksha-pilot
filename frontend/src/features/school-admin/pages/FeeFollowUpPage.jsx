@@ -14,6 +14,64 @@ import { Dialog } from '../../../common/ui/dialog';
 import { useToast } from '../../../common/components/Toast';
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 
+function CustomSelect({ options, value, onChange, placeholder = "Select...", disabled = false, className = "", buttonClassName = "", dropdownClassName = "" }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  const selectedOption = options.find(o => String(o.value) === String(value));
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={containerRef} className={`relative ${isOpen ? 'z-50' : 'z-10'} ${className}`}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={`flex h-10 items-center justify-between gap-2.5 rounded-full border border-border bg-surface px-4 py-2 text-xs font-bold text-text-primary shadow-2xs outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border active:outline-none select-none transition-colors min-w-[150px] ${
+          disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-border-strong'
+        } ${buttonClassName}`}
+      >
+        <span className="truncate">
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <ChevronDown className={`h-4 w-4 text-text-muted transition-transform duration-200 flex-shrink-0 ml-1 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && !disabled && (
+        <div className={`absolute left-0 right-0 top-full mt-1.5 min-w-[160px] rounded-2xl border border-border bg-surface shadow-2xl z-50 overflow-hidden animate-in fade-in duration-150 ${dropdownClassName}`}>
+          <div className="max-h-60 overflow-y-auto p-1.5 space-y-0.5 scrollbar-thin">
+            {options.map((opt) => {
+              const isSelected = String(opt.value) === String(value);
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(String(opt.value));
+                    setIsOpen(false);
+                  }}
+                  className={`w-full text-left px-3.5 py-2 rounded-xl text-xs font-semibold outline-none focus:outline-none select-none transition-colors hover:bg-primary/10 ${isSelected ? 'bg-primary/10 text-primary font-bold' : 'text-text-primary'}`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function FeeFollowUpPage() {
   const toast = useToast();
   const navigate = useNavigate();
@@ -420,7 +478,7 @@ export default function FeeFollowUpPage() {
     <div className="space-y-6 w-full flex flex-col animate-in fade-in duration-200">
       
       {/* Page Header */}
-      <div className="p-5 rounded-2xl border border-border !bg-zinc-100/80 dark:!bg-zinc-900/50 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="p-5 rounded-2xl border border-border bg-zinc-50/50 dark:bg-zinc-900/50 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-text-primary tracking-tight font-display uppercase">FEE FOLLOW-UPS</h2>
           <p className="text-xs text-text-secondary mt-1 font-medium">Track and manage future payment commitments from parents.</p>
@@ -483,30 +541,31 @@ export default function FeeFollowUpPage() {
           <div className="flex-1 space-y-1.5 w-full">
             <label htmlFor="search-student" className="text-[11px] text-text-secondary font-bold uppercase">Search Student</label>
             <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-text-muted" />
+              <Search className="absolute left-3 top-3 h-4 w-4 text-text-muted" />
               <Input id="search-student"
                 type="text"
                 placeholder="Search by name, admission no or roll no..."
                 value={filters.student_search}
                 onChange={e => setFilters(prev => ({ ...prev, student_search: e.target.value }))}
-                className="pl-8 text-xs font-semibold text-text-primary border border-border bg-surface rounded-lg w-full focus:outline-hidden"
+                className="pl-9 h-10 text-xs font-semibold text-text-primary border border-border bg-surface rounded-full w-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
               />
             </div>
           </div>
 
-          <div className="w-full md:w-48 space-y-1.5">
+          <div className="w-full md:w-52 space-y-1.5">
             <label className="text-[11px] text-text-secondary font-bold uppercase">Status Filter</label>
-            <select
+            <CustomSelect
               value={filters.status}
-              onChange={e => setFilters(prev => ({ ...prev, status: e.target.value }))}
-              className="w-full bg-surface border border-border rounded-lg p-2 text-xs font-semibold focus:outline-hidden text-text-primary"
-            >
-              <option value="ALL">All Commitments</option>
-              <option value="COMPLETED">Completed</option>
-              <option value="DUE_TODAY">Due Today</option>
-              <option value="UPCOMING">Upcoming</option>
-              <option value="OVERDUE">Overdue</option>
-            </select>
+              onChange={val => setFilters(prev => ({ ...prev, status: val }))}
+              options={[
+                { value: 'ALL', label: 'All Commitments' },
+                { value: 'COMPLETED', label: 'Completed' },
+                { value: 'DUE_TODAY', label: 'Due Today' },
+                { value: 'UPCOMING', label: 'Upcoming' },
+                { value: 'OVERDUE', label: 'Overdue' }
+              ]}
+              buttonClassName="w-full"
+            />
           </div>
         </div>
       </div>
@@ -652,7 +711,7 @@ export default function FeeFollowUpPage() {
                         setForm(prev => ({ ...prev, student_id: '' }));
                       }}
                       onFocus={() => setShowStudentDropdown(true)}
-                      className="pl-8 text-xs font-semibold text-text-primary border border-border bg-surface rounded-lg w-full focus:outline-hidden"
+                      className="pl-8 text-xs font-semibold text-text-primary border border-border bg-surface rounded-lg w-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
                     />
                   </div>
                   {showStudentDropdown && studentSearchVal.trim() !== '' && (
@@ -705,7 +764,7 @@ export default function FeeFollowUpPage() {
                   placeholder="0.00"
                   value={form.pending_amount}
                   onChange={e => setForm(prev => ({ ...prev, pending_amount: e.target.value }))}
-                  className="pl-8 text-xs font-semibold text-text-primary border border-border bg-surface rounded-lg w-full focus:outline-hidden"
+                  className="pl-8 text-xs font-semibold text-text-primary border border-border bg-surface rounded-lg w-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
                 />
               </div>
               <p className="text-[11px] text-text-muted leading-relaxed">Auto-fetched from student outstanding dues; editable if required.</p>
@@ -721,7 +780,7 @@ export default function FeeFollowUpPage() {
                   type="date"
                   value={form.promised_date}
                   onChange={e => setForm(prev => ({ ...prev, promised_date: e.target.value }))}
-                  className="pl-8 text-xs font-semibold text-text-primary border border-border bg-surface rounded-lg w-full focus:outline-hidden"
+                  className="pl-8 text-xs font-semibold text-text-primary border border-border bg-surface rounded-lg w-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
                 />
               </div>
               {formErrors.promised_date && <p className="text-red-600 text-[11px] font-bold">{formErrors.promised_date}</p>}
@@ -736,7 +795,7 @@ export default function FeeFollowUpPage() {
                 placeholder="Examples: Salary delayed, cheque clearing, family emergency..."
                 value={form.reason}
                 onChange={e => setForm(prev => ({ ...prev, reason: e.target.value }))}
-                className="w-full border border-border bg-surface rounded-lg p-2.5 text-xs text-text-primary font-semibold focus:outline-hidden focus:border-primary resize-y"
+                className="w-full border border-border bg-surface rounded-lg p-2.5 text-xs text-text-primary font-semibold outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border resize-y"
               />
               <div className="flex items-center justify-between text-[11px] text-text-muted">
                 <span>Maximum 25 words allowed</span>
@@ -894,7 +953,7 @@ export default function FeeFollowUpPage() {
                   type="date"
                   value={extendForm.promised_date}
                   onChange={e => setExtendForm(prev => ({ ...prev, promised_date: e.target.value }))}
-                  className="pl-8 text-xs font-semibold text-text-primary border border-border bg-surface rounded-lg w-full focus:outline-hidden"
+                  className="pl-8 text-xs font-semibold text-text-primary border border-border bg-surface rounded-lg w-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
                 />
               </div>
               {extendFormErrors.promised_date && <p className="text-red-600 text-[11px] font-bold">{extendFormErrors.promised_date}</p>}
@@ -909,7 +968,7 @@ export default function FeeFollowUpPage() {
                 placeholder="Reason for extension e.g. delay in crop sale, medical urgency..."
                 value={extendForm.reason}
                 onChange={e => setExtendForm(prev => ({ ...prev, reason: e.target.value }))}
-                className="w-full border border-border bg-surface rounded-lg p-2.5 text-xs text-text-primary font-semibold focus:outline-hidden focus:border-primary resize-y"
+                className="w-full border border-border bg-surface rounded-lg p-2.5 text-xs text-text-primary font-semibold outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border resize-y"
               />
               <div className="flex items-center justify-between text-[11px] text-text-muted">
                 <span>Maximum 25 words allowed</span>

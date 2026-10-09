@@ -31,7 +31,7 @@ export const ChartCard = ({
       className={twMerge('rounded-2xl border border-border bg-surface overflow-hidden shadow-sm', className)}
       aria-busy={loading || undefined}
     >
-      <div className={twMerge('px-6 py-2.5 min-h-[56px] border-b border-border !bg-zinc-100/80 dark:!bg-zinc-900/50 flex flex-wrap items-center justify-between gap-3', headerClassName)}>
+      <div className={twMerge('px-6 py-2.5 min-h-[56px] border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-wrap items-center justify-between gap-3', headerClassName)}>
         <div className="min-w-0">
           <h3 className="flex items-center gap-2 text-display-xs font-display text-text-primary">
             {Icon && <Icon className={twMerge('h-5 w-5 flex-shrink-0', iconTone)} aria-hidden="true" />}

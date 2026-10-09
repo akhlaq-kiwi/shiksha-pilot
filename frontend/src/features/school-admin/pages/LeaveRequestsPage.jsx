@@ -14,6 +14,65 @@ import { useToast } from '../../../common/components/Toast';
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 import PageTitle from '../../../common/components/PageTitle';
 import { resolveFileUrl } from '../../../common/utils/fileUrl';
+import { getClassIndex, getShortClassName } from '../../../common/constants/predefinedClasses';
+
+function CustomSelect({ options, value, onChange, placeholder = "Select...", disabled = false, className = "", buttonClassName = "", dropdownClassName = "" }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  const selectedOption = options.find(o => String(o.value) === String(value));
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={containerRef} className={`relative ${isOpen ? 'z-50' : 'z-10'} ${className}`}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={`flex h-10 items-center justify-between gap-2.5 rounded-full border border-border bg-surface px-4 py-2 text-xs font-bold text-text-primary shadow-2xs outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border active:outline-none select-none transition-colors min-w-[120px] ${
+          disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-border-strong'
+        } ${buttonClassName}`}
+      >
+        <span className="truncate">
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <ChevronDown className={`h-4 w-4 text-text-muted transition-transform duration-200 flex-shrink-0 ml-1 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && !disabled && (
+        <div className={`absolute left-0 right-0 top-full mt-1.5 min-w-[140px] rounded-2xl border border-border bg-surface shadow-2xl z-50 overflow-hidden animate-in fade-in duration-150 ${dropdownClassName}`}>
+          <div className="max-h-60 overflow-y-auto p-1.5 space-y-0.5 scrollbar-thin">
+            {options.map((opt) => {
+              const isSelected = String(opt.value) === String(value);
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(opt.value);
+                    setIsOpen(false);
+                  }}
+                  className={`w-full text-left px-3.5 py-2 rounded-xl text-xs font-semibold outline-none focus:outline-none select-none transition-colors hover:bg-primary/10 ${isSelected ? 'bg-primary/10 text-primary font-bold' : 'text-text-primary'}`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function LeaveRequestsPage() {
   const toast = useToast();
@@ -375,7 +434,7 @@ export default function LeaveRequestsPage() {
 
   return (
     <div className="flex flex-col gap-6 w-full">
-      <div className="p-5 rounded-2xl border border-border !bg-zinc-100/80 dark:!bg-zinc-900/50 shadow-2xs">
+      <div className="p-5 rounded-2xl border border-border bg-zinc-50/50 dark:bg-zinc-900/50 shadow-2xs">
         <h2 className="text-xl md:text-2xl font-bold text-text-primary tracking-tight font-display uppercase">MANAGE LEAVES</h2>
         <p className="text-text-secondary text-xs mt-1 font-medium">Manage school holidays, student leaves, and teacher leaves.</p>
       </div>
@@ -416,7 +475,7 @@ export default function LeaveRequestsPage() {
         {/* Add Holiday Form */}
         {!isReadOnly && (
           <Card className="border border-border shadow-sm bg-surface overflow-hidden">
-            <CardHeader className="py-3 px-5 border-b border-border !bg-zinc-100/80 dark:!bg-zinc-800/80">
+            <CardHeader className="py-3 px-5 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
               <CardTitle className="text-sm font-bold text-text-primary flex items-center gap-1.5">
                 <Plus className="h-4 w-4 text-primary" /> Add Holiday / Leave Day
               </CardTitle>
@@ -430,7 +489,7 @@ export default function LeaveRequestsPage() {
                     placeholder="e.g. Diwali Holidays"
                     value={newLeaveTitle}
                     onChange={e => setNewLeaveTitle(e.target.value)}
-                    className="h-9"
+                    className="h-9 outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
                   />
                 </div>
                 <div className="md:col-span-2 space-y-1.5">
@@ -442,9 +501,8 @@ export default function LeaveRequestsPage() {
                       setNewLeaveStartDate(e.target.value);
                       if (!newLeaveEndDate) setNewLeaveEndDate(e.target.value);
                     }}
-                    min={currentYear?.start_date || ''}
-                    max={currentYear?.end_date || ''}
-                    className="h-9"
+                    onClick={e => e.target.showPicker?.()}
+                    className="h-9 cursor-pointer outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
                   />
                 </div>
                 <div className="md:col-span-2 space-y-1.5">
@@ -453,9 +511,8 @@ export default function LeaveRequestsPage() {
                     type="date"
                     value={newLeaveEndDate}
                     onChange={e => setNewLeaveEndDate(e.target.value)}
-                    min={newLeaveStartDate || currentYear?.start_date || ''}
-                    max={currentYear?.end_date || ''}
-                    className="h-9"
+                    onClick={e => e.target.showPicker?.()}
+                    className="h-9 cursor-pointer outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
                   />
                 </div>
                 <div className="md:col-span-7 flex justify-end pt-1">
@@ -477,7 +534,7 @@ export default function LeaveRequestsPage() {
 
         {/* Holidays List */}
         <Card className="border border-border shadow-sm bg-surface overflow-hidden">
-          <CardHeader className="py-3 px-5 border-b border-border !bg-zinc-100/80 dark:!bg-zinc-800/80">
+          <CardHeader className="py-3 px-5 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
             <CardTitle className="text-sm font-bold text-text-primary">School Holidays List</CardTitle>
           </CardHeader>
           <CardContent className="pt-4 p-5">
@@ -512,7 +569,7 @@ export default function LeaveRequestsPage() {
                                 <Input 
                                   value={editName} 
                                   onChange={e => setEditName(e.target.value)} 
-                                  className="h-8 text-sm"
+                                  className="h-8 text-sm outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
                                 />
                               </div>
                               <div className="space-y-1">
@@ -521,9 +578,8 @@ export default function LeaveRequestsPage() {
                                   type="date"
                                   value={editDate} 
                                   onChange={e => setEditDate(e.target.value)} 
-                                  min={currentYear?.start_date || ''}
-                                  max={currentYear?.end_date || ''}
-                                  className="h-8 text-sm"
+                                  onClick={e => e.target.showPicker?.()}
+                                  className="h-8 text-sm cursor-pointer outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
                                 />
                               </div>
                             </div>
@@ -622,41 +678,53 @@ export default function LeaveRequestsPage() {
         </div>
 
         {/* Student Filters */}
-        <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between !bg-zinc-100/80 dark:!bg-zinc-900/50 border border-border p-4 rounded-2xl w-full shadow-2xs">
+        <div className="relative z-30 flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between bg-zinc-50/50 dark:bg-zinc-900/50 border border-border p-4 rounded-2xl w-full shadow-2xs">
           <div className="flex flex-col sm:flex-row flex-1 items-stretch sm:items-center gap-3 w-full">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />
               <Input aria-label="Search student name, class..."
                 type="text"
                 placeholder="Search student name, class..."
-                className="pl-9 text-xs w-full"
+                className="pl-9 text-xs w-full rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
                 value={studentFilters.search}
                 onChange={e => setStudentFilters(prev => ({ ...prev, search: e.target.value }))}
               />
             </div>
 
-            <Select
+            <CustomSelect
               value={studentFilters.status}
-              onChange={e => setStudentFilters(prev => ({ ...prev, status: e.target.value }))}
-              className="text-xs sm:w-44"
-            >
-              <option value="ALL">All Statuses</option>
-              <option value="PENDING">Pending</option>
-              <option value="APPROVED">Approved</option>
-              <option value="REJECTED">Rejected</option>
-              <option value="CANCELLED">Cancelled</option>
-            </Select>
+              onChange={val => setStudentFilters(prev => ({ ...prev, status: val }))}
+              className="sm:w-44"
+              options={[
+                { value: 'ALL', label: 'All Statuses' },
+                { value: 'PENDING', label: 'Pending' },
+                { value: 'APPROVED', label: 'Approved' },
+                { value: 'REJECTED', label: 'Rejected' },
+                { value: 'CANCELLED', label: 'Cancelled' },
+              ]}
+            />
 
-            <Select
+            <CustomSelect
               value={studentFilters.class_id}
-              onChange={e => setStudentFilters(prev => ({ ...prev, class_id: e.target.value }))}
-              className="text-xs sm:w-44"
-            >
-              <option value="ALL">All Classes</option>
-              {classes.map(c => (
-                <option key={c.id} value={c.id}>{c.name}-{c.section}</option>
-              ))}
-            </Select>
+              onChange={val => setStudentFilters(prev => ({ ...prev, class_id: val }))}
+              className="sm:w-44"
+              options={(() => {
+                const seen = new Set();
+                const sorted = classes
+                  .slice()
+                  .sort((a, b) => getClassIndex(a.name) - getClassIndex(b.name) || String(a.name).localeCompare(String(b.name), undefined, { numeric: true }));
+                const res = [{ value: 'ALL', label: 'All Classes' }];
+                for (const c of sorted) {
+                  const shortName = getShortClassName(c.name);
+                  const label = c.section ? `${shortName}-${c.section}` : shortName;
+                  if (!seen.has(c.id)) {
+                    seen.add(c.id);
+                    res.push({ value: String(c.id), label });
+                  }
+                }
+                return res;
+              })()}
+            />
           </div>
         </div>
 
@@ -798,30 +866,31 @@ export default function LeaveRequestsPage() {
         </div>
 
         {/* Teacher Filters */}
-        <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between !bg-zinc-100/80 dark:!bg-zinc-900/50 border border-border p-4 rounded-2xl w-full shadow-2xs">
+        <div className="relative z-30 flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between bg-zinc-50/50 dark:bg-zinc-900/50 border border-border p-4 rounded-2xl w-full shadow-2xs">
           <div className="flex flex-col sm:flex-row flex-1 items-stretch sm:items-center gap-3 w-full">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />
               <Input aria-label="Search teacher, department..."
                 type="text"
                 placeholder="Search teacher, department..."
-                className="pl-9 text-xs w-full"
+                className="pl-9 text-xs w-full rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
                 value={teacherFilters.search}
                 onChange={e => setTeacherFilters(prev => ({ ...prev, search: e.target.value }))}
               />
             </div>
 
-            <Select
+            <CustomSelect
               value={teacherFilters.status}
-              onChange={e => setTeacherFilters(prev => ({ ...prev, status: e.target.value }))}
-              className="text-xs sm:w-44"
-            >
-              <option value="ALL">All Statuses</option>
-              <option value="PENDING">Pending</option>
-              <option value="APPROVED">Approved</option>
-              <option value="REJECTED">Rejected</option>
-              <option value="CANCELLED">Cancelled</option>
-            </Select>
+              onChange={val => setTeacherFilters(prev => ({ ...prev, status: val }))}
+              className="sm:w-44"
+              options={[
+                { value: 'ALL', label: 'All Statuses' },
+                { value: 'PENDING', label: 'Pending' },
+                { value: 'APPROVED', label: 'Approved' },
+                { value: 'REJECTED', label: 'Rejected' },
+                { value: 'CANCELLED', label: 'Cancelled' },
+              ]}
+            />
           </div>
         </div>
 

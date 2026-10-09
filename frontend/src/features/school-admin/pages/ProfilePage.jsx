@@ -516,7 +516,7 @@ export default function ProfilePage({ mode = 'details' }) {
       {mode === 'details' && (
         <div className="space-y-6">
           <Card className="border border-border rounded-2xl shadow-2xs bg-surface overflow-hidden">
-            <CardHeader className="py-3.5 px-6 border-b border-border !bg-zinc-100/80 dark:!bg-zinc-800/80 flex flex-row items-center justify-between">
+            <CardHeader className="py-3.5 px-6 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-bold text-text-primary flex items-center gap-2">
                 <School className="h-4 w-4 text-text-secondary" /> Profile Details
               </CardTitle>

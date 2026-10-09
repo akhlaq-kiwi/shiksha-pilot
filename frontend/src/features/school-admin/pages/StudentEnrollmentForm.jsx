@@ -9,6 +9,7 @@ import { schoolService } from '../../../common/services/schoolService';
 import { ArrowLeft, Upload, Check, Calendar } from 'lucide-react';
 import { getClassIndex } from '../../../common/constants/predefinedClasses';
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
+import CustomSelect from '../../../common/ui/CustomSelect';
 
 export const normalizeReligion = (val) => {
   if (!val) return '';
@@ -206,28 +207,30 @@ function SearchableSelect({ label, placeholder, value, onChange, options, disabl
         }}
         onFocus={() => setIsOpen(true)}
         disabled={disabled}
-        className="flex h-9 w-full rounded-md border border-zinc-200 bg-surface px-3 py-1 text-sm shadow-xs transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-zinc-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-800 dark:bg-zinc-950 dark:ring-offset-zinc-950 dark:placeholder:text-zinc-400 dark:focus-visible:ring-zinc-300"
+        className="flex h-9 w-full rounded-full border border-border-strong bg-surface px-4 py-1.5 text-xs font-bold text-text-primary shadow-2xs transition-colors placeholder:text-text-muted outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border-strong focus-visible:border-border-strong disabled:cursor-not-allowed disabled:opacity-60"
       />
       {isOpen && !disabled && (
-        <div className="absolute left-0 right-0 top-[60px] max-h-40 overflow-y-auto bg-surface border border-border rounded-md shadow-lg z-50 py-1 bg-white dark:bg-zinc-950 animate-in fade-in slide-in-from-top-1 duration-200">
-          {filteredOptions.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-text-muted">No options found</div>
-          ) : (
-            filteredOptions.map(opt => (
-              <button
-                key={opt}
-                type="button"
-                onClick={() => {
-                  onChange(opt);
-                  setSearch(opt);
-                  setIsOpen(false);
-                }}
-                className={`w-full text-left px-3 py-2 text-xs font-bold hover:bg-primary/10 transition-colors ${opt === value ? 'bg-primary/5 text-primary' : 'text-text-primary'}`}
-              >
-                {opt}
-              </button>
-            ))
-          )}
+        <div className="absolute left-0 right-0 top-full mt-1.5 rounded-2xl border border-border bg-surface shadow-2xl z-50 overflow-hidden animate-in fade-in duration-150">
+          <div className="max-h-48 overflow-y-auto p-1.5 space-y-0.5 scrollbar-thin">
+            {filteredOptions.length === 0 ? (
+              <div className="px-3.5 py-2 text-xs text-text-muted font-medium">No options found</div>
+            ) : (
+              filteredOptions.map(opt => (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => {
+                    onChange(opt);
+                    setSearch(opt);
+                    setIsOpen(false);
+                  }}
+                  className={`w-full text-left px-3.5 py-2 rounded-xl text-xs font-semibold outline-none focus:outline-none select-none transition-colors hover:bg-primary/10 ${opt === value ? 'bg-primary/10 text-primary font-bold' : 'text-text-primary'}`}
+                >
+                  {opt}
+                </button>
+              ))
+            )}
+          </div>
         </div>
       )}
       {error && <p className="text-[11px] text-red-500 font-semibold">{error}</p>}
@@ -1107,7 +1110,7 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
       </div>
 
       <form onSubmit={handleSubmit}>
-        <Card className="shadow-sm">
+        <Card className="bg-zinc-50/50 dark:bg-zinc-900/50 border border-border rounded-2xl shadow-2xs">
           <CardContent className="p-6">
             
             {/* Tab 1: Basic Details */}
@@ -1140,18 +1143,18 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
 
                     <div className="space-y-1.5">
                       <label htmlFor="gender" className="text-xs font-bold text-text-secondary uppercase">Gender <span className="text-red-500">*</span></label>
-                      <select id="gender" 
-                        name="gender" 
-                        value={formData.gender} 
-                        onChange={handleTextChange} 
-                        required 
-                        className="flex h-9 w-full rounded-md border border-zinc-200 bg-surface px-3 py-1.5 text-sm text-text-primary shadow-xs transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-950 dark:border-zinc-800 dark:focus:ring-zinc-300"
-                      >
-                        <option value="">Select...</option>
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
-                        <option value="Other">Other</option>
-                      </select>
+                      <CustomSelect
+                        value={formData.gender}
+                        onChange={(val) => {
+                          handleTextChange({ target: { name: 'gender', value: val } });
+                        }}
+                        options={[
+                          { value: 'Male', label: 'Male' },
+                          { value: 'Female', label: 'Female' },
+                          { value: 'Other', label: 'Other' }
+                        ]}
+                        placeholder="Select..."
+                      />
                       {errors.gender && <p className="text-[11px] text-red-500 font-semibold">{errors.gender}</p>}
                     </div>
                     <div className="space-y-1.5">
@@ -1210,69 +1213,71 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                         <label htmlFor="student_category" className="text-xs font-bold text-text-secondary uppercase">
                           Student Category <span className="text-red-500">*</span>
                         </label>
-                        <select id="student_category"
-                          name="student_category"
+                        <CustomSelect
                           value={formData.student_category}
-                          onChange={handleTextChange}
-                          required
-                          className="flex h-9 w-full rounded-md border border-zinc-200 bg-surface px-3 py-1.5 text-sm text-text-primary shadow-xs transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-950 dark:border-zinc-800 dark:focus:ring-zinc-300"
-                        >
-                          <option value="">Select...</option>
-                          <option value="Existing Student">Existing Student</option>
-                          <option value="New Admission">New Admission</option>
-                        </select>
+                          onChange={(val) => {
+                            handleTextChange({ target: { name: 'student_category', value: val } });
+                          }}
+                          options={[
+                            { value: 'Existing Student', label: 'Existing Student' },
+                            { value: 'New Admission', label: 'New Admission' }
+                          ]}
+                          placeholder="Select..."
+                        />
                         {errors.student_category && <p className="text-[11px] text-red-500 font-semibold">{errors.student_category}</p>}
                       </div>
                     )}
                     <div className="space-y-1.5">
                       <label htmlFor="blood_group" className="text-xs font-bold text-text-secondary uppercase">Blood Group</label>
-                      <select id="blood_group" 
-                        name="blood_group" 
-                        value={formData.blood_group} 
-                        onChange={handleTextChange}
-                        className="flex h-9 w-full rounded-md border border-zinc-200 bg-surface px-3 py-1.5 text-sm text-text-primary shadow-xs transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-950 dark:border-zinc-800 dark:focus:ring-zinc-300"
-                      >
-                        <option value="">Select...</option>
-                        <option value="A+">A+</option><option value="A-">A-</option>
-                        <option value="B+">B+</option><option value="B-">B-</option>
-                        <option value="O+">O+</option><option value="O-">O-</option>
-                        <option value="AB+">AB+</option><option value="AB-">AB-</option>
-                      </select>
+                      <CustomSelect
+                        value={formData.blood_group}
+                        onChange={(val) => {
+                          handleTextChange({ target: { name: 'blood_group', value: val } });
+                        }}
+                        options={[
+                          { value: 'A+', label: 'A+' }, { value: 'A-', label: 'A-' },
+                          { value: 'B+', label: 'B+' }, { value: 'B-', label: 'B-' },
+                          { value: 'O+', label: 'O+' }, { value: 'O-', label: 'O-' },
+                          { value: 'AB+', label: 'AB+' }, { value: 'AB-', label: 'AB-' }
+                        ]}
+                        placeholder="Select..."
+                      />
                     </div>
 
                     <div className="space-y-1.5">
                       <label htmlFor="category" className="text-xs font-bold text-text-secondary uppercase">Category</label>
-                      <select id="category" 
-                        name="category" 
-                        value={formData.category} 
-                        onChange={handleTextChange}
-                        className="flex h-9 w-full rounded-md border border-zinc-200 bg-surface px-3 py-1.5 text-sm text-text-primary shadow-xs transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-950 dark:border-zinc-800 dark:focus:ring-zinc-300"
-                      >
-                        <option value="">Select...</option>
-                        <option value="General">General</option>
-                        <option value="OBC">OBC</option>
-                        <option value="SC">SC</option>
-                        <option value="ST">ST</option>
-                      </select>
+                      <CustomSelect
+                        value={formData.category}
+                        onChange={(val) => {
+                          handleTextChange({ target: { name: 'category', value: val } });
+                        }}
+                        options={[
+                          { value: 'General', label: 'General' },
+                          { value: 'OBC', label: 'OBC' },
+                          { value: 'SC', label: 'SC' },
+                          { value: 'ST', label: 'ST' }
+                        ]}
+                        placeholder="Select..."
+                      />
                     </div>
                     <div className="space-y-1.5">
                       <label htmlFor="religion" className="text-xs font-bold text-text-secondary uppercase">Religion</label>
-                      <select
-                        id="religion"
-                        name="religion"
+                      <CustomSelect
                         value={normalizeReligion(formData.religion)}
-                        onChange={handleTextChange}
-                        className="flex h-9 w-full rounded-md border border-zinc-200 bg-surface px-3 py-1.5 text-sm text-text-primary shadow-xs transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-950 dark:border-zinc-800 dark:focus:ring-zinc-300"
-                      >
-                        <option value="">Select...</option>
-                        <option value="Hindu">Hindu</option>
-                        <option value="Muslim">Muslim</option>
-                        <option value="Sikh">Sikh</option>
-                        <option value="Christian">Christian</option>
-                        {formData.religion && !['Hindu', 'Muslim', 'Sikh', 'Christian', '1', '2', '3', '4', 'Hinduism', 'Islam', 'Sikhism', 'Christianity', ''].includes(String(formData.religion).trim()) && (
-                          <option value={formData.religion}>{formData.religion}</option>
-                        )}
-                      </select>
+                        onChange={(val) => {
+                          handleTextChange({ target: { name: 'religion', value: val } });
+                        }}
+                        options={[
+                          { value: 'Hindu', label: 'Hindu' },
+                          { value: 'Muslim', label: 'Muslim' },
+                          { value: 'Sikh', label: 'Sikh' },
+                          { value: 'Christian', label: 'Christian' },
+                          ...(formData.religion && !['Hindu', 'Muslim', 'Sikh', 'Christian', '1', '2', '3', '4', 'Hinduism', 'Islam', 'Sikhism', 'Christianity', ''].includes(String(formData.religion).trim())
+                            ? [{ value: formData.religion, label: formData.religion }]
+                            : [])
+                        ]}
+                        placeholder="Select..."
+                      />
                     </div>
                     <div className="space-y-1.5">
                       <label htmlFor="aadhaar_no" className="text-xs font-bold text-text-secondary uppercase">Aadhaar Number</label>
@@ -1316,20 +1321,17 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                     {availableSections.length > 0 && (
                       <div className="space-y-1.5 animate-in fade-in duration-200">
                         <label htmlFor="section_name" className="text-xs font-bold text-text-secondary uppercase">Select Section <span className="text-red-500">*</span></label>
-                        <select id="section_name"
-                          name="section_name"
+                        <CustomSelect
                           value={selectedSectionName}
-                          onChange={handleSectionChange}
-                          required
-                          className="flex h-9 w-full rounded-md border border-zinc-200 bg-surface px-3 py-1.5 text-sm text-text-primary shadow-xs transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-950 dark:border-zinc-800 dark:focus:ring-zinc-300"
-                        >
-                          <option value="">Select Section...</option>
-                          {availableSections.map(sec => (
-                            <option key={sec} value={sec}>
-                              {sec.length === 1 ? `Section ${sec}` : sec}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={(val) => {
+                            handleSectionChange({ target: { value: val } });
+                          }}
+                          options={availableSections.map(sec => ({
+                            value: sec,
+                            label: sec.length === 1 ? `Section ${sec}` : sec
+                          }))}
+                          placeholder="Select Section..."
+                        />
                         {errors.section_name && <p className="text-[11px] text-red-500 font-semibold">{errors.section_name}</p>}
                       </div>
                     )}
@@ -1573,14 +1575,14 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                       </div>
 
                       <p className="border-l-2 border-indigo-500 pl-2.5 font-bold text-text-primary uppercase text-xs tracking-wider mt-4">Current Address</p>
-                      <p className="text-xs text-text-secondary bg-zinc-50 dark:bg-zinc-900/50 p-2.5 rounded-lg leading-relaxed border border-border">
+                      <p className="text-xs text-text-secondary bg-zinc-50/50 dark:bg-zinc-900/50 p-3.5 rounded-2xl leading-relaxed border border-border">
                         {((formData.current_address_line_1 || '') + (formData.current_address_line_2 ? ', ' + formData.current_address_line_2 : '')).trim() || formData.current_address_line}, {formData.current_city}, {formData.current_state} - {formData.current_pin_code}
                       </p>
 
                       {formData.same_as_current === 0 && (formData.permanent_address_line_1 || '').trim() !== '' && (
                         <>
                           <p className="border-l-2 border-indigo-500 pl-2.5 font-bold text-text-primary uppercase text-xs tracking-wider mt-3">Permanent Address</p>
-                          <p className="text-xs text-text-secondary bg-zinc-50 dark:bg-zinc-900/50 p-2.5 rounded-lg leading-relaxed border border-border">
+                          <p className="text-xs text-text-secondary bg-zinc-50/50 dark:bg-zinc-900/50 p-3.5 rounded-2xl leading-relaxed border border-border">
                             {((formData.permanent_address_line_1 || '') + (formData.permanent_address_line_2 ? ', ' + formData.permanent_address_line_2 : '')).trim() || formData.permanent_address_line}, {formData.permanent_city}, {formData.permanent_state} - {formData.permanent_pin_code}
                           </p>
                         </>

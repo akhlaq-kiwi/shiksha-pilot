@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
 import { Plus, Search, Edit, User, UserCog, Upload, AlertCircle, ArrowLeft, Check, Trash2, FileText, Download, Printer, MoreVertical, Lock, CheckCircle, AlertTriangle, CreditCard, ChevronDown, ChevronUp, Eye, Loader2 } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
@@ -16,6 +17,127 @@ import { DropdownMenu, DropdownItem } from '../../../common/ui/DropdownMenu';
 import CredentialsDialog from '../../../common/components/CredentialsDialog';
 import { resolveFileUrl } from '../../../common/utils/fileUrl';
 import TeacherIdentityCardPreview from '../components/TeacherIdentityCardPreview';
+
+const CustomSelect = ({
+  value,
+  onChange,
+  options = [],
+  placeholder = "Select...",
+  disabled = false,
+  className = "",
+  buttonClassName = "",
+  dropdownClassName = ""
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
+  const buttonRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  const selectedOption = options.find(o => String(o.value) === String(value));
+
+  const updateCoords = useCallback(() => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setCoords({
+        top: rect.bottom + 6,
+        left: rect.left,
+        width: rect.width
+      });
+    }
+  }, []);
+
+  const toggleOpen = () => {
+    if (disabled) return;
+    if (!isOpen) {
+      updateCoords();
+      setIsOpen(true);
+    } else {
+      setIsOpen(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleOutsideClick = (e) => {
+      if (
+        buttonRef.current && !buttonRef.current.contains(e.target) &&
+        dropdownRef.current && !dropdownRef.current.contains(e.target)
+      ) {
+        setIsOpen(false);
+      }
+    };
+
+    const handleScrollOrResize = () => {
+      updateCoords();
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    window.addEventListener('scroll', handleScrollOrResize, true);
+    window.addEventListener('resize', handleScrollOrResize);
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+      window.removeEventListener('resize', handleScrollOrResize);
+    };
+  }, [isOpen, updateCoords]);
+
+  return (
+    <div className={`relative ${className}`}>
+      <button
+        ref={buttonRef}
+        type="button"
+        disabled={disabled}
+        onClick={toggleOpen}
+        className={`flex h-9 w-full items-center justify-between rounded-full border border-border bg-surface px-4 py-2 text-xs font-bold text-text-primary shadow-2xs outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border active:outline-none select-none transition-colors ${
+          disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-border-strong'
+        } ${buttonClassName}`}
+      >
+        <span className="truncate">
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <ChevronDown className={`h-4 w-4 text-text-muted transition-transform duration-200 flex-shrink-0 ml-1 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && !disabled && createPortal(
+        <div
+          ref={dropdownRef}
+          style={{
+            position: 'fixed',
+            top: `${coords.top}px`,
+            left: `${coords.left}px`,
+            width: `${coords.width}px`,
+            zIndex: 99999,
+          }}
+          className={`rounded-2xl border border-border bg-surface shadow-2xl overflow-hidden animate-in fade-in duration-150 ${dropdownClassName}`}
+        >
+          <div className="max-h-60 overflow-y-auto p-1.5 space-y-0.5 scrollbar-thin">
+            {options.map((opt) => {
+              const isSelected = String(opt.value) === String(value);
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(String(opt.value));
+                    setIsOpen(false);
+                  }}
+                  className={`w-full text-left px-3.5 py-2 rounded-xl text-xs font-semibold outline-none focus:outline-none select-none transition-colors hover:bg-primary/10 ${
+                    isSelected ? 'bg-primary/10 text-primary font-bold' : 'text-text-primary'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+};
 
 // Self-healing avatar image component to handle loading errors gracefully
 const TeacherAvatar = ({ src, name, updatedAt }) => {
@@ -451,7 +573,7 @@ export default function StaffPage() {
       <div className="flex items-center justify-center min-h-[400px] w-full">
         <div className="flex flex-col items-center gap-3">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          <p className="text-xs font-bold text-text-muted uppercase tracking-wider">Loading Teachers...</p>
+          <p className="text-xs font-bold text-text-primary uppercase tracking-wider">LOADING TEACHERS...</p>
         </div>
       </div>
     );
@@ -1059,7 +1181,7 @@ export default function StaffPage() {
             <div className="flex items-center justify-center min-h-[300px]">
               <div className="flex flex-col items-center gap-3">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                <p className="text-xs font-semibold text-text-secondary uppercase">Loading details...</p>
+                <p className="text-xs font-bold text-text-primary uppercase tracking-wider">LOADING DETAILS...</p>
               </div>
             </div>
           );
@@ -1075,7 +1197,7 @@ export default function StaffPage() {
         return (
           <div className="space-y-6 animate-in fade-in duration-300">
             {/* Header */}
-            <div className="sticky top-14 z-20 flex items-center justify-between border-b border-border pb-4 gap-4 bg-surface p-4 rounded-2xl shadow-2xs">
+            <div className="sticky top-14 z-20 flex items-center justify-between border border-border pb-4 gap-4 bg-zinc-50/50 dark:bg-zinc-900/50 p-4 rounded-2xl shadow-2xs">
               <div className="flex items-center gap-6">
                 <button 
                   onClick={() => setView('list')} 
@@ -1184,9 +1306,11 @@ export default function StaffPage() {
               <div className="lg:col-span-2 space-y-6">
                 
                 {/* Address details */}
-                <Card className="p-6 bg-surface border border-border rounded-2xl shadow-xs">
-                  <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider mb-4 border-b border-border pb-2">Address Details</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+                <Card className="bg-surface border border-border rounded-2xl shadow-xs overflow-hidden">
+                  <div className="py-4 px-6 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
+                    <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider">Address Details</h3>
+                  </div>
+                  <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
                     <div className="space-y-2">
                       <h4 className="font-bold text-text-secondary uppercase text-[11px] tracking-wider">Current Address</h4>
                       <p className="text-sm text-text-primary leading-relaxed">
@@ -1211,10 +1335,10 @@ export default function StaffPage() {
                 </Card>
 
                 {/* Collapsible Documents Card relocation (Matching Student Details) */}
-                <Card className="shadow-xs overflow-hidden border border-border">
+                <Card className="shadow-xs overflow-hidden border border-border rounded-2xl">
                   <button 
                     onClick={() => setDocsOpen(prev => !prev)}
-                    className="w-full flex items-center justify-between px-6 py-4 bg-zinc-50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors focus:outline-none"
+                    className="w-full flex items-center justify-between px-6 py-4 bg-zinc-50/50 dark:bg-zinc-900/50 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/60 transition-colors focus:outline-none"
                   >
                     <div className="flex items-center gap-2">
                       <FileText className="h-4 w-4 text-primary" />
@@ -1264,15 +1388,15 @@ export default function StaffPage() {
                   )}
                 </Card>
                    {/* Salary Card panel */}
-                <Card className="p-6 bg-surface border border-border rounded-2xl shadow-xs animate-in fade-in duration-200">
-                  <div className="flex items-center justify-between border-b border-border pb-4 mb-4">
+                <Card className="bg-surface border border-border rounded-2xl shadow-xs overflow-hidden animate-in fade-in duration-200">
+                  <div className="py-4 px-6 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-row items-center justify-between">
                     <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider">Salary Card</h3>
                     <span className="text-xs text-text-secondary font-bold">
                       Academic Year: {currentYear?.name || academicYears.find(y => y.is_current)?.name || academicYears.find(y => y.status === 'Draft')?.name || '—'}
                     </span>
                   </div>
                   
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                     {getVisibleMonths(t.joining_date, currentYear?.start_date || (academicYears.find(y => y.is_current) || academicYears.find(y => y.status === 'Draft'))?.start_date).map(month => {
                       const payment = (t.salary_payments || []).find(p => 
                         p.payment_month === month && 
@@ -1377,7 +1501,7 @@ export default function StaffPage() {
                                   setDisburseMonth(month);
                                   setIsDisburseDialogOpen(true);
                                 }}
-                                className={`w-full h-8 text-xs font-bold ${((isReadOnly && t.is_migrated) || isDraft) ? 'bg-zinc-200 text-zinc-400 dark:bg-zinc-800 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 text-white'}`}
+                                className={`w-full h-8 text-xs font-bold ${((isReadOnly && t.is_migrated) || isDraft) ? 'bg-zinc-200 text-zinc-400 dark:bg-zinc-800 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-700 text-white'}`}
                               >
                                 Disburse
                               </Button>
@@ -1388,18 +1512,18 @@ export default function StaffPage() {
                     })}
                   </div>
                  {t.previous_year_pending && (
-                  <Card className="p-6 bg-surface border border-amber-200 dark:border-amber-900/30 rounded-2xl shadow-xs mt-4 animate-in fade-in duration-200">
-                    <div className="flex items-center justify-between border-b border-border pb-4 mb-4">
+                  <Card className="bg-surface border border-border rounded-2xl shadow-xs overflow-hidden mt-4 animate-in fade-in duration-200">
+                    <div className="py-4 px-6 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-row items-center justify-between">
                       <div className="flex items-center gap-2">
                         <AlertTriangle className="h-4 w-4 text-amber-500" />
                         <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider">Previous Year Salary Card</h3>
                       </div>
-                      <span className="text-xs text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full font-bold">
+                      <span className="text-xs text-amber-600 bg-amber-500/10 px-2.5 py-1 rounded-full font-bold">
                         AY: {t.previous_year_pending.academic_year_name}
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                    <div className="p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                       {(t.previous_year_pending.valid_months && t.previous_year_pending.valid_months.length > 0 ? t.previous_year_pending.valid_months : ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March']).map(month => {
                         const isPending = t.previous_year_pending.pending_months.includes(month);
                         const payment = (t.salary_payments || []).find(p => {
@@ -1551,7 +1675,7 @@ export default function StaffPage() {
         <>
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
             <div>
-              <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Teachers</h2>
+              <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display uppercase">TEACHERS</h2>
               <p className="text-text-secondary text-sm mt-1">{totalTeachers} teachers · {activeTeachersCount} active</p>
             </div>
             <div className="flex items-center gap-3">
@@ -1619,15 +1743,28 @@ export default function StaffPage() {
           {/* Filters */}
           <div className="p-5 rounded-2xl border border-border bg-zinc-50/50 dark:bg-zinc-900/50 shadow-2xs flex flex-col md:flex-row gap-4">
             <div className="relative w-full md:w-80">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-text-muted" />
-              <Input aria-label="Search teachers..." placeholder="Search teachers..." className="pl-9" value={staffSearch} onChange={e => setStaffSearch(e.target.value)} />
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />
+              <Input
+                aria-label="Search teachers..."
+                placeholder="Search teachers..."
+                className="pl-9 text-xs py-2 rounded-full border border-border bg-surface outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
+                value={staffSearch}
+                onChange={e => setStaffSearch(e.target.value)}
+              />
             </div>
-            <Select className="w-full md:w-48" value={selectedDeptFilter} onChange={e => setSelectedDeptFilter(e.target.value)}>
-              <option value="">All Subjects</option>
-              {Array.from(new Set(teachers.map(t => t.department).filter(Boolean))).sort().map(subj => (
-                <option key={subj} value={subj}>{subj}</option>
-              ))}
-            </Select>
+            <div className="w-full md:w-48">
+              <CustomSelect
+                value={selectedDeptFilter}
+                onChange={setSelectedDeptFilter}
+                options={[
+                  { value: '', label: 'All Subjects' },
+                  ...Array.from(new Set(teachers.map(t => t.department).filter(Boolean))).sort().map(subj => ({
+                    value: subj,
+                    label: subj
+                  }))
+                ]}
+              />
+            </div>
           </div>
 
           {/* Cards Grid */}
@@ -1794,25 +1931,25 @@ export default function StaffPage() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="space-y-1.5">
                 <label htmlFor="name" className="text-xs font-bold text-text-secondary uppercase">Full Name <span className="text-red-500">*</span></label>
-                <Input id="name" name="name" value={newStaff.name} onChange={handleTextChange} placeholder="e.g. Ms. Anita Sharma" required />
+                <Input id="name" name="name" value={newStaff.name} onChange={handleTextChange} placeholder="e.g. Ms. Anita Sharma" className="rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border" required />
                 {formErrors.name && <p className="text-[11px] text-red-500 font-semibold">{formErrors.name}</p>}
               </div>
               
               <div className="space-y-1.5">
                 <label htmlFor="father_name" className="text-xs font-bold text-text-secondary uppercase">Father Name <span className="text-red-500">*</span></label>
-                <Input id="father_name" name="father_name" value={newStaff.father_name} onChange={handleTextChange} placeholder="e.g. Shri Om Prakash Sharma" required />
+                <Input id="father_name" name="father_name" value={newStaff.father_name} onChange={handleTextChange} placeholder="e.g. Shri Om Prakash Sharma" className="rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border" required />
                 {formErrors.father_name && <p className="text-[11px] text-red-500 font-semibold">{formErrors.father_name}</p>}
               </div>
 
               <div className="space-y-1.5">
                 <label htmlFor="mother_name" className="text-xs font-bold text-text-secondary uppercase">Mother Name <span className="text-red-500">*</span></label>
-                <Input id="mother_name" name="mother_name" value={newStaff.mother_name} onChange={handleTextChange} placeholder="e.g. Shabana Begum" required />
+                <Input id="mother_name" name="mother_name" value={newStaff.mother_name} onChange={handleTextChange} placeholder="e.g. Shabana Begum" className="rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border" required />
                 {formErrors.mother_name && <p className="text-[11px] text-red-500 font-semibold">{formErrors.mother_name}</p>}
               </div>
 
               <div className="space-y-1.5">
                 <label htmlFor="phone" className="text-xs font-bold text-text-secondary uppercase">Contact Number <span className="text-red-500">*</span></label>
-                <Input id="phone" name="phone" value={newStaff.phone} onChange={handleTextChange} placeholder="10-digit mobile number" className={formErrors.phone ? 'border-red-500 ring-1 ring-red-500' : ''} required />
+                <Input id="phone" name="phone" value={newStaff.phone} onChange={handleTextChange} placeholder="10-digit mobile number" className={`rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border ${formErrors.phone ? 'border-red-500' : ''}`} required />
                 {formErrors.phone && <p className="text-[11px] text-red-500 font-semibold">{formErrors.phone}</p>}
               </div>
             </div>
@@ -1826,8 +1963,9 @@ export default function StaffPage() {
                   name="joining_date"
                   value={newStaff.joining_date} 
                   onChange={handleTextChange} 
+                  onClick={e => e.target.showPicker?.()}
                   onKeyDown={e => e.preventDefault()}
-                  className="cursor-pointer w-full" 
+                  className="cursor-pointer w-full rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border" 
                   required 
                 />
                 {formErrors.joining_date && <p className="text-[11px] text-red-500 font-semibold">{formErrors.joining_date}</p>}
@@ -1847,8 +1985,9 @@ export default function StaffPage() {
                       status: val ? 'Inactive' : 'ACTIVE'
                     }));
                   }} 
+                  onClick={e => e.target.showPicker?.()}
                   onKeyDown={e => e.preventDefault()}
-                  className="cursor-pointer w-full text-red-500 font-bold" 
+                  className="cursor-pointer w-full text-red-500 font-bold rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border" 
                 />
                 {formErrors.exit_date && <p className="text-[11px] text-red-500 font-semibold">{formErrors.exit_date}</p>}
               </div>
@@ -1861,6 +2000,7 @@ export default function StaffPage() {
                   value={newStaff.salary} 
                   onChange={handleTextChange} 
                   placeholder="e.g. 25000" 
+                  className="rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
                   required 
                 />
                 {formErrors.salary && <p className="text-[11px] text-red-500 font-semibold">{formErrors.salary}</p>}
@@ -1876,7 +2016,7 @@ export default function StaffPage() {
                     setNewStaff(p => ({ ...p, department: val }));
                     if (formErrors.department) setFormErrors(prev => ({ ...prev, department: '' }));
                   }}
-                  className={formErrors.department ? 'border-red-500 ring-1 ring-red-500' : ''}
+                  className={`rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border ${formErrors.department ? 'border-red-500' : ''}`}
                   required 
                 />
                 {formErrors.department && <p className="text-[11px] text-red-500 font-semibold">{formErrors.department}</p>}
@@ -1891,7 +2031,7 @@ export default function StaffPage() {
             <div className="space-y-4">
               <div className="space-y-1.5 w-full p-px">
                 <label htmlFor="current_address_line" className="text-xs font-bold text-text-secondary uppercase">Address Line <span className="text-red-500">*</span></label>
-                <Input id="current_address_line" name="current_address_line" value={newStaff.current_address_line} onChange={handleTextChange} placeholder="Max 50 characters allowed" maxLength={50} required />
+                <Input id="current_address_line" name="current_address_line" value={newStaff.current_address_line} onChange={handleTextChange} placeholder="Max 50 characters allowed" maxLength={50} className="rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border" required />
                 {formErrors.current_address_line && <p className="text-[11px] text-red-500 font-semibold">{formErrors.current_address_line}</p>}
               </div>
 
@@ -1916,11 +2056,11 @@ export default function StaffPage() {
                 />
                 <div className="space-y-1.5">
                   <label htmlFor="current_country" className="text-xs font-bold text-text-secondary uppercase">Country</label>
-                  <Input id="current_country" name="current_country" value={newStaff.current_country} readOnly />
+                  <Input id="current_country" name="current_country" value={newStaff.current_country} className="rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border" readOnly />
                 </div>
                 <div className="space-y-1.5">
                   <label htmlFor="current_pin_code" className="text-xs font-bold text-text-secondary uppercase">PIN Code <span className="text-red-500">*</span></label>
-                  <Input id="current_pin_code" name="current_pin_code" value={newStaff.current_pin_code} onChange={handleTextChange} placeholder="PIN Code" required />
+                  <Input id="current_pin_code" name="current_pin_code" value={newStaff.current_pin_code} onChange={handleTextChange} placeholder="PIN Code" className="rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border" required />
                   {formErrors.current_pin_code && <p className="text-[11px] text-red-500 font-semibold">{formErrors.current_pin_code}</p>}
                 </div>
               </div>
@@ -1944,7 +2084,7 @@ export default function StaffPage() {
                   <h4 className="text-[11px] font-bold text-text-secondary uppercase tracking-tight">Permanent Address</h4>
                   <div className="space-y-1.5 w-full p-px">
                     <label htmlFor="permanent_address_line" className="text-xs font-bold text-text-secondary uppercase">Address Line <span className="text-red-500">*</span></label>
-                    <Input id="permanent_address_line" name="permanent_address_line" value={newStaff.permanent_address_line} onChange={handleTextChange} placeholder="Max 50 characters allowed" maxLength={50} required />
+                    <Input id="permanent_address_line" name="permanent_address_line" value={newStaff.permanent_address_line} onChange={handleTextChange} placeholder="Max 50 characters allowed" maxLength={50} className="rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border" required />
                     {formErrors.permanent_address_line && <p className="text-[11px] text-red-500 font-semibold">{formErrors.permanent_address_line}</p>}
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -1968,11 +2108,11 @@ export default function StaffPage() {
                     />
                     <div className="space-y-1.5">
                       <label htmlFor="permanent_country" className="text-xs font-bold text-text-secondary uppercase">Country</label>
-                      <Input id="permanent_country" name="permanent_country" value={newStaff.permanent_country} readOnly />
+                      <Input id="permanent_country" name="permanent_country" value={newStaff.permanent_country} className="rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border" readOnly />
                     </div>
                     <div className="space-y-1.5">
                       <label htmlFor="permanent_pin_code" className="text-xs font-bold text-text-secondary uppercase">PIN Code <span className="text-red-500">*</span></label>
-                      <Input id="permanent_pin_code" name="permanent_pin_code" value={newStaff.permanent_pin_code} onChange={handleTextChange} placeholder="PIN Code" required />
+                      <Input id="permanent_pin_code" name="permanent_pin_code" value={newStaff.permanent_pin_code} onChange={handleTextChange} placeholder="PIN Code" className="rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border" required />
                       {formErrors.permanent_pin_code && <p className="text-[11px] text-red-500 font-semibold">{formErrors.permanent_pin_code}</p>}
                     </div>
                   </div>
@@ -1985,20 +2125,20 @@ export default function StaffPage() {
           <div className="space-y-4 pb-4">
             <h3 className="text-sm font-bold text-text-primary tracking-tight font-display">Upload Documents</h3>
             
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end bg-zinc-50 dark:bg-zinc-900/20 p-4 rounded-xl border border-border">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end bg-zinc-50/50 dark:bg-zinc-900/50 p-4 rounded-2xl border border-border">
               <div className="space-y-1.5 col-span-1">
                 <label className="text-xs font-bold text-text-secondary uppercase">Document Category</label>
-                <Select value={docCategory} onChange={e => setDocCategory(e.target.value)}>
-                  {DOCUMENT_CATEGORIES.map((c, i) => (
-                    <option key={i} value={c}>{c}</option>
-                  ))}
-                </Select>
+                <CustomSelect 
+                  value={docCategory} 
+                  onChange={setDocCategory}
+                  options={DOCUMENT_CATEGORIES.map(c => ({ value: c, label: c }))}
+                />
               </div>
 
               <div className="space-y-1.5 col-span-2">
                 <label className="text-xs font-bold text-text-secondary uppercase">Choose File (PDF, JPG, PNG, DOC, DOCX up to 10MB)</label>
                 <div className="flex items-center gap-2">
-                  <label className="flex-1 flex items-center justify-between px-3 py-1.5 rounded-lg border border-border text-xs font-bold text-text-secondary bg-surface hover:bg-zinc-50 cursor-pointer shadow-2xs transition-all">
+                  <label className="flex-1 flex items-center justify-between px-4 py-2 rounded-full border border-border text-xs font-bold text-text-secondary bg-surface hover:bg-zinc-50 cursor-pointer shadow-2xs transition-all">
                     <span className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5" /> Select Document</span>
                     <input 
                       type="file" 
@@ -2617,8 +2757,8 @@ export default function StaffPage() {
       </Dialog>
 
       {/* PRINCIPAL ROLE ASSIGNMENT / UNASSIGNMENT MODAL */}
-      <Dialog isOpen={isPrincipalModalOpen} onClose={() => !principalLoading && setIsPrincipalModalOpen(false)} hideHeader={true}>
-        <div className="p-6 max-w-md w-full bg-surface border border-border rounded-2xl shadow-xl space-y-4">
+      <Dialog isOpen={isPrincipalModalOpen} onClose={() => !principalLoading && setIsPrincipalModalOpen(false)} hideHeader={true} maxWidth="max-w-md">
+        <div className="space-y-4">
           <div className="flex items-center space-x-3 text-amber-600 dark:text-amber-400">
             <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center font-bold text-lg">
               P

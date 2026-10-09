@@ -1,14 +1,81 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Search, ChevronRight, AlertCircle, Landmark } from 'lucide-react';
+import { Search, ChevronRight, AlertCircle, Landmark, ChevronDown } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
 import { Input } from '../../../common/ui/input';
-import { Select } from '../../../common/ui/select';
 import { Button } from '../../../common/ui/button';
 import { schoolService } from '../../../common/services/schoolService';
 import StudentDetailsPage from './StudentDetailsPage';
 import StudentEnrollmentForm from './StudentEnrollmentForm';
+import { getClassIndex, getShortClassName } from '../../../common/constants/predefinedClasses';
+
+const CustomSelect = ({
+  value,
+  onChange,
+  options = [],
+  placeholder = "Select...",
+  disabled = false,
+  className = "",
+  buttonClassName = "",
+  dropdownClassName = ""
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  const selectedOption = options.find(o => String(o.value) === String(value));
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={containerRef} className={`relative w-full ${isOpen ? 'z-50' : 'z-10'} ${className}`}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={`flex h-9 w-full items-center justify-between rounded-full border border-border bg-surface px-4 py-2 text-xs font-bold text-text-primary shadow-2xs outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border active:outline-none select-none transition-colors ${
+          disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-border-strong'
+        } ${buttonClassName}`}
+      >
+        <span className="truncate">
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <ChevronDown className={`h-4 w-4 text-text-muted transition-transform duration-200 flex-shrink-0 ml-1 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && !disabled && (
+        <div className={`absolute left-0 right-0 top-full mt-1.5 rounded-2xl border border-border bg-surface shadow-2xl z-50 overflow-hidden animate-in fade-in duration-150 ${dropdownClassName}`}>
+          <div className="max-h-60 overflow-y-auto p-1.5 space-y-0.5 scrollbar-thin">
+            {options.map((opt) => {
+              const isSelected = String(opt.value) === String(value);
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(String(opt.value));
+                    setIsOpen(false);
+                  }}
+                  className={`w-full text-left px-3.5 py-2 rounded-xl text-xs font-semibold outline-none focus:outline-none select-none transition-colors hover:bg-primary/10 ${isSelected ? 'bg-primary/10 text-primary font-bold' : 'text-text-primary'}`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const formatCurrency = (val) => {
   return new Intl.NumberFormat('en-IN', {
@@ -81,8 +148,18 @@ export default function FinancePage() {
         schoolService.getClassFeeConfigurations(),
         schoolService.getAdditionalFeePayments()
       ]);
+      const rawClasses = clsData || [];
+      const uniqueClassesMap = new Map();
+      rawClasses.forEach(c => {
+        const shortName = getShortClassName(c.name);
+        const key = `${shortName}_${c.section || ''}`;
+        if (!uniqueClassesMap.has(key)) {
+          uniqueClassesMap.set(key, c);
+        }
+      });
+      const sortedClassesList = Array.from(uniqueClassesMap.values()).sort((a, b) => getClassIndex(a.name) - getClassIndex(b.name));
       setStudents(stuData || []);
-      setClasses(clsData || []);
+      setClasses(sortedClassesList);
       setFeePayments(fpData || []);
       setClassFeeConfigs(cfgData || []);
       setAdditionalFeePayments(addData || []);
@@ -325,7 +402,11 @@ export default function FinancePage() {
         studentName.includes(word) || firstName.includes(word) || lastName.includes(word)
       );
     }
-    const matchesClass = selectedClassId === 'ALL' || String(student.class_id) === String(selectedClassId);
+    const selectedClassObj = classes.find(c => String(c.id) === String(selectedClassId));
+    const selectedShortName = selectedClassObj ? getShortClassName(selectedClassObj.name) : null;
+    const matchesClass = selectedClassId === 'ALL' || 
+      String(student.class_id) === String(selectedClassId) ||
+      (selectedShortName && getShortClassName(student.class_name) === selectedShortName);
     const matchesStatus = selectedStatus === 'ALL' || student.calculated_status === selectedStatus;
 
     return matchesSearch && matchesClass && matchesStatus;
@@ -349,6 +430,17 @@ export default function FinancePage() {
 
   const paginatedStudents = filteredStudents.slice(0, visibleCount);
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px] h-[calc(100vh-120px)] w-full animate-in fade-in duration-300">
+        <div className="flex flex-col items-center gap-3">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <p className="text-xs font-bold text-text-primary uppercase tracking-wider">LOADING FEES PORTAL...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-[calc(100vh-80px)] space-y-4 max-h-[calc(100vh-80px)] animate-in fade-in duration-300">
       
@@ -371,45 +463,46 @@ export default function FinancePage() {
               placeholder="Search by Student Name..." 
               value={searchTerm} 
               onChange={e => setSearchTerm(e.target.value)} 
-              className="pl-9 text-xs py-2"
+              className="pl-9 text-xs py-2 rounded-full border border-border bg-surface outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
             />
           </div>
 
           <div>
-            <Select 
+            <CustomSelect 
               value={selectedClassId} 
-              onChange={e => setSelectedClassId(e.target.value)}
-              className="text-xs cursor-pointer font-bold text-text-primary"
-            >
-              <option value="ALL">All Classes</option>
-              {classes.map(c => (
-                <option key={c.id} value={c.id}>{c.name} {c.section ? `(${c.section})` : ''}</option>
-              ))}
-            </Select>
+              onChange={setSelectedClassId}
+              options={[
+                { value: 'ALL', label: 'All Classes' },
+                ...classes.map(c => ({
+                  value: c.id,
+                  label: `${getShortClassName(c.name)}${c.section ? ` (${c.section})` : ''}`
+                }))
+              ]}
+            />
           </div>
 
           <div>
-            <Select 
+            <CustomSelect 
               value={selectedStatus} 
-              onChange={e => setSelectedStatus(e.target.value)}
-              className="text-xs cursor-pointer font-bold text-text-primary"
-            >
-              <option value="ALL">All Statuses</option>
-              <option value="PAID">PAID</option>
-              <option value="PENDING">PENDING</option>
-            </Select>
+              onChange={setSelectedStatus}
+              options={[
+                { value: 'ALL', label: 'All Statuses' },
+                { value: 'PAID', label: 'PAID' },
+                { value: 'PENDING', label: 'PENDING' }
+              ]}
+            />
           </div>
 
           <div>
-            <Select 
+            <CustomSelect 
               value={sortByOutstanding} 
-              onChange={e => setSortByOutstanding(e.target.value)}
-              className="text-xs cursor-pointer font-bold text-text-primary"
-            >
-              <option value="NONE">Sort Outstanding</option>
-              <option value="DESC">Highest to Lowest</option>
-              <option value="ASC">Lowest to Highest</option>
-            </Select>
+              onChange={setSortByOutstanding}
+              options={[
+                { value: 'NONE', label: 'Sort Outstanding' },
+                { value: 'DESC', label: 'Highest to Lowest' },
+                { value: 'ASC', label: 'Lowest to Highest' }
+              ]}
+            />
           </div>
         </div>
       </div>
@@ -422,12 +515,7 @@ export default function FinancePage() {
 
       {/* Scrollable Table Area */}
       <div className="flex-1 min-h-0 border border-border rounded-2xl bg-surface shadow-2xs overflow-hidden flex flex-col">
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-24 gap-3 text-center flex-1">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            <p className="text-xs font-bold text-text-primary uppercase tracking-wider">Loading Fees Portal...</p>
-          </div>
-        ) : filteredStudents.length === 0 ? (
+        {filteredStudents.length === 0 ? (
           <div className="p-12 text-center text-text-muted text-xs font-bold leading-relaxed space-y-1 flex-1 flex flex-col justify-center">
             <p>No students found.</p>
             <p className="text-[11px] text-text-muted font-normal">Try another student name.</p>
@@ -456,7 +544,7 @@ export default function FinancePage() {
                       {s.name}
                     </TableCell>
                     <TableCell className="text-xs text-text-secondary font-bold uppercase py-3.5">
-                      {s.class_name || '—'}
+                      {getShortClassName(s.class_name) || '—'}
                     </TableCell>
                     <TableCell className="text-xs font-mono font-bold text-text-muted py-3.5">
                       {s.roll_no || '—'}

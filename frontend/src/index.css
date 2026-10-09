@@ -452,6 +452,37 @@ input[type=number] {
   -moz-appearance: textfield;
 }
 
+/* Hide default blue highlight box on date input subfields (mm, dd, yyyy) on focus */
+input[type="date"]::-webkit-datetime-edit-month-field:focus,
+input[type="date"]::-webkit-datetime-edit-day-field:focus,
+input[type="date"]::-webkit-datetime-edit-year-field:focus,
+input[type="date"]::-webkit-datetime-edit-month-field,
+input[type="date"]::-webkit-datetime-edit-day-field,
+input[type="date"]::-webkit-datetime-edit-year-field {
+  background-color: transparent !important;
+  color: inherit !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+input[type="date"]::-webkit-datetime-edit-fields-wrapper {
+  background-color: transparent !important;
+}
+
+input[type="date"]::selection,
+input[type="date"] *::selection {
+  background-color: transparent !important;
+  color: inherit !important;
+}
+
+input[type="date"]:focus,
+input[type="date"]:focus-visible,
+input[type="date"]:active {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: var(--border-strong) !important;
+}
+
 /* ============================================================================
    Print — report cards, receipts and salary slips are the most-kept artefacts
    of the product, so they get real print rules rather than screen styling.
