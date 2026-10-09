@@ -46,6 +46,7 @@ backend/public/uploads/*
 app/android/app/google-services.json
 backend/config/firebase-service-account.json
 *.apk
+*.aab
 app-release.apk
 
 # Android signing material — see secrets/README.md (PF-01).

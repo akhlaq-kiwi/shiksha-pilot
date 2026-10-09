@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Search, Calendar, Download, RefreshCw, X, 
   FileText, CheckCircle2, CreditCard, Banknote, User, Clock,
-  Smartphone, BookOpen, UserCheck, Receipt, Landmark
+  Smartphone, BookOpen, UserCheck, Receipt, Landmark, ChevronDown
 } from 'lucide-react';
 import { Card, CardContent } from '../../../common/ui/card';
 import { Button } from '../../../common/ui/button';
@@ -12,6 +12,65 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '.
 import { schoolService } from '../../../common/services/schoolService';
 import { FeeReceiptModal } from '../components/FeeReceiptModal';
 import html2pdf from 'html2pdf.js';
+
+function CustomSelect({ options, value, onChange, placeholder = "Select...", disabled = false, className = "", buttonClassName = "", dropdownClassName = "" }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  const selectedOption = options.find(o => String(o.value) === String(value));
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={containerRef} className={`relative ${isOpen ? 'z-50' : 'z-10'} ${className}`}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={`flex h-10 items-center justify-between gap-2.5 rounded-full border border-border bg-surface px-4 py-2 text-xs font-bold text-text-primary shadow-2xs outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border active:outline-none select-none transition-colors min-w-[120px] ${
+          disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-border-strong'
+        } ${buttonClassName}`}
+      >
+        <span className="truncate">
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <ChevronDown className={`h-4 w-4 text-text-muted transition-transform duration-200 flex-shrink-0 ml-1 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && !disabled && (
+        <div className={`absolute right-0 top-full mt-1.5 min-w-full w-max max-w-xs rounded-2xl border border-border bg-surface shadow-2xl z-50 overflow-hidden animate-in fade-in duration-150 ${dropdownClassName}`}>
+          <div className="max-h-60 overflow-y-auto p-1.5 space-y-0.5 scrollbar-thin">
+            {options.map((opt) => {
+              const isSelected = String(opt.value) === String(value);
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(opt.value);
+                    setIsOpen(false);
+                  }}
+                  className={`w-full text-left px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap outline-none focus:outline-none select-none transition-colors hover:bg-primary/10 ${isSelected ? 'bg-primary/10 text-primary font-bold' : 'text-text-primary'}`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function CollectionHistoryPage() {
   const navigate = useNavigate();
   
@@ -28,11 +87,11 @@ export default function CollectionHistoryPage() {
     total: 0,
     pages: 1
   });
-  const defaultPeriods = ['All Periods', '3 Months', '6 Months', '9 Months', '12 Months', '15 Months', '18 Months', '21 Months', '24 Months'];
+  const defaultPeriods = ['ALL TIME', 'SINCE LAST REPORT'];
   const [availablePeriods, setAvailablePeriods] = useState(defaultPeriods);
   const [availableCollectors, setAvailableCollectors] = useState([]);
   
-  const [selectedPeriod, setSelectedPeriod] = useState('All Periods');
+  const [selectedPeriod, setSelectedPeriod] = useState('ALL TIME');
   const [selectedCollector, setSelectedCollector] = useState('All Users');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -227,20 +286,14 @@ export default function CollectionHistoryPage() {
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       
-      {/* Navigation and Title */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="space-y-1">
-          <button 
-            onClick={() => navigate('/school-admin')} 
-            className="flex items-center gap-1.5 text-xs font-bold text-text-secondary hover:text-text-primary transition-colors mb-2 uppercase tracking-wider"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" /> Back to Dashboard
-          </button>
-          <h1 className="text-2xl font-bold text-text-primary tracking-tight font-display">Collection History</h1>
-          <p className="text-xs text-text-secondary">
-            View every fee collection transaction with complete payment history.
-          </p>
-        </div>
+      {/* Header Container */}
+      <div className="p-5 rounded-2xl border border-border bg-zinc-50/50 dark:bg-zinc-900/50 shadow-2xs flex flex-col justify-between gap-1">
+        <h1 className="text-xl md:text-2xl font-bold text-text-primary tracking-tight font-display uppercase leading-none">
+          COLLECTION HISTORY
+        </h1>
+        <p className="text-xs text-text-secondary mt-1 font-medium">
+          View every fee collection transaction with complete payment history.
+        </p>
       </div>
 
       {/* Summary Cards */}
@@ -269,7 +322,7 @@ export default function CollectionHistoryPage() {
       </div>
 
       {/* Filters and Search Control Box */}
-      <div className="bg-surface border border-border rounded-2xl p-5 shadow-xs flex flex-col md:flex-row gap-4 justify-between items-center">
+      <div className="relative z-30 bg-zinc-50/50 dark:bg-zinc-900/50 border border-border rounded-2xl p-5 shadow-2xs flex flex-col md:flex-row gap-4 justify-between items-center">
         
         {/* Search */}
         <div className="relative w-full md:w-72">
@@ -278,58 +331,54 @@ export default function CollectionHistoryPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search student, receipt, class..."
-            className="pl-10 text-xs font-semibold py-2.5 h-10"
+            className="pl-10 text-xs font-semibold py-2.5 h-10 rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
           />
         </div>
 
         {/* Filter Dropdowns (Deposit By & Filter Month) */}
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+        <div className="flex flex-col sm:flex-row items-center justify-end gap-4 sm:gap-5 w-full md:w-auto ml-auto">
           {/* Deposit By Selector dropdown */}
           <div className="flex items-center gap-2 w-full sm:w-auto">
-            <label className="text-xs font-bold text-text-secondary shrink-0 flex items-center gap-1 uppercase tracking-wider">
+            <label className="text-xs font-bold text-text-secondary shrink-0 flex items-center gap-1.5 uppercase tracking-wider">
               <User className="h-3.5 w-3.5 text-text-muted" /> Deposit By:
             </label>
-            <select
+            <CustomSelect
               value={selectedCollector}
-              onChange={(e) => {
-                setSelectedCollector(e.target.value);
+              onChange={(val) => {
+                setSelectedCollector(val);
                 setPage(1);
               }}
-              className="w-full sm:w-48 rounded-xl border border-border bg-surface text-text-primary px-3 py-2 text-xs font-bold focus:border-primary focus:ring-primary outline-none h-10 cursor-pointer"
-            >
-              {(availableCollectors.length > 0 ? availableCollectors : [{ name: 'All Users', label: 'All Users' }]).map((c) => (
-                <option key={c.name} value={c.name}>
-                  {c.phone || c.label || c.name}
-                </option>
-              ))}
-            </select>
+              buttonClassName="w-36"
+              options={(availableCollectors.length > 0 ? availableCollectors : [{ name: 'All Users', label: 'All Users' }]).map((c) => ({
+                value: c.name,
+                label: c.phone || c.label || c.name
+              }))}
+            />
           </div>
 
           {/* Period Selector dropdown */}
           <div className="flex items-center gap-2 w-full sm:w-auto">
-            <label className="text-xs font-bold text-text-secondary shrink-0 flex items-center gap-1 uppercase tracking-wider">
+            <label className="text-xs font-bold text-text-secondary shrink-0 flex items-center gap-1.5 uppercase tracking-wider">
               <Calendar className="h-3.5 w-3.5 text-text-muted" /> Filter Period:
             </label>
-            <select
+            <CustomSelect
               value={selectedPeriod}
-              onChange={(e) => {
-                setSelectedPeriod(e.target.value);
+              onChange={(val) => {
+                setSelectedPeriod(val);
                 setPage(1);
               }}
-              className="w-full sm:w-44 rounded-xl border border-border bg-surface text-text-primary px-3 py-2 text-xs font-bold focus:border-primary focus:ring-primary outline-none h-10 cursor-pointer"
-            >
-              {(availablePeriods.length > 0 ? availablePeriods : defaultPeriods).map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
+              buttonClassName="w-44"
+              options={(availablePeriods.length > 0 ? availablePeriods : defaultPeriods).map((p) => ({
+                value: p,
+                label: p
+              }))}
+            />
           </div>
         </div>
       </div>
 
       {/* Transaction History Log table */}
-      <Card className="shadow-xs border border-border bg-surface overflow-hidden">
+      <div className="rounded-2xl border border-border bg-surface overflow-hidden shadow-2xs">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
             <RefreshCw className="h-7 w-7 text-primary animate-spin" />
@@ -351,22 +400,32 @@ export default function CollectionHistoryPage() {
           <>
             {/* Desktop Table View */}
             <div className="hidden md:block overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-zinc-50/50 dark:bg-zinc-900/20">
-                    <TableHead className="font-bold text-xs whitespace-nowrap">Deposit By</TableHead>
-                    <TableHead className="font-bold text-xs whitespace-nowrap">Ref No.</TableHead>
-                    <TableHead className="font-bold text-xs whitespace-nowrap">Date & Time</TableHead>
-                    <TableHead className="font-bold text-xs whitespace-nowrap">Name & Class</TableHead>
-                    <TableHead className="font-bold text-xs whitespace-nowrap">Fee Description</TableHead>
-                    <TableHead className="font-bold text-xs text-center whitespace-nowrap">(Prev → Credit → New)</TableHead>
+              <Table containerClassName="border-0 rounded-none shadow-none bg-transparent">
+                <TableHeader className="bg-[#FAF6EC] dark:bg-zinc-900/50 border-b border-border">
+                  <TableRow className="bg-[#FAF6EC] dark:bg-zinc-900/50 hover:bg-[#FAF6EC] dark:hover:bg-zinc-900/50">
+                    <TableHead className="font-bold text-xs whitespace-nowrap text-text-secondary bg-[#FAF6EC] dark:bg-zinc-900/50">Deposit By</TableHead>
+                    <TableHead className="font-bold text-xs whitespace-nowrap text-text-secondary bg-[#FAF6EC] dark:bg-zinc-900/50">Ref No.</TableHead>
+                    <TableHead className="font-bold text-xs whitespace-nowrap text-text-secondary bg-[#FAF6EC] dark:bg-zinc-900/50">Date & Time</TableHead>
+                    <TableHead className="font-bold text-xs whitespace-nowrap text-text-secondary bg-[#FAF6EC] dark:bg-zinc-900/50">Name & Class</TableHead>
+                    <TableHead className="font-bold text-xs whitespace-nowrap text-text-secondary bg-[#FAF6EC] dark:bg-zinc-900/50">Fee Description</TableHead>
+                    <TableHead className="font-bold text-xs text-center whitespace-nowrap text-text-secondary bg-[#FAF6EC] dark:bg-zinc-900/50">(Prev → Credit → New)</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {transactions.map((t, idx) => {
                     const rowKey = `${t.type}-${t.history_id || t.id || idx}`;
                     return (
-                      <TableRow key={rowKey}>
+                      <TableRow 
+                        key={rowKey}
+                        onClick={() => {
+                          if (t.student_id) {
+                            navigate(`/school-admin/classes?studentId=${t.student_id}`, {
+                              state: { from: location.pathname + location.search }
+                            });
+                          }
+                        }}
+                        className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/50 transition-colors cursor-pointer"
+                      >
                         {/* Deposit By (User Name & Phone) */}
                         <TableCell className="text-xs whitespace-nowrap">
                           <div className="font-bold text-text-primary uppercase tracking-wider">
@@ -399,12 +458,12 @@ export default function CollectionHistoryPage() {
 
                         {/* Balance flow (Bank Statements Style) */}
                         <TableCell className="text-center text-xs py-3 whitespace-nowrap">
-                          <div className="flex items-center justify-center gap-1 text-sm font-semibold text-text-secondary bg-zinc-50 dark:bg-zinc-900/50 py-1.5 px-3 rounded-lg border border-border max-w-[340px] mx-auto">
-                            <span className="text-text-muted font-mono">₹{parseFloat(t.previous_total).toLocaleString('en-IN')}</span>
-                            <span className="text-text-muted">→</span>
-                            <span className="text-emerald-600 font-bold font-mono">+₹{t.amount.toLocaleString('en-IN')}</span>
-                            <span className="text-text-muted">→</span>
-                            <span className="font-bold text-text-primary font-mono">₹{parseFloat(t.updated_total).toLocaleString('en-IN')}</span>
+                          <div className="flex items-center justify-center gap-1.5 text-xs font-semibold bg-amber-500/10 dark:bg-amber-500/20 border border-amber-500/30 py-1.5 px-4 rounded-full max-w-[340px] mx-auto">
+                            <span className="text-amber-800/80 dark:text-amber-300/80 font-mono">₹{parseFloat(t.previous_total).toLocaleString('en-IN')}</span>
+                            <span className="text-amber-600/70 dark:text-amber-400/70">→</span>
+                            <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono">+₹{t.amount.toLocaleString('en-IN')}</span>
+                            <span className="text-amber-600/70 dark:text-amber-400/70">→</span>
+                            <span className="font-bold text-amber-950 dark:text-amber-100 font-mono">₹{parseFloat(t.updated_total).toLocaleString('en-IN')}</span>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -419,7 +478,17 @@ export default function CollectionHistoryPage() {
               {transactions.map((t, idx) => {
                 const cardKey = `${t.type}-${t.history_id || t.id || idx}`;
                 return (
-                  <div key={cardKey} className="p-4 space-y-3.5 bg-surface">
+                  <div 
+                    key={cardKey} 
+                    onClick={() => {
+                      if (t.student_id) {
+                        navigate(`/school-admin/classes?studentId=${t.student_id}`, {
+                          state: { from: location.pathname + location.search }
+                        });
+                      }
+                    }}
+                    className="p-4 space-y-3.5 bg-surface hover:bg-zinc-50/50 dark:hover:bg-zinc-900/50 transition-colors cursor-pointer"
+                  >
                     
                     {/* Top Row - Ref No & Amount */}
                     <div className="flex justify-between items-start">
@@ -454,12 +523,12 @@ export default function CollectionHistoryPage() {
                     </div>
 
                     {/* Bottom Row - Running balance */}
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-text-secondary pt-1">
-                      <span className="text-text-muted font-mono">₹{parseFloat(t.previous_total).toLocaleString('en-IN')}</span>
-                      <span>→</span>
-                      <span className="text-emerald-600 font-bold font-mono">+₹{t.amount.toLocaleString('en-IN')}</span>
-                      <span>→</span>
-                      <span className="font-bold text-text-primary font-mono">₹{parseFloat(t.updated_total).toLocaleString('en-IN')}</span>
+                    <div className="flex items-center justify-center gap-1.5 text-xs font-semibold bg-amber-500/10 dark:bg-amber-500/20 border border-amber-500/30 py-1.5 px-3 rounded-full">
+                      <span className="text-amber-800/80 dark:text-amber-300/80 font-mono">₹{parseFloat(t.previous_total).toLocaleString('en-IN')}</span>
+                      <span className="text-amber-600/70 dark:text-amber-400/70">→</span>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono">+₹{t.amount.toLocaleString('en-IN')}</span>
+                      <span className="text-amber-600/70 dark:text-amber-400/70">→</span>
+                      <span className="font-bold text-amber-950 dark:text-amber-100 font-mono">₹{parseFloat(t.updated_total).toLocaleString('en-IN')}</span>
                     </div>
 
                   </div>
@@ -489,7 +558,7 @@ export default function CollectionHistoryPage() {
             )}
           </>
         )}
-      </Card>
+      </div>
 
       {/* Fee Payment Receipt Popup */}
       {viewingReceipt && (

@@ -29,12 +29,20 @@ const StudentAvatar = ({ src, name, updatedAt }) => {
         src={cleanUrl} 
         alt={name} 
         onError={() => setError(true)} 
-        className="w-full h-full object-cover" 
+        className="w-full h-full object-cover animate-in fade-in duration-200" 
       />
     );
   }
   
-  return <User className="h-10 w-10 text-zinc-400" />;
+  const initials = name
+    ? name.split(' ').filter(n => n).filter((_, i) => i < 2).map(n => n[0]).join('').toUpperCase()
+    : 'S';
+    
+  return (
+    <div className="w-full h-full bg-teal-500/10 text-teal-600 dark:bg-teal-500/20 dark:text-teal-400 flex items-center justify-center text-xl font-bold select-none">
+      {initials}
+    </div>
+  );
 };
 
 // Inline Document Viewer Modal Component
@@ -916,8 +924,8 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
   const [followUpLoading, setFollowUpLoading] = useState(false);
   const [activeLedgerTab, setActiveLedgerTab] = useState('monthly'); // 'monthly' | 'additional'
   
-  // Accordion toggle for Documents (open by default)
-  const [docsOpen, setDocsOpen] = useState(true);
+  // Accordion toggle for Documents (closed by default)
+  const [docsOpen, setDocsOpen] = useState(false);
 
   // Modal view triggers
   const [viewingDoc, setViewingDoc] = useState(null); // { name, path }
@@ -1316,15 +1324,15 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
       if (totalPaid >= totalFee - 0.01 && totalFee > 0) {
         status = 'PAID';
         statusText = 'Paid';
-        statusClass = 'bg-green-500/10 text-green-600 border-green-500/20';
+        statusClass = 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30';
       } else if (totalPaid > 0) {
         status = 'PARTIAL';
         statusText = 'Partially';
-        statusClass = 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20';
+        statusClass = 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/30 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900/30';
       } else {
         status = 'UNPAID';
         statusText = 'Pending';
-        statusClass = 'bg-red-500/10 text-red-600 border-red-500/20';
+        statusClass = 'bg-amber-100 text-amber-800 dark:bg-amber-950/30 dark:text-amber-400 border-amber-200 dark:border-amber-900/30';
       }
 
       return {
@@ -1480,7 +1488,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
           {/* Sub-tab 1: Student & Parents */}
           {activeSubTab === 'profile' && (
             <div className="space-y-6 animate-in fade-in duration-200">
-              <Card className="shadow-xs">
+              <Card className="bg-zinc-50/50 dark:bg-zinc-900/50 border border-border rounded-2xl shadow-2xs">
                 <CardContent className="p-6 space-y-4">
                   <div className="flex items-center gap-2 border-b border-border pb-2.5">
                     <BookOpen className="h-4 w-4 text-primary" />
@@ -1500,7 +1508,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                 </CardContent>
               </Card>
 
-              <Card className="shadow-xs">
+              <Card className="bg-zinc-50/50 dark:bg-zinc-900/50 border border-border rounded-2xl shadow-2xs">
                 <CardContent className="p-6 space-y-4">
                   <div className="flex items-center gap-2 border-b border-border pb-2.5">
                     <Users className="h-4 w-4 text-primary" />
@@ -1514,7 +1522,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                 </CardContent>
               </Card>
 
-              <Card className="shadow-xs">
+              <Card className="bg-zinc-50/50 dark:bg-zinc-900/50 border border-border rounded-2xl shadow-2xs">
                 <CardContent className="p-6 space-y-4">
                   <div className="flex items-center gap-2 border-b border-border pb-2.5">
                     <Home className="h-4 w-4 text-primary" />
@@ -1523,7 +1531,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                     <div className="space-y-1">
                       <p className="font-bold text-text-primary uppercase text-[11px] tracking-wider mb-2">Current Residence Address</p>
-                      <p className="text-text-secondary leading-relaxed bg-zinc-50 dark:bg-zinc-900/50 border border-border p-3 rounded-lg min-h-[70px]">
+                      <p className="text-text-secondary leading-relaxed bg-zinc-50/50 dark:bg-zinc-900/50 border border-border p-3.5 rounded-2xl min-h-[70px]">
                         {student.current_address_line ? (
                           `${student.current_address_line}, ${student.current_city}, ${student.current_state} - ${student.current_pin_code}, ${student.current_country || 'India'}`
                         ) : (
@@ -1533,7 +1541,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                     </div>
                     <div className="space-y-1">
                       <p className="font-bold text-text-primary uppercase text-[11px] tracking-wider mb-2">Permanent Address</p>
-                      <p className="text-text-secondary leading-relaxed bg-zinc-50 dark:bg-zinc-900/50 border border-border p-3 rounded-lg min-h-[70px]">
+                      <p className="text-text-secondary leading-relaxed bg-zinc-50/50 dark:bg-zinc-900/50 border border-border p-3.5 rounded-2xl min-h-[70px]">
                         {student.same_as_current === 1 ? (
                           <span className="text-[11px] font-bold text-teal-600 bg-teal-500/10 px-2 py-0.5 rounded">SAME AS CURRENT ADDRESS</span>
                         ) : student.permanent_address_line ? (
@@ -1548,10 +1556,10 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
               </Card>
 
               {/* Collapsible Documents Card relocation */}
-              <Card className="shadow-xs overflow-hidden border border-border">
+              <Card className="bg-zinc-50/50 dark:bg-zinc-900/50 border border-border rounded-2xl shadow-2xs overflow-hidden">
                 <button 
                   onClick={() => setDocsOpen(prev => !prev)}
-                  className="w-full flex items-center justify-between px-6 py-4 bg-zinc-50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors focus:outline-none"
+                  className="w-full flex items-center justify-between px-6 py-4 bg-zinc-50/50 dark:bg-zinc-900/50 hover:bg-zinc-100/50 dark:hover:bg-zinc-800/50 transition-colors focus:outline-none"
                 >
                   <div className="flex items-center gap-2">
                     <FileText className="h-4 w-4 text-primary" />
@@ -1767,14 +1775,16 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                   })()}
 
                   {/* Switchable Fee Management panel */}
-                  <Card className="shadow-xs">
-                    <CardContent className="p-6 space-y-4">
-                      <div className="flex items-center gap-2 border-b border-border pb-2.5">
+                  <Card className="bg-surface border border-border rounded-2xl shadow-2xs overflow-hidden">
+                    <div className="py-4 px-6 border-b border-border bg-[#FAF6EC] dark:bg-zinc-900/50 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
                         <FileText className="h-4 w-4 text-primary" />
                         <h4 className="text-xs font-bold text-text-primary uppercase tracking-wider">
                           {activeLedgerTab === 'monthly' ? 'Month-wise Fee Card' : 'Additional Fee Card'}
                         </h4>
                       </div>
+                    </div>
+                    <CardContent className="p-6 space-y-4">
 
                       {activeLedgerTab === 'monthly' ? (
                         <Table>
@@ -1789,7 +1799,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                           </TableHeader>
                           <TableBody>
                             {monthWiseList.map(mw => (
-                              <TableRow key={mw.month}>
+                              <TableRow key={mw.month} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/50 transition-colors cursor-pointer">
                                 <TableCell className="font-bold text-text-primary text-xs uppercase tracking-wider">
                                   <div>{mw.month}</div>
                                   {mw.status === 'PARTIAL' && (
@@ -1805,7 +1815,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                                   {mw.receipt?.payment_date ? formatDate(mw.receipt.payment_date) : '—'}
                                 </TableCell>
                                 <TableCell>
-                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase border ${mw.statusClass}`}>
+                                  <span className={`inline-flex items-center justify-center w-[74px] py-0.5 rounded-full text-[11px] font-bold uppercase border ${mw.statusClass}`}>
                                     {mw.statusText}
                                   </span>
                                 </TableCell>
@@ -1893,7 +1903,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                                 const isPartial = clearedAmt > 0 && remAmt > 0.01;
 
                                 return (
-                                  <TableRow key={af.id}>
+                                  <TableRow key={af.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/50 transition-colors cursor-pointer">
                                     <TableCell className="font-bold text-text-primary text-xs uppercase tracking-wider">
                                       <div>{af.fee_name}</div>
                                       {af.description && <div className="text-[11px] text-text-muted normal-case mt-0.5 font-semibold">{af.description}</div>}
@@ -1910,12 +1920,12 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                                       {af.payment_date ? formatDate(af.payment_date) : '—'}
                                     </TableCell>
                                     <TableCell>
-                                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase border ${
+                                      <span className={`inline-flex items-center justify-center w-[74px] py-0.5 rounded-full text-[11px] font-bold uppercase border ${
                                         isPaid
-                                          ? 'bg-green-500/10 text-green-600 border-green-500/20'
+                                          ? 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30'
                                           : isPartial
-                                            ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
-                                            : 'bg-red-500/10 text-red-600 border-red-500/20'
+                                            ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/30 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900/30'
+                                            : 'bg-amber-100 text-amber-800 dark:bg-amber-950/30 dark:text-amber-400 border-amber-200 dark:border-amber-900/30'
                                       }`}>
                                         {isPaid ? 'Paid' : isPartial ? 'Partially' : 'Pending'}
                                       </span>

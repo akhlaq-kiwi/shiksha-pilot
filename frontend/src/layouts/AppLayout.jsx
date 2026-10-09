@@ -175,7 +175,7 @@ const AppLayout = ({ children }) => {
       {/* First tab stop: lets keyboard users bypass the header nav. */}
       <a href="#main-content" className="skip-link">Skip to main content</a>
       {/* Sticky header */}
-      <header className="sticky top-0 z-50 border-b border-border bg-surface no-print">
+      <header className="sticky top-0 z-50 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 backdrop-blur-md no-print">
         <div className="w-full px-6">
           <div className="flex items-center justify-between h-14 gap-4">
             
@@ -185,7 +185,7 @@ const AppLayout = ({ children }) => {
                 schoolProfile ? (
                   <div className="flex items-center gap-3 min-w-0">
                     <span 
-                      className="text-sm font-black text-text-primary font-display tracking-tight leading-none truncate uppercase"
+                      className="text-lg sm:text-[1.2rem] font-black text-text-primary font-display tracking-tight leading-none truncate uppercase"
                       style={{ fontWeight: 900 }}
                     >
                       {schoolProfile.name}
@@ -194,42 +194,11 @@ const AppLayout = ({ children }) => {
                     {currentYear && (
                       <>
                         <div className="h-4 w-px bg-border flex-shrink-0" aria-hidden="true"></div>
-                        {isSchoolAdmin ? (
-                          <div className="flex items-center gap-2 rounded-lg border border-border-strong bg-surface-sunken px-2 py-1 flex-shrink-0">
-                            <select
-                              id="academic-year-switcher"
-                              value={currentYear.id}
-                              onChange={async (e) => {
-                                const nextId = e.target.value;
-                                const next = academicYears.find((y) => String(y.id) === String(nextId));
-                                const leavingActive = currentYear.status === 'ACTIVE' && next?.status !== 'ACTIVE';
-                                if (leavingActive) {
-                                  const ok = await confirm({
-                                    title: `Switch from active year to ${next?.name}?`,
-                                    message: `All dashboards, fees, attendance and exam figures will show ${next?.name} data until you switch back.`,
-                                    confirmLabel: 'Switch Year',
-                                    danger: false,
-                                  });
-                                  if (!ok) return;
-                                }
-                                selectYear(nextId);
-                                navigate('/school-admin');
-                              }}
-                              className="h-7 cursor-pointer rounded-md border-0 bg-transparent pr-6 text-body-sm font-semibold text-text-primary outline-none focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 shadow-none"
-                            >
-                              {academicYears.map(y => (
-                                <option key={y.id} value={y.id}>
-                                  {y.name} {y.status === 'ACTIVE' ? '(Active)' : y.status === 'Archived' ? '(Archived)' : `(${y.status})`}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1.5 rounded-lg border border-border bg-surface-sunken px-2.5 py-1 flex-shrink-0">
-                            <span className="text-body-xs font-medium text-text-muted">Academic Year:</span>
-                            <span className="text-body-xs font-bold text-text-primary">{currentYear.name}</span>
-                          </div>
-                        )}
+                        <div className="flex items-center gap-1.5 rounded-lg border border-border bg-surface-sunken px-2.5 py-1 flex-shrink-0">
+                          <span className="text-body-xs font-bold text-text-primary">
+                            {currentYear.name} {currentYear.status === 'ACTIVE' ? '(Active)' : currentYear.status === 'Archived' ? '(Archived)' : `(${currentYear.status})`}
+                          </span>
+                        </div>
                       </>
                     )}
                   </div>
@@ -376,12 +345,12 @@ const AppLayout = ({ children }) => {
                     className="flex items-center gap-2.5 hover:opacity-85 transition-all text-left focus:outline-hidden"
                   >
                     {/* Avatar */}
-                    <div className="w-8 h-8 rounded-full border border-border flex items-center justify-center overflow-hidden bg-secondary text-text-primary text-xs font-bold uppercase flex-shrink-0">
+                    <div className="w-[50px] h-[50px] rounded-full border border-border flex items-center justify-center overflow-hidden bg-surface-sunken text-text-primary text-xs font-bold uppercase flex-shrink-0 shadow-2xs p-1.5">
                       {!logoError && schoolProfile?.logo_path ? (
                         <img 
                           src={schoolProfile.logo_path} 
                           alt="School Logo" 
-                          className="w-full h-full object-cover" 
+                          className="w-full h-full object-contain pointer-events-none" 
                           onError={() => setLogoError(true)}
                         />
                       ) : (
@@ -392,7 +361,7 @@ const AppLayout = ({ children }) => {
 
                   {/* Dropdown overlay */}
                   {isDropdownOpen && (
-                    <div className="absolute right-0 top-10 w-48 bg-surface border border-border shadow-lg rounded-xl py-1.5 z-50 text-left text-xs animate-in fade-in slide-in-from-top-1 duration-100">
+                    <div className="absolute right-0 top-13 w-48 bg-surface border border-border shadow-lg rounded-xl py-1.5 z-50 text-left text-xs animate-in fade-in slide-in-from-top-1 duration-100">
                       {role === 'TEACHER' ? (
                         <button 
                           onClick={() => { setIsDropdownOpen(false); handleLogout(); }}

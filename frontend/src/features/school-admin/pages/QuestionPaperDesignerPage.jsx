@@ -18,34 +18,97 @@ import { Dialog } from '../../../common/ui/dialog';
 import { schoolService } from '../../../common/services/schoolService';
 import { schoolAdminService } from '../../../common/services/schoolAdminService';
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
+import { getClassIndex, getShortClassName } from '../../../common/constants/predefinedClasses';
 import html2pdf from 'html2pdf.js';
-
-const getClassOrderIndex = (className) => {
-  if (!className) return 999;
-  const str = String(className).toLowerCase().trim();
-
-  if (str.includes('playgroup') || str.includes('pg')) return 1;
-  if (str.includes('nursery')) return 2;
-  if (str.includes('lkg') || str.includes('lower kg')) return 3;
-  if (str.includes('ukg') || str.includes('upper kg') || str.includes('kg')) return 4;
-
-  const numMatch = str.match(/\d+/);
-  if (numMatch) {
-    return 10 + parseInt(numMatch[0], 10);
-  }
-
-  return 900;
-};
 
 const sortClassNames = (classList) => {
   return [...classList].sort((a, b) => {
-    const orderA = getClassOrderIndex(a);
-    const orderB = getClassOrderIndex(b);
+    const orderA = getClassIndex(a);
+    const orderB = getClassIndex(b);
     if (orderA !== orderB) {
       return orderA - orderB;
     }
     return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
   });
+};
+
+const CustomSelect = ({
+  value,
+  onChange,
+  options = [],
+  placeholder = "Select...",
+  disabled = false,
+  className = "",
+  buttonClassName = "",
+  dropdownClassName = ""
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  const selectedOption = options.find(o => String(o.value) === String(value));
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={containerRef} className={`relative w-full ${isOpen ? 'z-50' : 'z-10'} ${className}`}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={`flex w-full items-center justify-between rounded-xl border border-border bg-surface px-4 py-2 text-xs font-semibold text-text-primary shadow-2xs outline-none focus:outline-none focus:ring-0 focus-visible:outline-none active:outline-none select-none ${
+          disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-border-strong'
+        } ${buttonClassName}`}
+      >
+        <span className="truncate">
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <ChevronDown className={`h-4 w-4 text-text-muted transition-transform duration-200 flex-shrink-0 ml-1 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && !disabled && (
+        <div className={`absolute left-0 right-0 top-full mt-1.5 rounded-xl border border-border bg-surface shadow-2xl z-50 overflow-hidden animate-in fade-in duration-150 ${dropdownClassName}`}>
+          <div className="max-h-60 overflow-y-auto py-1 scrollbar-thin">
+            {placeholder && (
+              <button
+                type="button"
+                onClick={() => {
+                  onChange('');
+                  setIsOpen(false);
+                }}
+                className={`w-full text-left px-4 py-2 text-xs font-semibold outline-none focus:outline-none select-none transition-colors hover:bg-primary/10 ${!value ? 'bg-primary/10 text-primary font-bold' : 'text-text-secondary'}`}
+              >
+                {placeholder}
+              </button>
+            )}
+            {options.map((opt) => {
+              const isSelected = String(opt.value) === String(value);
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(String(opt.value));
+                    setIsOpen(false);
+                  }}
+                  className={`w-full text-left px-4 py-2 text-xs font-semibold outline-none focus:outline-none select-none transition-colors hover:bg-primary/10 ${isSelected ? 'bg-primary/10 text-primary font-bold' : 'text-text-primary'}`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
 
 // Predefined Exam Templates
@@ -288,6 +351,7 @@ export default function QuestionPaperDesignerPage() {
   // Route State Props
   const initialExamId = location.state?.examId || '';
   const initialClassId = location.state?.classId || '';
+  const initialExamName = location.state?.examName || location.state?.testName || location.state?.name || '';
 
   // Core States
   const [classes, setClasses] = useState([]);
@@ -318,7 +382,7 @@ export default function QuestionPaperDesignerPage() {
   // Paper Settings State
   const [selectedClassId, setSelectedClassId] = useState(initialClassId);
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
-  const [paperTitle, setPaperTitle] = useState('Terminal Assessment');
+  const [paperTitle, setPaperTitle] = useState(initialExamName || 'Unit Test 1');
   const [examName, setExamName] = useState(initialExamId);
   const [duration, setDuration] = useState('3 Hours');
   const [maxMarks, setMaxMarks] = useState('100');
@@ -452,12 +516,28 @@ export default function QuestionPaperDesignerPage() {
         if (profile) setSchoolProfile(profile);
 
         // Pre-fill fields based on exam ID
+        const findExamInList = (list, id) => {
+          if (!list || !id) return null;
+          for (const item of list) {
+            if (String(item.id) === String(id)) return item;
+            if (item.sub_tests && Array.isArray(item.sub_tests)) {
+              const found = findExamInList(item.sub_tests, id);
+              if (found) return found;
+            }
+          }
+          return null;
+        };
+
         if (initialExamId && examsList) {
-          const selected = examsList.find(e => String(e.id) === String(initialExamId));
-          if (selected) {
+          const selected = findExamInList(examsList, initialExamId);
+          if (selected && selected.name) {
             setPaperTitle(selected.name);
             setExamName(selected.id);
+          } else if (initialExamName) {
+            setPaperTitle(initialExamName);
           }
+        } else if (initialExamName) {
+          setPaperTitle(initialExamName);
         }
       } catch (err) {
         console.error(err);
@@ -726,7 +806,7 @@ export default function QuestionPaperDesignerPage() {
       setCurrentPaperId(null);
       setSelectedClassId('');
       setSelectedSubjectId('');
-      setPaperTitle('Terminal Assessment');
+      setPaperTitle(initialExamName || 'Unit Test 1');
       setExamName('');
       setDuration('3 Hours');
       setMaxMarks('100');
@@ -741,15 +821,11 @@ export default function QuestionPaperDesignerPage() {
       setTimeout(() => setSuccess(''), 3000);
     };
 
-    if (questions.length > 0) {
-      triggerConfirm(
-        'Start New Paper',
-        'Starting a new paper will clear the current editor. Make sure you have saved your work. Do you want to continue?',
-        startNew
-      );
-    } else {
-      startNew();
-    }
+    triggerConfirm(
+      'Create New Paper',
+      'Are you sure you want to create a new paper? The current paper will be deleted. If you have created a paper, please download it before creating a new paper.',
+      startNew
+    );
   };
 
   const handleLoadSavedPaper = (paper) => {
@@ -2066,7 +2142,7 @@ export default function QuestionPaperDesignerPage() {
   const activeClassObj = classes.find(c => String(c.id) === String(selectedClassId));
   const activeClassName = activeClassObj ? `${activeClassObj.name}${activeClassObj.section ? ` - ${activeClassObj.section}` : ''}` : 'Class';
   const activeSubjectName = (subjects.find(s => String(s.id) === String(selectedSubjectId))?.name) || 'Subject';
-  const activeExamName = (exams.find(e => String(e.id) === String(examName))?.name) || 'N/A';
+  const activeExamName = paperTitle || (exams.find(e => String(e.id) === String(examName))?.name) || initialExamName || 'Unit Test 1';
 
   return (
     <div className="min-h-screen bg-background text-text-primary pb-10">
@@ -2074,17 +2150,16 @@ export default function QuestionPaperDesignerPage() {
       {/* HEADER BAR */}
       <div className="border-b border-border bg-surface sticky top-14 z-40 px-6 py-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex items-center gap-3">
-          <Button 
+          <button 
             type="button" 
-            variant="ghost" 
-            className="h-9 w-9 p-0" 
             onClick={() => navigate('/school-admin/exams')}
+            className="font-bold text-zinc-900 dark:text-zinc-50 border border-zinc-200 dark:border-zinc-800 bg-surface hover:bg-zinc-50 px-4 py-2 rounded-lg text-sm transition-all shadow-2xs"
           >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+            Back
+          </button>
           <div>
-            <h1 className="text-xl font-bold font-display tracking-tight text-text-primary">
-              Question Paper Designer
+            <h1 className="text-xl font-bold font-display tracking-tight text-text-primary uppercase">
+              QUESTION PAPER DESIGNER
             </h1>
             <p className="text-xs text-text-secondary">
               Configure parameters, write questions, build drawings/tables, and generate PDFs
@@ -2095,39 +2170,30 @@ export default function QuestionPaperDesignerPage() {
         <div className="flex flex-nowrap items-center gap-2 justify-end overflow-x-auto">
           <Button 
             type="button"
-            variant="outline" 
+            variant="default" 
             size="sm"
-            className="flex items-center gap-1.5 font-bold text-xs text-primary border-primary/20 bg-primary/5 hover:bg-primary/10 whitespace-nowrap"
+            className="flex items-center gap-1.5 font-bold text-xs bg-primary text-white whitespace-nowrap shadow-2xs"
             onClick={handleNewPaper}
           >
             <Plus className="h-4 w-4" /> New Paper
           </Button>
           <Button 
             type="button"
-            variant="outline" 
+            variant="default" 
             size="sm"
-            className="flex items-center gap-1.5 font-bold text-xs text-amber-600 border-amber-200 bg-amber-50 hover:bg-amber-100 whitespace-nowrap"
-            onClick={() => { setLibrarySelectedClass(null); setIsLibraryOpen(true); }}
+            className="flex items-center gap-1.5 font-bold text-xs bg-primary text-white whitespace-nowrap shadow-2xs"
+            onClick={handleDownloadPdf}
           >
-            <FolderOpen className="h-4 w-4" /> Saved Papers ({savedPapersList.length})
-          </Button>
-          <Button 
-            type="button"
-            variant="outline" 
-            size="sm"
-            className="flex items-center gap-1.5 font-bold text-xs text-green-600 border-green-200 bg-green-50 hover:bg-green-100 whitespace-nowrap"
-            onClick={saveDraft}
-          >
-            <Save className="h-4 w-4" /> Save Draft
+            <Download className="h-4 w-4" /> Download Paper
           </Button>
           <Button 
             type="button"
             variant="default" 
             size="sm"
-            className="flex items-center gap-1.5 font-bold text-xs bg-primary text-white whitespace-nowrap"
+            className="flex items-center gap-1.5 font-bold text-xs bg-primary text-white whitespace-nowrap shadow-2xs"
             onClick={handlePrint}
           >
-            <Printer className="h-4 w-4" /> Print
+            <Printer className="h-4 w-4" /> Print Paper
           </Button>
         </div>
       </div>
@@ -2151,53 +2217,68 @@ export default function QuestionPaperDesignerPage() {
         <div className="space-y-6 min-w-0">
           
           {/* CARD 1: EXAM METADATA DETAILS */}
-          <Card>
-            <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
+          <Card className="rounded-2xl shadow-2xs border border-border bg-surface relative z-20">
+            <CardHeader className="py-4 border-b border-border bg-surface rounded-t-2xl">
               <CardTitle className="text-sm font-bold text-text-primary flex items-center gap-2">
-                <Settings className="h-4 w-4 text-primary" /> Step 1, 2 & 3: Paper Configuration
+                <Settings className="h-4 w-4 text-primary" /> Paper Configuration
               </CardTitle>
             </CardHeader>
             <CardContent className="p-6 space-y-4">
               
+              {/* Test / Examination Title */}
+              <div className="space-y-1.5">
+                <label htmlFor="paper-title-input" className="text-xs font-bold text-text-secondary uppercase">Test / Examination Title *</label>
+                <Input 
+                  id="paper-title-input"
+                  placeholder="e.g. Unit Test 1"
+                  value={paperTitle}
+                  onChange={(e) => setPaperTitle(e.target.value)}
+                  className="focus:ring-0 focus-visible:ring-0 focus:outline-none focus:border-border-strong font-bold text-sm"
+                />
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Select Class */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-text-secondary uppercase">Select Class *</label>
-                  <select 
+                  <CustomSelect 
                     value={selectedClassId}
-                    onChange={(e) => setSelectedClassId(e.target.value)}
-                    className="w-full h-10 px-3 border border-border bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  >
-                    <option value="">-- Choose Class --</option>
-                    {classes
-                      .slice()
-                      .sort((a, b) => getClassOrderIndex(a.name) - getClassOrderIndex(b.name) || String(a.name).localeCompare(String(b.name), undefined, { numeric: true }))
-                      .map(c => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
-                      ))}
-                  </select>
+                    onChange={(val) => setSelectedClassId(val)}
+                    placeholder="-- Choose Class --"
+                    options={(() => {
+                      const seen = new Set();
+                      const sorted = classes
+                        .slice()
+                        .sort((a, b) => getClassIndex(a.name) - getClassIndex(b.name) || String(a.name).localeCompare(String(b.name), undefined, { numeric: true }));
+                      const res = [];
+                      for (const c of sorted) {
+                        const shortName = getShortClassName(c.name);
+                        if (!seen.has(shortName)) {
+                          seen.add(shortName);
+                          res.push({ value: String(c.id), label: shortName });
+                        }
+                      }
+                      return res;
+                    })()}
+                    buttonClassName="h-10"
+                  />
                 </div>
 
                 {/* Select Subject */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-text-secondary uppercase">Select Subject *</label>
-                  <select 
+                  <CustomSelect 
                     value={selectedSubjectId}
-                    onChange={(e) => setSelectedSubjectId(e.target.value)}
+                    onChange={(val) => setSelectedSubjectId(val)}
                     disabled={!selectedClassId}
-                    className="w-full h-10 px-3 border border-border bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
-                  >
-                    <option value="">-- Choose Subject --</option>
-                    {subjects.map(s => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
-                    ))}
-                  </select>
+                    placeholder="-- Choose Subject --"
+                    options={subjects.map(s => ({ value: String(s.id), label: s.name }))}
+                    buttonClassName="h-10"
+                  />
                 </div>
               </div>
 
-
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Duration */}
                 <div className="space-y-1.5">
                   <label htmlFor="duration" className="text-xs font-bold text-text-secondary uppercase">Duration</label>
@@ -2205,6 +2286,7 @@ export default function QuestionPaperDesignerPage() {
                     placeholder="3 Hours" 
                     value={duration} 
                     onChange={(e) => setDuration(e.target.value)} 
+                    className="focus:ring-0 focus-visible:ring-0 focus:outline-none focus:border-border-strong"
                   />
                 </div>
 
@@ -2216,15 +2298,8 @@ export default function QuestionPaperDesignerPage() {
                     placeholder="100" 
                     value={maxMarks} 
                     onChange={(e) => setMaxMarks(e.target.value)} 
+                    className="focus:ring-0 focus-visible:ring-0 focus:outline-none focus:border-border-strong"
                   />
-                </div>
-
-                {/* Exam Name (Read-Only) */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-text-secondary uppercase">Exam Name</label>
-                  <div className="h-10 px-3 border border-border bg-zinc-50 dark:bg-zinc-900 rounded-md text-sm flex items-center text-text-muted font-medium select-none">
-                    {activeExamName}
-                  </div>
                 </div>
               </div>
 
@@ -2236,30 +2311,28 @@ export default function QuestionPaperDesignerPage() {
                   value={instructions}
                   onChange={(e) => setInstructions(e.target.value)}
                   placeholder="Enter general examination guidelines..."
-                  className="w-full p-3 border border-border bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary font-mono text-xs"
+                  className="w-full p-3 border border-border bg-background rounded-xl text-sm focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border-strong font-mono text-xs"
                 />
               </div>
 
             </CardContent>
           </Card>
 
-          <Card className="sticky top-32 z-30 shadow-md">
-
-            <CardContent className="p-3 flex flex-wrap gap-2 items-center bg-white dark:bg-zinc-950">
-              <span className="text-[11px] font-bold text-text-muted uppercase">Quick Blocks:</span>
-              <Button type="button" size="sm" variant="outline" className="h-7 text-xs font-bold py-0" onClick={() => insertQuestionBlock('mcq')}>+ MCQ</Button>
-              <Button type="button" size="sm" variant="outline" className="h-7 text-xs font-bold py-0" onClick={() => insertQuestionBlock('true_false')}>+ True/False</Button>
-              <Button type="button" size="sm" variant="outline" className="h-7 text-xs font-bold py-0" onClick={() => insertQuestionBlock('fill_blanks')}>+ Blank</Button>
-              <Button type="button" size="sm" variant="outline" className="h-7 text-xs font-bold py-0" onClick={() => insertQuestionBlock('matching')}>+ Matching</Button>
-              <Button type="button" size="sm" variant="outline" className="h-7 text-xs font-bold py-0" onClick={() => insertQuestionBlock('sub_parts')}>+ Sub-Parts</Button>
-              <Button type="button" size="sm" variant="outline" className="h-7 text-xs font-bold py-0" onClick={() => insertQuestionBlock('short_answer')}>+ Short Q</Button>
-              <Button type="button" size="sm" variant="outline" className="h-7 text-xs font-bold py-0" onClick={() => insertQuestionBlock('long_answer')}>+ Long Q</Button>
-              <div className="h-6 w-px bg-border mx-1" />
-              <Button type="button" size="sm" variant="outline" className="h-7 text-xs font-bold py-0 text-primary border-primary/20 bg-primary/5 hover:bg-primary/10" onClick={() => insertQuestionBlock('section')}>+ Section</Button>
-              <Button type="button" size="sm" variant="outline" className="h-7 text-xs font-bold py-0 text-primary border-primary/20 bg-primary/5 hover:bg-primary/10" onClick={() => insertQuestionBlock('heading')}>+ Heading</Button>
-              <Button type="button" size="sm" variant="outline" className="h-7 text-xs font-bold py-0 text-primary border-primary/20 bg-primary/5 hover:bg-primary/10" onClick={() => insertQuestionBlock('instruction')}>+ Group Instruction</Button>
-            </CardContent>
-          </Card>
+          {/* Quick Blocks Bar */}
+          <div className="sticky top-32 z-30 bg-primary text-white border border-primary-hover p-4 rounded-2xl shadow-sm flex flex-wrap gap-2 items-center no-print">
+            <span className="text-[11px] font-bold text-white uppercase tracking-wider">Quick Blocks:</span>
+            <Button type="button" size="sm" variant="outline" className="h-7 text-xs font-bold py-0 bg-surface hover:bg-zinc-100 text-text-primary border-border shadow-2xs" onClick={() => insertQuestionBlock('mcq')}>+ MCQ</Button>
+            <Button type="button" size="sm" variant="outline" className="h-7 text-xs font-bold py-0 bg-surface hover:bg-zinc-100 text-text-primary border-border shadow-2xs" onClick={() => insertQuestionBlock('true_false')}>+ True/False</Button>
+            <Button type="button" size="sm" variant="outline" className="h-7 text-xs font-bold py-0 bg-surface hover:bg-zinc-100 text-text-primary border-border shadow-2xs" onClick={() => insertQuestionBlock('fill_blanks')}>+ Blank</Button>
+            <Button type="button" size="sm" variant="outline" className="h-7 text-xs font-bold py-0 bg-surface hover:bg-zinc-100 text-text-primary border-border shadow-2xs" onClick={() => insertQuestionBlock('matching')}>+ Matching</Button>
+            <Button type="button" size="sm" variant="outline" className="h-7 text-xs font-bold py-0 bg-surface hover:bg-zinc-100 text-text-primary border-border shadow-2xs" onClick={() => insertQuestionBlock('sub_parts')}>+ Sub-Parts</Button>
+            <Button type="button" size="sm" variant="outline" className="h-7 text-xs font-bold py-0 bg-surface hover:bg-zinc-100 text-text-primary border-border shadow-2xs" onClick={() => insertQuestionBlock('short_answer')}>+ Short Q</Button>
+            <Button type="button" size="sm" variant="outline" className="h-7 text-xs font-bold py-0 bg-surface hover:bg-zinc-100 text-text-primary border-border shadow-2xs" onClick={() => insertQuestionBlock('long_answer')}>+ Long Q</Button>
+            <div className="h-6 w-px bg-white/30 mx-1" />
+            <Button type="button" size="sm" variant="outline" className="h-7 text-xs font-bold py-0 text-amber-950 bg-amber-100 hover:bg-white border-amber-200 shadow-2xs" onClick={() => insertQuestionBlock('section')}>+ Section</Button>
+            <Button type="button" size="sm" variant="outline" className="h-7 text-xs font-bold py-0 text-amber-950 bg-amber-100 hover:bg-white border-amber-200 shadow-2xs" onClick={() => insertQuestionBlock('heading')}>+ Heading</Button>
+            <Button type="button" size="sm" variant="outline" className="h-7 text-xs font-bold py-0 text-amber-950 bg-amber-100 hover:bg-white border-amber-200 shadow-2xs" onClick={() => insertQuestionBlock('instruction')}>+ Group Instruction</Button>
+          </div>
 
 
 
@@ -2295,10 +2368,10 @@ export default function QuestionPaperDesignerPage() {
                   return (
                     <Card 
                       key={q.id} 
-                      className={`transition-all ${isActive ? 'border-primary shadow-md ring-1 ring-primary/20' : 'hover:border-zinc-300'}`}
+                      className={`rounded-2xl shadow-2xs transition-all border bg-surface ${isActive ? 'border-primary ring-1 ring-primary/20' : 'border-border'}`}
                       onClick={() => setActiveQuestionId(q.id)}
                     >
-                      <CardHeader className="py-2.5 px-4 border-b border-border bg-zinc-50/30 flex flex-row justify-between items-center space-y-0">
+                      <CardHeader className="py-2.5 px-4 border-b border-border bg-surface rounded-t-2xl flex flex-row justify-between items-center space-y-0">
                         <div className="flex items-center gap-2">
                           {isStructural || isSubParts ? (
                             <span className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase">
@@ -2690,7 +2763,7 @@ export default function QuestionPaperDesignerPage() {
                             {q.subQuestions && q.subQuestions.length > 0 && (
                               <div className="space-y-3 pl-4 border-l-2 border-primary/20">
                                 {q.subQuestions.map((sq, sqIdx) => (
-                                  <div key={sq.id} className="flex gap-2 items-start bg-zinc-50 dark:bg-zinc-900/50 p-2.5 rounded-lg border border-border">
+                                  <div key={sq.id} className="flex gap-2 items-start bg-surface p-2.5 rounded-lg border border-border">
                                     <span className="text-xs font-bold text-primary mt-2 flex-shrink-0">
                                       {String.fromCharCode(97 + sqIdx)})
                                     </span>
@@ -2751,48 +2824,41 @@ export default function QuestionPaperDesignerPage() {
             <h3 className="text-base font-bold text-text-primary flex items-center gap-1.5">
               <Eye className="h-5 w-5 text-primary" /> Live Print Preview (A4 Dimensions)
             </h3>
-            <div className="flex gap-2">
-              <Button type="button" size="sm" variant="outline" className="text-xs font-bold" onClick={handleDownloadPdf}>
-                <Download className="h-3.5 w-3.5 mr-1" /> PDF
-              </Button>
-              <Button type="button" size="sm" variant="outline" className="text-xs font-bold" onClick={handleExportDocx}>
-                <FileSpreadsheet className="h-3.5 w-3.5 mr-1" /> DOCX
-              </Button>
-            </div>
           </div>
 
           {/* SIMULATED A4 PAPER WRAPPER */}
-          <div ref={wrapperRef} className="border border-border shadow-xl rounded-xl bg-white text-black p-2 md:p-4 max-h-[85vh] overflow-y-auto w-full select-text leading-normal no-print-scroll font-serif text-[13px]">
-            <div 
-              id="printable-question-paper-doc" 
-              className="p-14 space-y-2 bg-white min-h-[1012px] shadow-sm relative"
-              onClick={() => setActiveFloatingId(null)}
-                    style={{
-                      width: '720px',
-                      zoom: zoomFactor,
-                      transformOrigin: 'top center',
-                      margin: '0 auto',
-                      boxSizing: 'border-box',
-                      position: 'relative'
-                    }}
-                  >
-              <style>{`
-                .q-block {
-                  page-break-inside: avoid !important;
-                  break-inside: avoid !important;
-                }
-                .q-block-section, .q-block-heading {
-                  page-break-after: avoid !important;
-                  break-after: avoid !important;
-                }
-              `}</style>
-              
-              {/* HEADING SECTION */}
-              <div className="pt-0 pb-1 px-4 text-center space-y-1">
-                <h1 className="text-xl font-bold uppercase tracking-wide m-0 p-0">{schoolProfile.name}</h1>
-                <h2 className="text-sm font-bold tracking-tight uppercase m-0 p-0">
-                  {paperTitle || 'Terminal Examination'}
-                </h2>
+          <div className="border border-border shadow-xl rounded-2xl bg-white text-black overflow-hidden w-full select-text leading-normal no-print-scroll font-serif text-[13px]">
+            <div ref={wrapperRef} className="max-h-[85vh] overflow-y-auto p-2 md:p-4 w-full scrollbar-thin">
+              <div 
+                id="printable-question-paper-doc" 
+                className="p-14 space-y-2 bg-white min-h-[1012px] shadow-sm relative"
+                onClick={() => setActiveFloatingId(null)}
+                      style={{
+                        width: '720px',
+                        zoom: zoomFactor,
+                        transformOrigin: 'top center',
+                        margin: '0 auto',
+                        boxSizing: 'border-box',
+                        position: 'relative'
+                      }}
+                    >
+                <style>{`
+                  .q-block {
+                    page-break-inside: avoid !important;
+                    break-inside: avoid !important;
+                  }
+                  .q-block-section, .q-block-heading {
+                    page-break-after: avoid !important;
+                    break-after: avoid !important;
+                  }
+                `}</style>
+                
+                {/* HEADING SECTION */}
+                <div className="pt-0 pb-1 px-4 text-center space-y-1">
+                  <h1 className="text-xl font-bold uppercase tracking-wide m-0 p-0">{schoolProfile.name}</h1>
+                  <h2 className="text-sm font-bold tracking-tight uppercase m-0 p-0">
+                    {paperTitle || (activeExamName !== 'N/A' ? activeExamName : 'Unit Test 1')}
+                  </h2>
                 
                 {/* Meta details list */}
                 <div className="flex justify-between text-xs font-bold pt-1 font-sans">
@@ -3257,6 +3323,7 @@ export default function QuestionPaperDesignerPage() {
             </div>
           </div>
         </div>
+      </div>
 
       </div>
 

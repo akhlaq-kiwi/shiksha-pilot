@@ -7695,6 +7695,7 @@ class SchoolAdminService extends BaseService
         $stmtMonthly = $pdo->prepare("
             SELECT 
                 fp.id,
+                fp.student_id AS student_id,
                 'monthly' AS type,
                 fp.receipt_no,
                 CASE 
@@ -7742,6 +7743,7 @@ class SchoolAdminService extends BaseService
                 afph.id AS id,
                 afph.id AS history_id,
                 afp.id AS payment_id,
+                afp.student_id AS student_id,
                 'additional' AS type,
                 COALESCE(afph.receipt_no, afp.receipt_no) AS receipt_no,
                 CASE 
@@ -7973,31 +7975,41 @@ class SchoolAdminService extends BaseService
         $availableCollectors = array_values($collectorsMap);
         array_unshift($availableCollectors, ['name' => 'All Users', 'display_name' => 'All Users', 'phone' => '', 'label' => 'All Users']);
 
-        // Generate list of available periods (3 to 24 months, 2 years span)
-        $availablePeriods = ['All Periods', '3 Months', '6 Months', '9 Months', '12 Months', '15 Months', '18 Months', '21 Months', '24 Months'];
+        // Generate list of available periods: ALL TIME and SINCE LAST REPORT
+        $availablePeriods = ['ALL TIME', 'SINCE LAST REPORT'];
 
         // Default period & collector filters if not provided
-        $selectedPeriod = !empty($params['period']) ? trim($params['period']) : (!empty($params['month']) ? trim($params['month']) : 'All Periods');
+        $selectedPeriod = !empty($params['period']) ? trim($params['period']) : (!empty($params['month']) ? trim($params['month']) : 'ALL TIME');
         $selectedCollector = !empty($params['deposit_by']) ? trim($params['deposit_by']) : (!empty($params['collected_by']) ? trim($params['collected_by']) : 'All Users');
         $search = !empty($params['search']) ? trim($params['search']) : '';
         
-        $periodCutoff = null;
-        if (!empty($selectedPeriod) && preg_match('/(\d+)\s*Months?/i', $selectedPeriod, $mMatches)) {
-            $numMonths = (int)$mMatches[1];
-            if ($numMonths > 0) {
-                $periodCutoff = date('Y-m-d', strtotime("-{$numMonths} months"));
+        // Fetch timestamp of last generated financial report for this school & academic year
+        $lastReportTimestamp = null;
+        if (strcasecmp($selectedPeriod, 'SINCE LAST REPORT') === 0) {
+            $stmtLastRep = $pdo->prepare("
+                SELECT created_at FROM financial_reports 
+                WHERE school_id = :sid 
+                  AND (academic_year_id = :ayid OR academic_year_id IS NULL)
+                ORDER BY id DESC LIMIT 1
+            ");
+            $stmtLastRep->execute([':sid' => $schoolId, ':ayid' => $workingYearId]);
+            $lastRepRow = $stmtLastRep->fetch(PDO::FETCH_ASSOC);
+            if ($lastRepRow && !empty($lastRepRow['created_at'])) {
+                $lastReportTimestamp = $lastRepRow['created_at'];
             }
         }
 
         // Strict AND Filtering: Only transactions matching ALL selected filter criteria are included
-        $filtered = array_filter($withBalance, function($t) use ($selectedPeriod, $periodCutoff, $selectedCollector, $search) {
+        $filtered = array_filter($withBalance, function($t) use ($selectedPeriod, $lastReportTimestamp, $selectedCollector, $search) {
             // 1. Filter Period check (AND condition)
-            if ($periodCutoff !== null) {
-                $tDate = !empty($t['payment_date']) ? substr($t['payment_date'], 0, 10) : '';
-                if ($tDate === '' || $tDate < $periodCutoff) {
-                    return false;
+            if (strcasecmp($selectedPeriod, 'SINCE LAST REPORT') === 0) {
+                if ($lastReportTimestamp !== null) {
+                    $txTime = !empty($t['created_at']) ? $t['created_at'] : (!empty($t['updated_at']) ? $t['updated_at'] : (!empty($t['payment_date']) ? $t['payment_date'] . ' 00:00:00' : ''));
+                    if ($txTime !== '' && strtotime($txTime) <= strtotime($lastReportTimestamp)) {
+                        return false;
+                    }
                 }
-            } elseif ($selectedPeriod && !in_array($selectedPeriod, ['All Periods', 'All Months', 'All'], true)) {
+            } elseif ($selectedPeriod && !in_array(strtoupper($selectedPeriod), ['ALL TIME', 'ALL PERIODS', 'ALL MONTHS', 'ALL'], true)) {
                 $timestamp = strtotime($t['payment_date']);
                 if ($timestamp === false) return false;
                 $tMonthNameYear = date('F Y', $timestamp);
@@ -8055,18 +8067,35 @@ class SchoolAdminService extends BaseService
             return true;
         });
 
-        // Calculate dynamic summary stats strictly on the AND-filtered set
-        $totalCollected = 0.0;
+        // Calculate summary stats: Total Fee Collected is fixed on overall academic year collection,
+        // Card 3 (this_month_collection) reflects the period-filtered collection.
+        $overallTotalCollected = 0.0;
         $todayCollection = 0.0;
-        $thisMonthCollection = 0.0;
-
         $todayStr = date('Y-m-d');
-        foreach ($filtered as $t) {
-            $totalCollected += $t['amount'];
-            if ($t['payment_date'] === $todayStr) {
-                $todayCollection += $t['amount'];
+
+        foreach ($withBalance as $t) {
+            $matchesCollector = true;
+            if ($selectedCollector && strcasecmp($selectedCollector, 'All Users') !== 0) {
+                if (strcasecmp($selectedCollector, 'ADMIN') === 0 || strcasecmp($selectedCollector, 'School Admin') === 0) {
+                    $matchesCollector = !empty($t['is_admin_collector']);
+                } else {
+                    $cName = !empty($t['collected_by']) ? trim($t['collected_by']) : 'School Admin';
+                    $matchesCollector = (strcasecmp($cName, $selectedCollector) === 0);
+                }
             }
-            $thisMonthCollection += $t['amount'];
+
+            if ($matchesCollector) {
+                $overallTotalCollected += (float)$t['amount'];
+                if (!empty($t['payment_date']) && substr($t['payment_date'], 0, 10) === $todayStr) {
+                    $todayCollection += (float)$t['amount'];
+                }
+            }
+        }
+
+        // Period collection (Card 3 value) calculated strictly on filtered set
+        $periodCollection = 0.0;
+        foreach ($filtered as $t) {
+            $periodCollection += (float)$t['amount'];
         }
 
         // Sort chronologically descending (newest first, latest time first)
@@ -8095,9 +8124,9 @@ class SchoolAdminService extends BaseService
         return [
             'transactions' => $paginated,
             'stats' => [
-                'total_collected' => $totalCollected,
+                'total_collected' => $overallTotalCollected,
                 'today_collection' => $todayCollection,
-                'this_month_collection' => $thisMonthCollection,
+                'this_month_collection' => $periodCollection,
                 'total_transactions' => $totalFiltered
             ],
             'pagination' => [
@@ -8644,10 +8673,33 @@ class SchoolAdminService extends BaseService
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->classRepo->getPdo();
 
-        // Find all class IDs for this class name in this school
-        $stmtFind = $pdo->prepare("SELECT id FROM classes WHERE school_id = :sid AND LOWER(TRIM(name)) = LOWER(TRIM(:name))");
-        $stmtFind->execute([':sid' => $schoolId, ':name' => $className]);
-        $classIds = $stmtFind->fetchAll(PDO::FETCH_COLUMN);
+        $cleanName = strtolower(trim($className));
+
+        // Fetch all classes for this school to match flexibly in PHP (avoiding PDO duplicate parameter limits)
+        $stmtAll = $pdo->prepare("SELECT id, name FROM classes WHERE school_id = :sid");
+        $stmtAll->execute([':sid' => $schoolId]);
+        $allClasses = $stmtAll->fetchAll(PDO::FETCH_ASSOC);
+
+        $classIds = [];
+        foreach ($allClasses as $c) {
+            $cName = strtolower(trim($c['name']));
+            if ($cName === $cleanName || str_contains($cName, "({$cleanName})") || str_contains($cName, "{$cleanName} (")) {
+                $classIds[] = (int)$c['id'];
+                continue;
+            }
+            if ($cleanName === 'pnc' && (str_contains($cName, 'pnc') || str_contains($cName, 'pre') || str_contains($cName, 'nursery'))) {
+                $classIds[] = (int)$c['id'];
+            } elseif ($cleanName === 'nc' && (str_contains($cName, 'nc') || str_contains($cName, 'nursery'))) {
+                $classIds[] = (int)$c['id'];
+            } elseif ($cleanName === 'lkg' && (str_contains($cName, 'lkg') || str_contains($cName, 'lower'))) {
+                $classIds[] = (int)$c['id'];
+            } elseif ($cleanName === 'ukg' && (str_contains($cName, 'ukg') || str_contains($cName, 'upper'))) {
+                $classIds[] = (int)$c['id'];
+            } elseif ($cleanName === 'kg' && (str_contains($cName, 'kg') || str_contains($cName, 'kindergarten'))) {
+                $classIds[] = (int)$c['id'];
+            }
+        }
+        $classIds = array_values(array_unique($classIds));
 
         if (empty($classIds)) {
             throw new NotFoundException("Class '{$className}' not found.");
@@ -8684,8 +8736,8 @@ class SchoolAdminService extends BaseService
             $stmtDelSnapshots = $pdo->prepare("DELETE FROM academic_achievement_snapshots WHERE class_id IN ({$inClause})");
             $stmtDelSnapshots->execute();
 
-            $stmtDelete = $pdo->prepare("DELETE FROM classes WHERE school_id = :sid AND name = :name");
-            $stmtDelete->execute([':sid' => $schoolId, ':name' => $className]);
+            $stmtDelete = $pdo->prepare("DELETE FROM classes WHERE school_id = :sid AND id IN ({$inClause})");
+            $stmtDelete->execute([':sid' => $schoolId]);
 
             $pdo->commit();
         } catch (\Exception $e) {
@@ -19785,6 +19837,249 @@ Only approve the settlement after reviewing all financial records.
         // Any device still holding a token would otherwise keep receiving pushes.
         $pdo->prepare('DELETE FROM device_tokens WHERE user_id = :id')
             ->execute(['id' => $userId]);
+    }
+
+    public function requestPrincipalOtp(array $user, int $teacherId, string $action = 'assign'): array
+    {
+        $pdo = $this->staffRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+        $userId = (int)($user['id'] ?? 0);
+
+        // Fetch staff teacher
+        $stmtTeacher = $pdo->prepare("SELECT id, name, role FROM staff WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtTeacher->execute([':id' => $teacherId, ':sid' => $schoolId]);
+        $teacher = $stmtTeacher->fetch(\PDO::FETCH_ASSOC);
+        if (!$teacher) {
+            throw new NotFoundException('Teacher member not found.');
+        }
+
+        // Fetch school admin email
+        $stmtSchool = $pdo->prepare("SELECT name, contact_email FROM schools WHERE id = :sid LIMIT 1");
+        $stmtSchool->execute([':sid' => $schoolId]);
+        $schoolRow = $stmtSchool->fetch(\PDO::FETCH_ASSOC);
+
+        $toEmail = trim((string)($schoolRow['contact_email'] ?? ''));
+        if (empty($toEmail) && !empty($user['email'])) {
+            $toEmail = trim((string)$user['email']);
+        }
+        if (empty($toEmail)) {
+            $stmtUserEmail = $pdo->prepare("SELECT email FROM users WHERE school_id = :sid AND role IN ('SCHOOL_ADMIN', 'SUPER_ADMIN', 'ADMIN') AND email IS NOT NULL AND email != '' ORDER BY id ASC LIMIT 1");
+            $stmtUserEmail->execute([':sid' => $schoolId]);
+            $toEmail = trim((string)$stmtUserEmail->fetchColumn());
+        }
+        if (empty($toEmail)) {
+            $stmtAnyUser = $pdo->prepare("SELECT email FROM users WHERE id = :uid AND email IS NOT NULL AND email != '' LIMIT 1");
+            $stmtAnyUser->execute([':uid' => $userId]);
+            $toEmail = trim((string)$stmtAnyUser->fetchColumn());
+        }
+
+        if (empty($toEmail)) {
+            throw new ValidationException(['email' => 'No registered school admin email address found to send OTP. Please update contact email in school settings.']);
+        }
+
+        // Auto-create table if missing
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS principal_assign_otps (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                school_id INT NOT NULL,
+                user_id INT NOT NULL,
+                teacher_id INT NOT NULL,
+                otp_code VARCHAR(10) NOT NULL,
+                attempts INT DEFAULT 0,
+                is_used TINYINT(1) DEFAULT 0,
+                expires_at DATETIME NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        ");
+
+        // Rate limiting check: 30 seconds
+        $stmtRate = $pdo->prepare("
+            SELECT created_at FROM principal_assign_otps
+            WHERE school_id = :sid AND user_id = :uid AND teacher_id = :tid AND is_used = 0
+            ORDER BY id DESC LIMIT 1
+        ");
+        $stmtRate->execute([':sid' => $schoolId, ':uid' => $userId, ':tid' => $teacherId]);
+        $lastOtpTime = $stmtRate->fetchColumn();
+        if ($lastOtpTime && (time() - strtotime((string)$lastOtpTime)) < 30) {
+            $wait = 30 - (time() - strtotime((string)$lastOtpTime));
+            throw new ValidationException(['rate_limit' => "Please wait {$wait} seconds before requesting a new OTP."]);
+        }
+
+        // Generate 4-digit OTP
+        $otpCode = sprintf("%04d", random_int(1000, 9999));
+
+        // Invalidate unused OTPs
+        $pdo->prepare("
+            UPDATE principal_assign_otps SET is_used = 1
+            WHERE school_id = :sid AND teacher_id = :tid AND is_used = 0
+        ")->execute([':sid' => $schoolId, ':tid' => $teacherId]);
+
+        // Insert new OTP with 5 min expiration
+        $expiresAt = date('Y-m-d H:i:s', strtotime('+5 minutes'));
+        $stmtIns = $pdo->prepare("
+            INSERT INTO principal_assign_otps (school_id, user_id, teacher_id, otp_code, attempts, is_used, expires_at)
+            VALUES (:sid, :uid, :tid, :code, 0, 0, :exp)
+        ");
+        $stmtIns->execute([
+            ':sid'  => $schoolId,
+            ':uid'  => $userId,
+            ':tid'  => $teacherId,
+            ':code' => $otpCode,
+            ':exp'  => $expiresAt
+        ]);
+
+        $teacherNameHtml = htmlspecialchars($teacher['name']);
+        $schoolNameHtml = htmlspecialchars($schoolRow['name'] ?? 'School Admin Portal');
+        
+        $isUnassign = (strtolower(trim($action)) === 'unassign');
+        $subject = $isUnassign 
+            ? "Security Verification: Unassign Principal Role - ShikshaPilot"
+            : "Security Verification: Assign Principal Role - ShikshaPilot";
+        $actionVerb = $isUnassign ? "unassign the Principal role from" : "assign the Principal role to";
+
+        $bodyHtml = "
+        <div style=\"font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; background-color: #ffffff;\">
+          <div style=\"background-color: #0f172a; color: #ffffff; padding: 20px; text-align: center;\">
+            <h2 style=\"margin: 0; font-size: 20px; font-weight: 600;\">ShikshaPilot Security Verification</h2>
+            <p style=\"margin: 5px 0 0 0; font-size: 13px; color: #94a3b8;\">Principal Role Authorization</p>
+          </div>
+          <div style=\"padding: 24px;\">
+            <p style=\"font-size: 14px; color: #334155; line-height: 1.6; margin-top: 0;\">
+              A request has been initiated to {$actionVerb} <strong>{$teacherNameHtml}</strong> on your school portal (<strong>{$schoolNameHtml}</strong>).
+            </p>
+            <div style=\"background-color: #f8fafc; border-left: 4px solid #f59e0b; padding: 16px; margin: 20px 0; border-radius: 0 4px 4px 0;\">
+              <p style=\"font-size: 13px; color: #64748b; margin: 0 0 8px 0;\">Your Security OTP Code:</p>
+              <div style=\"font-size: 28px; font-weight: 700; color: #0f172a; letter-spacing: 6px; font-family: monospace;\">
+                {$otpCode}
+              </div>
+              <p style=\"font-size: 12px; color: #94a3b8; margin: 8px 0 0 0;\">(Valid for 5 minutes)</p>
+            </div>
+            <p style=\"font-size: 13px; color: #64748b; line-height: 1.5;\">
+              <strong>Important Security Notice:</strong> If you did not initiate this action, please do not share this OTP and review your account activity immediately.
+            </p>
+          </div>
+          <div style=\"background-color: #f1f5f9; padding: 15px; text-align: center; font-size: 12px; color: #64748b;\">
+            This is an automated security notification from ShikshaPilot.
+          </div>
+        </div>";
+
+        try {
+            SmtpMailer::send($toEmail, $subject, $bodyHtml, '', '');
+        } catch (\Throwable $e) {
+            $this->log('Failed to send Principal assign OTP email', ['error' => $e->getMessage(), 'email' => $toEmail, 'otp' => $otpCode]);
+        }
+
+        // Mask email address
+        $parts = explode('@', $toEmail);
+        $namePart = $parts[0];
+        $domainPart = $parts[1] ?? '';
+        $maskedName = strlen($namePart) > 2 ? substr($namePart, 0, 2) . str_repeat('*', strlen($namePart) - 2) : $namePart . '***';
+        $maskedEmail = $maskedName . '@' . $domainPart;
+
+        return [
+            'success' => true,
+            'message' => 'OTP sent successfully to registered email address.',
+            'email_masked' => $maskedEmail
+        ];
+    }
+
+    public function assignPrincipalRole(array $user, int $teacherId, ?string $otpCode, string $action = 'assign'): array
+    {
+        $pdo = $this->staffRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        if (empty($otpCode)) {
+            throw new ValidationException(['otp' => 'OTP verification is required.']);
+        }
+
+        // Fetch staff teacher
+        $stmtTeacher = $pdo->prepare("SELECT id, name, phone, role FROM staff WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtTeacher->execute([':id' => $teacherId, ':sid' => $schoolId]);
+        $teacher = $stmtTeacher->fetch(\PDO::FETCH_ASSOC);
+        if (!$teacher) {
+            throw new NotFoundException('Teacher member not found.');
+        }
+
+        // Fetch active OTP
+        $stmt = $pdo->prepare("
+            SELECT * FROM principal_assign_otps
+            WHERE school_id = :sid AND teacher_id = :tid AND is_used = 0
+            ORDER BY id DESC LIMIT 1
+        ");
+        $stmt->execute([':sid' => $schoolId, ':tid' => $teacherId]);
+        $otpRow = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+        if (!$otpRow) {
+            throw new ValidationException(['otp' => 'No active OTP request found. Please click Send OTP again.']);
+        }
+
+        if (strtotime($otpRow['expires_at']) < time()) {
+            $pdo->prepare("UPDATE principal_assign_otps SET is_used = 1 WHERE id = :id")->execute([':id' => $otpRow['id']]);
+            throw new ValidationException(['otp' => 'OTP code has expired. Please request a new OTP.']);
+        }
+
+        if ((int)$otpRow['attempts'] >= 3) {
+            $pdo->prepare("UPDATE principal_assign_otps SET is_used = 1 WHERE id = :id")->execute([':id' => $otpRow['id']]);
+            throw new ValidationException(['otp' => 'Maximum invalid attempts reached. Please request a new OTP.']);
+        }
+
+        if (trim((string)$otpCode) !== trim((string)$otpRow['otp_code'])) {
+            $newAttempts = (int)$otpRow['attempts'] + 1;
+            if ($newAttempts >= 3) {
+                $pdo->prepare("UPDATE principal_assign_otps SET attempts = :att, is_used = 1 WHERE id = :id")->execute([':att' => $newAttempts, ':id' => $otpRow['id']]);
+                throw new ValidationException(['otp' => 'Maximum invalid attempts reached. Please request a new OTP.']);
+            } else {
+                $pdo->prepare("UPDATE principal_assign_otps SET attempts = :att WHERE id = :id")->execute([':att' => $newAttempts, ':id' => $otpRow['id']]);
+                throw new ValidationException(['otp' => 'Invalid OTP code. Please try again.']);
+            }
+        }
+
+        // OTP Verified -> Mark as used
+        $pdo->prepare("UPDATE principal_assign_otps SET is_used = 1 WHERE id = :id")->execute([':id' => $otpRow['id']]);
+
+        // Update is_principal column support in staff table
+        try {
+            $pdo->exec("ALTER TABLE staff ADD COLUMN is_principal TINYINT(1) DEFAULT 0");
+        } catch (\Throwable $e) {}
+
+        $isUnassign = (strtolower(trim($action)) === 'unassign');
+        $teacherPhone = trim((string)($teacher['phone'] ?? ''));
+
+        if ($isUnassign) {
+            // Update staff record
+            $stmtUpdateStaff = $pdo->prepare("UPDATE staff SET role = 'Teacher', is_principal = 0 WHERE id = :tid AND school_id = :sid");
+            $stmtUpdateStaff->execute([':tid' => $teacherId, ':sid' => $schoolId]);
+
+            // Update user account
+            if (!empty($teacherPhone)) {
+                $stmtUpdateUser = $pdo->prepare("UPDATE users SET role = 'TEACHER' WHERE school_id = :sid AND phone = :phone AND role = 'PRINCIPAL'");
+                $stmtUpdateUser->execute([':sid' => $schoolId, ':phone' => $teacherPhone]);
+            }
+
+            $this->log("Unassigned Principal role from teacher ID {$teacherId} ({$teacher['name']})", ['teacher_id' => $teacherId, 'school_id' => $schoolId]);
+
+            return [
+                'success' => true,
+                'message' => 'Principal role unassigned successfully.'
+            ];
+        } else {
+            // Update staff record
+            $stmtUpdateStaff = $pdo->prepare("UPDATE staff SET role = 'PRINCIPAL', is_principal = 1 WHERE id = :tid AND school_id = :sid");
+            $stmtUpdateStaff->execute([':tid' => $teacherId, ':sid' => $schoolId]);
+
+            // Update user account
+            if (!empty($teacherPhone)) {
+                $stmtUpdateUser = $pdo->prepare("UPDATE users SET role = 'PRINCIPAL' WHERE school_id = :sid AND phone = :phone AND role IN ('TEACHER', 'STAFF')");
+                $stmtUpdateUser->execute([':sid' => $schoolId, ':phone' => $teacherPhone]);
+            }
+
+            $this->log("Assigned Principal role to teacher ID {$teacherId} ({$teacher['name']})", ['teacher_id' => $teacherId, 'school_id' => $schoolId]);
+
+            return [
+                'success' => true,
+                'message' => 'Principal role assigned successfully.'
+            ];
+        }
     }
 }
 

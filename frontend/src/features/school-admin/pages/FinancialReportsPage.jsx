@@ -132,7 +132,7 @@ export default function FinancialReportsPage() {
   
   // Preview states
   const [previewData, setPreviewData] = useState(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(true);
   const [previewError, setPreviewError] = useState('');
   
   // Action states
@@ -379,13 +379,13 @@ export default function FinancialReportsPage() {
     <div className="space-y-6 animate-in fade-in duration-300">
       
       {/* Title Header Card */}
-      <div className="sticky top-14 z-20 bg-surface border border-border p-6 rounded-2xl shadow-2xs">
+      <div className="sticky top-14 z-20 bg-zinc-50/50 dark:bg-zinc-900/50 border border-border p-6 rounded-2xl shadow-2xs">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-primary/10 text-primary rounded-xl">
             <FileText className="h-6 w-6" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-text-primary tracking-tight font-display">Financial Reports</h2>
+            <h2 className="text-2xl font-bold text-text-primary tracking-tight font-display uppercase">FINANCIAL REPORTS</h2>
             <p className="text-text-secondary text-xs mt-1">On-demand financial accounting reports for school owners and live profit/loss preview for ongoing period.</p>
           </div>
         </div>
@@ -404,7 +404,7 @@ export default function FinancialReportsPage() {
               <CardTitle className="text-sm font-bold text-text-primary uppercase tracking-wider">Ongoing Month Inspection</CardTitle>
             </CardHeader>
             <div className="space-y-4">
-              <div className="text-xs text-text-secondary leading-relaxed bg-zinc-50/50 dark:bg-zinc-900/10 p-3.5 rounded-xl border border-border border-dashed">
+              <div className="text-xs text-text-secondary leading-relaxed bg-surface-sunken p-3.5 rounded-xl border border-border-strong border-dashed">
                 Inspect live transaction ledgers and generate on-demand financial accounting reports for any period. Click <strong>Generate Financial Report</strong> below to freeze transactions and log a report into history.
               </div>
 
@@ -478,24 +478,12 @@ export default function FinancialReportsPage() {
             </CardHeader>
             
             <div className="flex-1 flex flex-col justify-center py-6">
-              {!previewData && !previewLoading && (
-                <div className="flex flex-col items-center justify-center text-center text-text-muted space-y-2 py-4">
-                  <div className="w-12 h-12 rounded-full bg-zinc-50 dark:bg-zinc-900/50 flex items-center justify-center border border-border">
-                    <BarChart2 className="h-6 w-6 text-text-muted" />
-                  </div>
-                  <p className="text-xs font-bold text-text-secondary">Click Preview Report to view pending statements.</p>
-                  <p className="text-[11px] text-text-muted max-w-[280px]">Previews are live calculations of pending transactions and do not create permanent database entries.</p>
-                </div>
-              )}
-
-              {previewLoading && (
+              {(previewLoading || loading) ? (
                 <div className="flex flex-col items-center justify-center text-center text-text-secondary space-y-3 py-4">
                   <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-primary"></div>
                   <p className="text-xs font-bold uppercase tracking-wider">Computing transactions ledgers...</p>
                 </div>
-              )}
-
-              {previewData && (
+              ) : previewData ? (
                 <div className="space-y-4 animate-in fade-in duration-200">
                   <div className="flex items-center justify-between text-xs py-1">
                     <span className="font-bold text-text-secondary uppercase">Report Period</span>
@@ -505,37 +493,37 @@ export default function FinancialReportsPage() {
                   </div>
                   
                   <div className="grid grid-cols-2 gap-4 pt-2">
-                    <div className="bg-zinc-50 dark:bg-zinc-900/30 p-3.5 border border-border rounded-xl">
-                      <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Total Fees Collected</p>
-                      <p className="text-lg font-bold text-text-primary mt-1 font-sans">{formatCurrency(previewData.fees_collected)}</p>
+                    <div className="bg-primary text-white p-3.5 border border-primary/20 rounded-xl shadow-2xs">
+                      <p className="text-[11px] font-bold text-white/80 uppercase tracking-wider">Total Fees Collected</p>
+                      <p className="text-lg font-bold text-white mt-1 font-sans">{formatCurrency(previewData.fees_collected)}</p>
                     </div>
 
-                    <div className="bg-zinc-50 dark:bg-zinc-900/30 p-3.5 border border-border rounded-xl">
-                      <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Total Expenses & Salaries</p>
-                      <p className="text-lg font-bold text-text-primary mt-1 font-sans text-red-500">{formatCurrency(previewData.salary_paid)}</p>
+                    <div className="bg-primary text-white p-3.5 border border-primary/20 rounded-xl shadow-2xs">
+                      <p className="text-[11px] font-bold text-white/80 uppercase tracking-wider">Total Expenses & Salaries</p>
+                      <p className="text-lg font-bold text-white mt-1 font-sans">{formatCurrency(previewData.salary_paid)}</p>
                     </div>
                   </div>
 
                   <hr className="border-border" />
 
-                  <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-zinc-50 dark:bg-zinc-900/20">
+                  <div className="flex items-center justify-between p-4 rounded-xl border border-primary/20 bg-primary text-white shadow-2xs">
                     <div>
-                      <p className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Net Financial Outcome</p>
-                      <h4 className="text-2xl font-bold font-sans mt-0.5">
+                      <p className="text-[11px] font-bold text-white/80 uppercase tracking-wider">Net Financial Outcome</p>
+                      <h4 className="text-2xl font-bold font-sans mt-0.5 text-white">
                         {previewData.profit_loss >= 0 ? (
-                          <span className="text-green-600 dark:text-green-400">Profit: {formatCurrency(previewData.profit_loss)}</span>
+                          <span>Profit: {formatCurrency(previewData.profit_loss)}</span>
                         ) : (
-                          <span className="text-red-500">Loss: {formatCurrency(Math.abs(previewData.profit_loss))}</span>
+                          <span>Loss: {formatCurrency(Math.abs(previewData.profit_loss))}</span>
                         )}
                       </h4>
                     </div>
                     
-                    <div className={`flex items-center justify-center rounded-full transition-all duration-200 ${previewData.profit_loss >= 0 ? 'bg-green-500/10 text-green-600' : 'bg-red-500/10 text-red-500'}`} style={{ width: '42px', height: '42px' }}>
+                    <div className="flex items-center justify-center rounded-full bg-white/20 text-white" style={{ width: '42px', height: '42px' }}>
                       <span className="font-bold" style={{ fontSize: '22px', lineHeight: '1' }}>₹</span>
                     </div>
                   </div>
                 </div>
-              )}
+              ) : null}
             </div>
           </Card>
         </div>
@@ -557,7 +545,7 @@ export default function FinancialReportsPage() {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider">Financial Statements History</h3>
-          <span className="bg-zinc-100 text-text-secondary dark:bg-zinc-800 text-[11px] font-bold px-2 py-0.5 rounded-md uppercase border border-border">
+          <span className="bg-surface-sunken text-text-secondary text-[11px] font-bold px-2 py-0.5 rounded-md uppercase border border-border">
             {reports.length} Reports
           </span>
         </div>

@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Calendar, Users, Check, AlertCircle, Save, Download, Clock, QrCode, UserCheck, ShieldAlert, Award, RotateCw, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Calendar, Users, Check, AlertCircle, Save, Download, Clock, QrCode, UserCheck, ShieldAlert, Award, RotateCw, ChevronLeft, ChevronRight, ChevronDown, X } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
@@ -8,6 +8,64 @@ import { Select } from '../../../common/ui/select';
 import { Dialog } from '../../../common/ui/dialog';
 import { schoolService } from '../../../common/services/schoolService';
 import { useToast } from '../../../common/components/Toast';
+
+function CustomSelect({ options, value, onChange, placeholder = "Select...", disabled = false, className = "", buttonClassName = "", dropdownClassName = "" }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  const selectedOption = options.find(o => String(o.value) === String(value));
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={containerRef} className={`relative ${isOpen ? 'z-50' : 'z-10'} ${className}`}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={`flex h-10 items-center justify-between gap-2.5 rounded-full border border-border bg-surface px-4 py-2 text-xs font-bold text-text-primary shadow-2xs outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border active:outline-none select-none transition-colors min-w-[120px] ${
+          disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-border-strong'
+        } ${buttonClassName}`}
+      >
+        <span className="truncate">
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <ChevronDown className={`h-4 w-4 text-text-muted transition-transform duration-200 flex-shrink-0 ml-1 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && !disabled && (
+        <div className={`absolute left-0 right-0 top-full mt-1.5 min-w-[140px] rounded-2xl border border-border bg-surface shadow-2xl z-50 overflow-hidden animate-in fade-in duration-150 ${dropdownClassName}`}>
+          <div className="max-h-60 overflow-y-auto p-1.5 space-y-0.5 scrollbar-thin">
+            {options.map((opt) => {
+              const isSelected = String(opt.value) === String(value);
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(opt.value);
+                    setIsOpen(false);
+                  }}
+                  className={`w-full text-left px-3.5 py-2 rounded-xl text-xs font-semibold outline-none focus:outline-none select-none transition-colors hover:bg-primary/10 ${isSelected ? 'bg-primary/10 text-primary font-bold' : 'text-text-primary'}`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const getTodayLocalDateString = () => {
   const d = new Date();
@@ -456,7 +514,7 @@ export function TeacherAttendanceView() {
       <div className="flex gap-2 border-b border-border">
         <button
           onClick={() => requestTabChange('daily')}
-          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px flex items-center gap-2 ${
+          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px flex items-center gap-2 focus:outline-none focus:ring-0 focus-visible:outline-none ${
             teacherTab === 'daily'
               ? 'border-primary text-primary'
               : 'border-transparent text-text-muted hover:text-text-primary'
@@ -467,7 +525,7 @@ export function TeacherAttendanceView() {
         </button>
         <button
           onClick={() => requestTabChange('report')}
-          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px flex items-center gap-2 ${
+          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px flex items-center gap-2 focus:outline-none focus:ring-0 focus-visible:outline-none ${
             teacherTab === 'report'
               ? 'border-primary text-primary'
               : 'border-transparent text-text-muted hover:text-text-primary'
@@ -478,7 +536,7 @@ export function TeacherAttendanceView() {
         </button>
         <button
           onClick={() => requestTabChange('settings')}
-          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px flex items-center gap-2 ${
+          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px flex items-center gap-2 focus:outline-none focus:ring-0 focus-visible:outline-none ${
             teacherTab === 'settings'
               ? 'border-primary text-primary'
               : 'border-transparent text-text-muted hover:text-text-primary'
@@ -493,61 +551,59 @@ export function TeacherAttendanceView() {
       {teacherTab === 'daily' && (
         <div className="space-y-6">
           {/* Controls Bar */}
-          <Card className="border border-border bg-zinc-50/40 dark:bg-zinc-900/40 shadow-sm">
-            <CardContent className="p-4 flex flex-wrap gap-4 items-end justify-between">
-              <div className="flex items-center gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-text-secondary uppercase">Select Date</label>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={() => requestShiftDate(-1)}
-                      className="h-10 w-10 shrink-0 bg-background border-border hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                      title="Previous Day"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Input
-                      type="date"
-                      value={selectedDate}
-                      onChange={(e) => requestDateChange(e.target.value)}
-                      max={getTodayLocalDateString()}
-                      className="h-10 bg-background"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={() => requestShiftDate(1)}
-                      disabled={selectedDate >= getTodayLocalDateString()}
-                      className="h-10 w-10 shrink-0 bg-background border-border hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40"
-                      title="Next Day"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="space-y-1.5 hidden sm:block">
-                  <span className="text-xs font-bold text-text-secondary uppercase block">Official Entry Time</span>
-                  <span className="inline-flex items-center px-3 py-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold border border-emerald-500/20">
-                    <Clock className="h-3.5 w-3.5 mr-1.5" />
-                    {dailyData?.configured_entry_time || '08:30 AM'}
-                  </span>
+          <div className="p-5 rounded-2xl border border-border bg-zinc-50/50 dark:bg-zinc-900/50 shadow-2xs flex flex-wrap gap-4 items-end justify-between">
+            <div className="flex items-center gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-text-secondary uppercase">Select Date</label>
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => requestShiftDate(-1)}
+                    className="h-10 w-10 shrink-0 bg-background border-border hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                    title="Previous Day"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => requestDateChange(e.target.value)}
+                    max={getTodayLocalDateString()}
+                    className="h-10 bg-background"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => requestShiftDate(1)}
+                    disabled={selectedDate >= getTodayLocalDateString()}
+                    className="h-10 w-10 shrink-0 bg-background border-border hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40"
+                    title="Next Day"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
+              <div className="space-y-1.5 hidden sm:block">
+                <span className="text-xs font-bold text-text-secondary uppercase block">Official Entry Time</span>
+                <span className="inline-flex items-center px-3 py-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold border border-emerald-500/20">
+                  <Clock className="h-3.5 w-3.5 mr-1.5" />
+                  {dailyData?.configured_entry_time || '08:30 AM'}
+                </span>
+              </div>
+            </div>
 
-              <Button
-                onClick={handleSaveDaily}
-                disabled={savingDaily || loadingDaily || dailyData?.is_disabled}
-                className="h-10 px-5 font-bold text-xs bg-primary text-white rounded-xl shadow-md hover:bg-primary/90 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Save className="h-4 w-4" />
-                {savingDaily ? 'Saving...' : 'Save Attendance'}
-              </Button>
-            </CardContent>
-          </Card>
+            <Button
+              onClick={handleSaveDaily}
+              disabled={savingDaily || loadingDaily || dailyData?.is_disabled}
+              className="h-10 px-5 font-bold text-xs bg-primary text-white rounded-xl shadow-md hover:bg-primary/90 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Save className="h-4 w-4" />
+              {savingDaily ? 'Saving...' : 'Save Attendance'}
+            </Button>
+          </div>
 
           {/* Sunday / Holiday Notice Banner */}
           {dailyData?.is_disabled && (
@@ -584,28 +640,28 @@ export function TeacherAttendanceView() {
           )}
 
           {/* Teacher Attendance Table */}
-          <Card className="border border-border">
-            <CardHeader className="py-4 border-b border-border">
-              <CardTitle className="text-base font-bold flex items-center gap-2">
+          <div className="border border-border rounded-2xl overflow-hidden bg-surface shadow-2xs">
+            <div className="py-4 px-6 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex items-center justify-between">
+              <h3 className="text-base font-bold text-text-primary flex items-center gap-2">
                 <UserCheck className="h-5 w-5 text-primary" />
                 Daily Attendance
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
+              </h3>
+            </div>
+            <div className="p-0">
               {loadingDaily ? (
                 <div className="p-8 text-center text-text-muted">Loading teacher attendance data...</div>
               ) : !dailyData || !dailyData.records || dailyData.records.length === 0 ? (
                 <div className="p-8 text-center text-text-muted">No active teachers found.</div>
               ) : (
                 <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>EMP ID</TableHead>
-                        <TableHead>Teacher Name</TableHead>
-                        <TableHead>Entry Time</TableHead>
-                        <TableHead>Frequency</TableHead>
-                        <TableHead>Attendance Status</TableHead>
+                  <Table containerClassName="border-0 rounded-none shadow-none bg-transparent">
+                    <TableHeader className="bg-zinc-50/50 dark:bg-zinc-900/50 border-b border-border">
+                      <TableRow className="bg-zinc-50/50 dark:bg-zinc-900/50">
+                        <TableHead className="text-xs uppercase font-bold text-text-secondary bg-transparent">EMP ID</TableHead>
+                        <TableHead className="text-xs uppercase font-bold text-text-secondary bg-transparent">Teacher Name</TableHead>
+                        <TableHead className="text-xs uppercase font-bold text-text-secondary bg-transparent">Entry Time</TableHead>
+                        <TableHead className="text-xs uppercase font-bold text-text-secondary bg-transparent">Frequency</TableHead>
+                        <TableHead className="text-xs uppercase font-bold text-text-secondary bg-transparent">Attendance Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -674,53 +730,51 @@ export function TeacherAttendanceView() {
                   </Table>
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
       )}
 
       {/* TAB 2: MONTHLY REPORT */}
       {teacherTab === 'report' && (
         <div className="space-y-6">
-          <Card className="border border-border bg-zinc-50/40 dark:bg-zinc-900/40 shadow-sm">
-            <CardContent className="p-4 flex flex-wrap gap-4 items-end">
-              <div className="w-56 space-y-1.5">
-                <label className="text-xs font-bold text-text-secondary uppercase">Select Month</label>
-                <Select value={reportMonth} onChange={(e) => setReportMonth(parseInt(e.target.value, 10))}>
-                  {ACADEMIC_MONTHS.map(m => (
-                    <option key={m.value} value={m.value}>
-                      {m.name}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="p-5 rounded-2xl border border-border bg-zinc-50/50 dark:bg-zinc-900/50 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-sm font-bold text-text-primary uppercase tracking-tight">
+                Attendance report for {ACADEMIC_MONTHS.find(m => m.value === reportMonth)?.name || 'October'}
+              </h3>
+            </div>
 
-          <Card className="border border-border">
-            <CardHeader className="py-4 border-b border-border">
-              <CardTitle className="text-base font-bold">
-                Attendance report for {ACADEMIC_MONTHS.find(m => m.value === reportMonth)?.name || 'August'}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
+            <div className="flex items-center gap-3">
+              <label className="text-xs font-bold text-text-secondary uppercase whitespace-nowrap">Select Month</label>
+              <CustomSelect
+                value={reportMonth}
+                onChange={val => setReportMonth(parseInt(val, 10))}
+                options={ACADEMIC_MONTHS.map(m => ({ value: m.value, label: m.name }))}
+                buttonClassName="w-44 h-9"
+              />
+            </div>
+          </div>
+
+          <div className="border border-border rounded-2xl overflow-hidden bg-surface shadow-2xs flex flex-col min-h-0 flex-1">
+            <div className="p-0">
               {loadingReport ? (
                 <div className="p-8 text-center text-text-muted">Loading monthly report...</div>
               ) : !reportData || (!reportData.teachers && !reportData.records) || ((reportData.teachers || reportData.records).length === 0) ? (
                 <div className="p-8 text-center text-text-muted">No monthly records found.</div>
               ) : (
                 <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>EMP ID</TableHead>
-                        <TableHead>Teacher Name</TableHead>
-                        <TableHead className="text-center">Total Working Days</TableHead>
-                        <TableHead className="text-center">Present</TableHead>
-                        <TableHead className="text-center">Absent</TableHead>
-                        <TableHead className="text-center">Leave</TableHead>
-                        <TableHead className="text-center">Late Days</TableHead>
-                        <TableHead className="text-right">Attendance %</TableHead>
+                  <Table containerClassName="border-0 rounded-none shadow-none bg-transparent">
+                    <TableHeader className="bg-zinc-50/50 dark:bg-zinc-900/50 border-b border-border">
+                      <TableRow className="bg-zinc-50/50 dark:bg-zinc-900/50">
+                        <TableHead className="text-xs uppercase font-bold text-text-secondary bg-transparent">EMP ID</TableHead>
+                        <TableHead className="text-xs uppercase font-bold text-text-secondary bg-transparent">Teacher Name</TableHead>
+                        <TableHead className="text-center text-xs uppercase font-bold text-text-secondary bg-transparent">Total Working Days</TableHead>
+                        <TableHead className="text-center text-xs uppercase font-bold text-text-secondary bg-transparent">Present</TableHead>
+                        <TableHead className="text-center text-xs uppercase font-bold text-text-secondary bg-transparent">Absent</TableHead>
+                        <TableHead className="text-center text-xs uppercase font-bold text-text-secondary bg-transparent">Leave</TableHead>
+                        <TableHead className="text-center text-xs uppercase font-bold text-text-secondary bg-transparent">Late Days</TableHead>
+                        <TableHead className="text-right text-xs uppercase font-bold text-text-secondary bg-transparent">Attendance %</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -776,8 +830,8 @@ export function TeacherAttendanceView() {
                   </Table>
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
       )}
 
@@ -785,9 +839,9 @@ export function TeacherAttendanceView() {
       {teacherTab === 'settings' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Form Settings */}
-          <Card className="border border-border">
-            <CardHeader className="py-4 border-b border-border">
-              <CardTitle className="text-base font-bold flex items-center gap-2">
+          <Card className="border border-border rounded-2xl overflow-hidden shadow-2xs">
+            <CardHeader className="py-4 px-6 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
+              <CardTitle className="text-base font-bold flex items-center gap-2 text-text-primary">
                 <Clock className="h-5 w-5 text-primary" />
                 Teacher Attendance Configurations
               </CardTitle>
@@ -802,34 +856,29 @@ export function TeacherAttendanceView() {
                       Official Teacher Entry Time
                     </label>
                     <div className="grid grid-cols-3 gap-2">
-                      <select
+                      <CustomSelect
                         value={entryHour}
-                        onChange={(e) => setEntryHour(e.target.value)}
-                        className="h-10 px-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-surface font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
-                      >
-                        {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map(h => (
-                          <option key={h} value={h}>{h}</option>
-                        ))}
-                      </select>
+                        onChange={val => setEntryHour(val)}
+                        options={Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map(h => ({ value: h, label: h }))}
+                        buttonClassName="w-full h-10 min-w-0"
+                      />
 
-                      <select
+                      <CustomSelect
                         value={entryMinute}
-                        onChange={(e) => setEntryMinute(e.target.value)}
-                        className="h-10 px-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-surface font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
-                      >
-                        {Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0')).map(m => (
-                          <option key={m} value={m}>{m}</option>
-                        ))}
-                      </select>
+                        onChange={val => setEntryMinute(val)}
+                        options={Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0')).map(m => ({ value: m, label: m }))}
+                        buttonClassName="w-full h-10 min-w-0"
+                      />
 
-                      <select
+                      <CustomSelect
                         value={entryPeriod}
-                        onChange={(e) => setEntryPeriod(e.target.value)}
-                        className="h-10 px-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-surface font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
-                      >
-                        <option value="AM">AM</option>
-                        <option value="PM">PM</option>
-                      </select>
+                        onChange={val => setEntryPeriod(val)}
+                        options={[
+                          { value: 'AM', label: 'AM' },
+                          { value: 'PM', label: 'PM' }
+                        ]}
+                        buttonClassName="w-full h-10 min-w-0"
+                      />
                     </div>
                     <p className="text-xs text-text-secondary">
                       Teachers scanning after this time will be automatically flagged as <strong className="text-rose-500">Late</strong>.
@@ -845,7 +894,7 @@ export function TeacherAttendanceView() {
                       value={allowedLeaves}
                       onChange={(e) => setAllowedLeaves(e.target.value)}
                       placeholder="0"
-                      className="h-10"
+                      className="h-10 outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
                       min="0"
                     />
                     <p className="text-xs text-text-secondary">
@@ -862,7 +911,7 @@ export function TeacherAttendanceView() {
                       value={latePenaltyAmount}
                       onChange={(e) => setLatePenaltyAmount(e.target.value)}
                       placeholder="0"
-                      className="h-10"
+                      className="h-10 outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
                       min="0"
                       step="any"
                     />
@@ -898,9 +947,9 @@ export function TeacherAttendanceView() {
           </Card>
 
           {/* QR Code Card */}
-          <Card className="border border-border">
-            <CardHeader className="py-4 border-b border-border">
-              <CardTitle className="text-base font-bold flex items-center gap-2">
+          <Card className="border border-border rounded-2xl overflow-hidden shadow-2xs">
+            <CardHeader className="py-4 px-6 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
+              <CardTitle className="text-base font-bold flex items-center gap-2 text-text-primary">
                 <QrCode className="h-5 w-5 text-primary" />
                 Teacher Attendance QR Code
               </CardTitle>
@@ -1069,7 +1118,7 @@ export function TeacherAttendanceView() {
         {detailModalInfo && (
           <div className="space-y-4">
             {/* Header bar */}
-            <div className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-100 dark:bg-zinc-800/60 border border-border">
+            <div className="flex items-center justify-between p-3.5 rounded-xl bg-[#FAF6EC] dark:bg-zinc-900 border border-border">
               <span className="text-xs font-bold text-text-secondary uppercase tracking-wider">
                 Teacher: <strong className="text-text-primary">{detailModalInfo.teacherName}</strong> ({detailModalInfo.empId})
               </span>
@@ -1085,7 +1134,7 @@ export function TeacherAttendanceView() {
                 <button
                   type="button"
                   onClick={() => setDetailModalInfo(null)}
-                  className="h-7 w-7 rounded-full inline-flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                  className="h-7 w-7 rounded-full inline-flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-black/5 dark:hover:bg-zinc-700 transition-colors"
                   title="Close"
                 >
                   <X className="h-4 w-4" />
@@ -1103,7 +1152,7 @@ export function TeacherAttendanceView() {
                   <div
                     key={item.date + '-' + idx}
                     onClick={() => handleNavigateToDateAttendance(item.date)}
-                    className="flex items-center justify-between p-3.5 rounded-xl border border-border bg-background hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-all cursor-pointer group hover:border-primary/40 hover:shadow-sm"
+                    className="flex items-center justify-between p-3.5 rounded-xl border border-border bg-background hover:bg-[#FAF6EC] dark:hover:bg-zinc-900/80 transition-all cursor-pointer group hover:border-primary/50 hover:shadow-xs"
                   >
                     <div className="space-y-1">
                       <div className="font-semibold text-sm text-text-primary group-hover:text-primary transition-colors flex items-center gap-2">

@@ -62,7 +62,7 @@ const NAV_ITEMS = [
   { path: '/school-admin/classes',            label: 'Classes',            permissionKey: 'Classes',            icon: Users },
   { path: '/school-admin/finance',            label: 'Fees Portal',        permissionKey: 'Fees Portal',        icon: DollarSign },
   { path: '/school-admin/financial-reports',  label: 'Financial Reports',  permissionKey: 'Financial Reports',  icon: FileText },
-  { path: '/school-admin/finance-management', label: 'Finance Management', permissionKey: 'Finance Management', icon: Landmark },
+  { path: '/school-admin/finance-management', label: 'Manage Finance', permissionKey: 'Finance Management', icon: Landmark },
   { path: '/school-admin/fee-follow-ups',     label: 'Fee Follow-up',      permissionKey: 'Fee Follow-up',      icon: PhoneCall },
   { path: '/school-admin/timetable',          label: 'Timetable',          permissionKey: 'Timetable',          icon: Clock },
   { path: '/school-admin/attendance',         label: 'Attendance',         permissionKey: 'Attendance',         icon: ClipboardCheck },

@@ -11,6 +11,7 @@ import { Select } from '../../../common/ui/select';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../../common/ui/table';
 import { useToast } from '../../../common/components/Toast';
 import PageTitle from '../../../common/components/PageTitle';
+import { DropdownMenu, DropdownItem } from '../../../common/ui/DropdownMenu';
 
 export default function AnnouncementsPage() {
   const toast = useToast();
@@ -333,51 +334,53 @@ export default function AnnouncementsPage() {
     { label: 'Teachers & Students', value: 'Both' }
   ];
 
-  return (
-    <div className="space-y-6 p-1 md:p-6 max-w-7xl mx-auto min-h-[calc(100vh-140px)] flex flex-col animate-in fade-in duration-200">
-      {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/60 pb-5">
-        <div>
-          <PageTitle title="Announcements" />
-          <p className="text-xs text-text-secondary mt-1 font-medium">
-            Publish notices, alerts, and school updates. Create drafts and manage published announcements.
-          </p>
-        </div>
-        <Button 
-          onClick={handleOpenCreateModal}
-          className="font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 self-start md:self-center"
-        >
-          <Plus className="h-4 w-4" />
-          Create Announcement
-        </Button>
+  if (loading) {
+    return (
+      <div className="flex-1 flex flex-col justify-center items-center py-24 min-h-[400px] gap-3">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <p className="text-xs font-bold text-text-primary uppercase tracking-wider">LOADING ANNOUNCEMENTS...</p>
       </div>
+    );
+  }
 
-      {/* Standard Select component for Audience filter dropdown */}
-      <div className="w-full sm:w-[220px]">
-        <Select
-          value={audienceFilter}
-          onChange={(e) => setAudienceFilter(e.target.value)}
-          className="text-xs font-bold cursor-pointer bg-surface h-9"
-        >
-          {filterOptions.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </Select>
+  return (
+    <div className="space-y-6 flex flex-col min-h-[calc(100vh-140px)] animate-in fade-in duration-200">
+      {/* Top Header Container */}
+      <div className="p-5 rounded-2xl border border-border bg-zinc-50/50 dark:bg-zinc-900/50 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <h1 className="text-xl md:text-2xl font-bold text-text-primary font-display tracking-tight uppercase leading-none">
+          ANNOUNCEMENTS
+        </h1>
+
+        <div className="flex items-center gap-3 self-start md:self-center">
+          <Select
+            value={audienceFilter}
+            onChange={(e) => setAudienceFilter(e.target.value)}
+            className="text-xs font-bold cursor-pointer bg-surface h-10 w-[185px]"
+          >
+            {filterOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </Select>
+
+          <Button 
+            onClick={handleOpenCreateModal}
+            className="font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 h-10 px-4 shadow-2xs whitespace-nowrap shrink-0"
+          >
+            <Plus className="h-4 w-4" />
+            Create Announcement
+          </Button>
+        </div>
       </div>
 
       {/* Grid Table Layout with standard columns */}
-      <Card className="shadow-xs border border-border bg-surface flex-1 min-h-[480px] overflow-visible pb-16">
-        <CardContent className="p-0 flex-1 flex flex-col overflow-visible">
-          {loading ? (
-            <div className="flex justify-center items-center py-24">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-            </div>
-          ) : filteredAnnouncements.length === 0 ? (
+      <div className="border border-border rounded-2xl bg-surface shadow-2xs flex-1 min-h-[560px] overflow-hidden flex flex-col">
+        <div className="p-0 flex-1 flex flex-col min-h-0">
+          {filteredAnnouncements.length === 0 ? (
             /* Empty State Layout */
-            <div className="text-center py-20 px-6 max-w-md mx-auto space-y-5 animate-in fade-in duration-300">
-              <div className="mx-auto w-14 h-14 rounded-full bg-zinc-100 flex items-center justify-center text-text-muted">
+            <div className="text-center py-20 px-6 max-w-md mx-auto space-y-5 flex-1 flex flex-col justify-center items-center animate-in fade-in duration-300">
+              <div className="mx-auto w-14 h-14 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-text-muted">
                 <Megaphone className="h-6 w-6" />
               </div>
               <div className="space-y-1">
@@ -388,18 +391,18 @@ export default function AnnouncementsPage() {
               </div>
             </div>
           ) : (
-            <Table containerClassName="overflow-visible border-none shadow-none bg-transparent">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-1/2">Title</TableHead>
-                  <TableHead className="w-1/4">Created</TableHead>
-                  <TableHead className="w-1/6">Status</TableHead>
-                  <TableHead className="w-1/12 text-right">Action</TableHead>
+            <Table containerClassName="border-0 rounded-none shadow-none bg-transparent overflow-y-auto">
+              <TableHeader className="bg-zinc-50/50 dark:bg-zinc-900/50 border-b border-border">
+                <TableRow className="bg-zinc-50/50 dark:bg-zinc-900/50">
+                  <TableHead className="w-1/2 text-xs uppercase font-bold text-text-secondary bg-transparent">Title</TableHead>
+                  <TableHead className="w-1/4 text-xs uppercase font-bold text-text-secondary bg-transparent">Created</TableHead>
+                  <TableHead className="w-1/6 text-xs uppercase font-bold text-text-secondary bg-transparent">Status</TableHead>
+                  <TableHead className="w-1/12 text-right text-xs uppercase font-bold text-text-secondary bg-transparent">Action</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody className="overflow-visible">
+              <TableBody>
                 {filteredAnnouncements.map((ann) => (
-                  <TableRow key={ann.id} className="overflow-visible">
+                  <TableRow key={ann.id}>
                     {/* Title */}
                     <TableCell className="font-bold text-text-primary">
                       {ann.subject}
@@ -430,83 +433,63 @@ export default function AnnouncementsPage() {
                       )}
                     </TableCell>
 
-                    {/* Action dropdown button */}
-                    <TableCell className="text-right overflow-visible">
-                      <div className="dropdown-container relative inline-block text-left z-30">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setActiveDropdownId(activeDropdownId === ann.id ? null : ann.id);
+                    {/* Action dropdown button with portal */}
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownItem
+                          onClick={() => {
+                            setSelectedAnn(ann);
+                            setShowViewModal(true);
                           }}
-                          className="p-1.5 rounded-lg hover:bg-zinc-100 text-text-muted hover:text-text-primary transition-all border border-border/50 bg-surface inline-flex"
+                          className="flex items-center gap-2 font-bold uppercase tracking-wider text-xs"
                         >
-                          <MoreVertical className="h-4 w-4" />
-                        </button>
-                        
-                        {activeDropdownId === ann.id && (
-                          <div className="absolute right-0 top-full mt-1.5 w-40 bg-surface border border-border shadow-xl rounded-xl py-1.5 z-50 animate-in fade-in slide-in-from-top-1 duration-100 text-left">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedAnn(ann);
-                                setShowViewModal(true);
-                                setActiveDropdownId(null);
-                              }}
-                              className="w-full text-left px-4 py-2 text-xs text-text-primary hover:bg-zinc-50 flex items-center gap-2 font-bold uppercase tracking-wider"
-                            >
-                              <Eye className="h-3.5 w-3.5 text-zinc-500" />
-                              View
-                            </button>
-                            
-                            <button
-                              type="button"
-                              onClick={() => handleEdit(ann)}
-                              className="w-full text-left px-4 py-2 text-xs text-text-primary hover:bg-zinc-50 flex items-center gap-2 font-bold uppercase tracking-wider"
-                            >
-                              <Edit className="h-3.5 w-3.5 text-primary" />
-                              Edit
-                            </button>
+                          <Eye className="h-3.5 w-3.5 text-zinc-500" />
+                          View
+                        </DropdownItem>
 
-                            {ann.status === 'Draft' ? (
-                              <button
-                                type="button"
-                                onClick={() => handleDirectPublish(ann)}
-                                className="w-full text-left px-4 py-2 text-xs text-text-primary hover:bg-zinc-50 flex items-center gap-2 font-bold uppercase tracking-wider"
-                              >
-                                <Check className="h-3.5 w-3.5 text-emerald-600" />
-                                Publish
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => handleMoveToDraftTrigger(ann)}
-                                className="w-full text-left px-4 py-2 text-xs text-text-primary hover:bg-zinc-50 flex items-center gap-2 font-bold uppercase tracking-wider"
-                              >
-                                <FileText className="h-3.5 w-3.5 text-amber-600" />
-                                Move to Draft
-                              </button>
-                            )}
-                            
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteTrigger(ann)}
-                              className="w-full text-left px-4 py-2 text-xs text-destructive hover:bg-zinc-50 flex items-center gap-2 font-bold uppercase tracking-wider"
-                            >
-                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                              Delete
-                            </button>
-                          </div>
+                        <DropdownItem
+                          onClick={() => handleEdit(ann)}
+                          className="flex items-center gap-2 font-bold uppercase tracking-wider text-xs"
+                        >
+                          <Edit className="h-3.5 w-3.5 text-primary" />
+                          Edit
+                        </DropdownItem>
+
+                        {ann.status === 'Draft' ? (
+                          <DropdownItem
+                            onClick={() => handleDirectPublish(ann)}
+                            className="flex items-center gap-2 font-bold uppercase tracking-wider text-xs"
+                          >
+                            <Check className="h-3.5 w-3.5 text-emerald-600" />
+                            Publish
+                          </DropdownItem>
+                        ) : (
+                          <DropdownItem
+                            onClick={() => handleMoveToDraftTrigger(ann)}
+                            className="flex items-center gap-2 font-bold uppercase tracking-wider text-xs text-amber-600"
+                          >
+                            <FileText className="h-3.5 w-3.5 text-amber-600" />
+                            Move to Draft
+                          </DropdownItem>
                         )}
-                      </div>
+
+                        <DropdownItem
+                          destructive
+                          onClick={() => handleDeleteTrigger(ann)}
+                          className="flex items-center gap-2 font-bold uppercase tracking-wider text-xs"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                          Delete
+                        </DropdownItem>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Creation/Edit Modal */}
       <Dialog
@@ -535,14 +518,14 @@ export default function AnnouncementsPage() {
               Description <span className="text-destructive">*</span>
             </label>
             
-            <div className="border border-border rounded-lg overflow-hidden flex flex-col bg-surface">
+            <div className="border border-border-strong rounded-lg overflow-hidden flex flex-col bg-surface-sunken">
               {/* Rich text actions */}
-              <div className="flex items-center gap-1 bg-zinc-50 border-b border-border p-1.5">
+              <div className="flex items-center gap-1 bg-surface-sunken border-b border-border p-1.5">
                 <button 
                   type="button" 
                   title="Bold" 
                   onClick={() => execCmd('bold')}
-                  className="p-1.5 rounded hover:bg-zinc-200 text-text-primary transition-colors"
+                  className="p-1.5 rounded hover:bg-surface text-text-primary transition-colors border border-transparent hover:border-border"
                 >
                   <Bold className="h-3.5 w-3.5" />
                 </button>
@@ -550,7 +533,7 @@ export default function AnnouncementsPage() {
                   type="button" 
                   title="Italic" 
                   onClick={() => execCmd('italic')}
-                  className="p-1.5 rounded hover:bg-zinc-200 text-text-primary transition-colors"
+                  className="p-1.5 rounded hover:bg-surface text-text-primary transition-colors border border-transparent hover:border-border"
                 >
                   <Italic className="h-3.5 w-3.5" />
                 </button>
@@ -558,7 +541,7 @@ export default function AnnouncementsPage() {
                   type="button" 
                   title="Underline" 
                   onClick={() => execCmd('underline')}
-                  className="p-1.5 rounded hover:bg-zinc-200 text-text-primary transition-colors"
+                  className="p-1.5 rounded hover:bg-surface text-text-primary transition-colors border border-transparent hover:border-border"
                 >
                   <Underline className="h-3.5 w-3.5" />
                 </button>
@@ -570,7 +553,7 @@ export default function AnnouncementsPage() {
                 contentEditable
                 onInput={handleEditorInput}
                 onKeyDown={handleEditorKeyDown}
-                className="p-3 min-h-[140px] focus:outline-hidden text-sm overflow-y-auto max-h-60"
+                className="p-3 min-h-[140px] focus:outline-hidden text-sm overflow-y-auto max-h-60 bg-surface-sunken text-text-primary"
                 style={{ outline: 'none' }}
                 disabled={submitting}
               />
