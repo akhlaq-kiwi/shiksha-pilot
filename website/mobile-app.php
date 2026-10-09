@@ -31,12 +31,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'early_a
         if ($eaValues['email'] === '' || !filter_var($eaValues['email'], FILTER_VALIDATE_EMAIL)) {
             $eaErrors['email'] = 'Please enter a valid email address.';
         }
-        // Digits only, ignoring the punctuation people type in phone numbers.
-        $eaDigits = preg_replace('/\D+/', '', $eaValues['phone']);
+        $eaPhone = normalise_phone($eaValues['phone']);
         if ($eaValues['phone'] === '') {
             $eaErrors['phone'] = 'Please enter your phone number.';
-        } elseif (strlen($eaDigits) < 10 || strlen($eaDigits) > 15) {
-            $eaErrors['phone'] = 'Please enter a valid phone number.';
+        } elseif ($eaPhone === null) {
+            $eaErrors['phone'] = 'Please enter a 10-digit mobile number.';
+        } else {
+            // Store the normalised digits, not whatever spelling was typed.
+            $eaValues['phone'] = $eaPhone;
         }
     }
 
@@ -196,8 +198,8 @@ require_once __DIR__ . '/includes/header.php';
 
         <div class="form-row">
           <label for="ea-phone">Phone number</label>
-          <input type="tel" id="ea-phone" name="phone" value="<?php echo htmlspecialchars($eaValues['phone'], ENT_QUOTES); ?>" required autocomplete="tel" inputmode="tel" placeholder="98765 43210" aria-describedby="ea-phone-hint ea-phone-err">
-          <p id="ea-phone-hint" style="font-size:.85rem; opacity:.75; margin:.4rem 0 0;">So we can reach you if the email above turns out not to be a Google account &mdash; we can't add it to the tester list if it isn't.</p>
+          <input type="tel" id="ea-phone" name="phone" value="<?php echo htmlspecialchars($eaValues['phone'], ENT_QUOTES); ?>" required autocomplete="tel" inputmode="numeric" maxlength="18" placeholder="98765 43210" aria-describedby="ea-phone-hint ea-phone-err">
+          <p id="ea-phone-hint" style="font-size:.85rem; opacity:.75; margin:.4rem 0 0;">10-digit mobile number. So we can reach you if the email above turns out not to be a Google account &mdash; we can't add it to the tester list if it isn't.</p>
           <?php if (!empty($eaErrors['phone'])): ?><p class="form-error" id="ea-phone-err"><?php echo htmlspecialchars($eaErrors['phone'], ENT_QUOTES); ?></p><?php endif; ?>
         </div>
 

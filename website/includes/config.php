@@ -82,6 +82,34 @@ define('GTM_CONTAINER_ID', getenv('GTM_CONTAINER_ID') ?: '');
 require_once __DIR__ . '/db.php';
 
 /**
+ * Normalise a typed phone number to the ten digits we actually store.
+ *
+ * Shared by the demo form and the early-access form so the two cannot drift
+ * apart on what counts as valid.
+ *
+ * Numbers here are Indian mobiles: ten digits. People write them with spaces,
+ * dashes, a +91 country code or a leading 0, and rejecting those spellings
+ * would just lose sign-ups — so the common prefixes are stripped rather than
+ * refused. What comes back is always either exactly ten digits or null.
+ *
+ * @return string|null the ten digits, or null when the input is not a valid number
+ */
+function normalise_phone(string $raw): ?string {
+    $digits = preg_replace('/\D+/', '', $raw);
+
+    // +91 98765 43210 / 919876543210
+    if (strlen($digits) === 12 && strpos($digits, '91') === 0) {
+        $digits = substr($digits, 2);
+    }
+    // 09876543210, the way a landline-era number is still often written
+    if (strlen($digits) === 11 && $digits[0] === '0') {
+        $digits = substr($digits, 1);
+    }
+
+    return strlen($digits) === 10 ? $digits : null;
+}
+
+/**
  * Central nav/sitemap model — one array both header.php and sitemap.php
  * read from, so adding a page never means updating two files.
  */

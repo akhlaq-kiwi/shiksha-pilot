@@ -35,12 +35,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if ($values['school'] === '') { $errors['school'] = 'Please tell us your school\'s name.'; }
 
-        // Digits only, ignoring the punctuation people type in phone numbers.
-        $phoneDigits = preg_replace('/\D+/', '', $values['phone']);
+        $normalisedPhone = normalise_phone($values['phone']);
         if ($values['phone'] === '') {
             $errors['phone'] = 'Please enter your phone number.';
-        } elseif (strlen($phoneDigits) < 10 || strlen($phoneDigits) > 15) {
-            $errors['phone'] = 'Please enter a valid phone number.';
+        } elseif ($normalisedPhone === null) {
+            $errors['phone'] = 'Please enter a 10-digit mobile number.';
+        } else {
+            // Store the normalised digits, not whatever spelling was typed.
+            $values['phone'] = $normalisedPhone;
         }
 
         if (empty($errors)) {
@@ -107,7 +109,7 @@ require_once __DIR__ . '/includes/header.php';
 
         <div class="form-row">
           <label for="phone">Phone number</label>
-          <input type="tel" id="phone" name="phone" value="<?php echo htmlspecialchars($values['phone'], ENT_QUOTES); ?>" required autocomplete="tel" inputmode="tel" aria-describedby="phone-err">
+          <input type="tel" id="phone" name="phone" value="<?php echo htmlspecialchars($values['phone'], ENT_QUOTES); ?>" required autocomplete="tel" inputmode="numeric" maxlength="18" placeholder="98765 43210" aria-describedby="phone-err">
           <?php if (!empty($errors['phone'])): ?><p class="form-error" id="phone-err"><?php echo htmlspecialchars($errors['phone'], ENT_QUOTES); ?></p><?php endif; ?>
         </div>
 
