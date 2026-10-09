@@ -152,6 +152,7 @@ export default function EarlyAccessPage() {
             <TableHeader>
               <TableRow>
                 <TableHead className="text-xs">Email</TableHead>
+                <TableHead className="text-xs">Phone</TableHead>
                 <TableHead className="text-xs">Name</TableHead>
                 <TableHead className="text-xs">School</TableHead>
                 <TableHead className="text-xs">Requested</TableHead>
@@ -162,13 +163,13 @@ export default function EarlyAccessPage() {
             <TableBody>
               {loading && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-xs text-text-secondary py-8">Loading…</TableCell>
+                  <TableCell colSpan={7} className="text-center text-xs text-text-secondary py-8">Loading…</TableCell>
                 </TableRow>
               )}
 
               {!loading && requests.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-xs text-text-secondary py-8">
+                  <TableCell colSpan={7} className="text-center text-xs text-text-secondary py-8">
                     {status === 'PENDING'
                       ? 'Nobody is waiting. Everyone who signed up has been dealt with.'
                       : 'No requests match this filter.'}
@@ -179,6 +180,7 @@ export default function EarlyAccessPage() {
               {!loading && requests.map((r) => (
                 <TableRow key={r.id}>
                   <TableCell className="text-xs font-semibold text-text-primary break-all">{r.email}</TableCell>
+                  <TableCell className="text-xs text-text-secondary tabular-nums whitespace-nowrap">{r.phone || '—'}</TableCell>
                   <TableCell className="text-xs text-text-secondary">{r.name || '—'}</TableCell>
                   <TableCell className="text-xs text-text-secondary">{r.school || '—'}</TableCell>
                   <TableCell className="text-xs text-text-secondary whitespace-nowrap">{formatDateTime(r.created_at)}</TableCell>

@@ -54,22 +54,24 @@ function save_website_lead(array $data) {
  * INVITED keeps that status — re-submitting must not quietly send someone back
  * to the bottom of the queue.
  *
- * @param array{email:string,name:string,school:string} $data
+ * @param array{email:string,phone:string,name:string,school:string} $data
  * @throws PDOException on connection/insert failure — the caller decides what
  *         the visitor sees.
  */
 function save_early_access_request(array $data) {
     $pdo = get_db_connection();
     $stmt = $pdo->prepare(
-        'INSERT INTO early_access_requests (email, name, school, ip_address, user_agent)
-         VALUES (:email, :name, :school, :ip_address, :user_agent)
+        'INSERT INTO early_access_requests (email, phone, name, school, ip_address, user_agent)
+         VALUES (:email, :phone, :name, :school, :ip_address, :user_agent)
          ON DUPLICATE KEY UPDATE
+            phone      = COALESCE(NULLIF(VALUES(phone), \'\'), phone),
             name       = COALESCE(NULLIF(VALUES(name), \'\'), name),
             school     = COALESCE(NULLIF(VALUES(school), \'\'), school),
             updated_at = CURRENT_TIMESTAMP'
     );
     $stmt->execute([
         ':email'      => strtolower($data['email']),
+        ':phone'      => $data['phone'] !== '' ? $data['phone'] : null,
         ':name'       => $data['name'] !== '' ? $data['name'] : null,
         ':school'     => $data['school'] !== '' ? $data['school'] : null,
         ':ip_address' => $_SERVER['REMOTE_ADDR'] ?? null,

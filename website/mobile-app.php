@@ -12,10 +12,11 @@ if (empty($_SESSION['csrf_token'])) {
 
 $eaErrors  = [];
 $eaSuccess = false;
-$eaValues  = ['email' => '', 'name' => '', 'school' => ''];
+$eaValues  = ['email' => '', 'phone' => '', 'name' => '', 'school' => ''];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'early_access') {
     $eaValues['email']  = trim($_POST['email'] ?? '');
+    $eaValues['phone']  = trim($_POST['phone'] ?? '');
     $eaValues['name']   = trim($_POST['name'] ?? '');
     $eaValues['school'] = trim($_POST['school'] ?? '');
     $honeypot           = trim($_POST['website'] ?? ''); // hidden — real users never fill this in
@@ -26,9 +27,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'early_a
     } elseif ($honeypot !== '') {
         // Silently succeed without storing anything — don't tip off bots.
         $eaSuccess = true;
-    } elseif ($eaValues['email'] === '' || !filter_var($eaValues['email'], FILTER_VALIDATE_EMAIL)) {
-        $eaErrors['email'] = 'Please enter a valid email address.';
     } else {
+        if ($eaValues['email'] === '' || !filter_var($eaValues['email'], FILTER_VALIDATE_EMAIL)) {
+            $eaErrors['email'] = 'Please enter a valid email address.';
+        }
+        $eaPhone = normalise_phone($eaValues['phone']);
+        if ($eaValues['phone'] === '') {
+            $eaErrors['phone'] = 'Please enter your phone number.';
+        } elseif ($eaPhone === null) {
+            $eaErrors['phone'] = 'Please enter a 10-digit mobile number.';
+        } else {
+            // Store the normalised digits, not whatever spelling was typed.
+            $eaValues['phone'] = $eaPhone;
+        }
+    }
+
+    if (!$eaSuccess && empty($eaErrors)) {
         try {
             save_early_access_request($eaValues);
             $eaSuccess = true;
@@ -180,6 +194,13 @@ require_once __DIR__ . '/includes/header.php';
           <input type="email" id="ea-email" name="email" value="<?php echo htmlspecialchars($eaValues['email'], ENT_QUOTES); ?>" required autocomplete="email" placeholder="you@gmail.com" aria-describedby="ea-email-hint ea-email-err">
           <p id="ea-email-hint" style="font-size:.85rem; opacity:.75; margin:.4rem 0 0;">Play testing only works with a Google account &mdash; give us the one you use on your Android phone, or we won't be able to add you.</p>
           <?php if (!empty($eaErrors['email'])): ?><p class="form-error" id="ea-email-err"><?php echo htmlspecialchars($eaErrors['email'], ENT_QUOTES); ?></p><?php endif; ?>
+        </div>
+
+        <div class="form-row">
+          <label for="ea-phone">Phone number</label>
+          <input type="tel" id="ea-phone" name="phone" value="<?php echo htmlspecialchars($eaValues['phone'], ENT_QUOTES); ?>" required autocomplete="tel" inputmode="numeric" maxlength="18" placeholder="98765 43210" aria-describedby="ea-phone-hint ea-phone-err">
+          <p id="ea-phone-hint" style="font-size:.85rem; opacity:.75; margin:.4rem 0 0;">10-digit mobile number. So we can reach you if the email above turns out not to be a Google account &mdash; we can't add it to the tester list if it isn't.</p>
+          <?php if (!empty($eaErrors['phone'])): ?><p class="form-error" id="ea-phone-err"><?php echo htmlspecialchars($eaErrors['phone'], ENT_QUOTES); ?></p><?php endif; ?>
         </div>
 
         <div class="form-row">
