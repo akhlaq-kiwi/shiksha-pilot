@@ -9,6 +9,7 @@ import { apiClient } from '../../../common/services/apiClient';
 import html2pdf from 'html2pdf.js';
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 import { FeeReceiptModal } from '../components/FeeReceiptModal';
+import { normalizeReligion } from './StudentEnrollmentForm';
 import { formatCurrency } from '../../../common/utils/format';
 import { resolveFileUrl } from '../../../common/utils/fileUrl';
 import {
@@ -28,12 +29,20 @@ const StudentAvatar = ({ src, name, updatedAt }) => {
         src={cleanUrl} 
         alt={name} 
         onError={() => setError(true)} 
-        className="w-full h-full object-cover" 
+        className="w-full h-full object-cover animate-in fade-in duration-200" 
       />
     );
   }
   
-  return <User className="h-10 w-10 text-zinc-400" />;
+  const initials = name
+    ? name.split(' ').filter(n => n).filter((_, i) => i < 2).map(n => n[0]).join('').toUpperCase()
+    : 'S';
+    
+  return (
+    <div className="w-full h-full bg-teal-500/10 text-teal-600 dark:bg-teal-500/20 dark:text-teal-400 flex items-center justify-center text-xl font-bold select-none">
+      {initials}
+    </div>
+  );
 };
 
 // Inline Document Viewer Modal Component
@@ -915,8 +924,8 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
   const [followUpLoading, setFollowUpLoading] = useState(false);
   const [activeLedgerTab, setActiveLedgerTab] = useState('monthly'); // 'monthly' | 'additional'
   
-  // Accordion toggle for Documents (open by default)
-  const [docsOpen, setDocsOpen] = useState(true);
+  // Accordion toggle for Documents (closed by default)
+  const [docsOpen, setDocsOpen] = useState(false);
 
   // Modal view triggers
   const [viewingDoc, setViewingDoc] = useState(null); // { name, path }
@@ -929,9 +938,27 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
   const [showPhotoMenu, setShowPhotoMenu] = useState(false);
   const [schoolProfile, setSchoolProfile] = useState(null);
   const [revertConfirmOpen, setRevertConfirmOpen] = useState(false);
+  const [revertLockedOpen, setRevertLockedOpen] = useState(false);
   const [revertTarget, setRevertTarget] = useState(null); // { id, type: 'monthly' | 'additional', label }
   const [revertError, setRevertError] = useState('');
   const [revertSubmitting, setRevertSubmitting] = useState(false);
+  const [revertStep, setRevertStep] = useState(1); // 1 = Authorization Notice & Send OTP, 2 = Input 4-digit OTP & Verify
+  const [revertSendingOtp, setRevertSendingOtp] = useState(false);
+  const [revertOtpCode, setRevertOtpCode] = useState('');
+  const [revertMaskedEmail, setRevertMaskedEmail] = useState('');
+  const [revertTimer, setRevertTimer] = useState(0);
+
+  useEffect(() => {
+    let interval = null;
+    if (revertStep === 2 && revertTimer > 0) {
+      interval = setInterval(() => {
+        setRevertTimer((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [revertStep, revertTimer]);
 
   const getMonthYearString = (month, academicYearName) => {
     const parts = (academicYearName || '2025–2026').split(/[–-]/);
@@ -1093,6 +1120,9 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
   const handleRevertPayment = (receipt) => {
     if (!receipt || !receipt.id) return;
     setRevertError('');
+    setRevertStep(1);
+    setRevertOtpCode('');
+    setRevertMaskedEmail('');
     setRevertTarget({
       id: receipt.id,
       type: 'monthly',
@@ -1126,6 +1156,9 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
   const handleRevertAdditionalPayment = (item) => {
     if (!item || !item.id) return;
     setRevertError('');
+    setRevertStep(1);
+    setRevertOtpCode('');
+    setRevertMaskedEmail('');
     setRevertTarget({
       id: item.id,
       type: 'additional',
@@ -1134,19 +1167,67 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
     setRevertConfirmOpen(true);
   };
 
-  const confirmRevert = async () => {
+  const handleSendOtp = async () => {
     if (!revertTarget) return;
+    setRevertSendingOtp(true);
+    setRevertError('');
+    try {
+      const res = await schoolService.requestFeeRevertOtp({
+        payment_id: revertTarget.id,
+        payment_type: revertTarget.type
+      });
+      setRevertMaskedEmail(res?.email_masked || 'registered email');
+      setRevertStep(2);
+      setRevertTimer(30);
+      setRevertOtpCode('');
+    } catch (err) {
+      console.error(err);
+      let errorMsg = 'Failed to send OTP to registered email address.';
+      if (err.data) {
+        if (typeof err.data === 'string') {
+          errorMsg = err.data;
+        } else if (err.data.errors) {
+          const keys = Object.keys(err.data.errors);
+          if (keys.length > 0) errorMsg = err.data.errors[keys[0]];
+        } else {
+          const keys = Object.keys(err.data);
+          if (keys.length > 0) errorMsg = err.data[keys[0]];
+        }
+      } else if (err.message) {
+        errorMsg = err.message;
+      }
+      
+      if (errorMsg.toLowerCase().includes('financial report') || (err.data && err.data.locked)) {
+        setRevertConfirmOpen(false);
+        setRevertTarget(null);
+        setRevertLockedOpen(true);
+        return;
+      }
+
+      setRevertError(errorMsg);
+    } finally {
+      setRevertSendingOtp(false);
+    }
+  };
+
+  const confirmRevert = async () => {
+    if (!revertTarget || !revertOtpCode || revertOtpCode.length < 4) {
+      setRevertError('Please enter a valid 4-digit OTP code.');
+      return;
+    }
     setRevertSubmitting(true);
     setRevertError('');
     try {
       if (revertTarget.type === 'monthly') {
-        await schoolService.revertFeePayment(revertTarget.id);
+        await schoolService.revertFeePayment(revertTarget.id, revertOtpCode);
       } else {
-        await schoolService.revertAdditionalFeePayment(revertTarget.id);
+        await schoolService.revertAdditionalFeePayment(revertTarget.id, revertOtpCode);
       }
       window.dispatchEvent(new Event('fee-payment-updated'));
       setRevertConfirmOpen(false);
       setRevertTarget(null);
+      setRevertStep(1);
+      setRevertOtpCode('');
       await loadDetails();
     } catch (err) {
       console.error(err);
@@ -1156,18 +1237,22 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
           errorMsg = err.data;
         } else if (err.data.errors) {
           const keys = Object.keys(err.data.errors);
-          if (keys.length > 0) {
-            errorMsg = err.data.errors[keys[0]];
-          }
+          if (keys.length > 0) errorMsg = err.data.errors[keys[0]];
         } else {
           const keys = Object.keys(err.data);
-          if (keys.length > 0) {
-            errorMsg = err.data[keys[0]];
-          }
+          if (keys.length > 0) errorMsg = err.data[keys[0]];
         }
-      } else {
-        errorMsg = err.message || 'Failed to revert payment.';
+      } else if (err.message) {
+        errorMsg = err.message;
       }
+
+      if (errorMsg.toLowerCase().includes('financial report') || (err.data && err.data.locked)) {
+        setRevertConfirmOpen(false);
+        setRevertTarget(null);
+        setRevertLockedOpen(true);
+        return;
+      }
+
       setRevertError(errorMsg);
     } finally {
       setRevertSubmitting(false);
@@ -1239,15 +1324,15 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
       if (totalPaid >= totalFee - 0.01 && totalFee > 0) {
         status = 'PAID';
         statusText = 'Paid';
-        statusClass = 'bg-green-500/10 text-green-600 border-green-500/20';
+        statusClass = 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30';
       } else if (totalPaid > 0) {
         status = 'PARTIAL';
         statusText = 'Partially';
-        statusClass = 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20';
+        statusClass = 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/30 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900/30';
       } else {
         status = 'UNPAID';
         statusText = 'Pending';
-        statusClass = 'bg-red-500/10 text-red-600 border-red-500/20';
+        statusClass = 'bg-amber-100 text-amber-800 dark:bg-amber-950/30 dark:text-amber-400 border-amber-200 dark:border-amber-900/30';
       }
 
       return {
@@ -1403,7 +1488,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
           {/* Sub-tab 1: Student & Parents */}
           {activeSubTab === 'profile' && (
             <div className="space-y-6 animate-in fade-in duration-200">
-              <Card className="shadow-xs">
+              <Card className="bg-zinc-50/50 dark:bg-zinc-900/50 border border-border rounded-2xl shadow-2xs">
                 <CardContent className="p-6 space-y-4">
                   <div className="flex items-center gap-2 border-b border-border pb-2.5">
                     <BookOpen className="h-4 w-4 text-primary" />
@@ -1415,7 +1500,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                     <p><span className="text-text-muted block font-medium">Date of Birth</span> <span className="font-semibold text-text-primary text-sm">{student.dob || '-'}</span></p>
                     <p><span className="text-text-muted block font-medium">Aadhaar Number</span> <span className="font-semibold font-mono text-text-primary text-sm">{student.aadhaar_no || '-'}</span></p>
                     <p><span className="text-text-muted block font-medium">Category</span> <span className="font-semibold text-text-primary text-sm">{student.category || '-'}</span></p>
-                    <p><span className="text-text-muted block font-medium">Religion</span> <span className="font-semibold text-text-primary text-sm">{student.religion || '-'}</span></p>
+                    <p><span className="text-text-muted block font-medium">Religion</span> <span className="font-semibold text-text-primary text-sm">{normalizeReligion(student.religion) || '-'}</span></p>
                     <p><span className="text-text-muted block font-medium">Student Mobile</span> <span className="font-semibold font-mono text-text-primary text-sm">{student.student_mobile || '-'}</span></p>
                     <p><span className="text-text-muted block font-medium">Student Email</span> <span className="font-semibold text-text-primary text-sm">{student.student_email || '-'}</span></p>
                     <p><span className="text-text-muted block font-medium">Class Assigned</span> <span className="font-semibold text-text-primary text-sm">{student.class_name || 'Not Assigned'}</span></p>
@@ -1423,7 +1508,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                 </CardContent>
               </Card>
 
-              <Card className="shadow-xs">
+              <Card className="bg-zinc-50/50 dark:bg-zinc-900/50 border border-border rounded-2xl shadow-2xs">
                 <CardContent className="p-6 space-y-4">
                   <div className="flex items-center gap-2 border-b border-border pb-2.5">
                     <Users className="h-4 w-4 text-primary" />
@@ -1437,7 +1522,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                 </CardContent>
               </Card>
 
-              <Card className="shadow-xs">
+              <Card className="bg-zinc-50/50 dark:bg-zinc-900/50 border border-border rounded-2xl shadow-2xs">
                 <CardContent className="p-6 space-y-4">
                   <div className="flex items-center gap-2 border-b border-border pb-2.5">
                     <Home className="h-4 w-4 text-primary" />
@@ -1446,7 +1531,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                     <div className="space-y-1">
                       <p className="font-bold text-text-primary uppercase text-[11px] tracking-wider mb-2">Current Residence Address</p>
-                      <p className="text-text-secondary leading-relaxed bg-zinc-50 dark:bg-zinc-900/50 border border-border p-3 rounded-lg min-h-[70px]">
+                      <p className="text-text-secondary leading-relaxed bg-zinc-50/50 dark:bg-zinc-900/50 border border-border p-3.5 rounded-2xl min-h-[70px]">
                         {student.current_address_line ? (
                           `${student.current_address_line}, ${student.current_city}, ${student.current_state} - ${student.current_pin_code}, ${student.current_country || 'India'}`
                         ) : (
@@ -1456,7 +1541,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                     </div>
                     <div className="space-y-1">
                       <p className="font-bold text-text-primary uppercase text-[11px] tracking-wider mb-2">Permanent Address</p>
-                      <p className="text-text-secondary leading-relaxed bg-zinc-50 dark:bg-zinc-900/50 border border-border p-3 rounded-lg min-h-[70px]">
+                      <p className="text-text-secondary leading-relaxed bg-zinc-50/50 dark:bg-zinc-900/50 border border-border p-3.5 rounded-2xl min-h-[70px]">
                         {student.same_as_current === 1 ? (
                           <span className="text-[11px] font-bold text-teal-600 bg-teal-500/10 px-2 py-0.5 rounded">SAME AS CURRENT ADDRESS</span>
                         ) : student.permanent_address_line ? (
@@ -1471,10 +1556,10 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
               </Card>
 
               {/* Collapsible Documents Card relocation */}
-              <Card className="shadow-xs overflow-hidden border border-border">
+              <Card className="bg-zinc-50/50 dark:bg-zinc-900/50 border border-border rounded-2xl shadow-2xs overflow-hidden">
                 <button 
                   onClick={() => setDocsOpen(prev => !prev)}
-                  className="w-full flex items-center justify-between px-6 py-4 bg-zinc-50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors focus:outline-none"
+                  className="w-full flex items-center justify-between px-6 py-4 bg-zinc-50/50 dark:bg-zinc-900/50 hover:bg-zinc-100/50 dark:hover:bg-zinc-800/50 transition-colors focus:outline-none"
                 >
                   <div className="flex items-center gap-2">
                     <FileText className="h-4 w-4 text-primary" />
@@ -1690,14 +1775,16 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                   })()}
 
                   {/* Switchable Fee Management panel */}
-                  <Card className="shadow-xs">
-                    <CardContent className="p-6 space-y-4">
-                      <div className="flex items-center gap-2 border-b border-border pb-2.5">
+                  <Card className="bg-surface border border-border rounded-2xl shadow-2xs overflow-hidden">
+                    <div className="py-4 px-6 border-b border-border bg-[#FAF6EC] dark:bg-zinc-900/50 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
                         <FileText className="h-4 w-4 text-primary" />
                         <h4 className="text-xs font-bold text-text-primary uppercase tracking-wider">
                           {activeLedgerTab === 'monthly' ? 'Month-wise Fee Card' : 'Additional Fee Card'}
                         </h4>
                       </div>
+                    </div>
+                    <CardContent className="p-6 space-y-4">
 
                       {activeLedgerTab === 'monthly' ? (
                         <Table>
@@ -1712,7 +1799,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                           </TableHeader>
                           <TableBody>
                             {monthWiseList.map(mw => (
-                              <TableRow key={mw.month}>
+                              <TableRow key={mw.month} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/50 transition-colors cursor-pointer">
                                 <TableCell className="font-bold text-text-primary text-xs uppercase tracking-wider">
                                   <div>{mw.month}</div>
                                   {mw.status === 'PARTIAL' && (
@@ -1728,7 +1815,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                                   {mw.receipt?.payment_date ? formatDate(mw.receipt.payment_date) : '—'}
                                 </TableCell>
                                 <TableCell>
-                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase border ${mw.statusClass}`}>
+                                  <span className={`inline-flex items-center justify-center w-[74px] py-0.5 rounded-full text-[11px] font-bold uppercase border ${mw.statusClass}`}>
                                     {mw.statusText}
                                   </span>
                                 </TableCell>
@@ -1816,7 +1903,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                                 const isPartial = clearedAmt > 0 && remAmt > 0.01;
 
                                 return (
-                                  <TableRow key={af.id}>
+                                  <TableRow key={af.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/50 transition-colors cursor-pointer">
                                     <TableCell className="font-bold text-text-primary text-xs uppercase tracking-wider">
                                       <div>{af.fee_name}</div>
                                       {af.description && <div className="text-[11px] text-text-muted normal-case mt-0.5 font-semibold">{af.description}</div>}
@@ -1833,12 +1920,12 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                                       {af.payment_date ? formatDate(af.payment_date) : '—'}
                                     </TableCell>
                                     <TableCell>
-                                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase border ${
+                                      <span className={`inline-flex items-center justify-center w-[74px] py-0.5 rounded-full text-[11px] font-bold uppercase border ${
                                         isPaid
-                                          ? 'bg-green-500/10 text-green-600 border-green-500/20'
+                                          ? 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30'
                                           : isPartial
-                                            ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
-                                            : 'bg-red-500/10 text-red-600 border-red-500/20'
+                                            ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/30 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900/30'
+                                            : 'bg-amber-100 text-amber-800 dark:bg-amber-950/30 dark:text-amber-400 border-amber-200 dark:border-amber-900/30'
                                       }`}>
                                         {isPaid ? 'Paid' : isPartial ? 'Partially' : 'Pending'}
                                       </span>
@@ -2001,8 +2088,10 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
           onClose={() => {
             setRevertConfirmOpen(false);
             setRevertTarget(null);
+            setRevertStep(1);
+            setRevertOtpCode('');
           }}
-          title="Revert Payment?"
+          title={revertStep === 1 ? "Revert Fee Authorization" : "Enter Verification OTP"}
           description=""
           className="max-w-md animate-in fade-in duration-200"
           footer={
@@ -2012,18 +2101,32 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                 onClick={() => {
                   setRevertConfirmOpen(false);
                   setRevertTarget(null);
+                  setRevertStep(1);
+                  setRevertOtpCode('');
                 }}
               >
                 Cancel
               </Button>
-              <Button 
-                variant="destructive"
-                onClick={confirmRevert}
-                disabled={revertSubmitting}
-                className="font-bold bg-red-600 hover:bg-red-700 text-white"
-              >
-                {revertSubmitting ? 'Reverting...' : 'Confirm Revert'}
-              </Button>
+
+              {revertStep === 1 ? (
+                <Button 
+                  variant="primary"
+                  onClick={handleSendOtp}
+                  disabled={revertSendingOtp}
+                  className="font-bold bg-amber-500 hover:bg-amber-600 text-white border-none shadow-sm"
+                >
+                  {revertSendingOtp ? 'Sending OTP...' : 'Send OTP'}
+                </Button>
+              ) : (
+                <Button 
+                  variant="destructive"
+                  onClick={confirmRevert}
+                  disabled={revertSubmitting || revertOtpCode.length < 4}
+                  className="font-bold bg-red-600 hover:bg-red-700 text-white"
+                >
+                  {revertSubmitting ? 'Verifying & Reverting...' : 'Verify & Revert'}
+                </Button>
+              )}
             </div>
           }
         >
@@ -2034,56 +2137,95 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                 <span>{revertError}</span>
               </div>
             )}
-            
-            {revertTarget && revertTarget.type === 'monthly' ? (
+
+            {revertStep === 1 ? (
               <div className="space-y-4">
-                <p className="text-text-secondary leading-relaxed font-semibold">
-                  You are about to revert fee payment for:
-                </p>
-                <div className="space-y-1">
-                  <span className="text-text-muted text-xs uppercase tracking-wider font-bold block">Student:</span>
-                  <span className="font-bold text-text-primary text-base block">{student?.name}</span>
+                <div className="p-4 bg-amber-500/10 border border-amber-500/30 text-amber-900 rounded-2xl text-xs font-medium leading-relaxed shadow-xs">
+                  To revert this fee payment, a 4-digit OTP verification is required for security and transparency. Click <strong>Send OTP</strong> to receive the verification code on the registered school admin email address.
                 </div>
-                
-                <div className="space-y-2">
-                  <span className="text-text-muted text-xs uppercase tracking-wider font-bold block">Months:</span>
-                  <div className="space-y-1 text-sm font-bold text-text-primary">
-                    {getRevertedMonthsList().map(m => (
-                      <div key={m} className="flex items-center gap-2">
-                        <span className="text-text-muted text-lg leading-none">•</span>
-                        <span>{getMonthYearString(m, student?.academic_year_name)}</span>
-                      </div>
-                    ))}
+
+                <div className="space-y-2.5 bg-amber-500/5 p-4 rounded-2xl border border-amber-500/20 shadow-xs">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-amber-800/80 font-medium">Student:</span>
+                    <span className="font-bold text-amber-950">{student?.name}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-amber-800/80 font-medium">Fee Details:</span>
+                    <span className="font-bold text-amber-950">
+                      {revertTarget?.type === 'monthly'
+                        ? `Monthly Fee (${getRevertedMonthsList().join(', ')})`
+                        : revertTarget?.label}
+                    </span>
                   </div>
                 </div>
-
-                <div className="space-y-1">
-                  <span className="text-text-muted text-xs uppercase tracking-wider font-bold block">Total Months:</span>
-                  <span className="font-bold text-text-primary text-base block">{getRevertedMonthsList().length}</span>
-                </div>
-
-                <p className="text-xs text-text-muted leading-relaxed font-medium pt-2 border-t border-border">
-                  This action will mark these months as unpaid and update all related financial records.
-                </p>
               </div>
             ) : (
               <div className="space-y-4">
-                <p className="text-text-secondary leading-relaxed font-semibold">
-                  You are about to revert the payment for:
+                <p className="text-text-secondary text-xs leading-relaxed">
+                  A 4-digit security OTP code has been sent to <strong className="text-text-primary">{revertMaskedEmail}</strong>. Please enter it below to authorize this fee reversal:
                 </p>
-                <div className="space-y-1">
-                  <span className="text-text-muted text-xs uppercase tracking-wider font-bold block">Student:</span>
-                  <span className="font-bold text-text-primary text-base block">{student?.name}</span>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-text-secondary uppercase tracking-wider block text-center">
+                    4-Digit Verification Code
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={4}
+                    value={revertOtpCode}
+                    onChange={(e) => setRevertOtpCode(e.target.value.replace(/\D/g, ''))}
+                    placeholder="• • • •"
+                    className="w-full text-center text-3xl font-extrabold tracking-[0.5em] py-3.5 px-4 rounded-xl border border-border bg-bg-surface focus:outline-none focus:ring-2 focus:ring-primary text-text-primary"
+                    autoFocus
+                  />
                 </div>
-                <div className="space-y-1">
-                  <span className="text-text-muted text-xs uppercase tracking-wider font-bold block">Fee Item:</span>
-                  <span className="font-bold text-text-primary text-sm block">{revertTarget?.label}</span>
+
+                <div className="flex justify-between items-center pt-2 text-xs">
+                  <span className="text-text-muted">Didn't receive code?</span>
+                  {revertTimer > 0 ? (
+                    <span className="text-text-muted font-medium">Resend OTP in <strong>{revertTimer}s</strong></span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleSendOtp}
+                      disabled={revertSendingOtp}
+                      className="text-primary font-bold hover:underline disabled:opacity-50"
+                    >
+                      {revertSendingOtp ? 'Sending...' : 'Resend OTP'}
+                    </button>
+                  )}
                 </div>
-                <p className="text-xs text-text-muted leading-relaxed font-medium pt-2 border-t border-border">
-                  This action will mark this item as unpaid and update all related financial records.
-                </p>
               </div>
             )}
+          </div>
+        </Dialog>
+      )}
+
+      {/* Revert Locked Alert Modal */}
+      {revertLockedOpen && (
+        <Dialog
+          isOpen={revertLockedOpen}
+          onClose={() => setRevertLockedOpen(false)}
+          title="Fee Reversal Locked"
+          description=""
+          className="max-w-md animate-in fade-in duration-200"
+          footer={
+            <div className="flex justify-end w-full">
+              <Button 
+                variant="primary"
+                onClick={() => setRevertLockedOpen(false)}
+                className="w-full font-bold bg-amber-500 hover:bg-amber-600 text-white border-none shadow-sm py-2.5 rounded-xl text-sm"
+              >
+                Understood
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-4 text-sm mt-2">
+            <div className="p-4 bg-amber-500/10 border border-amber-500/30 text-amber-900 rounded-2xl text-xs font-semibold leading-relaxed shadow-xs flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+              <span>This action can not be done, This is already included in financial report</span>
+            </div>
           </div>
         </Dialog>
       )}

@@ -13,8 +13,9 @@ class ExamService {
         if (studentId != null) 'X-Student-Id': studentId.toString(),
       };
 
-  Future<List<dynamic>> getExamsList(String userRole, int? studentId) async {
-    final path = userRole == 'TEACHER' ? '/api/teacher/exams-new' : '/api/student/exams-new';
+  Future<List<dynamic>> getExamsList(String userRole, int? studentId, {int? classId}) async {
+    final query = (classId != null && classId > 0) ? '?class_id=$classId' : '';
+    final path = userRole == 'TEACHER' ? '/api/teacher/exams-new$query' : '/api/student/exams-new';
     final uri = Uri.parse('$baseUrl$path');
     final response = await http.get(uri, headers: _headers(studentId));
 
@@ -25,9 +26,21 @@ class ExamService {
     }
   }
 
-  Future<Map<String, dynamic>> getExamDetails(int examId, String userRole, int? studentId) async {
+  Future<List<dynamic>> getTeacherAssignedClasses() async {
+    final uri = Uri.parse('$baseUrl/api/teacher/classes?only_assigned=true');
+    final response = await http.get(uri, headers: _headers());
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body)['data'] ?? [];
+    } else {
+      throw Exception(json.decode(response.body)['message'] ?? 'Failed to load assigned classes.');
+    }
+  }
+
+  Future<Map<String, dynamic>> getExamDetails(int examId, String userRole, int? studentId, {int? classId}) async {
+    final query = (classId != null && classId > 0) ? '?class_id=$classId' : '';
     final path = userRole == 'TEACHER' 
-        ? '/api/teacher/exams-new/$examId/details' 
+        ? '/api/teacher/exams-new/$examId/details$query' 
         : '/api/student/exams-new/$examId/details';
     final uri = Uri.parse('$baseUrl$path');
     final response = await http.get(uri, headers: _headers(studentId));
@@ -39,8 +52,9 @@ class ExamService {
     }
   }
 
-  Future<Map<String, dynamic>> getMarksSheet(int examId, int subjectId) async {
-    final uri = Uri.parse('$baseUrl/api/teacher/exams-new/$examId/marks-sheet?subject_id=$subjectId');
+  Future<Map<String, dynamic>> getMarksSheet(int examId, int subjectId, {int? classId}) async {
+    final query = (classId != null && classId > 0) ? '&class_id=$classId' : '';
+    final uri = Uri.parse('$baseUrl/api/teacher/exams-new/$examId/marks-sheet?subject_id=$subjectId$query');
     final response = await http.get(uri, headers: _headers());
 
     if (response.statusCode == 200) {

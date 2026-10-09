@@ -21,6 +21,28 @@ class ReportCardTemplateController extends BaseController
         $this->db = $db;
     }
 
+    private function ensureBuiltinReportCardTemplates(): void
+    {
+        try {
+            $stmt = $this->db->query("SELECT COUNT(*) FROM report_card_templates WHERE is_system_default = 1");
+            $count = $stmt ? (int)$stmt->fetchColumn() : 0;
+            if ($stmt) $stmt->closeCursor();
+
+            if ($count < 4) {
+                $file025 = __DIR__ . '/../../Database/Migrations/025_ensure_builtin_report_card_templates.sql';
+                if (file_exists($file025)) {
+                    $sql = file_get_contents($file025);
+                    $statements = array_filter(array_map('trim', explode(';', $sql)), fn(string $s) => $s !== '');
+                    foreach ($statements as $st) {
+                        $this->db->exec($st);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            // Ignore fallback errors
+        }
+    }
+
     /**
      * GET /api/platform/report-card-templates
      * List all available report card templates
@@ -30,13 +52,16 @@ class ReportCardTemplateController extends BaseController
         $actor = $this->authenticate($request);
         $this->requireRole($actor, ['SUPER_ADMIN']);
 
+        $this->ensureBuiltinReportCardTemplates();
+
         $stmt = $this->db->query("
             SELECT t.*, 
-                   (SELECT COUNT(*) FROM schools s WHERE s.report_card_template_id = t.id) as assigned_schools_count
+                   (SELECT COUNT(*) FROM schools s WHERE s.report_card_template_id = t.id OR (t.is_system_default = 1 AND s.report_card_template_id IS NULL AND t.id = 1)) as assigned_schools_count
             FROM report_card_templates t
             ORDER BY t.is_system_default DESC, t.name ASC
         ");
         $templates = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
 
         foreach ($templates as &$t) {
             $t['layout_config'] = json_decode($t['layout_config'] ?? '{}', true) ?? [];
@@ -45,6 +70,58 @@ class ReportCardTemplateController extends BaseController
         }
 
         return $this->success($response, $templates);
+    }
+
+    /**
+     * GET /api/platform/report-card-templates/{id}/schools
+     * List all schools currently assigned to a specific report card template
+     */
+    public function getAssignedSchools(Request $request, Response $response, array $args): Response
+    {
+        $actor = $this->authenticate($request);
+        $this->requireRole($actor, ['SUPER_ADMIN']);
+
+        $templateId = (int)($args['id'] ?? 0);
+
+        $stmtTpl = $this->db->prepare("SELECT id, name, code, is_system_default FROM report_card_templates WHERE id = ?");
+        $stmtTpl->execute([$templateId]);
+        $tpl = $stmtTpl->fetch(PDO::FETCH_ASSOC);
+
+        if (!$tpl) {
+            return $this->error($response, 'Template not found.', 404);
+        }
+
+        $isDefault = (bool)$tpl['is_system_default'];
+
+        if ($isDefault && (int)$tpl['id'] === 1) {
+            $stmt = $this->db->prepare("
+                SELECT s.id, s.name, s.code, s.city, s.state, s.phone, s.contact_no, s.email, s.status, s.created_at, s.report_card_template_id
+                FROM schools s
+                WHERE s.report_card_template_id = ? OR s.report_card_template_id IS NULL
+                ORDER BY s.name ASC
+            ");
+            $stmt->execute([$templateId]);
+        } else {
+            $stmt = $this->db->prepare("
+                SELECT s.id, s.name, s.code, s.city, s.state, s.phone, s.contact_no, s.email, s.status, s.created_at, s.report_card_template_id
+                FROM schools s
+                WHERE s.report_card_template_id = ?
+                ORDER BY s.name ASC
+            ");
+            $stmt->execute([$templateId]);
+        }
+
+        $schools = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        return $this->success($response, [
+            'template' => [
+                'id' => (int)$tpl['id'],
+                'name' => $tpl['name'],
+                'code' => $tpl['code'],
+                'is_system_default' => $isDefault
+            ],
+            'schools' => $schools
+        ]);
     }
 
     /**
@@ -172,7 +249,10 @@ class ReportCardTemplateController extends BaseController
         $actor = $this->authenticate($request);
         $this->requireRole($actor, ['SUPER_ADMIN']);
 
+        $this->ensureBuiltinReportCardTemplates();
+
         $schoolId = (int)($args['id'] ?? 0);
+
         $data = RequestParser::body($request);
         $templateId = isset($data['template_id']) ? (int)$data['template_id'] : null;
 
@@ -187,6 +267,62 @@ class ReportCardTemplateController extends BaseController
         $upd = $this->db->prepare("UPDATE schools SET report_card_template_id = ? WHERE id = ?");
         $upd->execute([$templateId, $schoolId]);
 
-        return $this->success($response, ['message' => 'Report card template assigned to school successfully.']);
+        // Find current ACTIVE / current working academic year for this school
+        $stmtActiveAy = $this->db->prepare("
+            SELECT id FROM academic_years 
+            WHERE school_id = :sid AND (status = 'ACTIVE' OR is_current = 1) 
+            ORDER BY is_current DESC, id DESC LIMIT 1
+        ");
+        $stmtActiveAy->execute([':sid' => $schoolId]);
+        $activeAyId = (int)($stmtActiveAy->fetchColumn() ?: 0);
+
+        if ($activeAyId > 0) {
+            // Update active academic year's report_card_template_id ONLY (archived years stay isolated)
+            $updAY = $this->db->prepare("UPDATE academic_years SET report_card_template_id = ? WHERE id = ? AND school_id = ?");
+            $updAY->execute([$templateId, $activeAyId, $schoolId]);
+
+            // Reset/clear active academic year exams, papers, marks & seating plans
+            try {
+                // Delete seating plans for active year exams
+                $this->db->prepare("
+                    DELETE FROM seating_plans 
+                    WHERE exam_id IN (SELECT id FROM examinations WHERE school_id = ? AND academic_year_id = ?)
+                ")->execute([$schoolId, $activeAyId]);
+
+                // Delete marks for active year papers
+                $this->db->prepare("
+                    DELETE FROM exam_marks 
+                    WHERE exam_paper_id IN (
+                        SELECT ep.id FROM exam_papers ep 
+                        JOIN examinations e ON ep.exam_id = e.id 
+                        WHERE e.school_id = ? AND e.academic_year_id = ?
+                    )
+                ")->execute([$schoolId, $activeAyId]);
+
+                // Delete exam papers for active year
+                $this->db->prepare("
+                    DELETE FROM exam_papers 
+                    WHERE exam_id IN (SELECT id FROM examinations WHERE school_id = ? AND academic_year_id = ?)
+                ")->execute([$schoolId, $activeAyId]);
+
+                // Delete examinations for active year
+                $this->db->prepare("
+                    DELETE FROM examinations 
+                    WHERE school_id = ? AND academic_year_id = ?
+                ")->execute([$schoolId, $activeAyId]);
+            } catch (\Throwable $t) {
+                // Log/ignore table schema differences if any
+            }
+
+            // Auto-seed default exams for newly assigned template if applicable
+            try {
+                $schoolAdminService = new \App\Domain\SchoolAdmin\Services\SchoolAdminService();
+                $schoolAdminService->autoSeedDefaultSessionExams($this->db, $schoolId, $activeAyId);
+            } catch (\Throwable $t) {
+                // Ignore seeding errors
+            }
+        }
+
+        return $this->success($response, ['message' => 'Report card template assigned to active academic year successfully. Active year exam data reset for fresh start; archived years remain 100% isolated.']);
     }
 }

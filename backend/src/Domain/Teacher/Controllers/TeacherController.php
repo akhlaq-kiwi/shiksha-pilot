@@ -56,7 +56,8 @@ class TeacherController extends BaseController
         $this->requireRole($user, 'TEACHER');
 
         $params = $request->getQueryParams();
-        $onlyAssigned = isset($params['only_assigned']) && $params['only_assigned'] === '1';
+        $rawOnlyAssigned = strtolower(trim((string)($params['only_assigned'] ?? '')));
+        $onlyAssigned = in_array($rawOnlyAssigned, ['1', 'true', 'yes'], true);
 
         $data = $this->service->getMyClasses((int) $user['id'], (int) $user['school_id'], $onlyAssigned);
 
@@ -85,7 +86,10 @@ class TeacherController extends BaseController
         $user = $this->authenticate($request);
         $this->requireRole($user, 'TEACHER');
 
-        $data = $this->service->getOutstandingStudents($user);
+        $params = $request->getQueryParams();
+        $classId = isset($params['class_id']) ? (int)$params['class_id'] : null;
+
+        $data = $this->service->getOutstandingStudents($user, $classId);
 
         return $this->success($response, $data);
     }
@@ -222,7 +226,9 @@ class TeacherController extends BaseController
     {
         $user = $this->authenticate($request);
         $this->requireRole($user, 'TEACHER');
-        $data = $this->service->getExamsList($user);
+        $queryParams = $request->getQueryParams();
+        $classId = isset($queryParams['class_id']) ? (int)$queryParams['class_id'] : null;
+        $data = $this->service->getExamsList($user, $classId);
         return $this->success($response, $data);
     }
 
@@ -231,7 +237,9 @@ class TeacherController extends BaseController
         $user = $this->authenticate($request);
         $this->requireRole($user, 'TEACHER');
         $examId = (int)$args['id'];
-        $data = $this->service->getExamDetails($user, $examId);
+        $queryParams = $request->getQueryParams();
+        $classId = isset($queryParams['class_id']) ? (int)$queryParams['class_id'] : null;
+        $data = $this->service->getExamDetails($user, $examId, $classId);
         return $this->success($response, $data);
     }
 
@@ -242,7 +250,8 @@ class TeacherController extends BaseController
         $examId = (int)$args['id'];
         $queryParams = $request->getQueryParams();
         $subjectId = (int)($queryParams['subject_id'] ?? 0);
-        $data = $this->service->getMarksSheet($user, $examId, $subjectId);
+        $classId = isset($queryParams['class_id']) ? (int)$queryParams['class_id'] : null;
+        $data = $this->service->getMarksSheet($user, $examId, $subjectId, $classId);
         return $this->success($response, $data);
     }
 

@@ -38,8 +38,8 @@ const NavButton = ({ item, isActive, onSelect }) => {
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
         item.isSubmenu ? 'py-2 pl-9 pr-3 text-body-sm' : 'px-3 py-2.5 text-body-md',
         isActive
-          ? 'bg-primary text-primary-fg font-semibold shadow-sm'
-          : 'font-medium text-text-secondary hover:bg-secondary hover:text-text-primary'
+          ? 'bg-primary text-primary-fg font-bold shadow-sm'
+          : 'font-bold text-text-primary hover:bg-secondary'
       )}
     >
       {Icon && (
@@ -48,7 +48,7 @@ const NavButton = ({ item, isActive, onSelect }) => {
           aria-hidden="true"
         />
       )}
-      <span className="truncate">{item.label}</span>
+      <span className="truncate uppercase tracking-wider font-semibold">{item.label}</span>
       {item.badge != null && item.badge !== 0 && (
         <span
           className={twMerge(
@@ -138,7 +138,7 @@ const AppSidebar = ({
   return (
     <>
       {/* ---- Mobile: trigger labelled with where you currently are ---- */}
-      <div className="sticky top-14 z-30 flex items-center gap-3 border-b border-border bg-surface px-4 py-2 md:hidden no-print">
+      <div className="sticky top-14 z-30 flex items-center gap-3 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 px-4 py-2 md:hidden no-print">
         <button
           ref={triggerRef}
           type="button"
@@ -165,7 +165,7 @@ const AppSidebar = ({
               role="dialog"
               aria-modal="true"
               aria-label={title}
-              className="absolute inset-y-0 left-0 flex w-[280px] max-w-[85vw] flex-col border-r border-border bg-sidebar p-4 shadow-lg"
+              className="absolute inset-y-0 left-0 flex w-[280px] max-w-[85vw] flex-col border-r border-border bg-zinc-50/50 dark:bg-zinc-900/50 p-4 shadow-lg"
             >
               <div className="mb-4 flex items-center justify-between">
                 <p className="text-display-xs text-text-primary">{title}</p>
@@ -194,7 +194,7 @@ const AppSidebar = ({
       {/* ---- Desktop ---- */}
       <aside
         className={twMerge(
-          'hidden w-[240px] flex-shrink-0 flex-col border-r border-border bg-sidebar px-3 py-6 no-print',
+          'hidden w-[240px] flex-shrink-0 flex-col border-r border-border bg-zinc-50/50 dark:bg-zinc-900/50 px-3 py-6 no-print',
           'md:sticky md:top-14 md:flex md:h-[calc(100vh-56px)]',
           className
         )}

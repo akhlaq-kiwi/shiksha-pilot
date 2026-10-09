@@ -32,6 +32,7 @@ import 'package:school_hub/screens/user_profile_screen.dart';
 import 'package:school_hub/widgets/change_password_dialog.dart';
 import 'package:school_hub/screens/teacher_qr_scanner_screen.dart';
 import 'package:school_hub/screens/teacher_attendance_history_screen.dart';
+import 'package:school_hub/screens/question_paper_designer_screen.dart';
 
 class LauncherFeature {
   final String name;
@@ -196,6 +197,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       allowedRoles: ['PARENT', 'STUDENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL'],
       isAvailable: true,
     ),
+    LauncherFeature(
+      name: 'Paper Designer',
+      icon: Icons.design_services_rounded,
+      color: Colors.deepOrange,
+      allowedRoles: ['TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL'],
+      isAvailable: true,
+    ),
   ];
 
   @override
@@ -234,32 +242,33 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('base_url', widget.leaveService.baseUrl);
     await prefs.setString('user_role', widget.userRole);
+
+    final roleUpper = widget.userRole.toUpperCase();
+    final savedId = prefs.getInt('selected_student_id');
+
     setState(() {
       _userName = prefs.getString('user_name') ?? 'User';
       _schoolName = (prefs.getString('school_name') ?? 'Shiksha Pilot Academy').toUpperCase();
       _userPhone = prefs.getString('user_phone') ?? '';
       _userPhoto = prefs.getString('user_photo') ?? '';
+
+      if ((roleUpper == 'PARENT' || roleUpper == 'STUDENT') && savedId != null) {
+        _activeStudentId = savedId;
+      }
       
-      final role = widget.userRole.toUpperCase();
-      if (role == 'PARENT') {
+      if (roleUpper == 'PARENT') {
         _userRoleDisplay = 'Parent Profile';
-      } else if (role == 'TEACHER') {
+      } else if (roleUpper == 'TEACHER') {
         _userRoleDisplay = 'Teacher Profile';
-      } else if (role == 'SCHOOL_ADMIN' || role == 'PRINCIPAL') {
+      } else if (roleUpper == 'SCHOOL_ADMIN' || roleUpper == 'PRINCIPAL') {
         _userRoleDisplay = 'Principal Profile';
       } else {
-        _userRoleDisplay = role;
+        _userRoleDisplay = roleUpper;
       }
     });
 
-    final roleUpper = widget.userRole.toUpperCase();
     if (roleUpper == 'PARENT' || roleUpper == 'STUDENT') {
-      final savedId = prefs.getInt('selected_student_id');
-      if (savedId != null) {
-        setState(() {
-          _activeStudentId = savedId;
-        });
-      }
+      _resolveActiveStudentName();
     }
 
     // Refresh profile details dynamically in background to sync profile pictures immediately!
@@ -331,9 +340,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     Map<String, dynamic>? active;
     if (_activeStudentId != null) {
       for (final child in _children) {
-        final cId = child['id'] is int ? child['id'] : int.parse(child['id'].toString());
+        final cId = child['id'] is int ? child['id'] as int : int.parse(child['id'].toString());
         if (cId == _activeStudentId) {
-          active = child as Map<String, dynamic>;
+          active = Map<String, dynamic>.from(child);
           break;
         }
       }
@@ -341,20 +350,24 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     active ??= Map<String, dynamic>.from(_children.first);
     
     final resolvedId = active['id'] is int ? active['id'] as int : int.parse(active['id'].toString());
-    if (_activeStudentId != resolvedId) {
-      _activeStudentId = resolvedId;
-      SharedPreferences.getInstance().then((prefs) {
-        prefs.setInt('selected_student_id', resolvedId);
-      });
-    }
+    _activeStudentId = resolvedId;
+
+    final resolvedName = active['name']?.toString() ?? '';
+    final resolvedPhoto = active['photo_path']?.toString() ?? '';
 
     setState(() {
-      _activeStudentName = active!['name'] ?? '';
-      _activeStudentClass = active!['class_name'] ?? '';
+      _activeStudentName = resolvedName;
+      _activeStudentClass = active!['class_name']?.toString() ?? '';
+      _userName = resolvedName;
+      if (resolvedPhoto.isNotEmpty) {
+        _userPhoto = resolvedPhoto;
+      }
     });
+
     SharedPreferences.getInstance().then((prefs) {
-      prefs.setString('user_name', active!['name'] ?? '');
-      prefs.setString('user_photo', active!['photo_path']?.toString() ?? '');
+      prefs.setInt('selected_student_id', resolvedId);
+      prefs.setString('user_name', resolvedName);
+      prefs.setString('user_photo', resolvedPhoto);
     });
   }
 
@@ -870,6 +883,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             builder: (context) => OutstandingScreen(
               baseUrl: widget.leaveService.baseUrl,
               token: token,
+            ),
+          ),
+        );
+      } else if (feature.name == 'Paper Designer' || feature.name == 'Question Paper Designer') {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => QuestionPaperDesignerScreen(
+              leaveService: widget.leaveService,
             ),
           ),
         );

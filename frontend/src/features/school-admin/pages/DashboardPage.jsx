@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Users, UserCog, Banknote, FileText, UserPlus, ClipboardCheck,
-  CreditCard, BookMarked, PieChart
+  CreditCard, BookMarked, PieChart, ChevronDown
 } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { schoolService } from '../../../common/services/schoolService';
@@ -15,6 +15,74 @@ import { SkeletonStatGrid, SkeletonChart } from '../../../common/ui/skeleton';
 import { StatCard } from '../../../common/components/StatCard';
 import { formatCurrency } from '../../../common/utils/format';
 import { OnboardingChecklist } from '../../../common/components/OnboardingChecklist';
+import { getClassIndex, getShortClassName } from '../../../common/constants/predefinedClasses';
+
+const CustomSelect = ({
+  value,
+  onChange,
+  options = [],
+  placeholder = "Select...",
+  disabled = false,
+  className = "",
+  buttonClassName = "",
+  dropdownClassName = ""
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  const selectedOption = options.find(o => String(o.value) === String(value));
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={containerRef} className={`relative ${isOpen ? 'z-50' : 'z-10'} ${className}`}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={`flex items-center justify-between gap-2.5 rounded-xl border border-border bg-surface px-3.5 py-1.5 text-xs font-semibold text-text-primary shadow-2xs outline-none focus:outline-none focus:ring-0 focus-visible:outline-none active:outline-none select-none min-w-[140px] transition-colors ${
+          disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-border-strong'
+        } ${buttonClassName}`}
+      >
+        <span className="truncate">
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <ChevronDown className={`h-4 w-4 text-text-muted transition-transform duration-200 flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && !disabled && (
+        <div className={`absolute right-0 top-full mt-1.5 min-w-[160px] w-full rounded-2xl border border-border bg-surface shadow-2xl z-50 overflow-hidden animate-in fade-in duration-150 ${dropdownClassName}`}>
+          <div className="max-h-60 overflow-y-auto p-1.5 space-y-0.5 scrollbar-thin">
+            {options.map((opt) => {
+              const isSelected = String(opt.value) === String(value);
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(String(opt.value));
+                    setIsOpen(false);
+                  }}
+                  className={`w-full text-left px-3.5 py-2 rounded-xl text-xs font-semibold outline-none focus:outline-none select-none transition-colors hover:bg-primary/10 ${isSelected ? 'bg-primary/10 text-primary font-bold' : 'text-text-primary'}`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default function DashboardPage({ onNavigate }) {
   const { currentYear } = useAcademicYear();
@@ -76,9 +144,19 @@ export default function DashboardPage({ onNavigate }) {
         fee_collection_chart: [],
         salary_disbursement_chart: []
       });
-      setClasses(classesList || []);
-      if (classesList && classesList.length > 0 && !selectedClassId) {
-        setSelectedClassId(String(classesList[0].id));
+      const rawClasses = classesList || [];
+      const uniqueClassesMap = new Map();
+      rawClasses.forEach(c => {
+        const shortName = getShortClassName(c.name);
+        const key = `${shortName}_${c.section || ''}`;
+        if (!uniqueClassesMap.has(key)) {
+          uniqueClassesMap.set(key, c);
+        }
+      });
+      const sortedClassesList = Array.from(uniqueClassesMap.values()).sort((a, b) => getClassIndex(a.name) - getClassIndex(b.name));
+      setClasses(sortedClassesList);
+      if (sortedClassesList.length > 0 && !selectedClassId) {
+        setSelectedClassId(String(sortedClassesList[0].id));
       }
       setTimetableSettings(settings || null);
       setFeeStructures(feeStructData || []);
@@ -266,11 +344,10 @@ export default function DashboardPage({ onNavigate }) {
 
   if (loading) {
     return (
-      <div className="space-y-8">
-        <SkeletonStatGrid count={4} />
-        <div className="grid grid-cols-1 gap-6">
-          <SkeletonChart />
-          <SkeletonChart />
+      <div className="flex items-center justify-center min-h-[400px] w-full">
+        <div className="flex flex-col items-center gap-3">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <p className="text-xs font-bold text-text-primary uppercase tracking-wider">LOADING DASHBOARD...</p>
         </div>
       </div>
     );
@@ -318,13 +395,14 @@ export default function DashboardPage({ onNavigate }) {
           period comparison, and a fabricated trend arrow would be worse than
           none (see phase-0 principle: never invent data the source can't back).
         */}
-        <StatCard label="Total students" value={totalStudents} icon={Users} />
-        <StatCard label="Total teachers" value={totalStaff} icon={UserCog} />
+        <StatCard label="Total students" value={totalStudents} icon={Users} className="bg-zinc-50/50 dark:bg-zinc-900/50" />
+        <StatCard label="Total teachers" value={totalStaff} icon={UserCog} className="bg-zinc-50/50 dark:bg-zinc-900/50" />
         <StatCard
           label="Fee collected"
           value={formatCurrency(totalFeeCollected)}
           icon={Banknote}
           color="bg-chart-2/10 text-chart-2"
+          className="bg-zinc-50/50 dark:bg-zinc-900/50"
           onClick={onNavigate ? () => onNavigate('collection-history') : undefined}
         />
         <StatCard
@@ -332,6 +410,7 @@ export default function DashboardPage({ onNavigate }) {
           value={formatCurrency(pendingFees)}
           icon={CreditCard}
           color="bg-warning-50 text-warning-600"
+          className="bg-zinc-50/50 dark:bg-zinc-900/50"
         />
       </div>
 
@@ -339,10 +418,7 @@ export default function DashboardPage({ onNavigate }) {
       <div className="grid grid-cols-1 gap-6">
         {/* Monthly Fee Collection */}
         <ChartCard
-          title="Monthly fee collection"
-          subtitle={`Collection per month for academic year ${currentYear?.name || ''}`}
-          icon={Banknote}
-          iconTone="text-chart-2"
+          title="MONTHLY FEE COLLECTION"
           loading={loading}
           isEmpty={!FEE_DATA.some(d => (d.amount || 0) > 0)}
           emptyMessage="No fee payments recorded for this academic year yet."
@@ -352,17 +428,14 @@ export default function DashboardPage({ onNavigate }) {
 
         {/* Salary Disbursement */}
         <ChartCard
-          title="Salary disbursement"
-          subtitle="Monthly staff salary disbursements"
-          icon={CreditCard}
-          iconTone="text-chart-6"
+          title="SALARY DISBURSEMENT"
           loading={loading}
           isEmpty={!SALARY_DATA.some(d => (d.amount || 0) > 0)}
           emptyMessage="No salary disbursements recorded for this academic year yet."
         >
           <LineChart
             data={SALARY_DATA}
-            series={6}
+            series={2}
             formatValue={formatCurrency}
             onPointClick={(item) => onNavigate('salary-disbursement?month=' + encodeURIComponent(item.label))}
           />
@@ -370,111 +443,110 @@ export default function DashboardPage({ onNavigate }) {
       </div>
 
         {/* Today's Timetable Panel */}
-        <div className="bg-surface border border-border rounded-2xl p-6 shadow-sm space-y-6">
-          <div className="flex items-center justify-between border-b border-border pb-4">
+        <div className="bg-surface border border-border rounded-2xl shadow-sm relative z-20">
+          <div className="px-6 py-2.5 min-h-[56px] border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex items-center justify-between rounded-t-2xl">
             <div>
-              <h3 className="text-sm font-bold text-text-primary">Today&apos;s Timetable</h3>
+              <h3 className="text-sm font-bold text-text-primary">TODAY&apos;S TIMETABLE</h3>
             </div>
             {classes.length > 0 && (
               <div className="flex items-center gap-3">
                 <span className="text-xs font-bold text-text-secondary">Class:</span>
-                <select
+                <CustomSelect
                   value={selectedClassId}
-                  onChange={e => setSelectedClassId(e.target.value)}
-                  className="h-9 px-3 rounded-xl border border-border bg-surface text-xs font-semibold focus:outline-none shadow-2xs cursor-pointer min-w-[140px]"
-                >
-                  {classes.map(cls => (
-                    <option key={cls.id} value={cls.id}>
-                      {cls.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setSelectedClassId}
+                  options={classes.map(cls => ({
+                    value: cls.id,
+                    label: `${getShortClassName(cls.name)}${cls.section ? ` - ${cls.section}` : ''}`
+                  }))}
+                />
               </div>
             )}
           </div>
 
-          {classes.length === 0 ? (
-            <div className="py-16 text-center border border-dashed border-border/80 rounded-2xl bg-zinc-50/50 dark:bg-zinc-950/20 px-6">
-              <p className="text-sm font-bold text-text-primary">No classes available.</p>
-              <p className="text-xs text-text-secondary mt-1">Please create a class to configure and view timetables.</p>
-            </div>
-          ) : timetableLoading ? (
-            <div className="flex items-center justify-center py-12 text-xs text-text-muted font-semibold gap-2">
-              <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-              <span>Loading today&apos;s timetable...</span>
-            </div>
-          ) : timetableError ? (
-            <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl text-xs font-semibold text-center">
-              {timetableError}
-            </div>
-          ) : todayTimetable.length === 0 ? (
-            <div className="py-16 text-center border border-dashed border-border/80 rounded-2xl bg-zinc-50/50 dark:bg-zinc-950/20 px-6">
-              <p className="text-sm font-bold text-text-primary">No timetable has been published for today.</p>
-              <p className="text-xs text-text-secondary mt-1">Please publish today&apos;s timetable to view scheduled periods.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              {(() => {
-                const sortedPeriods = [...todayTimetable].sort((a, b) => a.period_number - b.period_number);
-                const intervalAfter = timetableSettings ? parseInt(timetableSettings.interval_after_period, 10) : null;
-                const intervalDuration = timetableSettings ? parseInt(timetableSettings.interval_duration, 10) : 0;
-                
-                return sortedPeriods.reduce((acc, p, idx) => {
-                  const timingStr = getPeriodTimingStr(p.period_number);
-                  const teacherName = p.is_backup ? p.backup_teacher_name : p.teacher_name;
+          <div className="p-6 space-y-6">
+            {classes.length === 0 ? (
+              <div className="py-16 text-center border border-dashed border-border/80 rounded-2xl bg-surface-sunken px-6">
+                <p className="text-sm font-bold text-text-primary">No classes available.</p>
+                <p className="text-xs text-text-secondary mt-1">Please create a class to configure and view timetables.</p>
+              </div>
+            ) : timetableLoading ? (
+              <div className="flex items-center justify-center py-12 text-xs text-text-muted font-semibold gap-2">
+                <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                <span>Loading today&apos;s timetable...</span>
+              </div>
+            ) : timetableError ? (
+              <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl text-xs font-semibold text-center">
+                {timetableError}
+              </div>
+            ) : todayTimetable.length === 0 ? (
+              <div className="py-16 text-center border border-dashed border-border/80 rounded-2xl bg-surface-sunken px-6">
+                <p className="text-sm font-bold text-text-primary">No timetable has been published for today.</p>
+                <p className="text-xs text-text-secondary mt-1">Please publish today&apos;s timetable to view scheduled periods.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {(() => {
+                  const sortedPeriods = [...todayTimetable].sort((a, b) => a.period_number - b.period_number);
+                  const intervalAfter = timetableSettings ? parseInt(timetableSettings.interval_after_period, 10) : null;
+                  const intervalDuration = timetableSettings ? parseInt(timetableSettings.interval_duration, 10) : 0;
                   
-                  // Add normal period card
-                  acc.push(
-                    <div 
-                      key={`period-${p.id}`} 
-                      className="flex flex-col justify-between p-4 bg-zinc-50 dark:bg-zinc-900/30 border border-border/60 rounded-xl space-y-2.5 shadow-2xs hover:border-primary/40 transition-colors"
-                    >
-                      <div className="flex items-center justify-between border-b border-border/50 pb-2">
-                        <span className="text-[11px] font-bold text-primary uppercase tracking-wider">Period {p.period_number}</span>
-                        <span className="text-[11px] font-bold text-text-primary font-mono whitespace-nowrap">
-                          {timingStr}
-                        </span>
-                      </div>
-                      <div className="space-y-1">
-                        <h4 className="text-sm font-bold text-text-primary truncate">{p.subject_name}</h4>
-                        <p className="text-xs text-text-secondary font-semibold truncate flex items-center gap-1.5">
-                          {teacherName}
-                          {p.is_backup && (
-                            <span className="text-[11px] font-bold text-amber-600 dark:text-amber-500 uppercase tracking-wider bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded-full select-none">
-                              Backup
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                  );
-
-                  // If interval exists after this period
-                  if (intervalAfter && p.period_number === intervalAfter && intervalDuration > 0) {
-                    const intervalTimeStr = getIntervalTimingStr();
+                  return sortedPeriods.reduce((acc, p, idx) => {
+                    const timingStr = getPeriodTimingStr(p.period_number);
+                    const teacherName = p.is_backup ? p.backup_teacher_name : p.teacher_name;
+                    
+                    // Add normal period card
                     acc.push(
                       <div 
-                        key="interval-break" 
-                        className="flex flex-col justify-between p-4 bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-2.5 shadow-2xs"
+                        key={`period-${p.id}`} 
+                        className="flex flex-col justify-between p-4 bg-surface-sunken border border-border-strong rounded-xl space-y-2.5 shadow-2xs hover:border-primary/40 transition-colors"
                       >
-                        <div className="flex items-center justify-between border-b border-amber-500/20 pb-2">
-                          <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Interval Break</span>
-                          <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 font-mono whitespace-nowrap">
-                            {intervalTimeStr}
+                        <div className="flex items-center justify-between border-b border-border/50 pb-2">
+                          <span className="text-[11px] font-bold text-primary uppercase tracking-wider">Period {p.period_number}</span>
+                          <span className="text-[11px] font-bold text-text-primary font-mono whitespace-nowrap">
+                            {timingStr}
                           </span>
                         </div>
-                        <div className="py-1">
-                          <span className="text-xs text-amber-600 dark:text-amber-400/80 font-bold uppercase tracking-wider">Break Time</span>
+                        <div className="space-y-1">
+                          <h4 className="text-sm font-bold text-text-primary truncate">{p.subject_name}</h4>
+                          <p className="text-xs text-text-secondary font-semibold truncate flex items-center gap-1.5">
+                            {teacherName}
+                            {p.is_backup && (
+                              <span className="text-[11px] font-bold text-amber-600 dark:text-amber-500 uppercase tracking-wider bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded-full select-none">
+                                Backup
+                              </span>
+                            )}
+                          </p>
                         </div>
                       </div>
                     );
-                  }
 
-                  return acc;
-                }, []);
-              })()}
-            </div>
-          )}
+                    // If interval exists after this period
+                    if (intervalAfter && p.period_number === intervalAfter && intervalDuration > 0) {
+                      const intervalTimeStr = getIntervalTimingStr();
+                      acc.push(
+                        <div 
+                          key="interval-break" 
+                          className="flex flex-col justify-between p-4 bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-2.5 shadow-2xs"
+                        >
+                          <div className="flex items-center justify-between border-b border-amber-500/20 pb-2">
+                            <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Interval Break</span>
+                            <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 font-mono whitespace-nowrap">
+                              {intervalTimeStr}
+                            </span>
+                          </div>
+                          <div className="py-1">
+                            <span className="text-xs text-amber-600 dark:text-amber-400/80 font-bold uppercase tracking-wider">Break Time</span>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return acc;
+                  }, []);
+                })()}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );

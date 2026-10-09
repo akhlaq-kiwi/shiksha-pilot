@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../services/attendance_service.dart';
+import '../utils/class_formatter.dart';
 
 class AttendanceScreen extends StatefulWidget {
   final AttendanceService attendanceService;
@@ -1147,16 +1148,15 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                         child: DropdownButtonHideUnderline(
                           child: DropdownButton<int>(
                             value: _selectedClassId,
-                            isExpanded: true,
+                            isExpanded: false,
                             style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87, fontSize: 14),
-                            items: _classes.map((cls) {
+                            items: sortClassesAscending(_classes).map((cls) {
+                              final String rawName = cls['name']?.toString() ?? '';
+                              final String sec = cls['section']?.toString() ?? '';
+                              final String displayName = formatShortClassName(rawName, section: sec);
                               return DropdownMenuItem<int>(
                                 value: cls['id'] as int,
-                                child: Text(
-                                  (cls['section'] != null && cls['section'].toString().isNotEmpty)
-                                      ? '${cls['name']}-${cls['section']}'
-                                      : cls['name'],
-                                ),
+                                child: Text(displayName),
                               );
                             }).toList(),
                             onChanged: _isLoadingTeacherData ? null : (val) {

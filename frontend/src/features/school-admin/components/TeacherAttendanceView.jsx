@@ -1,12 +1,71 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Calendar, Users, Check, AlertCircle, Save, Download, Clock, QrCode, UserCheck, ShieldAlert, Award, RotateCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Calendar, Users, Check, AlertCircle, Save, Download, Clock, QrCode, UserCheck, ShieldAlert, Award, RotateCw, ChevronLeft, ChevronRight, ChevronDown, X } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
 import { Input } from '../../../common/ui/input';
 import { Select } from '../../../common/ui/select';
+import { Dialog } from '../../../common/ui/dialog';
 import { schoolService } from '../../../common/services/schoolService';
 import { useToast } from '../../../common/components/Toast';
+
+function CustomSelect({ options, value, onChange, placeholder = "Select...", disabled = false, className = "", buttonClassName = "", dropdownClassName = "" }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  const selectedOption = options.find(o => String(o.value) === String(value));
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={containerRef} className={`relative ${isOpen ? 'z-50' : 'z-10'} ${className}`}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={`flex h-10 items-center justify-between gap-2.5 rounded-full border border-border bg-surface px-4 py-2 text-xs font-bold text-text-primary shadow-2xs outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border active:outline-none select-none transition-colors min-w-[120px] ${
+          disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-border-strong'
+        } ${buttonClassName}`}
+      >
+        <span className="truncate">
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <ChevronDown className={`h-4 w-4 text-text-muted transition-transform duration-200 flex-shrink-0 ml-1 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && !disabled && (
+        <div className={`absolute left-0 right-0 top-full mt-1.5 min-w-[140px] rounded-2xl border border-border bg-surface shadow-2xl z-50 overflow-hidden animate-in fade-in duration-150 ${dropdownClassName}`}>
+          <div className="max-h-60 overflow-y-auto p-1.5 space-y-0.5 scrollbar-thin">
+            {options.map((opt) => {
+              const isSelected = String(opt.value) === String(value);
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(opt.value);
+                    setIsOpen(false);
+                  }}
+                  className={`w-full text-left px-3.5 py-2 rounded-xl text-xs font-semibold outline-none focus:outline-none select-none transition-colors hover:bg-primary/10 ${isSelected ? 'bg-primary/10 text-primary font-bold' : 'text-text-primary'}`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const getTodayLocalDateString = () => {
   const d = new Date();
@@ -48,7 +107,37 @@ export function TeacherAttendanceView() {
   const [teacherTab, setTeacherTab] = useState('daily'); // 'daily', 'report', 'settings'
   const [selectedDate, setSelectedDate] = useState(getTodayLocalDateString());
 
-  const handleShiftDate = (days) => {
+  // Daily State
+  const [loadingDaily, setLoadingDaily] = useState(false);
+  const [dailyData, setDailyData] = useState(null);
+  const [dailyMap, setDailyMap] = useState({});
+  const [savingDaily, setSavingDaily] = useState(false);
+
+  // Unsaved Changes Tracking
+  const [hasUnsavedDaily, setHasUnsavedDaily] = useState(false);
+  const [showUnsavedModal, setShowUnsavedModal] = useState(false);
+  const [pendingNav, setPendingNav] = useState(null); // { type: 'date' | 'tab', value: string }
+
+  const executeNavAction = (nav) => {
+    if (!nav) return;
+    if (nav.type === 'date') {
+      setSelectedDate(nav.value);
+    } else if (nav.type === 'tab') {
+      setTeacherTab(nav.value);
+    }
+  };
+
+  const requestDateChange = (newDateStr) => {
+    if (!newDateStr || newDateStr === selectedDate) return;
+    if (hasUnsavedDaily) {
+      setPendingNav({ type: 'date', value: newDateStr });
+      setShowUnsavedModal(true);
+    } else {
+      setSelectedDate(newDateStr);
+    }
+  };
+
+  const requestShiftDate = (days) => {
     if (!selectedDate) return;
     const parts = selectedDate.split('-');
     if (parts.length !== 3) return;
@@ -63,14 +152,18 @@ export function TeacherAttendanceView() {
     const maxDate = getTodayLocalDateString();
     if (days > 0 && maxDate && newDateStr > maxDate) return;
 
-    setSelectedDate(newDateStr);
+    requestDateChange(newDateStr);
   };
 
-  // Daily State
-  const [loadingDaily, setLoadingDaily] = useState(false);
-  const [dailyData, setDailyData] = useState(null);
-  const [dailyMap, setDailyMap] = useState({});
-  const [savingDaily, setSavingDaily] = useState(false);
+  const requestTabChange = (newTab) => {
+    if (newTab === teacherTab) return;
+    if (teacherTab === 'daily' && hasUnsavedDaily) {
+      setPendingNav({ type: 'tab', value: newTab });
+      setShowUnsavedModal(true);
+    } else {
+      setTeacherTab(newTab);
+    }
+  };
 
   // Monthly Report State
   const [reportMonth, setReportMonth] = useState(new Date().getMonth() + 1);
@@ -83,7 +176,8 @@ export function TeacherAttendanceView() {
   const [entryMinute, setEntryMinute] = useState('30');
   const [entryPeriod, setEntryPeriod] = useState('AM');
   const [allowedLeaves, setAllowedLeaves] = useState('0');
-  const [initialSettings, setInitialSettings] = useState({ entryTime: '08:30 AM', allowedLeaves: '0' });
+  const [latePenaltyAmount, setLatePenaltyAmount] = useState('0');
+  const [initialSettings, setInitialSettings] = useState({ entryTime: '08:30 AM', allowedLeaves: '0', latePenaltyAmount: '0' });
   const [showSaveSettingsModal, setShowSaveSettingsModal] = useState(false);
   const [loadingSettings, setLoadingSettings] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
@@ -94,6 +188,67 @@ export function TeacherAttendanceView() {
   const [loadingQr, setLoadingQr] = useState(false);
   const [refreshingQr, setRefreshingQr] = useState(false);
   const [showConfirmQrModal, setShowConfirmQrModal] = useState(false);
+
+  // Breakdown Modal State
+  const [detailModalInfo, setDetailModalInfo] = useState(null);
+
+  const handleOpenBreakdown = (teacherRow, type) => {
+    const monthName = ACADEMIC_MONTHS.find(m => m.value === reportMonth)?.name || 'Month';
+    let typeName = 'Absent Days';
+    let dates = [];
+    let count = 0;
+
+    if (type === 'absent') {
+      typeName = 'Absent Days';
+      dates = teacherRow.absent_dates || [];
+      count = teacherRow.absent_days || 0;
+    } else if (type === 'late') {
+      typeName = 'Late Days';
+      dates = teacherRow.late_dates || [];
+      count = teacherRow.late_days || 0;
+    } else if (type === 'present') {
+      typeName = 'Present Days';
+      dates = teacherRow.present_dates || [];
+      count = teacherRow.present_days || 0;
+    } else if (type === 'leave') {
+      typeName = 'Leave Days';
+      dates = teacherRow.leave_dates || [];
+      count = teacherRow.leave_days || 0;
+    }
+
+    setDetailModalInfo({
+      teacherName: teacherRow.name,
+      empId: teacherRow.emp_id,
+      type,
+      typeName,
+      monthName,
+      year: reportYear,
+      count,
+      dates,
+    });
+  };
+
+  const handleNavigateToDateAttendance = (dateStr) => {
+    setDetailModalInfo(null);
+    setSelectedDate(dateStr);
+    setTeacherTab('daily');
+    toast.success(`Switched to Daily Attendance for ${dateStr}`);
+  };
+
+  const formatDateWithDayName = (dateStr) => {
+    try {
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        const dt = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        return `${dt.getDate().toString().padStart(2, '0')} ${months[dt.getMonth()]} ${dt.getFullYear()}, ${days[dt.getDay()]}`;
+      }
+      return dateStr;
+    } catch (_) {
+      return dateStr;
+    }
+  };
 
   // Load Daily Data
   const loadDailyData = useCallback(async () => {
@@ -110,6 +265,7 @@ export function TeacherAttendanceView() {
         };
       });
       setDailyMap(map);
+      setHasUnsavedDaily(false);
     } catch (err) {
       console.error(err);
       toast.error('Failed to load teacher attendance.');
@@ -124,15 +280,15 @@ export function TeacherAttendanceView() {
     }
   }, [teacherTab, loadDailyData]);
 
-  // Load Monthly Report
-  const loadMonthlyReport = useCallback(async () => {
+  // Load Monthly Report Data
+  const loadReportData = useCallback(async () => {
     setLoadingReport(true);
     try {
       const data = await schoolService.getTeacherAttendanceReport({ month: reportMonth, year: reportYear });
       setReportData(data);
     } catch (err) {
       console.error(err);
-      toast.error('Failed to load teacher monthly report.');
+      toast.error('Failed to load monthly attendance report.');
     } finally {
       setLoadingReport(false);
     }
@@ -140,11 +296,11 @@ export function TeacherAttendanceView() {
 
   useEffect(() => {
     if (teacherTab === 'report') {
-      loadMonthlyReport();
+      loadReportData();
     }
-  }, [teacherTab, loadMonthlyReport]);
+  }, [teacherTab, loadReportData]);
 
-  // Load Settings & QR
+  // Load Settings & QR Code Token
   const loadSettingsAndQr = useCallback(async () => {
     setLoadingSettings(true);
     setLoadingQr(true);
@@ -161,8 +317,13 @@ export function TeacherAttendanceView() {
         : '0';
       setAllowedLeaves(leavesVal);
 
+      const penaltyVal = (st.late_penalty_amount !== null && st.late_penalty_amount !== undefined && String(st.late_penalty_amount).trim() !== '')
+        ? String(st.late_penalty_amount)
+        : '0';
+      setLatePenaltyAmount(penaltyVal);
+
       const formattedTime = `${parsedTime.hour}:${parsedTime.minute} ${parsedTime.period}`;
-      setInitialSettings({ entryTime: formattedTime, allowedLeaves: leavesVal });
+      setInitialSettings({ entryTime: formattedTime, allowedLeaves: leavesVal, latePenaltyAmount: penaltyVal });
 
       const qr = await schoolService.getTeacherAttendanceQrToken();
       setQrPayload(qr?.qr_payload || qr?.data?.qr_payload || qr?.data?.data?.qr_payload || '');
@@ -184,37 +345,79 @@ export function TeacherAttendanceView() {
 
   // Handlers
   const handleStatusChange = (staffId, status) => {
-    setDailyMap(prev => ({
-      ...prev,
-      [staffId]: {
-        ...prev[staffId],
-        status,
-        entry_time: status === 'Present' ? (dailyData?.configured_entry_time || '08:30 AM') : '—'
+    setDailyMap(prev => {
+      const origRecord = dailyData?.records?.find(r => r.staff_id === staffId);
+      const isChanged = origRecord ? (origRecord.status !== status || prev[staffId]?.is_status_changed) : true;
+      let newEntryTime;
+      if (status === 'Present') {
+        newEntryTime = isChanged
+          ? (dailyData?.configured_entry_time || '08:30 AM')
+          : (origRecord?.entry_time || dailyData?.configured_entry_time || '08:30 AM');
+      } else {
+        newEntryTime = '—';
       }
-    }));
+
+      return {
+        ...prev,
+        [staffId]: {
+          ...prev[staffId],
+          status,
+          entry_time: newEntryTime,
+          is_status_changed: isChanged
+        }
+      };
+    });
+    setHasUnsavedDaily(true);
   };
 
-  const handleSaveDaily = async () => {
-    if (!dailyData || !dailyData.records) return;
+  const handleSaveDaily = async (navToExecute = null) => {
+    if (!dailyData || !dailyData.records) return false;
     setSavingDaily(true);
     try {
       const records = dailyData.records.map(r => {
-        const status = dailyMap[r.staff_id]?.status || r.status;
+        const item = dailyMap[r.staff_id];
+        const status = item?.status || r.status;
+        const isChanged = item?.is_status_changed || r.status !== status;
         return {
           staff_id: r.staff_id,
           status: status,
-          entry_time: status === 'Present' ? (dailyData.configured_entry_time || '08:30 AM') : '—'
+          entry_time: status === 'Present' 
+            ? (isChanged ? (dailyData.configured_entry_time || '08:30 AM') : r.entry_time) 
+            : '—',
+          is_status_changed: isChanged
         };
       });
       await schoolService.markTeacherAttendance({ date: selectedDate, records });
       toast.success('Teacher attendance updated successfully.');
-      loadDailyData();
+      setHasUnsavedDaily(false);
+      if (navToExecute) {
+        executeNavAction(navToExecute);
+      } else {
+        loadDailyData();
+      }
+      return true;
     } catch (err) {
       console.error(err);
       toast.error('Failed to save teacher attendance.');
+      return false;
     } finally {
       setSavingDaily(false);
     }
+  };
+
+  const handleSaveAndNavigate = async () => {
+    const nav = pendingNav;
+    setShowUnsavedModal(false);
+    setPendingNav(null);
+    await handleSaveDaily(nav);
+  };
+
+  const handleIgnoreUnsaved = () => {
+    const nav = pendingNav;
+    setShowUnsavedModal(false);
+    setHasUnsavedDaily(false);
+    setPendingNav(null);
+    executeNavAction(nav);
   };
 
   const handleSaveSettingsClick = (e) => {
@@ -229,10 +432,11 @@ export function TeacherAttendanceView() {
     try {
       await schoolService.saveTeacherAttendanceSettings({
         entry_time: formattedTime,
-        allowed_leaves: allowedLeaves.trim() !== '' ? parseInt(allowedLeaves, 10) : 0
+        allowed_leaves: allowedLeaves.trim() !== '' ? parseInt(allowedLeaves, 10) : 0,
+        late_penalty_amount: latePenaltyAmount.trim() !== '' ? parseFloat(latePenaltyAmount) : 0
       });
       toast.success('Teacher attendance configurations updated successfully.');
-      setInitialSettings({ entryTime: formattedTime, allowedLeaves: allowedLeaves });
+      setInitialSettings({ entryTime: formattedTime, allowedLeaves: allowedLeaves, latePenaltyAmount: latePenaltyAmount });
     } catch (err) {
       console.error(err);
       toast.error('Failed to save settings.');
@@ -309,8 +513,8 @@ export function TeacherAttendanceView() {
       {/* Sub Tabs */}
       <div className="flex gap-2 border-b border-border">
         <button
-          onClick={() => setTeacherTab('daily')}
-          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px flex items-center gap-2 ${
+          onClick={() => requestTabChange('daily')}
+          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px flex items-center gap-2 focus:outline-none focus:ring-0 focus-visible:outline-none ${
             teacherTab === 'daily'
               ? 'border-primary text-primary'
               : 'border-transparent text-text-muted hover:text-text-primary'
@@ -320,8 +524,8 @@ export function TeacherAttendanceView() {
           Daily Attendance
         </button>
         <button
-          onClick={() => setTeacherTab('report')}
-          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px flex items-center gap-2 ${
+          onClick={() => requestTabChange('report')}
+          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px flex items-center gap-2 focus:outline-none focus:ring-0 focus-visible:outline-none ${
             teacherTab === 'report'
               ? 'border-primary text-primary'
               : 'border-transparent text-text-muted hover:text-text-primary'
@@ -331,8 +535,8 @@ export function TeacherAttendanceView() {
           Monthly Report
         </button>
         <button
-          onClick={() => setTeacherTab('settings')}
-          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px flex items-center gap-2 ${
+          onClick={() => requestTabChange('settings')}
+          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px flex items-center gap-2 focus:outline-none focus:ring-0 focus-visible:outline-none ${
             teacherTab === 'settings'
               ? 'border-primary text-primary'
               : 'border-transparent text-text-muted hover:text-text-primary'
@@ -347,61 +551,59 @@ export function TeacherAttendanceView() {
       {teacherTab === 'daily' && (
         <div className="space-y-6">
           {/* Controls Bar */}
-          <Card className="border border-border bg-zinc-50/40 dark:bg-zinc-900/40 shadow-sm">
-            <CardContent className="p-4 flex flex-wrap gap-4 items-end justify-between">
-              <div className="flex items-center gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-text-secondary uppercase">Select Date</label>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={() => handleShiftDate(-1)}
-                      className="h-10 w-10 shrink-0 bg-background border-border hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                      title="Previous Day"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Input
-                      type="date"
-                      value={selectedDate}
-                      onChange={(e) => setSelectedDate(e.target.value)}
-                      max={getTodayLocalDateString()}
-                      className="h-10 bg-background"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={() => handleShiftDate(1)}
-                      disabled={selectedDate >= getTodayLocalDateString()}
-                      className="h-10 w-10 shrink-0 bg-background border-border hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40"
-                      title="Next Day"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="space-y-1.5 hidden sm:block">
-                  <span className="text-xs font-bold text-text-secondary uppercase block">Official Entry Time</span>
-                  <span className="inline-flex items-center px-3 py-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold border border-emerald-500/20">
-                    <Clock className="h-3.5 w-3.5 mr-1.5" />
-                    {dailyData?.configured_entry_time || '08:30 AM'}
-                  </span>
+          <div className="p-5 rounded-2xl border border-border bg-zinc-50/50 dark:bg-zinc-900/50 shadow-2xs flex flex-wrap gap-4 items-end justify-between">
+            <div className="flex items-center gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-text-secondary uppercase">Select Date</label>
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => requestShiftDate(-1)}
+                    className="h-10 w-10 shrink-0 bg-background border-border hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                    title="Previous Day"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => requestDateChange(e.target.value)}
+                    max={getTodayLocalDateString()}
+                    className="h-10 bg-background"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => requestShiftDate(1)}
+                    disabled={selectedDate >= getTodayLocalDateString()}
+                    className="h-10 w-10 shrink-0 bg-background border-border hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40"
+                    title="Next Day"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
+              <div className="space-y-1.5 hidden sm:block">
+                <span className="text-xs font-bold text-text-secondary uppercase block">Official Entry Time</span>
+                <span className="inline-flex items-center px-3 py-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold border border-emerald-500/20">
+                  <Clock className="h-3.5 w-3.5 mr-1.5" />
+                  {dailyData?.configured_entry_time || '08:30 AM'}
+                </span>
+              </div>
+            </div>
 
-              <Button
-                onClick={handleSaveDaily}
-                disabled={savingDaily || loadingDaily || dailyData?.is_disabled}
-                className="h-10 px-5 font-bold text-xs bg-primary text-white rounded-xl shadow-md hover:bg-primary/90 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Save className="h-4 w-4" />
-                {savingDaily ? 'Saving...' : 'Save Attendance'}
-              </Button>
-            </CardContent>
-          </Card>
+            <Button
+              onClick={handleSaveDaily}
+              disabled={savingDaily || loadingDaily || dailyData?.is_disabled}
+              className="h-10 px-5 font-bold text-xs bg-primary text-white rounded-xl shadow-md hover:bg-primary/90 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Save className="h-4 w-4" />
+              {savingDaily ? 'Saving...' : 'Save Attendance'}
+            </Button>
+          </div>
 
           {/* Sunday / Holiday Notice Banner */}
           {dailyData?.is_disabled && (
@@ -438,28 +640,28 @@ export function TeacherAttendanceView() {
           )}
 
           {/* Teacher Attendance Table */}
-          <Card className="border border-border">
-            <CardHeader className="py-4 border-b border-border">
-              <CardTitle className="text-base font-bold flex items-center gap-2">
+          <div className="border border-border rounded-2xl overflow-hidden bg-surface shadow-2xs">
+            <div className="py-4 px-6 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex items-center justify-between">
+              <h3 className="text-base font-bold text-text-primary flex items-center gap-2">
                 <UserCheck className="h-5 w-5 text-primary" />
                 Daily Attendance
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
+              </h3>
+            </div>
+            <div className="p-0">
               {loadingDaily ? (
                 <div className="p-8 text-center text-text-muted">Loading teacher attendance data...</div>
               ) : !dailyData || !dailyData.records || dailyData.records.length === 0 ? (
                 <div className="p-8 text-center text-text-muted">No active teachers found.</div>
               ) : (
                 <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>EMP ID</TableHead>
-                        <TableHead>Teacher Name</TableHead>
-                        <TableHead>Entry Time</TableHead>
-                        <TableHead>Frequency</TableHead>
-                        <TableHead>Attendance Status</TableHead>
+                  <Table containerClassName="border-0 rounded-none shadow-none bg-transparent">
+                    <TableHeader className="bg-zinc-50/50 dark:bg-zinc-900/50 border-b border-border">
+                      <TableRow className="bg-zinc-50/50 dark:bg-zinc-900/50">
+                        <TableHead className="text-xs uppercase font-bold text-text-secondary bg-transparent">EMP ID</TableHead>
+                        <TableHead className="text-xs uppercase font-bold text-text-secondary bg-transparent">Teacher Name</TableHead>
+                        <TableHead className="text-xs uppercase font-bold text-text-secondary bg-transparent">Entry Time</TableHead>
+                        <TableHead className="text-xs uppercase font-bold text-text-secondary bg-transparent">Frequency</TableHead>
+                        <TableHead className="text-xs uppercase font-bold text-text-secondary bg-transparent">Attendance Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -528,53 +730,51 @@ export function TeacherAttendanceView() {
                   </Table>
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
       )}
 
       {/* TAB 2: MONTHLY REPORT */}
       {teacherTab === 'report' && (
         <div className="space-y-6">
-          <Card className="border border-border bg-zinc-50/40 dark:bg-zinc-900/40 shadow-sm">
-            <CardContent className="p-4 flex flex-wrap gap-4 items-end">
-              <div className="w-56 space-y-1.5">
-                <label className="text-xs font-bold text-text-secondary uppercase">Select Month</label>
-                <Select value={reportMonth} onChange={(e) => setReportMonth(parseInt(e.target.value, 10))}>
-                  {ACADEMIC_MONTHS.map(m => (
-                    <option key={m.value} value={m.value}>
-                      {m.name}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="p-5 rounded-2xl border border-border bg-zinc-50/50 dark:bg-zinc-900/50 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-sm font-bold text-text-primary uppercase tracking-tight">
+                Attendance report for {ACADEMIC_MONTHS.find(m => m.value === reportMonth)?.name || 'October'}
+              </h3>
+            </div>
 
-          <Card className="border border-border">
-            <CardHeader className="py-4 border-b border-border">
-              <CardTitle className="text-base font-bold">
-                Attendance report for {ACADEMIC_MONTHS.find(m => m.value === reportMonth)?.name || 'August'}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
+            <div className="flex items-center gap-3">
+              <label className="text-xs font-bold text-text-secondary uppercase whitespace-nowrap">Select Month</label>
+              <CustomSelect
+                value={reportMonth}
+                onChange={val => setReportMonth(parseInt(val, 10))}
+                options={ACADEMIC_MONTHS.map(m => ({ value: m.value, label: m.name }))}
+                buttonClassName="w-44 h-9"
+              />
+            </div>
+          </div>
+
+          <div className="border border-border rounded-2xl overflow-hidden bg-surface shadow-2xs flex flex-col min-h-0 flex-1">
+            <div className="p-0">
               {loadingReport ? (
                 <div className="p-8 text-center text-text-muted">Loading monthly report...</div>
               ) : !reportData || (!reportData.teachers && !reportData.records) || ((reportData.teachers || reportData.records).length === 0) ? (
                 <div className="p-8 text-center text-text-muted">No monthly records found.</div>
               ) : (
                 <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>EMP ID</TableHead>
-                        <TableHead>Teacher Name</TableHead>
-                        <TableHead className="text-center">Total Working Days</TableHead>
-                        <TableHead className="text-center">Present</TableHead>
-                        <TableHead className="text-center">Absent</TableHead>
-                        <TableHead className="text-center">Leave</TableHead>
-                        <TableHead className="text-center">Late Days</TableHead>
-                        <TableHead className="text-right">Attendance %</TableHead>
+                  <Table containerClassName="border-0 rounded-none shadow-none bg-transparent">
+                    <TableHeader className="bg-zinc-50/50 dark:bg-zinc-900/50 border-b border-border">
+                      <TableRow className="bg-zinc-50/50 dark:bg-zinc-900/50">
+                        <TableHead className="text-xs uppercase font-bold text-text-secondary bg-transparent">EMP ID</TableHead>
+                        <TableHead className="text-xs uppercase font-bold text-text-secondary bg-transparent">Teacher Name</TableHead>
+                        <TableHead className="text-center text-xs uppercase font-bold text-text-secondary bg-transparent">Total Working Days</TableHead>
+                        <TableHead className="text-center text-xs uppercase font-bold text-text-secondary bg-transparent">Present</TableHead>
+                        <TableHead className="text-center text-xs uppercase font-bold text-text-secondary bg-transparent">Absent</TableHead>
+                        <TableHead className="text-center text-xs uppercase font-bold text-text-secondary bg-transparent">Leave</TableHead>
+                        <TableHead className="text-center text-xs uppercase font-bold text-text-secondary bg-transparent">Late Days</TableHead>
+                        <TableHead className="text-right text-xs uppercase font-bold text-text-secondary bg-transparent">Attendance %</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -583,10 +783,46 @@ export function TeacherAttendanceView() {
                           <TableCell className="font-mono text-xs font-bold text-text-secondary">{t.emp_id}</TableCell>
                           <TableCell className="font-medium text-text-primary">{t.name}</TableCell>
                           <TableCell className="text-center font-semibold">{t.total_working_days}</TableCell>
-                          <TableCell className="text-center font-semibold text-emerald-600 dark:text-emerald-400">{t.present_days}</TableCell>
-                          <TableCell className="text-center font-semibold text-rose-600 dark:text-rose-400">{t.absent_days}</TableCell>
-                          <TableCell className="text-center font-semibold text-amber-600 dark:text-amber-400">{t.leave_days}</TableCell>
-                          <TableCell className="text-center font-semibold text-orange-600 dark:text-orange-400">{t.late_days}</TableCell>
+                          <TableCell className="text-center font-semibold">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenBreakdown(t, 'present')}
+                              className="inline-flex items-center justify-center min-w-[2.25rem] px-2.5 py-1 rounded-full text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 font-bold transition-all cursor-pointer hover:scale-105 hover:shadow-sm"
+                              title="Click to view present dates"
+                            >
+                              {t.present_days}
+                            </button>
+                          </TableCell>
+                          <TableCell className="text-center font-semibold">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenBreakdown(t, 'absent')}
+                              className="inline-flex items-center justify-center min-w-[2.25rem] px-2.5 py-1 rounded-full text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 font-bold transition-all cursor-pointer hover:scale-105 hover:shadow-sm"
+                              title="Click to view absent dates"
+                            >
+                              {t.absent_days}
+                            </button>
+                          </TableCell>
+                          <TableCell className="text-center font-semibold">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenBreakdown(t, 'leave')}
+                              className="inline-flex items-center justify-center min-w-[2.25rem] px-2.5 py-1 rounded-full text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/60 font-bold transition-all cursor-pointer hover:scale-105 hover:shadow-sm"
+                              title="Click to view leave dates"
+                            >
+                              {t.leave_days}
+                            </button>
+                          </TableCell>
+                          <TableCell className="text-center font-semibold">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenBreakdown(t, 'late')}
+                              className="inline-flex items-center justify-center min-w-[2.25rem] px-2.5 py-1 rounded-full text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/40 hover:bg-orange-100 dark:hover:bg-orange-900/60 font-bold transition-all cursor-pointer hover:scale-105 hover:shadow-sm"
+                              title="Click to view late dates"
+                            >
+                              {t.late_days}
+                            </button>
+                          </TableCell>
                           <TableCell className="text-right font-bold text-primary">{t.attendance_percentage}%</TableCell>
                         </TableRow>
                       ))}
@@ -594,8 +830,8 @@ export function TeacherAttendanceView() {
                   </Table>
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
       )}
 
@@ -603,9 +839,9 @@ export function TeacherAttendanceView() {
       {teacherTab === 'settings' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Form Settings */}
-          <Card className="border border-border">
-            <CardHeader className="py-4 border-b border-border">
-              <CardTitle className="text-base font-bold flex items-center gap-2">
+          <Card className="border border-border rounded-2xl overflow-hidden shadow-2xs">
+            <CardHeader className="py-4 px-6 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
+              <CardTitle className="text-base font-bold flex items-center gap-2 text-text-primary">
                 <Clock className="h-5 w-5 text-primary" />
                 Teacher Attendance Configurations
               </CardTitle>
@@ -620,34 +856,29 @@ export function TeacherAttendanceView() {
                       Official Teacher Entry Time
                     </label>
                     <div className="grid grid-cols-3 gap-2">
-                      <select
+                      <CustomSelect
                         value={entryHour}
-                        onChange={(e) => setEntryHour(e.target.value)}
-                        className="h-10 px-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-surface font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
-                      >
-                        {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map(h => (
-                          <option key={h} value={h}>{h}</option>
-                        ))}
-                      </select>
+                        onChange={val => setEntryHour(val)}
+                        options={Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map(h => ({ value: h, label: h }))}
+                        buttonClassName="w-full h-10 min-w-0"
+                      />
 
-                      <select
+                      <CustomSelect
                         value={entryMinute}
-                        onChange={(e) => setEntryMinute(e.target.value)}
-                        className="h-10 px-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-surface font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
-                      >
-                        {Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0')).map(m => (
-                          <option key={m} value={m}>{m}</option>
-                        ))}
-                      </select>
+                        onChange={val => setEntryMinute(val)}
+                        options={Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0')).map(m => ({ value: m, label: m }))}
+                        buttonClassName="w-full h-10 min-w-0"
+                      />
 
-                      <select
+                      <CustomSelect
                         value={entryPeriod}
-                        onChange={(e) => setEntryPeriod(e.target.value)}
-                        className="h-10 px-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-surface font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
-                      >
-                        <option value="AM">AM</option>
-                        <option value="PM">PM</option>
-                      </select>
+                        onChange={val => setEntryPeriod(val)}
+                        options={[
+                          { value: 'AM', label: 'AM' },
+                          { value: 'PM', label: 'PM' }
+                        ]}
+                        buttonClassName="w-full h-10 min-w-0"
+                      />
                     </div>
                     <p className="text-xs text-text-secondary">
                       Teachers scanning after this time will be automatically flagged as <strong className="text-rose-500">Late</strong>.
@@ -663,7 +894,7 @@ export function TeacherAttendanceView() {
                       value={allowedLeaves}
                       onChange={(e) => setAllowedLeaves(e.target.value)}
                       placeholder="0"
-                      className="h-10"
+                      className="h-10 outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
                       min="0"
                     />
                     <p className="text-xs text-text-secondary">
@@ -671,9 +902,31 @@ export function TeacherAttendanceView() {
                     </p>
                   </div>
 
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-text-primary uppercase tracking-wide">
+                      Late Entry Penalty Amount per day (₹)
+                    </label>
+                    <Input
+                      type="number"
+                      value={latePenaltyAmount}
+                      onChange={(e) => setLatePenaltyAmount(e.target.value)}
+                      placeholder="0"
+                      className="h-10 outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
+                      min="0"
+                      step="any"
+                    />
+                    <p className="text-xs text-text-secondary">
+                      If configured (e.g. ₹10 per day late), per day late entries will automatically deduct penalty amount from monthly teacher salary cards.
+                    </p>
+                  </div>
+
                   {(() => {
                     const currentFormattedTime = `${entryHour}:${entryMinute} ${entryPeriod}`;
-                    const isDirty = (currentFormattedTime !== initialSettings.entryTime || allowedLeaves !== initialSettings.allowedLeaves);
+                    const isDirty = (
+                      currentFormattedTime !== initialSettings.entryTime ||
+                      allowedLeaves !== initialSettings.allowedLeaves ||
+                      latePenaltyAmount !== initialSettings.latePenaltyAmount
+                    );
                     return (
                       <Button
                         type="submit"
@@ -694,9 +947,9 @@ export function TeacherAttendanceView() {
           </Card>
 
           {/* QR Code Card */}
-          <Card className="border border-border">
-            <CardHeader className="py-4 border-b border-border">
-              <CardTitle className="text-base font-bold flex items-center gap-2">
+          <Card className="border border-border rounded-2xl overflow-hidden shadow-2xs">
+            <CardHeader className="py-4 px-6 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
+              <CardTitle className="text-base font-bold flex items-center gap-2 text-text-primary">
                 <QrCode className="h-5 w-5 text-primary" />
                 Teacher Attendance QR Code
               </CardTitle>
@@ -812,6 +1065,124 @@ export function TeacherAttendanceView() {
           </div>
         </div>
       )}
+
+      {/* Unsaved Attendance Changes Confirmation Dialog */}
+      <Dialog
+        isOpen={showUnsavedModal}
+        onClose={() => {
+          setShowUnsavedModal(false);
+          setPendingNav(null);
+        }}
+        title="Unsaved Attendance Changes"
+        footer={
+          <div className="flex items-center gap-2 justify-end w-full">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleIgnoreUnsaved}
+              className="font-bold text-xs px-4 h-9"
+            >
+              Ignore
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSaveAndNavigate}
+              disabled={savingDaily}
+              className="font-bold text-xs px-4 h-9 bg-primary text-white hover:bg-primary/90"
+            >
+              {savingDaily ? 'Saving...' : 'Save Attendance'}
+            </Button>
+          </div>
+        }
+      >
+        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-sm flex items-start gap-3">
+          <ShieldAlert className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+          <div className="space-y-1.5">
+            <p className="font-bold text-sm text-amber-900 dark:text-amber-200">
+              You have unsaved changes in teacher attendance.
+            </p>
+            <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
+              You updated teacher attendance for date <strong>{selectedDate}</strong> but haven't saved it yet. Would you like to save attendance before moving forward, or ignore changes?
+            </p>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* Detailed Breakdown Dates Modal */}
+      <Dialog
+        isOpen={!!detailModalInfo}
+        onClose={() => setDetailModalInfo(null)}
+        hideHeader={true}
+        maxWidth="max-w-lg"
+      >
+        {detailModalInfo && (
+          <div className="space-y-4">
+            {/* Header bar */}
+            <div className="flex items-center justify-between p-3.5 rounded-xl bg-[#FAF6EC] dark:bg-zinc-900 border border-border">
+              <span className="text-xs font-bold text-text-secondary uppercase tracking-wider">
+                Teacher: <strong className="text-text-primary">{detailModalInfo.teacherName}</strong> ({detailModalInfo.empId})
+              </span>
+              <div className="flex items-center gap-2">
+                <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                  detailModalInfo.type === 'absent' ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300' :
+                  detailModalInfo.type === 'late' ? 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300' :
+                  detailModalInfo.type === 'leave' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300' :
+                  'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+                }`}>
+                  {detailModalInfo.count} {detailModalInfo.typeName}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setDetailModalInfo(null)}
+                  className="h-7 w-7 rounded-full inline-flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-black/5 dark:hover:bg-zinc-700 transition-colors"
+                  title="Close"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {(!detailModalInfo.dates || detailModalInfo.dates.length === 0) ? (
+              <div className="py-8 text-center text-text-muted text-sm font-medium">
+                No {detailModalInfo.typeName.toLowerCase()} recorded for {detailModalInfo.teacherName} in {detailModalInfo.monthName}.
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+                {detailModalInfo.dates.map((item, idx) => (
+                  <div
+                    key={item.date + '-' + idx}
+                    onClick={() => handleNavigateToDateAttendance(item.date)}
+                    className="flex items-center justify-between p-3.5 rounded-xl border border-border bg-background hover:bg-[#FAF6EC] dark:hover:bg-zinc-900/80 transition-all cursor-pointer group hover:border-primary/50 hover:shadow-xs"
+                  >
+                    <div className="space-y-1">
+                      <div className="font-semibold text-sm text-text-primary group-hover:text-primary transition-colors flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-text-muted group-hover:text-primary transition-colors" />
+                        {formatDateWithDayName(item.date)}
+                      </div>
+                      {item.entry_time && item.entry_time !== '—' && (
+                        <div className="text-xs text-text-muted flex items-center gap-1.5 font-mono">
+                          <Clock className="h-3.5 w-3.5 text-text-muted" />
+                          Entry: <span className="font-bold text-text-primary">{item.entry_time}</span>
+                          {item.is_late && <span className="text-rose-500 font-bold ml-1">(Late)</span>}
+                        </div>
+                      )}
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs font-bold text-primary group-hover:bg-primary group-hover:text-white transition-all h-8 px-3"
+                    >
+                      View <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </Dialog>
     </div>
   );
 }

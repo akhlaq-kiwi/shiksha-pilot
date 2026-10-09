@@ -74,11 +74,22 @@ class AuthService extends BaseService
         $schoolId = isset($user['school_id']) ? (int)$user['school_id'] : 0;
         $pdo = $this->repo->getPdo();
 
-        $isInactive = (($user['status'] ?? '') !== 'ACTIVE');
-
-        if ($schoolId > 0 && ($user['school_status'] ?? '') !== 'ACTIVE') {
-            $isInactive = true;
+        // 1. Check if school is active first for non-SUPER_ADMIN users
+        if ($role !== 'SUPER_ADMIN' && $schoolId > 0) {
+            $stmtSch = $pdo->prepare("SELECT status FROM schools WHERE id = :sid LIMIT 1");
+            $stmtSch->execute([':sid' => $schoolId]);
+            $schRow = $stmtSch->fetch(\PDO::FETCH_ASSOC);
+            $schStatus = strtoupper((string)($schRow['status'] ?? ''));
+            if ($schStatus !== 'ACTIVE') {
+                $this->logAuditDirect($user, 'Security', 'Failed Login Attempt', 'Failed login attempt for school marked inactive: ' . ($user['name'] ?? $user['email']));
+                throw new \App\Shared\Exceptions\ValidationException(
+                    ['phone' => 'You have been marked as Inactive please contact Shiksha Pilot Team for for more details'],
+                    'You have been marked as Inactive please contact Shiksha Pilot Team for for more details'
+                );
+            }
         }
+
+        $isInactive = (($user['status'] ?? '') !== 'ACTIVE');
 
         // For Teacher/Staff role: check if staff profile in school is inactive or exit_date set
         if (!$isInactive && ($role === 'TEACHER' || $role === 'STAFF') && $schoolId > 0) {

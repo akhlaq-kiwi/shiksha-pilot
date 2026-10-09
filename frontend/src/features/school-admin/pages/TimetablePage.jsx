@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, ChevronLeft, ChevronRight, Plus, Edit, Trash2, ShieldAlert, CheckCircle2, Lock, MoreVertical, RefreshCw, UserPlus, Users, FileText, Download, Printer, Loader2 } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Plus, Edit, Trash2, ShieldAlert, CheckCircle2, Lock, MoreVertical, RefreshCw, UserPlus, Users, FileText, Download, Printer, Loader2, ChevronDown } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
 import { Input } from '../../../common/ui/input';
@@ -11,6 +11,74 @@ import { schoolAdminService } from '../../../common/services/schoolAdminService'
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 import { useToast } from '../../../common/components/Toast';
 import html2pdf from 'html2pdf.js';
+import { getClassIndex, getShortClassName } from '../../../common/constants/predefinedClasses';
+
+const CustomSelect = ({
+  value,
+  onChange,
+  options = [],
+  placeholder = "Select...",
+  disabled = false,
+  className = "",
+  buttonClassName = "",
+  dropdownClassName = ""
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  const selectedOption = options.find(o => String(o.value) === String(value));
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={containerRef} className={`relative ${isOpen ? 'z-50' : 'z-10'} ${className}`}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={`flex h-10 items-center justify-between gap-2.5 rounded-full border border-border bg-surface px-4 py-2 text-xs font-bold text-text-primary shadow-2xs outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border active:outline-none select-none transition-colors min-w-[150px] ${
+          disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-border-strong'
+        } ${buttonClassName}`}
+      >
+        <span className="truncate">
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <ChevronDown className={`h-4 w-4 text-text-muted transition-transform duration-200 flex-shrink-0 ml-1 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && !disabled && (
+        <div className={`absolute left-0 right-0 top-full mt-1.5 min-w-[160px] rounded-2xl border border-border bg-surface shadow-2xl z-50 overflow-hidden animate-in fade-in duration-150 ${dropdownClassName}`}>
+          <div className="max-h-60 overflow-y-auto p-1.5 space-y-0.5 scrollbar-thin">
+            {options.map((opt) => {
+              const isSelected = String(opt.value) === String(value);
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(String(opt.value));
+                    setIsOpen(false);
+                  }}
+                  className={`w-full text-left px-3.5 py-2 rounded-xl text-xs font-semibold outline-none focus:outline-none select-none transition-colors hover:bg-primary/10 ${isSelected ? 'bg-primary/10 text-primary font-bold' : 'text-text-primary'}`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const getLocalDateStr = () => {
   const d = new Date();
@@ -96,6 +164,8 @@ export default function TimetablePage() {
   const [copiedSchedule, setCopiedSchedule] = useState(null);
   const [isPasteConfirmOpen, setIsPasteConfirmOpen] = useState(false);
   const [pasteDestinationDay, setPasteDestinationDay] = useState('');
+  const [isDeleteDayConfirmOpen, setIsDeleteDayConfirmOpen] = useState(false);
+  const [dayToDelete, setDayToDelete] = useState('');
 
   // Inline forms for adding period per day
   const [addPeriodForm, setAddPeriodForm] = useState({
@@ -132,8 +202,17 @@ export default function TimetablePage() {
           })
         ]);
 
-        const classesData = classList || [];
-        setClasses(classesData);
+        const rawClasses = classList || [];
+        const uniqueClassesMap = new Map();
+        rawClasses.forEach(c => {
+          const shortName = getShortClassName(c.name);
+          const key = `${shortName}_${c.section || ''}`;
+          if (!uniqueClassesMap.has(key)) {
+            uniqueClassesMap.set(key, c);
+          }
+        });
+        const sortedClassesList = Array.from(uniqueClassesMap.values()).sort((a, b) => getClassIndex(a.name) - getClassIndex(b.name));
+        setClasses(sortedClassesList);
         setHolidays(holidaysList || []);
         
         const hasSubjects = subjectsList && subjectsList.length > 0;
@@ -142,8 +221,8 @@ export default function TimetablePage() {
         
         setTimetableSettings(settings || null);
 
-        if (classesData.length > 0) {
-          setSelectedClassId(String(classesData[0].id));
+        if (sortedClassesList.length > 0) {
+          setSelectedClassId(String(sortedClassesList[0].id));
         }
 
         const staffList = await schoolService.getStaff({ date: currentDate }).catch(err => {
@@ -590,6 +669,39 @@ export default function TimetablePage() {
     }
   };
 
+  const handleOpenDeleteDayConfirm = (dayName) => {
+    setError('');
+    setDayToDelete(dayName);
+    setIsDeleteDayConfirmOpen(true);
+  };
+
+  const handleDeleteDayTimetable = async () => {
+    if (!dayToDelete || !selectedClassId) return;
+    const weekDates = getWeekDates(currentDate);
+    const dateStr = timetableData[dayToDelete]?.date || weekDates[dayToDelete] || '';
+
+    setActionLoading('delete-day-' + dayToDelete);
+    setError('');
+    setIsDeleteDayConfirmOpen(false);
+
+    try {
+      await schoolAdminService.deleteDayTimetable({
+        class_id: parseInt(selectedClassId, 10),
+        day_of_week: dayToDelete,
+        date: dateStr
+      });
+      toast.success(`Timetable for ${dayToDelete} deleted successfully.`);
+      setDayToDelete('');
+      await loadTimetable();
+      await loadStaff();
+    } catch (err) {
+      console.error(err);
+      setError(err.response?.data?.message || err.message || `Failed to delete timetable for ${dayToDelete}.`);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleOpenSubjectModal = async () => {
     setNewSubject({ id: '', name: '' });
     setSubjectError('');
@@ -607,44 +719,88 @@ export default function TimetablePage() {
 
   // Subject Management Dialog Action
   const handleSaveSubject = async () => {
-    const trimmedName = newSubject.name.trim();
-    if (!trimmedName) {
+    const rawInput = newSubject.name.trim();
+    if (!rawInput) {
       setSubjectError('Subject name is required.');
       return;
     }
-    
-    // Front-end case-insensitive check within all modal subjects
-    const exists = modalSubjects.some(s => s.name.toLowerCase() === trimmedName.toLowerCase() && s.id !== newSubject.id);
-    if (exists) {
-      setSubjectError('This subject already exists.');
-      return;
-    }
 
-    setActionLoading('modal');
-    setSubjectError('');
-    try {
-      if (newSubject.id) {
-        await schoolAdminService.updateSubject(newSubject.id, {
-          name: trimmedName
-        });
-      } else {
-        await schoolAdminService.createSubject({
-          name: trimmedName
-        });
+    if (newSubject.id) {
+      // Single subject editing
+      const trimmedName = rawInput.replace(/,/g, '').trim();
+      if (!trimmedName) {
+        setSubjectError('Subject name is required.');
+        return;
       }
-      setNewSubject({ id: '', name: '' });
-      const list = await schoolAdminService.getSubjects();
-      setModalSubjects(list || []);
-      setHasSchoolSubjects(list && list.length > 0);
-      await loadSubjects();
-    } catch (err) {
-      console.error(err);
-      setSubjectError(err.response?.data?.message || err.message || 'Failed to save subject.');
-    } finally {
-      setActionLoading(null);
-      setTimeout(() => {
-        subjectInputRef.current?.focus();
-      }, 50);
+      const exists = modalSubjects.some(s => s.name.toLowerCase() === trimmedName.toLowerCase() && s.id !== newSubject.id);
+      if (exists) {
+        setSubjectError('This subject already exists.');
+        return;
+      }
+
+      setActionLoading('modal');
+      setSubjectError('');
+      try {
+        await schoolAdminService.updateSubject(newSubject.id, { name: trimmedName });
+        setNewSubject({ id: '', name: '' });
+        const list = await schoolAdminService.getSubjects();
+        setModalSubjects(list || []);
+        setHasSchoolSubjects(list && list.length > 0);
+        await loadSubjects();
+      } catch (err) {
+        console.error(err);
+        setSubjectError(err.response?.data?.message || err.message || 'Failed to save subject.');
+      } finally {
+        setActionLoading(null);
+        setTimeout(() => {
+          subjectInputRef.current?.focus();
+        }, 50);
+      }
+    } else {
+      // Bulk or single subject creation via comma separation
+      const names = rawInput.split(',').map(n => n.trim()).filter(Boolean);
+      if (names.length === 0) {
+        setSubjectError('Subject name is required.');
+        return;
+      }
+
+      // Filter out duplicate subject names (case-insensitive)
+      const uniqueNamesInput = [];
+      names.forEach(n => {
+        if (!uniqueNamesInput.some(u => u.toLowerCase() === n.toLowerCase())) {
+          uniqueNamesInput.push(n);
+        }
+      });
+
+      const toCreate = uniqueNamesInput.filter(
+        n => !modalSubjects.some(s => s.name.toLowerCase() === n.toLowerCase())
+      );
+
+      if (toCreate.length === 0) {
+        setSubjectError(uniqueNamesInput.length === 1 ? 'This subject already exists.' : 'All specified subjects already exist.');
+        return;
+      }
+
+      setActionLoading('modal');
+      setSubjectError('');
+      try {
+        for (const name of toCreate) {
+          await schoolAdminService.createSubject({ name });
+        }
+        setNewSubject({ id: '', name: '' });
+        const list = await schoolAdminService.getSubjects();
+        setModalSubjects(list || []);
+        setHasSchoolSubjects(list && list.length > 0);
+        await loadSubjects();
+      } catch (err) {
+        console.error(err);
+        setSubjectError(err.response?.data?.message || err.message || 'Failed to save subjects.');
+      } finally {
+        setActionLoading(null);
+        setTimeout(() => {
+          subjectInputRef.current?.focus();
+        }, 50);
+      }
     }
   };
 
@@ -727,7 +883,7 @@ export default function TimetablePage() {
       <div className="flex items-center justify-center min-h-[400px] w-full">
         <div className="flex flex-col items-center gap-3">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          <p className="text-xs font-bold text-text-muted uppercase tracking-wider">Loading Timetable...</p>
+          <p className="text-xs font-bold text-text-primary uppercase tracking-wider">LOADING TIMETABLE...</p>
         </div>
       </div>
     );
@@ -742,7 +898,7 @@ export default function TimetablePage() {
       {/* Top Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Academic Timetable</h2>
+          <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display uppercase">ACADEMIC TIMETABLE</h2>
           <p className="text-text-secondary text-sm mt-1">Manage weekly recurring schedules and track workloads.</p>
         </div>
         
@@ -825,19 +981,18 @@ export default function TimetablePage() {
       ) : (
         <>
           {/* Control Panel Filter bar */}
-          <Card className="p-4 shadow-2xs border border-border flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="p-5 bg-zinc-50/50 dark:bg-zinc-900/50 border border-border rounded-2xl shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex flex-col gap-1">
                 <span className="text-[11px] font-bold text-text-secondary uppercase">Class Selection</span>
-                <select
+                <CustomSelect
                   value={selectedClassId}
-                  onChange={e => setSelectedClassId(e.target.value)}
-                  className="h-10 px-3 pr-8 rounded-lg border border-border bg-surface text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs"
-                >
-                  {classes.map(c => (
-                    <option key={c.id} value={c.id}>{c.name} {c.section ? ` - ${c.section}` : ''}</option>
-                  ))}
-                </select>
+                  onChange={setSelectedClassId}
+                  options={classes.map(c => ({
+                    value: c.id,
+                    label: `${getShortClassName(c.name)}${c.section ? ` - ${c.section}` : ''}`
+                  }))}
+                />
               </div>
 
               <div className="flex flex-col gap-1">
@@ -853,11 +1008,12 @@ export default function TimetablePage() {
                   </Button>
                   
                   <div className="relative">
-                    <input
+                    <Input
                       type="date"
                       value={currentDate}
                       onChange={e => setCurrentDate(e.target.value)}
-                      className="h-10 px-3 pr-8 rounded-lg border border-border bg-surface text-xs font-bold text-text-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs cursor-pointer"
+                      onClick={e => e.target.showPicker?.()}
+                      className="h-10 px-4 rounded-full border border-border bg-surface text-xs font-bold text-text-primary focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border-strong cursor-pointer"
                     />
                   </div>
 
@@ -878,7 +1034,7 @@ export default function TimetablePage() {
               <span className="text-[11px] font-bold text-text-secondary uppercase">Active Range</span>
               <span className="text-sm font-bold text-text-primary font-sans">{getWeekRangeStr()}</span>
             </div>
-          </Card>
+          </div>
 
           {/* Week Locked Banner */}
           {isWeekLocked && (
@@ -921,7 +1077,7 @@ export default function TimetablePage() {
                       handleToggleDaySelection(dayName);
                     }
                   }}
-                  className={`flex flex-col justify-between border-2 rounded-3xl p-6 transition-all duration-300 min-h-[460px] bg-zinc-50 dark:bg-zinc-950/40 ${
+                  className={`flex flex-col justify-between border-2 rounded-3xl p-6 transition-all duration-300 min-h-[460px] bg-surface-sunken ${
                     isSelectionMode ? 'cursor-pointer select-none' : ''
                   } ${
                     isToday 
@@ -984,6 +1140,13 @@ export default function TimetablePage() {
                               >
                                 Paste Schedule
                               </DropdownItem>
+                              <DropdownItem 
+                                destructive
+                                disabled={periodsList.length === 0}
+                                onClick={() => handleOpenDeleteDayConfirm(dayName)}
+                              >
+                                Delete Timetable
+                              </DropdownItem>
                             </DropdownMenu>
                           </div>
                         )}
@@ -1007,7 +1170,7 @@ export default function TimetablePage() {
                           return (
                             <div 
                               key={p.id} 
-                              className="flex items-center justify-between py-2 px-3 bg-zinc-100/60 dark:bg-zinc-900/40 border border-border/80 rounded-xl relative transition-all group"
+                              className="flex items-center justify-between py-2 px-3 bg-surface border border-border-strong rounded-xl relative transition-all group"
                             >
                               <div className="space-y-0.5 min-w-0 flex-1">
                                 <h4 className="text-xs font-bold text-text-primary truncate">
@@ -1083,10 +1246,9 @@ export default function TimetablePage() {
                       {periodsList.length < periodConfigs.length && (
                         <div className="space-y-2">
                           <div className="grid grid-cols-2 gap-2">
-                            <select
+                            <CustomSelect
                               value={addPeriodForm[dayName].subject_id}
-                              onChange={e => {
-                                const val = e.target.value;
+                              onChange={val => {
                                 setAddPeriodForm(p => ({
                                   ...p,
                                   [dayName]: { ...p[dayName], subject_id: val }
@@ -1096,18 +1258,20 @@ export default function TimetablePage() {
                                   [dayName]: ''
                                 }));
                               }}
-                              className="w-full h-9 px-2.5 rounded-lg border border-border bg-surface text-xs font-bold focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs cursor-pointer"
-                            >
-                              <option value="">Select Subject</option>
-                              {subjects.filter(s => !periodsList.some(p => String(p.subject_id) === String(s.id))).map(s => (
-                                <option key={s.id} value={s.id}>{s.name}</option>
-                              ))}
-                            </select>
+                              placeholder="Select Subject"
+                              options={[
+                                { value: '', label: 'Select Subject' },
+                                ...subjects
+                                  .filter(s => !periodsList.some(p => String(p.subject_id) === String(s.id)))
+                                  .map(s => ({ value: s.id, label: s.name }))
+                              ]}
+                              className="w-full"
+                              buttonClassName="w-full h-9 min-w-0 px-3 text-xs"
+                            />
 
-                            <select
+                            <CustomSelect
                               value={addPeriodForm[dayName].teacher_id}
-                              onChange={e => {
-                                const val = e.target.value;
+                              onChange={val => {
                                 setAddPeriodForm(p => ({
                                   ...p,
                                   [dayName]: { ...p[dayName], teacher_id: val }
@@ -1117,28 +1281,29 @@ export default function TimetablePage() {
                                   [dayName]: ''
                                 }));
                               }}
-                              className="w-full h-9 px-2.5 rounded-lg border border-border bg-surface text-xs font-bold focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs cursor-pointer"
-                            >
-                              <option value="">Select Teacher</option>
-                              {staff.filter(t => {
-                                if (t.status !== 'ACTIVE' || t.role !== 'Teacher') return false;
-                                const isOccupiedInPeriod = allTimetableEntries.some(entry => {
-                                  return entry.day_of_week === dayName &&
-                                         entry.period_number === nextPeriodNum &&
-                                         entry.active_teacher_id === t.id &&
-                                         String(entry.class_id) !== String(selectedClassId);
-                                });
-                                if (isOccupiedInPeriod) return false;
+                              placeholder="Select Teacher"
+                              options={[
+                                { value: '', label: 'Select Teacher' },
+                                ...staff
+                                  .filter(t => {
+                                    if (t.status !== 'ACTIVE' || t.role !== 'Teacher') return false;
+                                    const isOccupiedInPeriod = allTimetableEntries.some(entry => {
+                                      return entry.day_of_week === dayName &&
+                                             entry.period_number === nextPeriodNum &&
+                                             entry.active_teacher_id === t.id &&
+                                             String(entry.class_id) !== String(selectedClassId);
+                                    });
+                                    if (isOccupiedInPeriod) return false;
 
-                                const dailyAssigned = t.day_workloads?.[dayName] ?? 0;
-                                const max = periodConfigs.length;
-                                return dailyAssigned < max;
-                              }).map(t => (
-                                <option key={t.id} value={t.id}>
-                                  {t.name}
-                                </option>
-                              ))}
-                            </select>
+                                    const dailyAssigned = t.day_workloads?.[dayName] ?? 0;
+                                    const max = periodConfigs.length;
+                                    return dailyAssigned < max;
+                                  })
+                                  .map(t => ({ value: t.id, label: t.name }))
+                              ]}
+                              className="w-full"
+                              buttonClassName="w-full h-9 min-w-0 px-3 text-xs"
+                            />
                           </div>
 
                           {formErrors[dayName] && (
@@ -1203,7 +1368,7 @@ export default function TimetablePage() {
               e.preventDefault();
               handleSaveSubject();
             }}
-            className="p-4 border border-border bg-zinc-50/50 dark:bg-zinc-950/20 rounded-xl space-y-4"
+            className="p-4 border border-border bg-zinc-50/50 dark:bg-zinc-950/20 rounded-2xl space-y-4"
           >
             <h4 className="text-xs font-bold text-text-primary uppercase tracking-wide">
               {newSubject.id ? 'Edit Subject' : 'Add Subject'}
@@ -1215,11 +1380,13 @@ export default function TimetablePage() {
             )}
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="flex-1 space-y-1.5">
-                <label htmlFor="subject-name" className="text-[11px] font-bold text-text-secondary uppercase">Subject Name *</label>
+                <label htmlFor="subject-name" className="text-[11px] font-bold text-text-secondary uppercase">
+                  Subject Name * <span className="text-[10px] text-text-muted font-normal lowercase">(separate multiple with comma)</span>
+                </label>
                 <Input
                   ref={subjectInputRef}
                   id="subject-name"
-                  placeholder="e.g. English Literature"
+                  placeholder="e.g. English, Hindi, Math..."
                   value={newSubject.name}
                   onChange={e => {
                     setNewSubject(p => ({ ...p, name: e.target.value }));
@@ -1231,11 +1398,11 @@ export default function TimetablePage() {
                       handleSaveSubject();
                     }
                   }}
-                  className="h-10"
+                  className="h-10 text-xs font-semibold text-text-primary border border-border bg-surface rounded-full w-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
                 />
               </div>
               <div className="sm:self-end">
-                <Button type="submit" disabled={actionLoading === 'modal'} className="h-10 w-full font-bold">
+                <Button type="submit" disabled={actionLoading === 'modal'} className="h-10 w-full font-bold rounded-full px-6 shadow-xs">
                   {actionLoading === 'modal' ? (newSubject.id ? 'Updating...' : 'Adding...') : (newSubject.id ? 'Update Subject' : 'Add Subject')}
                 </Button>
               </div>
@@ -1252,7 +1419,7 @@ export default function TimetablePage() {
                 modalSubjects.map(s => (
                   <div 
                     key={s.id} 
-                    className="flex items-center gap-2 px-3 py-1.5 bg-zinc-100 dark:bg-zinc-900 border border-border rounded-lg text-xs font-bold text-text-primary hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50 transition-colors animate-in zoom-in duration-200"
+                    className="flex items-center gap-2 px-3.5 py-1.5 bg-zinc-50/50 dark:bg-zinc-950/20 border border-border rounded-full text-xs font-bold text-text-primary hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors animate-in zoom-in duration-200"
                   >
                     <span>{s.name}</span>
                     <button
@@ -1262,7 +1429,7 @@ export default function TimetablePage() {
                         setDeleteError('');
                         setIsDeleteConfirmOpen(true);
                       }}
-                      className="text-red-500 hover:text-red-700 transition-colors font-bold ml-1"
+                      className="text-red-500 hover:text-red-700 transition-colors font-bold ml-1 cursor-pointer"
                     >
                       ✕
                     </button>
@@ -1317,6 +1484,47 @@ export default function TimetablePage() {
           )}
           <p className="text-xs text-text-secondary leading-relaxed">
             Do you want to continue?
+          </p>
+        </div>
+      </Dialog>
+
+      {/* Modal: Delete Day Timetable Confirmation */}
+      <Dialog
+        isOpen={isDeleteDayConfirmOpen}
+        onClose={() => {
+          setIsDeleteDayConfirmOpen(false);
+          setDayToDelete('');
+        }}
+        title="Delete Timetable?"
+        description=""
+        className="w-[95vw] md:max-w-md"
+        footer={
+          <div className="flex justify-end gap-3 w-full">
+            <Button 
+              variant="secondary" 
+              onClick={() => {
+                setIsDeleteDayConfirmOpen(false);
+                setDayToDelete('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleDeleteDayTimetable} 
+              disabled={Boolean(actionLoading && typeof actionLoading === 'string' && actionLoading.startsWith('delete-day'))}
+            >
+              {actionLoading && typeof actionLoading === 'string' && actionLoading.startsWith('delete-day') ? 'Deleting...' : 'Delete Timetable'}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-3 pt-2">
+          <p className="text-xs text-text-secondary leading-relaxed">
+            Are you sure you want to delete all scheduled periods for <strong className="text-text-primary">{dayToDelete}</strong>?
+          </p>
+          <p className="text-xs text-text-muted leading-relaxed">
+            This action will remove all periods scheduled for this day. Teachers assigned to these periods will become available for new assignments.
           </p>
         </div>
       </Dialog>
@@ -1382,33 +1590,34 @@ export default function TimetablePage() {
         <div className="space-y-4 pt-4">
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-text-secondary uppercase">Select Backup Teacher</label>
-            <select
+            <CustomSelect
               value={backupTeacherId}
-              onChange={e => setBackupTeacherId(e.target.value)}
-              className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-xs font-semibold focus:outline-none shadow-2xs"
-            >
-              <option value="">Select Backup Teacher</option>
-              {staff.filter(t => {
-                if (t.status !== 'ACTIVE' || t.role !== 'Teacher' || t.id === activeTimetableItem?.teacher_id) return false;
-                const dayName = activeTimetableItem?.day_of_week;
-                const periodNum = activeTimetableItem?.period_number;
-                const isOccupiedInPeriod = allTimetableEntries.some(entry => {
-                  return entry.day_of_week === dayName &&
-                         entry.period_number === periodNum &&
-                         entry.active_teacher_id === t.id &&
-                         String(entry.class_id) !== String(selectedClassId);
-                });
-                if (isOccupiedInPeriod) return false;
+              onChange={val => setBackupTeacherId(val)}
+              placeholder="Select Backup Teacher"
+              options={[
+                { value: '', label: 'Select Backup Teacher' },
+                ...staff
+                  .filter(t => {
+                    if (t.status !== 'ACTIVE' || t.role !== 'Teacher' || t.id === activeTimetableItem?.teacher_id) return false;
+                    const dayName = activeTimetableItem?.day_of_week;
+                    const periodNum = activeTimetableItem?.period_number;
+                    const isOccupiedInPeriod = allTimetableEntries.some(entry => {
+                      return entry.day_of_week === dayName &&
+                             entry.period_number === periodNum &&
+                             entry.active_teacher_id === t.id &&
+                             String(entry.class_id) !== String(selectedClassId);
+                    });
+                    if (isOccupiedInPeriod) return false;
 
-                const dailyAssigned = t.day_workloads?.[dayName] ?? 0;
-                const max = periodConfigs.length;
-                return dailyAssigned < max;
-              }).map(t => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
+                    const dailyAssigned = t.day_workloads?.[dayName] ?? 0;
+                    const max = periodConfigs.length;
+                    return dailyAssigned < max;
+                  })
+                  .map(t => ({ value: t.id, label: t.name }))
+              ]}
+              className="w-full"
+              buttonClassName="w-full h-10 min-w-0 px-4 text-xs font-semibold"
+            />
             <p className="text-[11px] text-text-muted mt-1">Note: This assignment will automatically expire. The main teacher returns on the next recurring date.</p>
           </div>
         </div>
@@ -1428,33 +1637,34 @@ export default function TimetablePage() {
         <div className="space-y-4 pt-4">
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-text-secondary uppercase">Select Replacement Teacher</label>
-            <select
+            <CustomSelect
               value={replaceTeacherId}
-              onChange={e => setReplaceTeacherId(e.target.value)}
-              className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-xs font-semibold focus:outline-none shadow-2xs"
-            >
-              <option value="">Select Replacement Teacher</option>
-              {staff.filter(t => {
-                if (t.status !== 'ACTIVE' || t.role !== 'Teacher' || t.id === activeTimetableItem?.teacher_id) return false;
-                const dayName = activeTimetableItem?.day_of_week;
-                const periodNum = activeTimetableItem?.period_number;
-                const isOccupiedInPeriod = allTimetableEntries.some(entry => {
-                  return entry.day_of_week === dayName &&
-                         entry.period_number === periodNum &&
-                         entry.active_teacher_id === t.id &&
-                         String(entry.class_id) !== String(selectedClassId);
-                });
-                if (isOccupiedInPeriod) return false;
+              onChange={val => setReplaceTeacherId(val)}
+              placeholder="Select Replacement Teacher"
+              options={[
+                { value: '', label: 'Select Replacement Teacher' },
+                ...staff
+                  .filter(t => {
+                    if (t.status !== 'ACTIVE' || t.role !== 'Teacher' || t.id === activeTimetableItem?.teacher_id) return false;
+                    const dayName = activeTimetableItem?.day_of_week;
+                    const periodNum = activeTimetableItem?.period_number;
+                    const isOccupiedInPeriod = allTimetableEntries.some(entry => {
+                      return entry.day_of_week === dayName &&
+                             entry.period_number === periodNum &&
+                             entry.active_teacher_id === t.id &&
+                             String(entry.class_id) !== String(selectedClassId);
+                    });
+                    if (isOccupiedInPeriod) return false;
 
-                const dailyAssigned = t.day_workloads?.[dayName] ?? 0;
-                const max = periodConfigs.length;
-                return dailyAssigned < max;
-              }).map(t => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
+                    const dailyAssigned = t.day_workloads?.[dayName] ?? 0;
+                    const max = periodConfigs.length;
+                    return dailyAssigned < max;
+                  })
+                  .map(t => ({ value: t.id, label: t.name }))
+              ]}
+              className="w-full"
+              buttonClassName="w-full h-10 min-w-0 px-4 text-xs font-semibold"
+            />
             <p className="text-[11px] text-text-muted mt-1">Warning: This update applies to all future weeks. History remains locked and unchanged.</p>
           </div>
         </div>

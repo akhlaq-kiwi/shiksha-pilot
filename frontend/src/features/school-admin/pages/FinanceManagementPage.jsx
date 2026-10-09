@@ -11,6 +11,18 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '.
 import { Dialog } from '../../../common/ui/dialog';
 import { schoolService } from '../../../common/services/schoolService';
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
+import { getClassIndex, getShortClassName } from '../../../common/constants/predefinedClasses';
+
+const formatDisplayClassName = (name) => {
+  if (!name) return '';
+  const clean = String(name).trim();
+  const idx = getClassIndex(clean);
+  const class1Idx = getClassIndex('Class 1');
+  if (idx !== -1 && idx < class1Idx) {
+    return getShortClassName(clean);
+  }
+  return clean;
+};
 
 const formatCurrency = (val) => {
   const num = parseFloat(val);
@@ -58,6 +70,64 @@ const getLocalDateString = () => {
 };
 
 const ACADEMIC_MONTHS = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+
+function CustomSelect({ options, value, onChange, placeholder = "Select...", disabled = false, className = "", buttonClassName = "", dropdownClassName = "" }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  const selectedOption = options.find(o => String(o.value) === String(value));
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={containerRef} className={`relative ${isOpen ? 'z-50' : 'z-10'} ${className}`}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={`flex h-10 items-center justify-between gap-2.5 rounded-full border border-border bg-surface px-4 py-2 text-xs font-bold text-text-primary shadow-2xs outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border active:outline-none select-none transition-colors min-w-[120px] ${
+          disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-border-strong'
+        } ${buttonClassName}`}
+      >
+        <span className="truncate">
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <ChevronDown className={`h-4 w-4 text-text-muted transition-transform duration-200 flex-shrink-0 ml-1 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && !disabled && (
+        <div className={`absolute left-0 right-0 top-full mt-1.5 min-w-[140px] rounded-2xl border border-border bg-surface shadow-2xl z-50 overflow-hidden animate-in fade-in duration-150 ${dropdownClassName}`}>
+          <div className="max-h-60 overflow-y-auto p-1.5 space-y-0.5 scrollbar-thin">
+            {options.map((opt) => {
+              const isSelected = String(opt.value) === String(value);
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(opt.value);
+                    setIsOpen(false);
+                  }}
+                  className={`w-full text-left px-3.5 py-2 rounded-xl text-xs font-semibold outline-none focus:outline-none select-none transition-colors hover:bg-primary/10 ${isSelected ? 'bg-primary/10 text-primary font-bold' : 'text-text-primary'}`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function FinanceManagementPage() {
   const location = useLocation();
@@ -112,7 +182,7 @@ export default function FinanceManagementPage() {
 
   const [classes, setClasses] = useState([]);
 
-  // Deduplicate classes by class name so section rows are merged for fee allocations
+  // Deduplicate classes by class name so section rows are merged for fee allocations, sorted from smallest to largest class
   const uniqueClasses = useMemo(() => {
     const map = new Map();
     (classes || []).forEach(c => {
@@ -121,12 +191,21 @@ export default function FinanceManagementPage() {
         if (!map.has(name)) {
           map.set(name, {
             name: name,
+            displayName: formatDisplayClassName(name),
             ids: classes.filter(item => item && item.name && item.name.trim() === name).map(item => item.id)
           });
         }
       }
     });
-    return Array.from(map.values());
+    const list = Array.from(map.values());
+    return list.sort((a, b) => {
+      const idxA = getClassIndex(a.name);
+      const idxB = getClassIndex(b.name);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return a.name.localeCompare(b.name);
+    });
   }, [classes]);
   const [academicYears, setAcademicYears] = useState([]);
   const [expenses, setExpenses] = useState([]);
@@ -1267,18 +1346,27 @@ export default function FinanceManagementPage() {
   // Compute dynamic monthly totals for expenses listing
   const filteredTotalExpensesAmount = expenses.reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
 
+  if (loading) {
+    return (
+      <div className="flex-1 flex flex-col justify-center items-center py-24 min-h-[400px] gap-3">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <p className="text-xs font-bold text-text-primary uppercase tracking-wider">LOADING FINANCE...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-[calc(100vh-80px)] space-y-4 max-h-[calc(100vh-80px)] animate-in fade-in duration-300">
       
       {/* Page Header (Fixed) */}
-      <div className="flex-shrink-0 bg-surface border border-border p-6 rounded-2xl shadow-2xs">
+      <div className="flex-shrink-0 bg-zinc-50/50 dark:bg-zinc-900/50 border border-border p-6 rounded-2xl shadow-2xs">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-primary/10 text-primary rounded-xl">
               <Landmark className="h-6 w-6" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-text-primary tracking-tight font-display">Finance Management</h2>
+              <h2 className="text-2xl font-bold text-text-primary tracking-tight font-display uppercase">MANAGE FINANCE</h2>
               <p className="text-text-secondary text-xs mt-1">Record daily school operational expenses and manage student non-tuition fees ledger payouts.</p>
             </div>
           </div>
@@ -1340,19 +1428,14 @@ export default function FinanceManagementPage() {
         </div>
       )}
 
-      {/* LOADING SPINNER */}
-      {loading && (
-        <div className="flex-1 flex justify-center items-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-      )}
+
 
       {/* Tab 1: Expenses View */}
       {!loading && activeTab === 'expenses' && (
         <div className="flex-1 flex flex-col min-h-0 space-y-4">
           
           {/* Header row with search, month filter, and Add Expense button */}
-          <div className="flex-shrink-0 bg-surface border border-border p-5 rounded-2xl shadow-2xs space-y-4">
+          <div className="relative z-30 flex-shrink-0 bg-zinc-50/50 dark:bg-zinc-900/50 border border-border p-5 rounded-2xl shadow-2xs space-y-4">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border pb-4">
               <div>
                 <span className="text-[11px] text-text-muted font-bold uppercase tracking-wider">Total Expenses for Selected Month</span>
@@ -1366,19 +1449,20 @@ export default function FinanceManagementPage() {
                   placeholder="Search by Description..." 
                   value={expenseSearch} 
                   onChange={e => setExpenseSearch(e.target.value)} 
-                  className="text-xs"
+                  className="text-xs rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
                 />
               </div>
 
               <div>
-                <Select 
+                <CustomSelect 
                   value={selectedMonth} 
-                  onChange={e => setSelectedMonth(e.target.value)}
-                  className="text-xs cursor-pointer"
-                >
-                  <option value="ALL">All Months</option>
-                  {ACADEMIC_MONTHS.map((m, idx) => <option key={idx} value={m}>{m}</option>)}
-                </Select>
+                  onChange={val => setSelectedMonth(val)}
+                  className="w-full"
+                  options={[
+                    { value: 'ALL', label: 'All Months' },
+                    ...ACADEMIC_MONTHS.map(m => ({ value: m, label: m }))
+                  ]}
+                />
               </div>
 
               {!isReadOnly && (
@@ -1397,119 +1481,121 @@ export default function FinanceManagementPage() {
           </div>
 
           {/* Table Listing Area */}
-          <div 
-            ref={expensesContainerRef}
-            onScroll={handleExpensesScroll}
-            className="flex-1 min-h-0 overflow-y-auto border border-border rounded-2xl bg-surface shadow-2xs relative"
-          >
-            {expenses.length === 0 ? (
-              <div className="p-12 text-center text-text-muted text-xs font-bold leading-relaxed">
-                No expense entries logged.
-              </div>
-            ) : (
-              <>
-                <Table>
-                  <TableHeader className="sticky top-0 bg-surface z-10 border-b border-border shadow-3xs">
-                    <TableRow>
-                      <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Description</TableHead>
-                      <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Expense Date</TableHead>
-                      <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Amount</TableHead>
-                      <TableHead className="text-right text-xs uppercase font-bold text-text-secondary bg-surface w-16">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paginatedExpenses.map((e) => (
-                      <TableRow key={e.id}>
-                        <TableCell className="text-xs font-semibold text-text-primary py-3.5 max-w-[350px]">
-                          <div className="inline-flex items-center gap-1.5 max-w-full">
-                            <span className="truncate">{e.description}</span>
-                            {e.bill_attachment_path && (
-                              <button
-                                type="button"
-                                onClick={(ev) => {
-                                  ev.stopPropagation();
-                                  setPreviewingBillUrl(e.bill_attachment_path);
-                                }}
-                                className="inline-flex items-center justify-center p-1 rounded-md text-primary hover:text-primary/80 hover:bg-primary/10 transition-all shrink-0 cursor-pointer"
-                                title="View Bill Attachment"
-                              >
-                                <Paperclip className="h-3.5 w-3.5" />
-                              </button>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-xs font-mono font-bold text-text-secondary py-3.5 whitespace-nowrap">{formatDateFull(e.expense_date)}</TableCell>
-                        <TableCell className="text-xs font-bold font-sans text-red-500 py-3.5">{formatCurrency(e.amount)}</TableCell>
-                        <TableCell className="text-right py-3.5 relative">
-                          <button 
-                            onClick={(ev) => {
-                              ev.stopPropagation();
-                              if (activeExpenseDropdownId === e.id) {
-                                setActiveExpenseDropdownId(null);
-                                setDropdownCoords(null);
-                              } else {
-                                const rect = ev.currentTarget.getBoundingClientRect();
-                                setDropdownCoords({
-                                  top: rect.bottom + window.scrollY,
-                                  left: rect.right - 128 + window.scrollX,
-                                });
-                                setActiveExpenseDropdownId(e.id);
-                              }
-                            }}
-                            className="p-1.5 hover:bg-zinc-100 rounded-lg transition-all"
-                          >
-                            <MoreVertical className="h-4 w-4 text-text-muted" />
-                          </button>
-
-                          {/* Dropdown Menu Overlay via Portal */}
-                          {activeExpenseDropdownId === e.id && dropdownCoords && createPortal(
-                            <div 
-                              ref={dropdownRef}
-                              style={{
-                                position: 'absolute',
-                                top: `${dropdownCoords.top}px`,
-                                left: `${dropdownCoords.left}px`,
-                              }}
-                              className="w-32 bg-surface border border-border shadow-md rounded-xl py-1.5 z-[9999] text-left text-xs text-text-primary animate-in fade-in duration-100"
-                            >
-                              {isReadOnly || e.is_locked ? (
-                                <div className="px-3 py-1.5 text-text-muted font-bold italic flex flex-col">
-                                  <span className="text-[11px] uppercase tracking-wider text-amber-600 flex items-center gap-0.5"><AlertTriangle className="h-3 w-3" /> Locked</span>
-                                  {isReadOnly && <span className="text-[8px] text-text-muted mt-0.5">Archived Year</span>}
-                                </div>
-                              ) : (
-                                <>
-                                  <button 
-                                    onClick={() => handleExpenseModalOpen(e)}
-                                    className="w-full px-3 py-1.5 hover:bg-zinc-50 flex items-center gap-1.5 font-semibold text-zinc-700"
-                                  >
-                                    <Edit className="h-3.5 w-3.5 text-text-muted" /> Edit
-                                  </button>
-                                  <button 
-                                    onClick={() => handleDeleteExpenseClick(e)}
-                                    className="w-full px-3 py-1.5 hover:bg-zinc-50 flex items-center gap-1.5 font-semibold text-red-600"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5 text-red-400" /> Delete
-                                  </button>
-                                </>
-                              )}
-                            </div>,
-                            document.body
-                          )}
-                        </TableCell>
+          <div className="flex-1 min-h-0 border border-border rounded-2xl bg-surface shadow-2xs relative overflow-hidden flex flex-col">
+            <div 
+              ref={expensesContainerRef}
+              onScroll={handleExpensesScroll}
+              className="flex-1 min-h-0 flex flex-col"
+            >
+              {expenses.length === 0 ? (
+                <div className="p-12 text-center text-text-muted text-xs font-bold leading-relaxed">
+                  No expense entries logged.
+                </div>
+              ) : (
+                <>
+                  <Table containerClassName="border-0 rounded-none shadow-none bg-transparent flex-1 min-h-0 overflow-y-auto">
+                    <TableHeader className="sticky top-0 z-10 border-b border-border bg-[#FAF6EC] dark:bg-zinc-900/50 backdrop-blur-xs">
+                      <TableRow className="bg-[#FAF6EC] dark:bg-zinc-900/50">
+                        <TableHead className="text-xs uppercase font-bold text-text-secondary bg-[#FAF6EC] dark:bg-zinc-900/50">Description</TableHead>
+                        <TableHead className="text-xs uppercase font-bold text-text-secondary bg-[#FAF6EC] dark:bg-zinc-900/50">Expense Date</TableHead>
+                        <TableHead className="text-xs uppercase font-bold text-text-secondary bg-[#FAF6EC] dark:bg-zinc-900/50">Amount</TableHead>
+                        <TableHead className="text-right text-xs uppercase font-bold text-text-secondary bg-[#FAF6EC] dark:bg-zinc-900/50 w-16">Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                
-                {isFetchingMoreExpenses && (
-                  <div className="py-4 flex flex-col items-center justify-center gap-2 border-t border-border bg-zinc-50/50 dark:bg-zinc-900/10">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                    <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Loading more expenses...</span>
-                  </div>
-                )}
-              </>
-            )}
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedExpenses.map((e) => (
+                        <TableRow key={e.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/50 transition-colors cursor-pointer">
+                          <TableCell className="text-xs font-semibold text-text-primary py-3.5 max-w-[350px]">
+                            <div className="inline-flex items-center gap-1.5 max-w-full">
+                              <span className="truncate">{e.description}</span>
+                              {e.bill_attachment_path && (
+                                <button
+                                  type="button"
+                                  onClick={(ev) => {
+                                    ev.stopPropagation();
+                                    setPreviewingBillUrl(e.bill_attachment_path);
+                                  }}
+                                  className="inline-flex items-center justify-center p-1 rounded-md text-primary hover:text-primary/80 hover:bg-primary/10 transition-all shrink-0 cursor-pointer"
+                                  title="View Bill Attachment"
+                                >
+                                  <Paperclip className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-xs font-mono font-bold text-text-secondary py-3.5 whitespace-nowrap">{formatDateFull(e.expense_date)}</TableCell>
+                          <TableCell className="text-xs font-bold font-sans text-red-500 py-3.5">{formatCurrency(e.amount)}</TableCell>
+                          <TableCell className="text-right py-3.5 relative">
+                            <button 
+                              onClick={(ev) => {
+                                ev.stopPropagation();
+                                if (activeExpenseDropdownId === e.id) {
+                                  setActiveExpenseDropdownId(null);
+                                  setDropdownCoords(null);
+                                } else {
+                                  const rect = ev.currentTarget.getBoundingClientRect();
+                                  setDropdownCoords({
+                                    top: rect.bottom + window.scrollY,
+                                    left: rect.right - 128 + window.scrollX,
+                                  });
+                                  setActiveExpenseDropdownId(e.id);
+                                }
+                              }}
+                              className="p-1.5 hover:bg-zinc-100 rounded-lg transition-all"
+                            >
+                              <MoreVertical className="h-4 w-4 text-text-muted" />
+                            </button>
+
+                            {/* Dropdown Menu Overlay via Portal */}
+                            {activeExpenseDropdownId === e.id && dropdownCoords && createPortal(
+                              <div 
+                                ref={dropdownRef}
+                                style={{
+                                  position: 'absolute',
+                                  top: `${dropdownCoords.top}px`,
+                                  left: `${dropdownCoords.left}px`,
+                                }}
+                                className="w-32 bg-surface border border-border shadow-md rounded-xl py-1.5 z-[9999] text-left text-xs text-text-primary animate-in fade-in duration-100"
+                              >
+                                {isReadOnly || e.is_locked ? (
+                                  <div className="px-3 py-1.5 text-text-muted font-bold italic flex flex-col">
+                                    <span className="text-[11px] uppercase tracking-wider text-amber-600 flex items-center gap-0.5"><AlertTriangle className="h-3 w-3" /> Locked</span>
+                                    {isReadOnly && <span className="text-[8px] text-text-muted mt-0.5">Archived Year</span>}
+                                  </div>
+                                ) : (
+                                  <>
+                                    <button 
+                                      onClick={() => handleExpenseModalOpen(e)}
+                                      className="w-full px-3 py-1.5 hover:bg-zinc-50 flex items-center gap-1.5 font-semibold text-zinc-700"
+                                    >
+                                      <Edit className="h-3.5 w-3.5 text-text-muted" /> Edit
+                                    </button>
+                                    <button 
+                                      onClick={() => handleDeleteExpenseClick(e)}
+                                      className="w-full px-3 py-1.5 hover:bg-zinc-50 flex items-center gap-1.5 font-semibold text-red-600"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5 text-red-400" /> Delete
+                                    </button>
+                                  </>
+                                )}
+                              </div>,
+                              document.body
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  
+                  {isFetchingMoreExpenses && (
+                    <div className="py-4 flex flex-col items-center justify-center gap-2 border-t border-border bg-zinc-50/50 dark:bg-zinc-900/10">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                      <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Loading more expenses...</span>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -1519,14 +1605,14 @@ export default function FinanceManagementPage() {
         <div className="flex-1 flex flex-col min-h-0 space-y-4 animate-in fade-in duration-200">
           
           {/* Header Row consistent with Expenses */}
-          <div className="flex-shrink-0 bg-surface border border-border p-5 rounded-2xl shadow-2xs space-y-4">
+          <div className="flex-shrink-0 bg-zinc-50/50 dark:bg-zinc-900/50 border border-border p-5 rounded-2xl shadow-2xs space-y-4">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="relative flex-1 max-w-md w-full">
                 <Input aria-label="Search by Fee Description..." 
                   placeholder="Search by Fee Description..." 
                   value={feeSearch} 
                   onChange={e => setFeeSearch(e.target.value)} 
-                  className="text-xs w-full"
+                  className="text-xs w-full rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
                 />
               </div>
 
@@ -1550,114 +1636,116 @@ export default function FinanceManagementPage() {
           </div>
 
           {/* Additional Fee Types definitions list Table */}
-          <div 
-            ref={feesContainerRef}
-            onScroll={handleFeesScroll}
-            className="flex-1 min-h-0 overflow-y-auto border border-border rounded-2xl bg-surface shadow-2xs relative"
-          >
-            {filteredFeeTypes.length === 0 ? (
-              <div className="p-12 text-center text-text-muted text-xs font-bold leading-relaxed">
-                No additional fees created.
-              </div>
-            ) : (
-              <>
-                <Table>
-                  <TableHeader className="sticky top-0 bg-surface z-10 border-b border-border shadow-3xs">
-                    <TableRow>
-                      <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Fee Description</TableHead>
-                      <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Class</TableHead>
-                      <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Due Date</TableHead>
-                      <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Amount</TableHead>
-                      <TableHead className="text-right text-xs uppercase font-bold text-text-secondary bg-surface w-24">Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paginatedFees.map((ft) => (
-                      <TableRow key={ft.id}>
-                        <TableCell className="font-bold text-text-primary text-xs uppercase tracking-wider py-3.5 max-w-[200px] truncate">{ft.name}</TableCell>
-                        <TableCell className="text-xs text-text-secondary font-bold py-3.5 truncate max-w-[170px]">{formatClassColumnText(ft.assigned_to)}</TableCell>
-                        <TableCell className="text-xs text-text-muted font-mono whitespace-nowrap py-3.5">{formatDateFull(ft.due_date)}</TableCell>
-                        <TableCell className="text-xs text-text-primary font-bold font-sans py-3.5">{formatCurrency(ft.amount)}</TableCell>
-                        <TableCell className="text-right py-3.5 relative whitespace-nowrap">
-                          <button 
-                            onClick={(ev) => {
-                              ev.stopPropagation();
-                              if (activeFeeDropdownId === ft.id) {
-                                setActiveFeeDropdownId(null);
-                                setDropdownCoords(null);
-                              } else {
-                                const rect = ev.currentTarget.getBoundingClientRect();
-                                setDropdownCoords({
-                                  top: rect.bottom + window.scrollY,
-                                  left: rect.right - 128 + window.scrollX,
-                                });
-                                setActiveFeeDropdownId(ft.id);
-                              }
-                            }}
-                            className="p-1.5 hover:bg-zinc-100 rounded-lg transition-all"
-                          >
-                            <MoreVertical className="h-4 w-4 text-text-muted" />
-                          </button>
-
-                          {/* Dropdown Menu Overlay via Portal */}
-                          {activeFeeDropdownId === ft.id && dropdownCoords && createPortal(
-                            <div 
-                              ref={dropdownRef}
-                              style={{
-                                position: 'absolute',
-                                top: `${dropdownCoords.top}px`,
-                                left: `${dropdownCoords.left}px`,
-                              }}
-                              className="w-32 bg-surface border border-border shadow-md rounded-xl py-1.5 z-[9999] text-left text-xs text-text-primary animate-in fade-in duration-100"
-                            >
-                              <button 
-                                onClick={() => { setViewingFeeType(ft); setActiveFeeDropdownId(null); }}
-                                className="w-full px-3 py-1.5 hover:bg-zinc-50 flex items-center gap-1.5 font-semibold"
-                              >
-                                <Eye className="h-3.5 w-3.5 text-text-muted" /> View Details
-                              </button>
-                              
-                              {ft.category !== 'System Generated' && ft.name?.trim().toLowerCase() !== 'annual fee' && !isReadOnly && (
-                                <button 
-                                  onClick={() => handleEditFeeTypeClick(ft)}
-                                  className="w-full px-3 py-1.5 hover:bg-zinc-50 border-t border-border flex items-center gap-1.5 font-semibold text-zinc-700"
-                                >
-                                  <Edit className="h-3.5 w-3.5 text-text-muted" /> Edit
-                                </button>
-                              )}
-                              
-                              {ft.category !== 'System Generated' && ft.name?.trim().toLowerCase() !== 'annual fee' && !isReadOnly && (
-                                <button 
-                                  onClick={() => handleDeleteFeeTypeClick(ft)}
-                                  className="w-full px-3 py-1.5 hover:bg-zinc-50 flex items-center gap-1.5 font-semibold text-red-600"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5 text-red-400" /> Delete
-                                </button>
-                              )}
-
-                              {isReadOnly && (
-                                <div className="px-3 py-1.5 text-text-muted font-bold italic border-t border-border flex flex-col">
-                                  <span className="text-[11px] uppercase tracking-wider text-amber-600 flex items-center gap-0.5"><AlertTriangle className="h-3 w-3" /> Read Only</span>
-                                  <span className="text-[8px] text-text-muted mt-0.5">Archived Year</span>
-                                </div>
-                              )}
-                            </div>,
-                            document.body
-                          )}
-                        </TableCell>
+          <div className="flex-1 min-h-0 border border-border rounded-2xl bg-surface shadow-2xs relative overflow-hidden flex flex-col">
+            <div 
+              ref={feesContainerRef}
+              onScroll={handleFeesScroll}
+              className="flex-1 min-h-0 flex flex-col"
+            >
+              {filteredFeeTypes.length === 0 ? (
+                <div className="p-12 text-center text-text-muted text-xs font-bold leading-relaxed">
+                  No additional fees created.
+                </div>
+              ) : (
+                <>
+                  <Table containerClassName="border-0 rounded-none shadow-none bg-transparent flex-1 min-h-0 overflow-y-auto">
+                    <TableHeader className="sticky top-0 z-10 border-b border-border bg-[#FAF6EC] dark:bg-zinc-900/50 backdrop-blur-xs">
+                      <TableRow className="bg-[#FAF6EC] dark:bg-zinc-900/50">
+                        <TableHead className="text-xs uppercase font-bold text-text-secondary bg-[#FAF6EC] dark:bg-zinc-900/50">Fee Description</TableHead>
+                        <TableHead className="text-xs uppercase font-bold text-text-secondary bg-[#FAF6EC] dark:bg-zinc-900/50">Class</TableHead>
+                        <TableHead className="text-xs uppercase font-bold text-text-secondary bg-[#FAF6EC] dark:bg-zinc-900/50">Due Date</TableHead>
+                        <TableHead className="text-xs uppercase font-bold text-text-secondary bg-[#FAF6EC] dark:bg-zinc-900/50">Amount</TableHead>
+                        <TableHead className="text-right text-xs uppercase font-bold text-text-secondary bg-[#FAF6EC] dark:bg-zinc-900/50 w-24">Action</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                
-                {isFetchingMoreFees && (
-                  <div className="py-4 flex flex-col items-center justify-center gap-2 border-t border-border bg-zinc-50/50 dark:bg-zinc-900/10">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                    <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Loading more fees...</span>
-                  </div>
-                )}
-              </>
-            )}
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedFees.map((ft) => (
+                        <TableRow key={ft.id}>
+                          <TableCell className="font-bold text-text-primary text-xs uppercase tracking-wider py-3.5 max-w-[200px] truncate">{ft.name}</TableCell>
+                          <TableCell className="text-xs text-text-secondary font-bold py-3.5 truncate max-w-[170px]">{formatClassColumnText(ft.assigned_to)}</TableCell>
+                          <TableCell className="text-xs text-text-muted font-mono whitespace-nowrap py-3.5">{formatDateFull(ft.due_date)}</TableCell>
+                          <TableCell className="text-xs text-text-primary font-bold font-sans py-3.5">{formatCurrency(ft.amount)}</TableCell>
+                          <TableCell className="text-right py-3.5 relative whitespace-nowrap">
+                            <button 
+                              onClick={(ev) => {
+                                ev.stopPropagation();
+                                if (activeFeeDropdownId === ft.id) {
+                                  setActiveFeeDropdownId(null);
+                                  setDropdownCoords(null);
+                                } else {
+                                  const rect = ev.currentTarget.getBoundingClientRect();
+                                  setDropdownCoords({
+                                    top: rect.bottom + window.scrollY,
+                                    left: rect.right - 128 + window.scrollX,
+                                  });
+                                  setActiveFeeDropdownId(ft.id);
+                                }
+                              }}
+                              className="p-1.5 hover:bg-zinc-100 rounded-lg transition-all"
+                            >
+                              <MoreVertical className="h-4 w-4 text-text-muted" />
+                            </button>
+
+                            {/* Dropdown Menu Overlay via Portal */}
+                            {activeFeeDropdownId === ft.id && dropdownCoords && createPortal(
+                              <div 
+                                ref={dropdownRef}
+                                style={{
+                                  position: 'absolute',
+                                  top: `${dropdownCoords.top}px`,
+                                  left: `${dropdownCoords.left}px`,
+                                }}
+                                className="w-32 bg-surface border border-border shadow-md rounded-xl py-1.5 z-[9999] text-left text-xs text-text-primary animate-in fade-in duration-100"
+                              >
+                                <button 
+                                  onClick={() => { setViewingFeeType(ft); setActiveFeeDropdownId(null); }}
+                                  className="w-full px-3 py-1.5 hover:bg-zinc-50 flex items-center gap-1.5 font-semibold"
+                                >
+                                  <Eye className="h-3.5 w-3.5 text-text-muted" /> View Details
+                                </button>
+                                
+                                {ft.category !== 'System Generated' && ft.name?.trim().toLowerCase() !== 'annual fee' && !isReadOnly && (
+                                  <button 
+                                    onClick={() => handleEditFeeTypeClick(ft)}
+                                    className="w-full px-3 py-1.5 hover:bg-zinc-50 border-t border-border flex items-center gap-1.5 font-semibold text-zinc-700"
+                                  >
+                                    <Edit className="h-3.5 w-3.5 text-text-muted" /> Edit
+                                  </button>
+                                )}
+                                
+                                {ft.category !== 'System Generated' && ft.name?.trim().toLowerCase() !== 'annual fee' && !isReadOnly && (
+                                  <button 
+                                    onClick={() => handleDeleteFeeTypeClick(ft)}
+                                    className="w-full px-3 py-1.5 hover:bg-zinc-50 flex items-center gap-1.5 font-semibold text-red-600"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5 text-red-400" /> Delete
+                                  </button>
+                                )}
+
+                                {isReadOnly && (
+                                  <div className="px-3 py-1.5 text-text-muted font-bold italic border-t border-border flex flex-col">
+                                    <span className="text-[11px] uppercase tracking-wider text-amber-600 flex items-center gap-0.5"><AlertTriangle className="h-3 w-3" /> Read Only</span>
+                                    <span className="text-[8px] text-text-muted mt-0.5">Archived Year</span>
+                                  </div>
+                                )}
+                              </div>,
+                              document.body
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  
+                  {isFetchingMoreFees && (
+                    <div className="py-4 flex flex-col items-center justify-center gap-2 border-t border-border bg-zinc-50/50 dark:bg-zinc-900/10">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                      <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Loading more fees...</span>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -1667,27 +1755,28 @@ export default function FinanceManagementPage() {
         <div className="flex-1 flex flex-col min-h-0 space-y-4 animate-in fade-in duration-200">
           
           {/* Header Row */}
-          <div className="flex-shrink-0 bg-surface border border-border p-5 rounded-2xl shadow-2xs space-y-4">
+          <div className="relative z-30 flex-shrink-0 bg-zinc-50/50 dark:bg-zinc-900/50 border border-border p-5 rounded-2xl shadow-2xs space-y-4">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="relative flex-1 max-w-md w-full">
                 <Input aria-label="Search by Student Name or Admission Number..." 
                   placeholder="Search by Student Name or Admission Number..." 
                   value={transportSearch} 
                   onChange={e => setTransportSearch(e.target.value)} 
-                  className="text-xs w-full"
+                  className="text-xs w-full rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
                 />
               </div>
 
               <div className="flex items-center gap-4 w-full sm:w-auto">
-                <Select
+                <CustomSelect
                   value={transportStatusFilter}
-                  onChange={e => setTransportStatusFilter(e.target.value)}
-                  className="text-xs w-full sm:w-40 cursor-pointer"
-                >
-                  <option value="All">All Statuses</option>
-                  <option value="Active">Active Only</option>
-                  <option value="Inactive">Inactive Only</option>
-                </Select>
+                  onChange={val => setTransportStatusFilter(val)}
+                  className="w-full sm:w-40"
+                  options={[
+                    { value: 'All', label: 'All Statuses' },
+                    { value: 'Active', label: 'Active Only' },
+                    { value: 'Inactive', label: 'Inactive Only' },
+                  ]}
+                />
 
                 {!isReadOnly && (
                   <Button 
@@ -1702,25 +1791,23 @@ export default function FinanceManagementPage() {
           </div>
 
           {/* Transport Fees Listing Table */}
-          <div 
-            className="flex-1 min-h-0 overflow-y-auto border border-border rounded-2xl bg-surface shadow-2xs relative"
-          >
+          <div className="flex-1 min-h-0 border border-border rounded-2xl bg-surface shadow-2xs relative overflow-hidden flex flex-col">
             {filteredTransportFees.length === 0 ? (
               <div className="p-12 text-center text-text-muted text-xs font-bold leading-relaxed">
                 No transport fees configured.
               </div>
             ) : (
-              <Table>
-                <TableHeader className="sticky top-0 bg-surface z-10 border-b border-border shadow-3xs">
-                  <TableRow>
-                    <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Student Name</TableHead>
-                    <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">SR No</TableHead>
-                    <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Class</TableHead>
-                    <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Monthly Fee</TableHead>
-                    <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Start Date</TableHead>
-                    <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Status</TableHead>
-                    <TableHead className="text-xs uppercase font-bold text-text-secondary bg-surface">Next Charge Amount</TableHead>
-                    <TableHead className="text-right text-xs uppercase font-bold text-text-secondary bg-surface w-24">Action</TableHead>
+              <Table containerClassName="border-0 rounded-none shadow-none bg-transparent flex-1 min-h-0 overflow-y-auto">
+                <TableHeader className="sticky top-0 z-10 border-b border-border bg-[#FAF6EC] dark:bg-zinc-900/50 backdrop-blur-xs">
+                  <TableRow className="bg-[#FAF6EC] dark:bg-zinc-900/50">
+                    <TableHead className="text-xs uppercase font-bold text-text-secondary bg-[#FAF6EC] dark:bg-zinc-900/50">Student Name</TableHead>
+                    <TableHead className="text-xs uppercase font-bold text-text-secondary bg-[#FAF6EC] dark:bg-zinc-900/50">SR No</TableHead>
+                    <TableHead className="text-xs uppercase font-bold text-text-secondary bg-[#FAF6EC] dark:bg-zinc-900/50">Class</TableHead>
+                    <TableHead className="text-xs uppercase font-bold text-text-secondary bg-[#FAF6EC] dark:bg-zinc-900/50">Monthly Fee</TableHead>
+                    <TableHead className="text-xs uppercase font-bold text-text-secondary bg-[#FAF6EC] dark:bg-zinc-900/50">Start Date</TableHead>
+                    <TableHead className="text-xs uppercase font-bold text-text-secondary bg-[#FAF6EC] dark:bg-zinc-900/50">Status</TableHead>
+                    <TableHead className="text-xs uppercase font-bold text-text-secondary bg-[#FAF6EC] dark:bg-zinc-900/50">Next Charge Amount</TableHead>
+                    <TableHead className="text-right text-xs uppercase font-bold text-text-secondary bg-[#FAF6EC] dark:bg-zinc-900/50 w-24">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1994,6 +2081,7 @@ export default function FinanceManagementPage() {
               value={expenseDesc} 
               onChange={e => setExpenseDesc(e.target.value)} 
               required 
+              className="rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
             />
           </div>
 
@@ -2006,6 +2094,7 @@ export default function FinanceManagementPage() {
                 value={expenseAmount} 
                 onChange={e => setExpenseAmount(e.target.value)} 
                 required 
+                className="rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
               />
             </div>
             
@@ -2017,6 +2106,7 @@ export default function FinanceManagementPage() {
                 onChange={e => setExpenseDate(e.target.value)} 
                 max={getLocalDateString()}
                 required 
+                className="rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
               />
             </div>
           </div>
@@ -2371,7 +2461,7 @@ export default function FinanceManagementPage() {
               value={feeDescription} 
               maxLength={27}
               onChange={e => setFeeDescription(e.target.value)} 
-              className="text-xs"
+              className="text-xs rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
             />
             {feeFormErrors.description && (
               <p className="text-[11px] text-red-500 font-bold mt-1">{feeFormErrors.description}</p>
@@ -2398,7 +2488,7 @@ export default function FinanceManagementPage() {
                   }
                 }} 
                 disabled={editingFeeType && editingFeeType.collected_students > 0}
-                className="text-xs"
+                className="text-xs rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
               />
               {feeFormErrors.amount && (
                 <p className="text-[11px] text-red-500 font-bold mt-1">{feeFormErrors.amount}</p>
@@ -2415,31 +2505,33 @@ export default function FinanceManagementPage() {
           {!editingFeeType && applyType === 'classes' && (
             <div className="space-y-2 animate-in slide-in-from-top-1 duration-200">
               <label htmlFor="class-dues-allocation" className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Class Dues Allocation</label>
-              <div className="border border-border rounded-xl overflow-hidden max-h-[220px] overflow-y-auto bg-zinc-50/50 dark:bg-zinc-900/50">
-                <Table>
-                  <TableHeader className="sticky top-0 bg-zinc-50 dark:bg-zinc-900 z-10">
-                    <TableRow>
-                      <TableHead className="text-[11px] uppercase font-bold py-2 bg-zinc-50 dark:bg-zinc-900">Class</TableHead>
-                      <TableHead className="text-[11px] uppercase font-bold py-2 bg-zinc-50 dark:bg-zinc-900 w-32">Amount (₹)</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {uniqueClasses.map(uc => (
-                      <TableRow key={uc.name}>
-                        <TableCell className="py-2 font-bold text-xs">{uc.name}</TableCell>
-                        <TableCell className="py-1">
-                          <Input id={`class-dues-${uc.name}`} 
-                            type="number" 
-                            placeholder="Enter Amount (₹)" 
-                            value={classAmountsMap[uc.name] || ''} 
-                            onChange={e => setClassAmountsMap(prev => ({ ...prev, [uc.name]: e.target.value }))}
-                            className="h-7 text-xs w-full"
-                          />
-                        </TableCell>
+              <div className="border border-border rounded-xl overflow-hidden shadow-2xs">
+                <div className="max-h-[220px] overflow-y-auto scrollbar-thin">
+                  <Table>
+                    <TableHeader className="sticky top-0 bg-[#FAF6EC] dark:bg-zinc-900 z-10 shadow-2xs">
+                      <TableRow className="bg-[#FAF6EC] dark:bg-zinc-900 border-b border-border">
+                        <TableHead className="text-[11px] uppercase font-bold py-2.5 bg-[#FAF6EC] dark:bg-zinc-900 text-text-primary">CLASS</TableHead>
+                        <TableHead className="text-[11px] uppercase font-bold py-2.5 bg-[#FAF6EC] dark:bg-zinc-900 text-text-primary w-36">AMOUNT (₹)</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody className="divide-y divide-border/60">
+                      {uniqueClasses.map(uc => (
+                        <TableRow key={uc.name} className="hover:bg-primary/5 transition-colors">
+                          <TableCell className="py-2.5 font-bold text-xs text-text-primary">{uc.displayName || formatDisplayClassName(uc.name)}</TableCell>
+                          <TableCell className="py-1.5">
+                            <Input id={`class-dues-${uc.name}`} 
+                              type="number" 
+                              placeholder="Enter Amount" 
+                              value={classAmountsMap[uc.name] || ''} 
+                              onChange={e => setClassAmountsMap(prev => ({ ...prev, [uc.name]: e.target.value }))}
+                              className="h-8 text-xs w-full rounded-full border border-border"
+                            />
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
               {feeFormErrors.classAmounts && (
                 <p className="text-[11px] text-red-500 font-bold mt-1">{feeFormErrors.classAmounts}</p>
@@ -2668,7 +2760,7 @@ export default function FinanceManagementPage() {
                 placeholder="e.g. 1000"
                 value={transportMonthlyFee}
                 onChange={e => setTransportMonthlyFee(e.target.value)}
-                className="text-xs"
+                className="text-xs rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
               />
               {transportFormErrors.monthly_fee && (
                 <p className="text-[11px] text-red-500 font-bold mt-1">{transportFormErrors.monthly_fee}</p>
@@ -2682,7 +2774,8 @@ export default function FinanceManagementPage() {
                 type="date"
                 value={transportStartDate}
                 onChange={e => setTransportStartDate(e.target.value)}
-                className="text-xs"
+                onClick={e => e.target.showPicker?.()}
+                className="text-xs rounded-full cursor-pointer outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
               />
               {transportFormErrors.start_date && (
                 <p className="text-[11px] text-red-500 font-bold mt-1">{transportFormErrors.start_date}</p>
@@ -2692,14 +2785,15 @@ export default function FinanceManagementPage() {
             {/* Status selection */}
             <div className="space-y-1.5">
               <label className="text-[11px] text-text-secondary font-bold uppercase font-bold tracking-wider">Status *</label>
-              <Select
+              <CustomSelect
                 value={transportStatus}
-                onChange={e => setTransportStatus(e.target.value)}
-                className="text-xs cursor-pointer"
-              >
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
-              </Select>
+                onChange={val => setTransportStatus(val)}
+                className="w-full"
+                options={[
+                  { value: 'Active', label: 'Active' },
+                  { value: 'Inactive', label: 'Inactive' },
+                ]}
+              />
             </div>
 
             {/* Form Footer */}
@@ -3021,38 +3115,40 @@ export default function FinanceManagementPage() {
                   <p className="text-[11px] text-red-500 font-bold">{annualFeeFormErrors.classes}</p>
                 )}
               </div>
-              <div className="max-h-56 overflow-y-auto border border-border rounded-xl">
-                <Table className="text-xs">
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead className="font-bold text-[11px] uppercase">Class</TableHead>
-                      <TableHead className="font-bold text-[11px] uppercase text-right">Annual Fee (₹)</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {uniqueClasses.map(uc => (
-                      <TableRow key={uc.name}>
-                        <TableCell className="font-medium text-xs">
-                          {uc.name}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Input id={`annual-fee-class-${uc.name}`}
-                            type="number"
-                            placeholder="Enter Amount (₹)"
-                            value={annualFeeClassAmountsMap[uc.name] || ''}
-                            onChange={e => setAnnualFeeClassAmountsMap({
-                              ...annualFeeClassAmountsMap,
-                              [uc.name]: e.target.value
-                            })}
-                            min="0"
-                            step="any"
-                            className="h-8 w-28 ml-auto text-right text-xs"
-                          />
-                        </TableCell>
+              <div className="border border-border rounded-xl overflow-hidden shadow-2xs">
+                <div className="max-h-[220px] overflow-y-auto scrollbar-thin">
+                  <Table className="text-xs">
+                    <TableHeader className="sticky top-0 bg-[#FAF6EC] dark:bg-zinc-900 z-10 shadow-2xs">
+                      <TableRow className="bg-[#FAF6EC] dark:bg-zinc-900 border-b border-border">
+                        <TableHead className="font-bold text-[11px] uppercase py-2.5 bg-[#FAF6EC] dark:bg-zinc-900 text-text-primary">CLASS</TableHead>
+                        <TableHead className="font-bold text-[11px] uppercase py-2.5 bg-[#FAF6EC] dark:bg-zinc-900 text-text-primary text-right w-36">ANNUAL FEE (₹)</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody className="divide-y divide-border/60">
+                      {uniqueClasses.map(uc => (
+                        <TableRow key={uc.name} className="hover:bg-primary/5 transition-colors">
+                          <TableCell className="font-bold text-xs py-2.5 text-text-primary">
+                            {uc.displayName || formatDisplayClassName(uc.name)}
+                          </TableCell>
+                          <TableCell className="text-right py-1.5">
+                            <Input id={`annual-fee-class-${uc.name}`}
+                              type="number"
+                              placeholder="Enter Amount"
+                              value={annualFeeClassAmountsMap[uc.name] || ''}
+                              onChange={e => setAnnualFeeClassAmountsMap({
+                                ...annualFeeClassAmountsMap,
+                                [uc.name]: e.target.value
+                              })}
+                              min="0"
+                              step="any"
+                              className="h-8 w-28 ml-auto text-right text-xs rounded-full border border-border"
+                            />
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
             </div>
           )}

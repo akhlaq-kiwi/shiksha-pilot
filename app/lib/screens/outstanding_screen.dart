@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../services/http_service.dart' as http;
+import '../utils/class_formatter.dart';
 
 class OutstandingScreen extends StatefulWidget {
   final String baseUrl;
@@ -23,6 +24,8 @@ class _OutstandingScreenState extends State<OutstandingScreen> {
   
   bool _hasClass = false;
   String _fullClassName = '';
+  int? _selectedClassId;
+  List<dynamic> _assignedClasses = [];
   List<dynamic> _allStudents = [];
   List<dynamic> _filteredStudents = [];
   final TextEditingController _searchController = TextEditingController();
@@ -55,14 +58,19 @@ class _OutstandingScreenState extends State<OutstandingScreen> {
     });
   }
 
-  Future<void> _fetchOutstandingData() async {
+  Future<void> _fetchOutstandingData([int? targetClassId]) async {
     setState(() {
       _isLoading = true;
       _errorMessage = '';
     });
 
     try {
-      final uri = Uri.parse('${widget.baseUrl}/api/teacher/outstanding');
+      final cid = targetClassId ?? _selectedClassId;
+      final String url = cid != null
+          ? '${widget.baseUrl}/api/teacher/outstanding?class_id=$cid'
+          : '${widget.baseUrl}/api/teacher/outstanding';
+
+      final uri = Uri.parse(url);
       final headers = {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ${widget.token}',
@@ -75,12 +83,16 @@ class _OutstandingScreenState extends State<OutstandingScreen> {
         final data = decoded['data'] ?? {};
 
         final bool hasClass = data['has_class'] == true;
-        final String fullClassName = (data['full_class_name'] ?? data['class_name'] ?? '').toString();
+        final String fullClassName = formatShortClassName((data['full_class_name'] ?? data['class_name'] ?? '').toString());
         final List<dynamic> studentsList = data['students'] ?? [];
+        final List<dynamic> assignedCls = data['assigned_classes'] ?? [];
+        final int? returnedClassId = data['class_id'] is int ? data['class_id'] : int.tryParse(data['class_id']?.toString() ?? '');
 
         setState(() {
           _hasClass = hasClass;
           _fullClassName = fullClassName;
+          _assignedClasses = assignedCls;
+          _selectedClassId = returnedClassId ?? cid;
           _allStudents = studentsList;
           _filteredStudents = List.from(studentsList);
         });
@@ -275,6 +287,58 @@ class _OutstandingScreenState extends State<OutstandingScreen> {
 
     return Column(
       children: [
+        // Class Selection Dropdown if teacher has multiple classes assigned
+        if (_assignedClasses.length > 1)
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.indigo.shade50.withOpacity(0.6),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.indigo.shade100, width: 1.2),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.class_rounded, color: Colors.indigo, size: 20),
+                  const SizedBox(width: 10),
+                  const Text(
+                    'Class:',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.indigo),
+                  ),
+                  const SizedBox(width: 12),
+                  Flexible(
+                    fit: FlexFit.loose,
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<int>(
+                        value: _selectedClassId,
+                        isExpanded: false,
+                        icon: const Icon(Icons.arrow_drop_down_rounded, color: Colors.indigo),
+                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87, fontSize: 14),
+                        items: sortClassesAscending(_assignedClasses).map((cls) {
+                          final int id = cls['id'] is int ? cls['id'] : int.parse(cls['id'].toString());
+                          final String rawName = (cls['full_class_name'] ?? cls['name'] ?? 'Class').toString();
+                          final String sec = (cls['section'] ?? cls['class_section'] ?? '').toString();
+                          final String name = formatShortClassName(rawName, section: sec);
+                          return DropdownMenuItem<int>(
+                            value: id,
+                            child: Text(name),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null && val != _selectedClassId) {
+                            _fetchOutstandingData(val);
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
         // Search Box Container
         Container(
           color: Colors.white,

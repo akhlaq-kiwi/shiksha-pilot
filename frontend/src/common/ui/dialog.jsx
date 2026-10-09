@@ -26,6 +26,7 @@ export const Dialog = ({
   footer,
   className = '',
   containerClassName = '',
+  contentClassName = '',
   maxWidth = 'max-w-lg',
   /** Set false for flows where a stray backdrop click must not discard work. */
   closeOnBackdropClick = true,
@@ -108,10 +109,10 @@ export const Dialog = ({
         aria-labelledby={title ? titleId : undefined}
         aria-describedby={descriptionId}
         tabIndex={-1}
-        className={`relative z-10 flex w-full ${maxWidth} max-h-[90vh] flex-col rounded-2xl border border-border bg-white dark:bg-zinc-900 bg-surface text-text-primary shadow-2xl animate-zoom-in focus:outline-none ${className}`}
+        className={`relative z-10 flex w-full ${maxWidth} max-h-[90vh] flex-col rounded-2xl border border-border-strong bg-surface text-text-primary shadow-2xl animate-zoom-in focus:outline-none ${className}`}
       >
         {!hideHeader && (
-          <div className="flex items-start justify-between gap-4 border-b border-border/60 p-5">
+          <div className="flex items-start justify-between gap-4 border-b border-border/60 p-5 bg-zinc-50/50 dark:bg-zinc-900/50 rounded-t-2xl">
             <div className="min-w-0">
               {title && <h3 id={titleId} className="text-display-xs font-display">{title}</h3>}
               {description && (
@@ -134,10 +135,10 @@ export const Dialog = ({
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto p-6 text-body-md">{children}</div>
+        <div className={`flex-1 overflow-y-auto p-6 text-body-md ${contentClassName}`}>{children}</div>
 
         {footer && (
-          <div className="flex items-center justify-end gap-3 rounded-b-2xl border-t border-border/60 bg-zinc-50 dark:bg-zinc-900/90 p-4">
+          <div className="flex items-center justify-end gap-3 rounded-b-2xl border-t border-border/60 bg-surface-sunken p-4">
             {footer}
           </div>
         )}

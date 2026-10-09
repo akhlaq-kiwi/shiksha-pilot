@@ -8,6 +8,8 @@ import { schoolService } from '../../../common/services/schoolService';
 import { authService } from '../../../common/services/authService';
 import { SearchableSelect, INDIAN_STATES_AND_CITIES } from '../../../common/ui/SearchableSelect';
 import { useToast } from '../../../common/components/Toast';
+import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
+import { useConfirm } from '../../../common/components/ConfirmDialog';
 
 const calculateDaysLeftText = (expiryDateStr) => {
   if (!expiryDateStr) return 'Expired';
@@ -24,6 +26,8 @@ const calculateDaysLeftText = (expiryDateStr) => {
 }
 
 export default function ProfilePage({ mode = 'details' }) {
+  const { academicYears, currentYear, selectYear } = useAcademicYear();
+  const confirm = useConfirm();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
@@ -447,7 +451,7 @@ export default function ProfilePage({ mode = 'details' }) {
         };
       default:
         return {
-          title: "Profile Settings",
+          title: "PROFILE SETTINGS",
           desc: "Manage school profile details and configurations."
         };
     }
@@ -457,9 +461,41 @@ export default function ProfilePage({ mode = 'details' }) {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      <div>
-        <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">{title}</h2>
-        <p className="text-text-secondary text-sm mt-1">{desc}</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl md:text-3xl font-bold text-text-primary tracking-tight font-display uppercase">{title}</h2>
+          <p className="text-text-secondary text-sm mt-1">{desc}</p>
+        </div>
+        {mode === 'details' && currentYear && academicYears && academicYears.length > 0 && (
+          <div className="flex items-center gap-2 rounded-xl border border-border-strong bg-surface-sunken px-3 py-1.5 shadow-xs shrink-0">
+            <select
+              id="academic-year-switcher-profile"
+              value={currentYear.id}
+              onChange={async (e) => {
+                const nextId = e.target.value;
+                const next = academicYears.find((y) => String(y.id) === String(nextId));
+                const leavingActive = currentYear.status === 'ACTIVE' && next?.status !== 'ACTIVE';
+                if (leavingActive) {
+                  const ok = await confirm({
+                    title: `Switch from active year to ${next?.name}?`,
+                    message: `All dashboards, fees, attendance and exam figures will show ${next?.name} data until you switch back.`,
+                    confirmLabel: 'Switch Year',
+                    danger: false,
+                  });
+                  if (!ok) return;
+                }
+                selectYear(nextId);
+              }}
+              className="h-8 cursor-pointer rounded-lg border-0 bg-transparent text-sm font-bold text-text-primary outline-none focus:outline-none focus:ring-0 shadow-none"
+            >
+              {academicYears.map(y => (
+                <option key={y.id} value={y.id}>
+                  {y.name} {y.status === 'ACTIVE' ? '(Active)' : y.status === 'Archived' ? '(Archived)' : `(${y.status})`}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {error && (
@@ -479,8 +515,8 @@ export default function ProfilePage({ mode = 'details' }) {
       {/* ─── SECTION 1: Profile Details ────────────────────────────────────────── */}
       {mode === 'details' && (
         <div className="space-y-6">
-          <Card className="shadow-xs border-border bg-surface">
-            <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-row items-center justify-between">
+          <Card className="border border-border rounded-2xl shadow-2xs bg-surface overflow-hidden">
+            <CardHeader className="py-3.5 px-6 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-bold text-text-primary flex items-center gap-2">
                 <School className="h-4 w-4 text-text-secondary" /> Profile Details
               </CardTitle>
@@ -491,13 +527,13 @@ export default function ProfilePage({ mode = 'details' }) {
             <CardContent className="p-6 space-y-6">
               
               {/* School Logo / Profile Image Upload Section */}
-              <div className="flex flex-col sm:flex-row items-center gap-6 p-4 bg-zinc-50/50 dark:bg-zinc-900/50 border border-border rounded-xl mb-4">
-                <div className="w-20 h-20 rounded-full border border-border flex items-center justify-center overflow-hidden bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100 text-xl font-bold uppercase flex-shrink-0">
+              <div className="flex flex-col sm:flex-row items-center gap-6 p-4 !bg-zinc-50/50 dark:!bg-zinc-900/50 border border-border rounded-xl mb-4">
+                <div className="w-20 h-20 rounded-full border border-border flex items-center justify-center overflow-hidden bg-surface-sunken text-text-primary text-xl font-bold uppercase flex-shrink-0 shadow-2xs p-2">
                   {!logoError && profile?.logo_path ? (
                     <img 
                       src={profile.logo_path} 
                       alt="School Logo" 
-                      className="w-full h-full object-cover" 
+                      className="w-full h-full object-contain pointer-events-none" 
                       onError={() => setLogoError(true)}
                     />
                   ) : (
@@ -510,7 +546,7 @@ export default function ProfilePage({ mode = 'details' }) {
                   <p className="text-[11px] text-text-muted">PNG, JPG, JPEG. Max file size: 5MB.</p>
                   
                   <div className="flex flex-wrap gap-2 justify-center sm:justify-start items-center">
-                    <label className="cursor-pointer inline-flex items-center justify-center rounded-md text-xs font-bold transition-colors border border-input bg-background hover:bg-zinc-50 dark:hover:bg-zinc-900 h-8 px-3">
+                    <label className="cursor-pointer inline-flex items-center justify-center rounded-md text-xs font-bold transition-colors border border-border-strong bg-surface hover:bg-secondary h-8 px-3 text-text-primary shadow-xs">
                       <span>{profile?.logo_path ? 'Change Image' : 'Upload Image'}</span>
                       <input 
                         type="file" 
@@ -528,50 +564,6 @@ export default function ProfilePage({ mode = 'details' }) {
                         className="h-8 px-3 text-xs font-bold"
                       >
                         Remove Image
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Principal Signature Upload Section */}
-              <div className="flex flex-col sm:flex-row items-center gap-6 p-4 bg-zinc-50/50 dark:bg-zinc-900/50 border border-border rounded-xl mb-6">
-                <div className="w-32 h-16 rounded-xl border border-border flex items-center justify-center overflow-hidden bg-white dark:bg-zinc-800 p-1 flex-shrink-0">
-                  {!signatureError && profile?.principal_signature_path ? (
-                    <img 
-                      src={profile.principal_signature_path} 
-                      alt="Principal Signature" 
-                      className="w-full h-full object-contain" 
-                      onError={() => setSignatureError(true)}
-                    />
-                  ) : (
-                    <span className="text-[11px] font-bold text-text-muted italic">No Signature</span>
-                  )}
-                </div>
-
-                <div className="space-y-2 text-center sm:text-left flex-1">
-                  <h4 className="text-xs font-bold text-text-primary uppercase tracking-wide">Principal Signature</h4>
-                  <p className="text-[11px] text-text-muted">PNG, JPG, JPEG. White background paper will be automatically made transparent.</p>
-                  
-                  <div className="flex flex-wrap gap-2 justify-center sm:justify-start items-center">
-                    <label className="cursor-pointer inline-flex items-center justify-center rounded-md text-xs font-bold transition-colors border border-input bg-background hover:bg-zinc-50 dark:hover:bg-zinc-900 h-8 px-3">
-                      <span>{profile?.principal_signature_path ? 'Change Signature' : 'Upload Signature'}</span>
-                      <input 
-                        type="file" 
-                        accept=".png, .jpg, .jpeg" 
-                        onChange={handleSignatureUpload}
-                        className="hidden" 
-                      />
-                    </label>
-
-                    {profile?.principal_signature_path && (
-                      <Button 
-                        variant="destructive" 
-                        size="sm" 
-                        onClick={() => setIsRemoveSignatureConfirmOpen(true)}
-                        className="h-8 px-3 text-xs font-bold"
-                      >
-                        Remove Signature
                       </Button>
                     )}
                   </div>
@@ -629,8 +621,8 @@ export default function ProfilePage({ mode = 'details' }) {
                     <p className="text-sm font-semibold text-text-primary mt-0.5">{phone}</p>
                   </div>
                 </div>
-                <div className="p-3 bg-zinc-50 border border-zinc-200 dark:bg-zinc-900/50 dark:border-zinc-800 text-[11px] text-text-muted italic rounded-lg leading-relaxed mt-2.5">
-                  To update your registered email address or contact number, please contact the Super Admin.
+                <div className="p-3 bg-surface-sunken border border-border text-[11px] text-text-muted italic rounded-lg leading-relaxed mt-2.5 font-medium">
+                  To update your registered email address or contact number, please contact the Shiksha Pilot Team.
                 </div>
               </div>
 
@@ -642,7 +634,7 @@ export default function ProfilePage({ mode = 'details' }) {
       {/* ─── SECTION 2: Change Password ────────────────────────────────────────── */}
       {mode === 'password' && (
         <Card className="max-w-md shadow-xs border-border bg-surface">
-          <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
+          <CardHeader className="py-4 border-b border-border bg-surface-sunken">
             <CardTitle className="text-sm font-bold text-text-primary flex items-center gap-2">
               <KeyRound className="h-4 w-4 text-text-secondary" /> Change Password
             </CardTitle>
@@ -755,13 +747,13 @@ export default function ProfilePage({ mode = 'details' }) {
                           <div className="flex justify-between items-start">
                             <h4 className="text-base font-bold text-text-primary tracking-tight font-display">{plan.name}</h4>
                             {isCurrent && (
-                              <span className="text-[11px] font-bold bg-primary text-zinc-50 px-2.5 py-1 rounded-full uppercase tracking-wider">Current</span>
+                              <span className="text-[11px] font-bold bg-primary text-white px-2.5 py-1 rounded-full uppercase tracking-wider shadow-xs">Current</span>
                             )}
                           </div>
 
                           <div className="flex items-center justify-between mt-2">
                             <span className="text-2xl font-bold text-text-primary tracking-tight">₹{parseFloat(plan.price).toLocaleString('en-IN')}</span>
-                            <span className="text-xs font-bold text-text-secondary bg-zinc-100 dark:bg-zinc-800/80 px-2.5 py-1 rounded-lg">
+                            <span className="text-xs font-bold text-text-primary bg-surface-sunken px-2.5 py-1 rounded-lg border border-border">
                               {isCurrent && profile?.subscription_expiry ? (
                                 `Expires on ${(() => {
                                   const d = new Date(profile.subscription_expiry);
@@ -799,7 +791,7 @@ export default function ProfilePage({ mode = 'details' }) {
 
                       <div className="pt-6">
                         <Button 
-                          className="w-full font-bold text-xs uppercase tracking-wider bg-amber-600 hover:bg-amber-700 text-white"
+                          className="w-full font-bold text-xs uppercase tracking-wider bg-primary hover:bg-primary-hover text-white"
                           onClick={() => setContactOpen(true)}
                         >
                           Contact Super Admin
@@ -820,7 +812,7 @@ export default function ProfilePage({ mode = 'details' }) {
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
-                      <tr className="border-b border-border bg-zinc-50 dark:bg-zinc-900/50 text-text-secondary font-bold uppercase tracking-wider text-[11px]">
+                      <tr className="border-b border-border bg-surface-sunken text-text-primary font-bold uppercase tracking-wider text-[11px]">
                         <th className="p-4">Plan Name</th>
                         <th className="p-4">Purchase Date</th>
                         <th className="p-4">Expiry Date</th>
@@ -840,7 +832,7 @@ export default function ProfilePage({ mode = 'details' }) {
                           const today = new Date();
                           today.setHours(0, 0, 0, 0);
                           return (
-                            <tr key={idx} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20 transition-colors">
+                            <tr key={idx} className="hover:bg-secondary transition-colors">
                               <td className="p-4 font-bold text-text-primary">{sub.plan_name}</td>
                               <td className="p-4 text-text-secondary font-medium">
                                 {new Date(sub.created_at).toLocaleDateString('en-IN', {
@@ -917,11 +909,11 @@ export default function ProfilePage({ mode = 'details' }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-text-secondary uppercase">Contact Email (Read-only)</label>
-              <Input value={profileForm.contact_email} disabled className="bg-zinc-50 dark:bg-zinc-800/40 text-text-muted" />
+              <Input value={profileForm.contact_email} disabled className="bg-surface-sunken text-text-muted border-border" />
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-text-secondary uppercase">Contact Phone (Read-only)</label>
-              <Input value={profileForm.contact_phone} disabled className="bg-zinc-50 dark:bg-zinc-800/40 text-text-muted" />
+              <Input value={profileForm.contact_phone} disabled className="bg-surface-sunken text-text-muted border-border" />
             </div>
           </div>
 
@@ -1028,14 +1020,14 @@ function ContactSuperAdminDialog({ isOpen, onClose }) {
       }
     >
       <div className="space-y-4 text-sm mt-3">
-        <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed font-medium">
+        <p className="text-text-secondary leading-relaxed font-medium">
           Please get in touch with the ShikshaPilot Support Team using any of the contact methods below for assistance with report card template assignment, account setup, or queries.
         </p>
 
-        <div className="bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-xl border border-border space-y-3">
+        <div className="bg-surface-sunken border border-border p-4 rounded-xl space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Phone className="h-4 w-4 text-zinc-500" />
+              <Phone className="h-4 w-4 text-primary" />
               <span className="text-text-primary font-bold">8650302499</span>
             </div>
             <Button 
@@ -1050,7 +1042,7 @@ function ContactSuperAdminDialog({ isOpen, onClose }) {
 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Mail className="h-4 w-4 text-zinc-500" />
+              <Mail className="h-4 w-4 text-primary" />
               <span className="text-text-primary font-bold">Shikshapilot@gmail.com</span>
             </div>
             <Button 

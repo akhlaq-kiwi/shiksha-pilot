@@ -65,6 +65,14 @@ export const schoolService = {
     return apiClient.put(`/api/school/staff/${id}`, staffData);
   },
 
+  requestPrincipalOtp(teacherId, action = 'assign') {
+    return apiClient.post(`/api/school/staff/${teacherId}/request-principal-otp`, { action });
+  },
+
+  assignPrincipalRole(teacherId, otpCode, action = 'assign') {
+    return apiClient.post(`/api/school/staff/${teacherId}/assign-principal`, { otp_code: otpCode, action });
+  },
+
   getAvailableStaff() {
     return this.getStaff().then(list => (list || []).filter(s => s.status === 'ACTIVE' && (s.assigned_periods || 0) < (s.max_periods || 8)));
   },
@@ -161,12 +169,20 @@ export const schoolService = {
     return apiClient.get(`/api/school/exams-new/${id}`);
   },
 
-  deleteExamination(id) {
-    return apiClient.delete(`/api/school/exams-new/${id}`);
+  requestExamDeleteOtp(id) {
+    return apiClient.post(`/api/school/exams-new/${id}/request-delete-otp`);
+  },
+
+  deleteExamination(id, otpCode) {
+    return apiClient.delete(`/api/school/exams-new/${id}`, { data: { otp_code: otpCode } });
   },
 
   updateExamination(id, data) {
     return apiClient.put(`/api/school/exams-new/${id}`, data);
+  },
+
+  getAllExamSchemes(examId) {
+    return apiClient.get(`/api/school/exams-new/${examId}/all-schemes`);
   },
 
   getExamTimetable(examId, classId) {
@@ -341,6 +357,10 @@ export const schoolService = {
 
   checkSrNoExists(params) {
     return apiClient.get(buildUrl('/api/school/students/check-sr-no', params));
+  },
+
+  getNextSrNo() {
+    return apiClient.get('/api/school/students/next-sr-no');
   },
 
   createAcademicYear(data) {
@@ -619,6 +639,9 @@ export const schoolService = {
   getReportCardTemplates() {
     return apiClient.get('/api/platform/report-card-templates');
   },
+  getTemplateAssignedSchools(id) {
+    return apiClient.get(`/api/platform/report-card-templates/${id}/schools`);
+  },
   createReportCardTemplate(templateData) {
     return apiClient.post('/api/platform/report-card-templates', templateData);
   },
@@ -630,6 +653,19 @@ export const schoolService = {
   },
   assignReportCardTemplateToSchool(schoolId, templateId) {
     return apiClient.post(`/api/platform/schools/${schoolId}/report-card-template`, { template_id: templateId });
+  },
+
+  requestFeeRevertOtp(payload) {
+    return apiClient.post('/api/school/fees/request-revert-otp', payload);
+  },
+
+  revertFeePayment(id, otpCode) {
+    return apiClient.delete(`/api/school/fee-payments/${id}`, { data: { otp_code: otpCode } });
+  },
+
+  revertAdditionalFeePayment(id, otpCode) {
+    return apiClient.post(`/api/school/additional-fees/payments/${id}/revert`, { otp_code: otpCode });
   }
 };
+
 

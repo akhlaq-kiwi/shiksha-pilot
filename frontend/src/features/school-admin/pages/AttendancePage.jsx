@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, Users, Check, AlertCircle, Edit2, Save, FileText, CheckCircle2, Trash2, Plus, MoreVertical, Lock, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, Users, Check, AlertCircle, Edit2, Save, FileText, CheckCircle2, Trash2, Plus, MoreVertical, Lock, ChevronDown, ChevronLeft, ChevronRight, ShieldAlert } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
@@ -12,6 +12,65 @@ import { useToast } from '../../../common/components/Toast';
 import { DropdownMenu, DropdownItem } from '../../../common/ui/DropdownMenu';
 import { Dialog } from '../../../common/ui/dialog';
 import { TeacherAttendanceView } from '../components/TeacherAttendanceView';
+import { getClassIndex, getShortClassName } from '../../../common/constants/predefinedClasses';
+
+function CustomSelect({ options, value, onChange, placeholder = "Select...", disabled = false, className = "", buttonClassName = "", dropdownClassName = "" }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  const selectedOption = options.find(o => String(o.value) === String(value));
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={containerRef} className={`relative ${isOpen ? 'z-50' : 'z-10'} ${className}`}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={`flex h-10 items-center justify-between gap-2.5 rounded-full border border-border bg-surface px-4 py-2 text-xs font-bold text-text-primary shadow-2xs outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border active:outline-none select-none transition-colors min-w-[120px] ${
+          disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-border-strong'
+        } ${buttonClassName}`}
+      >
+        <span className="truncate">
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <ChevronDown className={`h-4 w-4 text-text-muted transition-transform duration-200 flex-shrink-0 ml-1 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && !disabled && (
+        <div className={`absolute left-0 right-0 top-full mt-1.5 min-w-[140px] rounded-2xl border border-border bg-surface shadow-2xl z-50 overflow-hidden animate-in fade-in duration-150 ${dropdownClassName}`}>
+          <div className="max-h-60 overflow-y-auto p-1.5 space-y-0.5 scrollbar-thin">
+            {options.map((opt) => {
+              const isSelected = String(opt.value) === String(value);
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(opt.value);
+                    setIsOpen(false);
+                  }}
+                  className={`w-full text-left px-3.5 py-2 rounded-xl text-xs font-semibold outline-none focus:outline-none select-none transition-colors hover:bg-primary/10 ${isSelected ? 'bg-primary/10 text-primary font-bold' : 'text-text-primary'}`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const getTodayLocalDateString = () => {
   const d = new Date();
@@ -62,10 +121,11 @@ export default function AttendancePage() {
       .then(data => {
         setClasses(data || []);
         if (data && data.length > 0) {
-          const names = Array.from(new Set(data.map(c => c.name)));
-          const firstClassName = names[0] || '';
+          const rawNames = Array.from(new Set(data.map(c => getShortClassName(c.name))));
+          const sortedNames = rawNames.sort((a, b) => getClassIndex(a) - getClassIndex(b));
+          const firstClassName = sortedNames[0] || '';
           setSelectedClassName(firstClassName);
-          const matchingSections = data.filter(c => c.name === firstClassName).map(c => c.section || '');
+          const matchingSections = data.filter(c => getShortClassName(c.name) === firstClassName || c.name === firstClassName).map(c => c.section || '');
           const firstSection = matchingSections[0] || '';
           setSelectedSection(firstSection);
         }
@@ -81,7 +141,7 @@ export default function AttendancePage() {
   const handleClassChange = (e) => {
     const className = e.target.value;
     setSelectedClassName(className);
-    const matchingSections = classes.filter(c => c.name === className).map(c => c.section || '');
+    const matchingSections = classes.filter(c => getShortClassName(c.name) === className || c.name === className).map(c => c.section || '');
     const firstSection = matchingSections[0] || '';
     setSelectedSection(firstSection);
     setStudents([]);
@@ -142,9 +202,124 @@ export default function AttendancePage() {
   };
 
   const activeClass = classes.find(c => 
-    c.name === selectedClassName && 
+    (c.name === selectedClassName || getShortClassName(c.name) === selectedClassName) && 
     ((c.section || '') === selectedSection || !selectedSection)
   );
+
+  // Unsaved Changes Tracking for Student Attendance
+  const [hasUnsavedStudentAtt, setHasUnsavedStudentAtt] = useState(false);
+  const [showUnsavedStudentModal, setShowUnsavedStudentModal] = useState(false);
+  const [pendingStudentNav, setPendingStudentNav] = useState(null);
+
+  const executePendingStudentNav = (nav) => {
+    if (!nav) return;
+    if (nav.type === 'date') {
+      setSelectedDate(nav.value);
+    } else if (nav.type === 'class') {
+      setSelectedClassName(nav.value);
+      const matchingSections = classes.filter(c => getShortClassName(c.name) === nav.value || c.name === nav.value).map(c => c.section || '');
+      const firstSection = matchingSections[0] || '';
+      setSelectedSection(firstSection);
+      setStudents([]);
+      setAttendanceRecords([]);
+      setAttendanceMap({});
+    } else if (nav.type === 'section') {
+      setSelectedSection(nav.value);
+      setStudents([]);
+      setAttendanceRecords([]);
+      setAttendanceMap({});
+    } else if (nav.type === 'tab') {
+      setActiveTab(nav.value);
+    } else if (nav.type === 'userType') {
+      setUserType(nav.value);
+    }
+  };
+
+  const requestStudentDateChange = (newDateStr) => {
+    if (!newDateStr || newDateStr === selectedDate) return;
+    if (hasUnsavedStudentAtt) {
+      setPendingStudentNav({ type: 'date', value: newDateStr });
+      setShowUnsavedStudentModal(true);
+    } else {
+      setSelectedDate(newDateStr);
+    }
+  };
+
+  const requestStudentShiftDate = (days) => {
+    if (!selectedDate) return;
+    const parts = selectedDate.split('-');
+    if (parts.length !== 3) return;
+    const dt = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    dt.setDate(dt.getDate() + days);
+
+    const year = dt.getFullYear();
+    const month = String(dt.getMonth() + 1).padStart(2, '0');
+    const day = String(dt.getDate()).padStart(2, '0');
+    const newDateStr = `${year}-${month}-${day}`;
+
+    const minDate = currentYear?.start_date || '';
+    const todayStr = getTodayLocalDateString();
+
+    if (days < 0 && minDate && newDateStr < minDate) {
+      toast.warning(`Cannot select a date before the academic year started (${minDate}).`);
+      return;
+    }
+    if (days > 0 && newDateStr > todayStr) {
+      toast.warning("Cannot select a future date.");
+      return;
+    }
+
+    requestStudentDateChange(newDateStr);
+  };
+
+  const requestClassChange = (e) => {
+    const className = e.target.value;
+    if (hasUnsavedStudentAtt) {
+      setPendingStudentNav({ type: 'class', value: className });
+      setShowUnsavedStudentModal(true);
+    } else {
+      setSelectedClassName(className);
+      const matchingSections = classes.filter(c => c.name === className).map(c => c.section || '');
+      const firstSection = matchingSections[0] || '';
+      setSelectedSection(firstSection);
+      setStudents([]);
+      setAttendanceRecords([]);
+      setAttendanceMap({});
+    }
+  };
+
+  const requestSectionChange = (e) => {
+    const sectionName = e.target.value;
+    if (hasUnsavedStudentAtt) {
+      setPendingStudentNav({ type: 'section', value: sectionName });
+      setShowUnsavedStudentModal(true);
+    } else {
+      setSelectedSection(sectionName);
+      setStudents([]);
+      setAttendanceRecords([]);
+      setAttendanceMap({});
+    }
+  };
+
+  const requestStudentTabChange = (newTab) => {
+    if (newTab === activeTab) return;
+    if (activeTab === 'daily' && hasUnsavedStudentAtt) {
+      setPendingStudentNav({ type: 'tab', value: newTab });
+      setShowUnsavedStudentModal(true);
+    } else {
+      setActiveTab(newTab);
+    }
+  };
+
+  const requestUserTypeChange = (newUserType) => {
+    if (newUserType === userType) return;
+    if (userType === 'Student' && activeTab === 'daily' && hasUnsavedStudentAtt) {
+      setPendingStudentNav({ type: 'userType', value: newUserType });
+      setShowUnsavedStudentModal(true);
+    } else {
+      setUserType(newUserType);
+    }
+  };
 
   // Load daily attendance and students
   const loadDailyData = useCallback(async () => {
@@ -175,6 +350,7 @@ export default function AttendancePage() {
 
       setAttendanceMap(map);
       setIsEditing(false);
+      setHasUnsavedStudentAtt(false);
     } catch (err) {
       console.error(err);
       toast.error('Failed to load daily attendance data.');
@@ -237,10 +413,11 @@ export default function AttendancePage() {
       ...prev,
       [studentId]: status
     }));
+    setHasUnsavedStudentAtt(true);
   };
 
-  const handleSaveAttendance = async () => {
-    if (!activeClass) return;
+  const handleSaveAttendance = async (navToExecute = null) => {
+    if (!activeClass) return false;
     setSavingAttendance(true);
     try {
       const records = students.map(s => ({
@@ -254,13 +431,35 @@ export default function AttendancePage() {
         records: records
       });
       toast.success('Attendance saved successfully.', 'Success');
-      await loadDailyData();
+      setHasUnsavedStudentAtt(false);
+      if (navToExecute) {
+        executePendingStudentNav(navToExecute);
+      } else {
+        await loadDailyData();
+      }
+      return true;
     } catch (err) {
       console.error(err);
       toast.error(err.message || 'Failed to save student attendance.');
+      return false;
     } finally {
       setSavingAttendance(false);
     }
+  };
+
+  const handleSaveAndNavigateStudent = async () => {
+    const nav = pendingStudentNav;
+    setShowUnsavedStudentModal(false);
+    setPendingStudentNav(null);
+    await handleSaveAttendance(nav);
+  };
+
+  const handleIgnoreUnsavedStudent = () => {
+    const nav = pendingStudentNav;
+    setShowUnsavedStudentModal(false);
+    setHasUnsavedStudentAtt(false);
+    setPendingStudentNav(null);
+    executePendingStudentNav(nav);
   };
 
   // Helper to check if a date is Sunday
@@ -362,20 +561,55 @@ export default function AttendancePage() {
     ? Math.round((presentReportRecords / totalReportRecords) * 100) 
     : 0;
 
-  const uniqueClasses = Array.from(new Set(classes.map(c => c.name)));
-  const uniqueSections = Array.from(new Set(classes.filter(c => c.name === selectedClassName && c.section).map(c => c.section))).sort();
+  const formatClassName = (name) => {
+    if (!name) return '';
+    const lower = name.toLowerCase().trim();
+    if (lower === 'nursery' || lower === 'nc') return 'NC';
+    if (lower === 'pre nursery' || lower === 'pnc' || lower === 'playgroup') return 'PNC';
+    if (lower === 'lower kindergarten' || lower === 'lkg') return 'LKG';
+    if (lower === 'upper kindergarten' || lower === 'ukg') return 'UKG';
+    if (lower === 'kindergarten' || lower === 'kg') return 'KG';
+    return name;
+  };
+
+  const getClassIndex = (name) => {
+    const formatted = formatClassName(name).toUpperCase();
+    if (formatted === 'PNC' || formatted === 'PLAYGROUP') return 1;
+    if (formatted === 'NC' || formatted === 'NURSERY') return 2;
+    if (formatted === 'LKG') return 3;
+    if (formatted === 'UKG') return 4;
+    if (formatted === 'KG') return 5;
+    const numMatch = formatted.match(/\d+/);
+    if (numMatch) {
+      return 10 + parseInt(numMatch[0], 10);
+    }
+    return 99;
+  };
+
+  const rawClasses = Array.from(new Set(classes.map(c => getShortClassName(c.name))));
+  const uniqueClasses = rawClasses.sort((a, b) => getClassIndex(a) - getClassIndex(b));
+  const uniqueSections = Array.from(new Set(classes.filter(c => (c.name === selectedClassName || getShortClassName(c.name) === selectedClassName) && c.section).map(c => c.section))).sort();
 
   // Holidays list sorted chronologically
   const sortedHolidays = [...holidays].sort((a, b) => new Date(a.date) - new Date(b.date));
 
   const todayStr = getTodayLocalDateString();
 
+  if (loadingClasses) {
+    return (
+      <div className="flex-1 flex flex-col justify-center items-center py-24 min-h-[400px] gap-3">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <p className="text-xs font-bold text-text-primary uppercase tracking-wider">LOADING ATTENDANCE...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* Title section */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Attendance</h2>
+          <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">ATTENDANCE</h2>
           <p className="text-text-secondary text-sm mt-1">
             {userType === 'Student' 
               ? 'Mark student daily attendance and review reports.' 
@@ -384,19 +618,17 @@ export default function AttendancePage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="relative flex items-center gap-2.5 bg-surface border border-zinc-300 dark:border-zinc-700 px-4 py-2 rounded-xl shadow-2xs hover:border-primary/60 transition-all cursor-pointer">
-            <span className="text-xs font-bold text-text-secondary uppercase tracking-wider">Switch User</span>
-            <span className="text-sm font-bold text-primary flex items-center gap-1">
-              {userType} <ChevronDown className="w-4 h-4 text-primary" />
-            </span>
-            <select
+          <div className="flex items-center gap-2.5 bg-surface border border-border px-3.5 py-1.5 rounded-full shadow-2xs">
+            <span className="text-xs font-bold text-text-secondary uppercase tracking-wider pl-1">SWITCH USER</span>
+            <CustomSelect
               value={userType}
-              onChange={(e) => setUserType(e.target.value)}
-              className="absolute inset-0 opacity-0 w-full h-full cursor-pointer font-bold"
-            >
-              <option value="Teacher">Teacher</option>
-              <option value="Student">Student</option>
-            </select>
+              onChange={(val) => requestUserTypeChange(val)}
+              options={[
+                { value: 'Teacher', label: 'Teacher' },
+                { value: 'Student', label: 'Student' }
+              ]}
+              buttonClassName="h-8 border-0 bg-primary/10 text-primary font-extrabold hover:bg-primary/20 px-3 rounded-full min-w-[100px]"
+            />
           </div>
 
           {userType === 'Student' && isReadOnly && (
@@ -419,7 +651,7 @@ export default function AttendancePage() {
       {/* Tabs */}
       <div className="flex gap-1 border-b border-border">
         <button
-          onClick={() => setActiveTab('daily')}
+          onClick={() => requestStudentTabChange('daily')}
           className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px ${
             activeTab === 'daily'
               ? 'border-primary text-primary'
@@ -429,7 +661,7 @@ export default function AttendancePage() {
           Daily Attendance
         </button>
         <button
-          onClick={() => setActiveTab('report')}
+          onClick={() => requestStudentTabChange('report')}
           className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px ${
             activeTab === 'report'
               ? 'border-primary text-primary'
@@ -442,34 +674,34 @@ export default function AttendancePage() {
 
       {(
         /* Dropdown controls for Attendance marking and Report */
-        <Card className="border border-border bg-zinc-50/40 dark:bg-zinc-900/40 shadow-sm">
+        <Card className="relative z-30 border border-border bg-zinc-50/50 dark:bg-zinc-900/50 shadow-2xs rounded-2xl">
           <CardContent className="p-4 flex flex-wrap gap-4 items-end">
             <div className="flex-1 min-w-[150px] space-y-1.5">
               <label className="text-xs font-bold text-text-secondary uppercase">Class</label>
-              <Select value={selectedClassName} onChange={handleClassChange} disabled={loadingClasses}>
-                {loadingClasses ? (
-                  <option>Loading...</option>
-                ) : (
-                  uniqueClasses.map(name => <option key={name} value={name}>{name}</option>)
-                )}
-              </Select>
+              <CustomSelect
+                value={selectedClassName}
+                onChange={(val) => requestClassChange({ target: { value: val } })}
+                disabled={loadingClasses}
+                placeholder={loadingClasses ? "Loading..." : "Select Class"}
+                options={uniqueClasses.map(name => ({ value: name, label: name }))}
+                buttonClassName="w-full h-9 min-w-0"
+              />
             </div>
 
             {uniqueSections.length > 0 && (
               <div className="flex-1 min-w-[120px] space-y-1.5">
                 <label className="text-xs font-bold text-text-secondary uppercase">Section</label>
-                <Select 
-                  value={selectedSection} 
-                  onChange={handleSectionChange} 
+                <CustomSelect
+                  value={selectedSection}
+                  onChange={(val) => requestSectionChange({ target: { value: val } })}
                   disabled={loadingClasses}
-                >
-                  <option value="">Select Section</option>
-                  {uniqueSections.map(sec => (
-                    <option key={sec} value={sec}>
-                      Section {sec}
-                    </option>
-                  ))}
-                </Select>
+                  placeholder="All Sections"
+                  options={[
+                    { value: '', label: 'All Sections' },
+                    ...uniqueSections.map(sec => ({ value: sec, label: `Section ${sec}` }))
+                  ]}
+                  buttonClassName="w-full h-9 min-w-0"
+                />
               </div>
             )}
 
@@ -481,7 +713,7 @@ export default function AttendancePage() {
                     type="button"
                     variant="outline"
                     size="icon"
-                    onClick={() => handleShiftDate(-1)}
+                    onClick={() => requestStudentShiftDate(-1)}
                     className="h-9 w-9 shrink-0 bg-background border-border hover:bg-zinc-100 dark:hover:bg-zinc-800"
                     title="Previous Day"
                   >
@@ -490,16 +722,16 @@ export default function AttendancePage() {
                   <Input 
                     type="date" 
                     value={selectedDate} 
-                    onChange={handleDateChange} 
+                    onChange={(e) => requestStudentDateChange(e.target.value)} 
                     min={currentYear?.start_date || ''}
                     max={getTodayLocalDateString()}
-                    className="h-9 bg-background" 
+                    className="h-9 bg-background outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border" 
                   />
                   <Button
                     type="button"
                     variant="outline"
                     size="icon"
-                    onClick={() => handleShiftDate(1)}
+                    onClick={() => requestStudentShiftDate(1)}
                     disabled={selectedDate >= getTodayLocalDateString()}
                     className="h-9 w-9 shrink-0 bg-background border-border hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40"
                     title="Next Day"
@@ -513,13 +745,18 @@ export default function AttendancePage() {
             {activeTab === 'report' && (
               <div className="flex-1 min-w-[140px] space-y-1.5">
                 <label className="text-xs font-bold text-text-secondary uppercase">Month</label>
-                <Select value={selectedReportMonth} onChange={e => setSelectedReportMonth(e.target.value)}>
-                  <option value="all">All Months</option>
-                  {[4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3].map(m => {
-                    const monthName = new Date(2026, m - 1).toLocaleString('default', { month: 'long' });
-                    return <option key={m} value={m}>{monthName}</option>;
-                  })}
-                </Select>
+                <CustomSelect
+                  value={selectedReportMonth}
+                  onChange={val => setSelectedReportMonth(val)}
+                  options={[
+                    { value: 'all', label: 'All Months' },
+                    ...[4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3].map(m => ({
+                      value: m,
+                      label: new Date(2026, m - 1).toLocaleString('default', { month: 'long' })
+                    }))
+                  ]}
+                  buttonClassName="w-full h-9 min-w-0"
+                />
               </div>
             )}
           </CardContent>
@@ -598,13 +835,7 @@ export default function AttendancePage() {
                   </span>
                 </div>
               </div>
-            ) : (
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-zinc-50 border border-border dark:bg-zinc-900/60 rounded-xl">
-                <div>
-                  <span className="text-sm font-bold text-text-primary">Total Students: <strong className="text-base font-bold">{sortedStudents.length}</strong></span>
-                </div>
-              </div>
-            )}
+            ) : null}
 
             {/* Grid of Student Cards */}
             {isCompletedMode && !isEditing ? (
@@ -721,8 +952,8 @@ export default function AttendancePage() {
             <CardContent>No students enrolled in the selected Class/Section.</CardContent>
           </Card>
         ) : (
-          <Card className="border border-border shadow-sm">
-            <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-row items-center justify-between">
+          <Card className="border border-border rounded-2xl overflow-hidden bg-surface shadow-2xs">
+            <CardHeader className="py-4 px-6 border-b border-border bg-surface flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-bold text-text-primary">Attendance Summary</CardTitle>
               {totalReportRecords > 0 && (
                 <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border ${
@@ -743,21 +974,21 @@ export default function AttendancePage() {
                 </span>
               )}
             </CardHeader>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Student Name</TableHead>
-                  <TableHead>Roll Number</TableHead>
-                  <TableHead className="text-center">Total Working Days</TableHead>
-                  <TableHead className="text-center">Present</TableHead>
-                  <TableHead className="text-center">Absent</TableHead>
-                  <TableHead className="text-center">Leave</TableHead>
-                  <TableHead className="text-right">Attendance %</TableHead>
+            <Table containerClassName="border-0 rounded-none shadow-none bg-transparent">
+              <TableHeader className="bg-surface border-b border-border">
+                <TableRow className="bg-surface hover:bg-surface border-b border-border">
+                  <TableHead className="text-xs uppercase font-bold text-text-primary bg-surface">Student Name</TableHead>
+                  <TableHead className="text-xs uppercase font-bold text-text-primary bg-surface">Roll Number</TableHead>
+                  <TableHead className="text-center text-xs uppercase font-bold text-text-primary bg-surface">Total Working Days</TableHead>
+                  <TableHead className="text-center text-xs uppercase font-bold text-text-primary bg-surface">Present</TableHead>
+                  <TableHead className="text-center text-xs uppercase font-bold text-text-primary bg-surface">Absent</TableHead>
+                  <TableHead className="text-center text-xs uppercase font-bold text-text-primary bg-surface">Leave</TableHead>
+                  <TableHead className="text-right text-xs uppercase font-bold text-text-primary bg-surface">Attendance %</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {reportRows.map(row => (
-                  <TableRow key={row.student.id}>
+                  <TableRow key={row.student.id} className="hover:bg-zinc-100/60 dark:hover:bg-zinc-800/40 transition-colors">
                     <TableCell className="font-bold text-sm text-text-primary">{row.student.name}</TableCell>
                     <TableCell className="text-sm font-bold text-text-secondary font-mono">{row.student.roll_no || '—'}</TableCell>
                     <TableCell className="text-center font-mono text-sm font-bold text-text-primary">{totalWorkingDays}</TableCell>
@@ -784,6 +1015,48 @@ export default function AttendancePage() {
       )}
         </>
       )}
+
+      {/* Unsaved Student Attendance Changes Confirmation Dialog */}
+      <Dialog
+        isOpen={showUnsavedStudentModal}
+        onClose={() => {
+          setShowUnsavedStudentModal(false);
+          setPendingStudentNav(null);
+        }}
+        title="Unsaved Attendance Changes"
+        footer={
+          <div className="flex items-center gap-2 justify-end w-full">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleIgnoreUnsavedStudent}
+              className="font-bold text-xs px-4 h-9"
+            >
+              Ignore
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSaveAndNavigateStudent}
+              disabled={savingAttendance}
+              className="font-bold text-xs px-4 h-9 bg-primary text-white hover:bg-primary/90"
+            >
+              {savingAttendance ? 'Saving...' : 'Save Attendance'}
+            </Button>
+          </div>
+        }
+      >
+        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-sm flex items-start gap-3">
+          <ShieldAlert className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+          <div className="space-y-1.5">
+            <p className="font-bold text-sm text-amber-900 dark:text-amber-200">
+              You have unsaved changes in student attendance.
+            </p>
+            <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
+              You updated student attendance for date <strong>{selectedDate}</strong> but haven't saved it yet. Would you like to save attendance before moving forward, or ignore changes?
+            </p>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }

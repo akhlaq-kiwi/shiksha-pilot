@@ -1,5 +1,6 @@
 import React from 'react';
 import { SIGNATURE_GAP, STAMP_SPACE, PAGE_CONTENT_MIN_HEIGHT } from '../reportCardLayout';
+import { sortSubjectsWithGradeAtBottom } from '../../../common/services/reportCardEngine';
 
 /**
  * Template 1: Modern School Report
@@ -7,10 +8,11 @@ import { SIGNATURE_GAP, STAMP_SPACE, PAGE_CONTENT_MIN_HEIGHT } from '../reportCa
  */
 export default function ModernReportCardTemplate({ data, config = {} }) {
   const { student, school, academic_year, exam, subjects = [], summary } = data;
+  const subjectsList = sortSubjectsWithGradeAtBottom(subjects);
   const isFinalReport = Boolean(exam?.is_final_session_report || data?.is_final_session_report);
 
   // Dynamic layout density scaling based on subject count (inline styles for guaranteed rendering)
-  const subCount = subjects?.length || 0;
+  const subCount = subjectsList?.length || 0;
 
   let cellPadding = '10px 16px';
   let headerPadding = '10px 16px';
@@ -170,7 +172,7 @@ export default function ModernReportCardTemplate({ data, config = {} }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 font-medium">
-              {subjects.map((sub, idx) => (
+              {subjectsList.map((sub, idx) => (
                 <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-zinc-50/60'}>
                   <td style={{ padding: cellPadding }} className="text-left font-bold text-zinc-900 border-r border-zinc-200 whitespace-nowrap">{sub.subject_name}</td>
                   {(data.session_exams || ['Quarterly Exam', 'Half Yearly Exam', 'Annual Exam']).map(exName => {
@@ -219,7 +221,7 @@ export default function ModernReportCardTemplate({ data, config = {} }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 font-medium">
-              {subjects.map((sub, idx) => (
+              {subjectsList.map((sub, idx) => (
                 <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-zinc-50/60'}>
                   <td style={{ padding: cellPadding }} className="text-left font-bold text-zinc-900 border-r border-zinc-200 whitespace-nowrap">{sub.subject_name}</td>
                   <td style={{ padding: cellPadding }} className="text-center border-r border-zinc-200 font-mono font-bold text-emerald-700">{sub.marks_obtained}</td>
@@ -286,10 +288,11 @@ export default function ModernReportCardTemplate({ data, config = {} }) {
       {(() => {
         const remarkText = summary?.teacher_remark || data?.teacher_remark || data?.report_card_remark || school?.report_card_remark;
         if (!remarkText || remarkText.toString().trim() === '') return null;
+        const cleanRemark = remarkText.toString().replace(/^["']|["']$/g, '').trim();
         return (
           <div className="mt-2.5 px-1 font-sans text-xs leading-normal">
             <strong className="font-bold text-zinc-900">Teacher Remarks:</strong>{' '}
-            <span className="font-bold italic text-emerald-700">"{remarkText}"</span>
+            <span className="font-bold italic text-emerald-700">{cleanRemark}</span>
           </div>
         );
       })()}

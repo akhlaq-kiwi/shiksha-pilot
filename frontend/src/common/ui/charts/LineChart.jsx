@@ -104,7 +104,7 @@ export const LineChart = ({
           </defs>
 
           {/* Gridlines */}
-          {[0, 0.25, 0.5, 0.75, 1].map((t) => (
+          {[1].map((t) => (
             <line
               key={t}
               x1={paddingX}
@@ -113,8 +113,7 @@ export const LineChart = ({
               y2={topY + t * usableH}
               stroke="var(--border-color)"
               strokeWidth="1"
-              strokeDasharray={t === 1 ? undefined : '4 4'}
-              opacity={t === 1 ? 0.8 : 0.4}
+              opacity={0.6}
             />
           ))}
 

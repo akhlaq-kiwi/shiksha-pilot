@@ -134,6 +134,16 @@ class SchoolAdminController extends BaseController
         return $this->success($response, ['exists' => $exists]);
     }
 
+    public function getNextSrNo(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $data = $this->service->getNextSrNo($user);
+
+        return $this->success($response, $data);
+    }
+
     public function uploadDocument(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
@@ -227,6 +237,34 @@ class SchoolAdminController extends BaseController
         $member = $this->service->getStaffDetails($user, $id, $params);
 
         return $this->success($response, $member);
+    }
+
+    public function requestPrincipalOtp(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int)$args['id'];
+        $body = RequestParser::body($request);
+        $action = $body['action'] ?? $request->getQueryParams()['action'] ?? 'assign';
+        $result = $this->service->requestPrincipalOtp($user, $id, $action);
+
+        return $this->success($response, $result, 'OTP sent to school admin email address.');
+    }
+
+    public function assignPrincipalRole(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int)$args['id'];
+        $body = RequestParser::body($request);
+        $otpCode = $body['otp_code'] ?? null;
+        $action = $body['action'] ?? 'assign';
+
+        $result = $this->service->assignPrincipalRole($user, $id, $otpCode, $action);
+
+        return $this->success($response, $result, $result['message'] ?? 'Principal role updated successfully.');
     }
 
     // -------------------------------------------------------------------------
@@ -436,12 +474,23 @@ class SchoolAdminController extends BaseController
         return $this->success($response, $data);
     }
 
+    public function requestExamDeleteOtp(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $id = (int)$args['id'];
+        $res = $this->service->requestExamDeleteOtp($user, $id);
+        return $this->success($response, $res);
+    }
+
     public function deleteExamination(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
         $this->requireRole($user, ['SCHOOL_ADMIN']);
         $id = (int)$args['id'];
-        $this->service->deleteExamination($user, $id);
+        $body = RequestParser::body($request);
+        $otpCode = $body['otp_code'] ?? $request->getQueryParams()['otp'] ?? null;
+        $this->service->deleteExamination($user, $id, $otpCode);
         return $this->success($response, null, 'Examination deleted successfully');
     }
 
@@ -453,6 +502,15 @@ class SchoolAdminController extends BaseController
         $body = RequestParser::body($request);
         $this->service->updateExamination($user, $id, $body);
         return $this->success($response, null, 'Examination updated successfully');
+    }
+
+    public function getAllExamSchemes(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $examId = (int)$args['id'];
+        $data = $this->service->getAllExamSchemes($user, $examId);
+        return $this->success($response, $data);
     }
 
     public function getExamTimetable(Request $request, Response $response, array $args): Response
@@ -674,6 +732,17 @@ class SchoolAdminController extends BaseController
         $this->service->deleteTimetablePeriod($user, $id, $date);
 
         return $this->success($response, null, 'Timetable period deleted successfully');
+    }
+
+    public function deleteDayTimetable(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body = RequestParser::body($request);
+        $data = $this->service->deleteDayTimetable($user, $body);
+
+        return $this->success($response, $data, 'Timetable for the day deleted successfully');
     }
 
     public function assignBackupTeacher(Request $request, Response $response): Response
@@ -1238,9 +1307,22 @@ class SchoolAdminController extends BaseController
         $this->requireRole($user, ['SCHOOL_ADMIN']);
 
         $id = (int)$args['id'];
-        $this->service->deleteFeePayment($user, $id);
+        $body = RequestParser::body($request);
+        $otpCode = !empty($body['otp_code']) ? trim((string)$body['otp_code']) : (string)($request->getQueryParams()['otp_code'] ?? '');
+        $this->service->deleteFeePayment($user, $id, $otpCode);
 
         return $this->success($response, null, 'Payment reverted successfully');
+    }
+
+    public function requestFeeRevertOtp(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body = RequestParser::body($request);
+        $data = $this->service->requestFeeRevertOtp($user, $body);
+
+        return $this->success($response, $data, 'OTP sent to registered email address');
     }
 
     public function createAcademicYear(Request $request, Response $response): Response
@@ -1638,7 +1720,9 @@ class SchoolAdminController extends BaseController
         $this->requireRole($user, ['SCHOOL_ADMIN']);
 
         $id = (int)$args['id'];
-        $data = $this->service->revertAdditionalFeePayment($user, $id);
+        $body = RequestParser::body($request);
+        $otpCode = !empty($body['otp_code']) ? trim((string)$body['otp_code']) : (string)($request->getQueryParams()['otp_code'] ?? '');
+        $data = $this->service->revertAdditionalFeePayment($user, $id, $otpCode);
 
         return $this->success($response, $data, 'Additional fee payment reverted successfully');
     }

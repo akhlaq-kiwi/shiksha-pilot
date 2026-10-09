@@ -80,6 +80,12 @@ export const schoolAdminService = {
   async updateStaff(id, data) {
     return apiClient.put(`/api/school/staff/${id}`, data);
   },
+  async requestPrincipalOtp(teacherId, action = 'assign') {
+    return apiClient.post(`/api/school/staff/${teacherId}/request-principal-otp`, { action });
+  },
+  async assignPrincipalRole(teacherId, otpCode, action = 'assign') {
+    return apiClient.post(`/api/school/staff/${teacherId}/assign-principal`, { otp_code: otpCode, action });
+  },
   async deleteStaff(id) {
     return apiClient.delete(`/api/school/staff/${id}`);
   },
@@ -103,6 +109,9 @@ export const schoolAdminService = {
   },
   async deleteTimetableEntry(id, data = {}) {
     return apiClient.delete(`/api/school/timetable/${id}`, { body: data });
+  },
+  async deleteDayTimetable(data) {
+    return apiClient.post('/api/school/timetable/delete-day', data);
   },
   async assignBackupTeacher(data) {
     return apiClient.post('/api/school/timetable/backup', data);

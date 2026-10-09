@@ -8,6 +8,18 @@ import { FormErrorSummary } from '../../../common/ui/field';
 import { schoolService } from '../../../common/services/schoolService';
 import { ArrowLeft, Upload, Check, Calendar } from 'lucide-react';
 import { getClassIndex } from '../../../common/constants/predefinedClasses';
+import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
+import CustomSelect from '../../../common/ui/CustomSelect';
+
+export const normalizeReligion = (val) => {
+  if (!val) return '';
+  const str = String(val).trim();
+  if (['Hindu', '1', 'Hinduism', 'hindu', 'hinduism'].includes(str)) return 'Hindu';
+  if (['Muslim', '2', 'Islam', 'muslim', 'islam'].includes(str)) return 'Muslim';
+  if (['Sikh', '3', 'Sikhism', 'sikh', 'sikhism'].includes(str)) return 'Sikh';
+  if (['Christian', '4', 'Christianity', 'christian', 'christianity'].includes(str)) return 'Christian';
+  return str;
+};
 
 const INDIAN_STATES_AND_CITIES = {
   "Andhra Pradesh": [
@@ -195,28 +207,30 @@ function SearchableSelect({ label, placeholder, value, onChange, options, disabl
         }}
         onFocus={() => setIsOpen(true)}
         disabled={disabled}
-        className="flex h-9 w-full rounded-md border border-zinc-200 bg-surface px-3 py-1 text-sm shadow-xs transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-zinc-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-800 dark:bg-zinc-950 dark:ring-offset-zinc-950 dark:placeholder:text-zinc-400 dark:focus-visible:ring-zinc-300"
+        className="flex h-9 w-full rounded-full border border-border-strong bg-surface px-4 py-1.5 text-xs font-bold text-text-primary shadow-2xs transition-colors placeholder:text-text-muted outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border-strong focus-visible:border-border-strong disabled:cursor-not-allowed disabled:opacity-60"
       />
       {isOpen && !disabled && (
-        <div className="absolute left-0 right-0 top-[60px] max-h-40 overflow-y-auto bg-surface border border-border rounded-md shadow-lg z-50 py-1 bg-white dark:bg-zinc-950 animate-in fade-in slide-in-from-top-1 duration-200">
-          {filteredOptions.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-text-muted">No options found</div>
-          ) : (
-            filteredOptions.map(opt => (
-              <button
-                key={opt}
-                type="button"
-                onClick={() => {
-                  onChange(opt);
-                  setSearch(opt);
-                  setIsOpen(false);
-                }}
-                className={`w-full text-left px-3 py-2 text-xs font-bold hover:bg-primary/10 transition-colors ${opt === value ? 'bg-primary/5 text-primary' : 'text-text-primary'}`}
-              >
-                {opt}
-              </button>
-            ))
-          )}
+        <div className="absolute left-0 right-0 top-full mt-1.5 rounded-2xl border border-border bg-surface shadow-2xl z-50 overflow-hidden animate-in fade-in duration-150">
+          <div className="max-h-48 overflow-y-auto p-1.5 space-y-0.5 scrollbar-thin">
+            {filteredOptions.length === 0 ? (
+              <div className="px-3.5 py-2 text-xs text-text-muted font-medium">No options found</div>
+            ) : (
+              filteredOptions.map(opt => (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => {
+                    onChange(opt);
+                    setSearch(opt);
+                    setIsOpen(false);
+                  }}
+                  className={`w-full text-left px-3.5 py-2 rounded-xl text-xs font-semibold outline-none focus:outline-none select-none transition-colors hover:bg-primary/10 ${opt === value ? 'bg-primary/10 text-primary font-bold' : 'text-text-primary'}`}
+                >
+                  {opt}
+                </button>
+              ))
+            )}
+          </div>
         </div>
       )}
       {error && <p className="text-[11px] text-red-500 font-semibold">{error}</p>}
@@ -226,6 +240,7 @@ function SearchableSelect({ label, placeholder, value, onChange, options, disabl
 
 export default function StudentEnrollmentForm({ studentId, currentClassName, currentClassId, onCancel, onSuccess }) {
   const navigate = useNavigate();
+  const { currentYear: activeSelectedYear } = useAcademicYear();
   const [showLimitReached, setShowLimitReached] = useState(null);
   const [academicYears, setAcademicYears] = useState([]);
   const [classesList, setClassesList] = useState([]);
@@ -369,11 +384,13 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
             }
           }
         } else {
-          // Pre-select current academic year and today's date if possible
-          const currentYear = years.find(y => y.is_current) || years.find(y => y.status === 'Draft');
+          // Pre-select currently active/selected academic year from context or localStorage
+          const savedYearId = activeSelectedYear?.id 
+            || (localStorage.getItem('shiksha_pilot_academic_year_id') ? parseInt(localStorage.getItem('shiksha_pilot_academic_year_id'), 10) : null);
+          const matchedYear = years.find(y => y.id === savedYearId) || years.find(y => y.is_current) || years.find(y => y.status === 'Draft') || years[0];
           setFormData(prev => ({
             ...prev,
-            academic_year_id: currentYear ? currentYear.id : (years[0]?.id || ''),
+            academic_year_id: matchedYear ? matchedYear.id : '',
             admission_date: (() => {
               const d = new Date();
               return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -480,9 +497,54 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
     }
   }, [studentId, currentClassName, currentClassId, classesList]);
 
-  // Determine if manual SR entry is allowed
-  const isFirstYear = academicYears.length <= 1 || (formData.academic_year_id && 
-    parseInt(formData.academic_year_id) === academicYears[0]?.id);
+  // Determine if manual SR entry is allowed (only for the school's earliest session)
+  const earliestAcademicYear = useMemo(() => {
+    if (!academicYears || academicYears.length === 0) return null;
+    return [...academicYears].sort((a, b) => {
+      const d1 = new Date(a.start_date || a.created_at || 0);
+      const d2 = new Date(b.start_date || b.created_at || 0);
+      if (d1.getTime() !== d2.getTime()) return d1 - d2;
+      return a.id - b.id;
+    })[0];
+  }, [academicYears]);
+
+  const isFirstYear = useMemo(() => {
+    if (!academicYears || academicYears.length <= 1) return true;
+    if (!formData.academic_year_id) return true;
+    if (!earliestAcademicYear) return true;
+    return String(formData.academic_year_id) === String(earliestAcademicYear.id);
+  }, [academicYears, formData.academic_year_id, earliestAcademicYear]);
+
+  const shouldShowAdmissionFee = useMemo(() => {
+    const cat = (formData.student_category || '').trim().toLowerCase();
+    if (cat.includes('existing')) {
+      return false;
+    }
+    if (studentId && cat !== 'new admission') {
+      return false;
+    }
+    return true;
+  }, [formData.student_category, studentId]);
+
+  // Pre-fetch next available SR number for subsequent academic years
+  useEffect(() => {
+    const fetchNextSrNo = async () => {
+      if (!isFirstYear && !studentId) {
+        try {
+          const res = await schoolService.getNextSrNo();
+          const nextVal = res && res.next_sr_no ? String(res.next_sr_no) : '';
+          setFormData(prev => ({
+            ...prev,
+            sr_no: nextVal,
+            student_category: 'New Admission'
+          }));
+        } catch (err) {
+          console.error('Failed to fetch next SR number:', err);
+        }
+      }
+    };
+    fetchNextSrNo();
+  }, [isFirstYear, studentId]);
 
   const handleSrNoBlur = async () => {
     if (!isFirstYear || !formData.sr_no) return;
@@ -522,13 +584,15 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
 
     setErrors(prev => {
       const nextErrs = { ...prev };
-      const currentCategory = name === 'student_category' ? value : updatedForm.student_category;
+      const cat = (name === 'student_category' ? value : updatedForm.student_category || '').trim().toLowerCase();
       const currentFeeStr = name === 'admission_fee' ? value : updatedForm.admission_fee;
       const feeVal = (currentFeeStr !== '' && currentFeeStr !== null && currentFeeStr !== undefined) ? parseFloat(currentFeeStr) : 0;
 
-      if (currentCategory === 'Existing Student' && feeVal > 0) {
-        nextErrs.admission_fee = 'Not allowed for existing student';
-      } else if (nextErrs.admission_fee === 'Not allowed for existing student') {
+      if (cat.includes('existing') || (studentId && cat !== 'new admission')) {
+        nextErrs.admission_fee = null;
+      } else if (feeVal < 0) {
+        nextErrs.admission_fee = 'Admission Fee cannot be negative.';
+      } else if (nextErrs.admission_fee) {
         nextErrs.admission_fee = null;
       }
 
@@ -748,12 +812,14 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
       if (!formData.admission_date) {
         errs.admission_date = 'Admission Date is required';
       }
-      if (formData.admission_fee !== '' && formData.admission_fee !== null && parseFloat(formData.admission_fee) < 0) {
-        errs.admission_fee = 'Admission Fee cannot be negative.';
-      } else if (formData.student_category === 'Existing Student' && formData.admission_fee !== '' && formData.admission_fee !== null && parseFloat(formData.admission_fee) > 0) {
-        errs.admission_fee = 'Not allowed for existing student';
+      if (shouldShowAdmissionFee) {
+        if (formData.admission_fee !== '' && formData.admission_fee !== null && parseFloat(formData.admission_fee) < 0) {
+          errs.admission_fee = 'Admission Fee cannot be negative.';
+        }
+      } else {
+        delete errs.admission_fee;
       }
-      const isFirstYearSession = (academicYears || []).length <= 1 || (formData.academic_year_id && String(formData.academic_year_id) === String(academicYears[0]?.id));
+      const isFirstYearSession = isFirstYear;
       if (isFirstYearSession && !studentId && !formData.student_category) {
         errs.student_category = 'Student Category is required.';
       }
@@ -924,6 +990,10 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
         class_name: selectedClassName
       };
 
+      if (!shouldShowAdmissionFee) {
+        delete submitPayload.admission_fee;
+      }
+
       if (studentId) {
         await schoolService.updateStudent(studentId, submitPayload);
       } else {
@@ -1040,7 +1110,7 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
       </div>
 
       <form onSubmit={handleSubmit}>
-        <Card className="shadow-sm">
+        <Card className="bg-zinc-50/50 dark:bg-zinc-900/50 border border-border rounded-2xl shadow-2xs">
           <CardContent className="p-6">
             
             {/* Tab 1: Basic Details */}
@@ -1073,18 +1143,18 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
 
                     <div className="space-y-1.5">
                       <label htmlFor="gender" className="text-xs font-bold text-text-secondary uppercase">Gender <span className="text-red-500">*</span></label>
-                      <select id="gender" 
-                        name="gender" 
-                        value={formData.gender} 
-                        onChange={handleTextChange} 
-                        required 
-                        className="flex h-9 w-full rounded-md border border-zinc-200 bg-surface px-3 py-1.5 text-sm text-text-primary shadow-xs transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-950 dark:border-zinc-800 dark:focus:ring-zinc-300"
-                      >
-                        <option value="">Select...</option>
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
-                        <option value="Other">Other</option>
-                      </select>
+                      <CustomSelect
+                        value={formData.gender}
+                        onChange={(val) => {
+                          handleTextChange({ target: { name: 'gender', value: val } });
+                        }}
+                        options={[
+                          { value: 'Male', label: 'Male' },
+                          { value: 'Female', label: 'Female' },
+                          { value: 'Other', label: 'Other' }
+                        ]}
+                        placeholder="Select..."
+                      />
                       {errors.gender && <p className="text-[11px] text-red-500 font-semibold">{errors.gender}</p>}
                     </div>
                     <div className="space-y-1.5">
@@ -1118,77 +1188,96 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                       </div>
                       {errors.admission_date && <p className="text-[11px] text-red-500 font-semibold">{errors.admission_date}</p>}
                     </div>
-                    <div className="space-y-1.5">
-                      <label htmlFor="admission_fee" className="text-xs font-bold text-text-secondary uppercase">Admission Fee</label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-2 text-xs font-bold text-text-muted">₹</span>
-                        <Input id="admission_fee"
-                          type="number"
-                          name="admission_fee"
-                          placeholder="0.00"
-                          value={formData.admission_fee}
-                          onChange={handleTextChange}
-                          min="0"
-                          step="any"
-                          className="pl-7 text-text-primary text-sm"
-                        />
+                    {shouldShowAdmissionFee && (
+                      <div className="space-y-1.5">
+                        <label htmlFor="admission_fee" className="text-xs font-bold text-text-secondary uppercase">Admission Fee</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2 text-xs font-bold text-text-muted">₹</span>
+                          <Input id="admission_fee"
+                            type="number"
+                            name="admission_fee"
+                            placeholder="0.00"
+                            value={formData.admission_fee}
+                            onChange={handleTextChange}
+                            min="0"
+                            step="any"
+                            className="pl-7 text-text-primary text-sm"
+                          />
+                        </div>
+                        {errors.admission_fee && <p className="text-[11px] text-red-500 font-semibold">{errors.admission_fee}</p>}
                       </div>
-                      {errors.admission_fee && <p className="text-[11px] text-red-500 font-semibold">{errors.admission_fee}</p>}
-                    </div>
+                    )}
 
-                    {(((academicYears || []).length <= 1 || (formData.academic_year_id && String(formData.academic_year_id) === String(academicYears[0]?.id))) || formData.student_category) && (
+                    {isFirstYear && (
                       <div className="space-y-1.5">
                         <label htmlFor="student_category" className="text-xs font-bold text-text-secondary uppercase">
                           Student Category <span className="text-red-500">*</span>
                         </label>
-                        <select id="student_category"
-                          name="student_category"
+                        <CustomSelect
                           value={formData.student_category}
-                          onChange={handleTextChange}
-                          required
-                          className="flex h-9 w-full rounded-md border border-zinc-200 bg-surface px-3 py-1.5 text-sm text-text-primary shadow-xs transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-950 dark:border-zinc-800 dark:focus:ring-zinc-300"
-                        >
-                          <option value="">Select...</option>
-                          <option value="Existing Student">Existing Student</option>
-                          <option value="New Admission">New Admission</option>
-                        </select>
+                          onChange={(val) => {
+                            handleTextChange({ target: { name: 'student_category', value: val } });
+                          }}
+                          options={[
+                            { value: 'Existing Student', label: 'Existing Student' },
+                            { value: 'New Admission', label: 'New Admission' }
+                          ]}
+                          placeholder="Select..."
+                        />
                         {errors.student_category && <p className="text-[11px] text-red-500 font-semibold">{errors.student_category}</p>}
                       </div>
                     )}
                     <div className="space-y-1.5">
                       <label htmlFor="blood_group" className="text-xs font-bold text-text-secondary uppercase">Blood Group</label>
-                      <select id="blood_group" 
-                        name="blood_group" 
-                        value={formData.blood_group} 
-                        onChange={handleTextChange}
-                        className="flex h-9 w-full rounded-md border border-zinc-200 bg-surface px-3 py-1.5 text-sm text-text-primary shadow-xs transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-950 dark:border-zinc-800 dark:focus:ring-zinc-300"
-                      >
-                        <option value="">Select...</option>
-                        <option value="A+">A+</option><option value="A-">A-</option>
-                        <option value="B+">B+</option><option value="B-">B-</option>
-                        <option value="O+">O+</option><option value="O-">O-</option>
-                        <option value="AB+">AB+</option><option value="AB-">AB-</option>
-                      </select>
+                      <CustomSelect
+                        value={formData.blood_group}
+                        onChange={(val) => {
+                          handleTextChange({ target: { name: 'blood_group', value: val } });
+                        }}
+                        options={[
+                          { value: 'A+', label: 'A+' }, { value: 'A-', label: 'A-' },
+                          { value: 'B+', label: 'B+' }, { value: 'B-', label: 'B-' },
+                          { value: 'O+', label: 'O+' }, { value: 'O-', label: 'O-' },
+                          { value: 'AB+', label: 'AB+' }, { value: 'AB-', label: 'AB-' }
+                        ]}
+                        placeholder="Select..."
+                      />
                     </div>
 
                     <div className="space-y-1.5">
                       <label htmlFor="category" className="text-xs font-bold text-text-secondary uppercase">Category</label>
-                      <select id="category" 
-                        name="category" 
-                        value={formData.category} 
-                        onChange={handleTextChange}
-                        className="flex h-9 w-full rounded-md border border-zinc-200 bg-surface px-3 py-1.5 text-sm text-text-primary shadow-xs transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-950 dark:border-zinc-800 dark:focus:ring-zinc-300"
-                      >
-                        <option value="">Select...</option>
-                        <option value="General">General</option>
-                        <option value="OBC">OBC</option>
-                        <option value="SC">SC</option>
-                        <option value="ST">ST</option>
-                      </select>
+                      <CustomSelect
+                        value={formData.category}
+                        onChange={(val) => {
+                          handleTextChange({ target: { name: 'category', value: val } });
+                        }}
+                        options={[
+                          { value: 'General', label: 'General' },
+                          { value: 'OBC', label: 'OBC' },
+                          { value: 'SC', label: 'SC' },
+                          { value: 'ST', label: 'ST' }
+                        ]}
+                        placeholder="Select..."
+                      />
                     </div>
                     <div className="space-y-1.5">
                       <label htmlFor="religion" className="text-xs font-bold text-text-secondary uppercase">Religion</label>
-                      <Input id="religion" name="religion" value={formData.religion} onChange={handleTextChange} placeholder="e.g. Hinduism" />
+                      <CustomSelect
+                        value={normalizeReligion(formData.religion)}
+                        onChange={(val) => {
+                          handleTextChange({ target: { name: 'religion', value: val } });
+                        }}
+                        options={[
+                          { value: 'Hindu', label: 'Hindu' },
+                          { value: 'Muslim', label: 'Muslim' },
+                          { value: 'Sikh', label: 'Sikh' },
+                          { value: 'Christian', label: 'Christian' },
+                          ...(formData.religion && !['Hindu', 'Muslim', 'Sikh', 'Christian', '1', '2', '3', '4', 'Hinduism', 'Islam', 'Sikhism', 'Christianity', ''].includes(String(formData.religion).trim())
+                            ? [{ value: formData.religion, label: formData.religion }]
+                            : [])
+                        ]}
+                        placeholder="Select..."
+                      />
                     </div>
                     <div className="space-y-1.5">
                       <label htmlFor="aadhaar_no" className="text-xs font-bold text-text-secondary uppercase">Aadhaar Number</label>
@@ -1201,7 +1290,7 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                       {errors.student_mobile && <p className="text-[11px] text-red-500 font-semibold">{errors.student_mobile}</p>}
                     </div>
 
-                    {isFirstYear && (
+                    {isFirstYear ? (
                       <div className="space-y-1.5">
                         <label htmlFor="sr_no" className="text-xs font-bold text-text-secondary uppercase">SR Number <span className="text-red-500">*</span></label>
                         <Input id="sr_no" 
@@ -1214,25 +1303,35 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                         />
                         {errors.sr_no && <p className="text-[11px] text-red-500 font-semibold">{errors.sr_no}</p>}
                       </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <label htmlFor="sr_no" className="text-xs font-bold text-text-secondary uppercase">
+                          SR Number <span className="text-zinc-400 font-normal text-[10px] lowercase">(auto generated)</span>
+                        </label>
+                        <Input id="sr_no" 
+                          name="sr_no" 
+                          value={formData.sr_no || ''} 
+                          placeholder="Auto Assigned" 
+                          disabled 
+                          className="font-bold bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 cursor-not-allowed"
+                        />
+                      </div>
                     )}
 
                     {availableSections.length > 0 && (
                       <div className="space-y-1.5 animate-in fade-in duration-200">
                         <label htmlFor="section_name" className="text-xs font-bold text-text-secondary uppercase">Select Section <span className="text-red-500">*</span></label>
-                        <select id="section_name"
-                          name="section_name"
+                        <CustomSelect
                           value={selectedSectionName}
-                          onChange={handleSectionChange}
-                          required
-                          className="flex h-9 w-full rounded-md border border-zinc-200 bg-surface px-3 py-1.5 text-sm text-text-primary shadow-xs transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-950 dark:border-zinc-800 dark:focus:ring-zinc-300"
-                        >
-                          <option value="">Select Section...</option>
-                          {availableSections.map(sec => (
-                            <option key={sec} value={sec}>
-                              {sec.length === 1 ? `Section ${sec}` : sec}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={(val) => {
+                            handleSectionChange({ target: { value: val } });
+                          }}
+                          options={availableSections.map(sec => ({
+                            value: sec,
+                            label: sec.length === 1 ? `Section ${sec}` : sec
+                          }))}
+                          placeholder="Select Section..."
+                        />
                         {errors.section_name && <p className="text-[11px] text-red-500 font-semibold">{errors.section_name}</p>}
                       </div>
                     )}
@@ -1476,14 +1575,14 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                       </div>
 
                       <p className="border-l-2 border-indigo-500 pl-2.5 font-bold text-text-primary uppercase text-xs tracking-wider mt-4">Current Address</p>
-                      <p className="text-xs text-text-secondary bg-zinc-50 dark:bg-zinc-900/50 p-2.5 rounded-lg leading-relaxed border border-border">
+                      <p className="text-xs text-text-secondary bg-zinc-50/50 dark:bg-zinc-900/50 p-3.5 rounded-2xl leading-relaxed border border-border">
                         {((formData.current_address_line_1 || '') + (formData.current_address_line_2 ? ', ' + formData.current_address_line_2 : '')).trim() || formData.current_address_line}, {formData.current_city}, {formData.current_state} - {formData.current_pin_code}
                       </p>
 
                       {formData.same_as_current === 0 && (formData.permanent_address_line_1 || '').trim() !== '' && (
                         <>
                           <p className="border-l-2 border-indigo-500 pl-2.5 font-bold text-text-primary uppercase text-xs tracking-wider mt-3">Permanent Address</p>
-                          <p className="text-xs text-text-secondary bg-zinc-50 dark:bg-zinc-900/50 p-2.5 rounded-lg leading-relaxed border border-border">
+                          <p className="text-xs text-text-secondary bg-zinc-50/50 dark:bg-zinc-900/50 p-3.5 rounded-2xl leading-relaxed border border-border">
                             {((formData.permanent_address_line_1 || '') + (formData.permanent_address_line_2 ? ', ' + formData.permanent_address_line_2 : '')).trim() || formData.permanent_address_line}, {formData.permanent_city}, {formData.permanent_state} - {formData.permanent_pin_code}
                           </p>
                         </>

@@ -8,9 +8,9 @@ import { useFieldContext } from './field';
  * flat text on some screens.
  */
 export const controlBase =
-  'flex w-full rounded-lg border border-border-strong bg-surface px-3 text-body-md text-text-primary ' +
+  'flex w-full rounded-full border border-border-strong bg-surface px-4 text-body-md text-text-primary ' +
   'shadow-sm transition-colors placeholder:text-text-muted ' +
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary ' +
+  'outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border-strong focus-visible:border-border-strong ' +
   'disabled:cursor-not-allowed disabled:opacity-60 disabled:bg-secondary';
 
 const invalidStyles = 'border-danger-500 focus-visible:ring-danger-500/50 focus-visible:border-danger-500';
@@ -26,20 +26,39 @@ function useControlProps({ id, invalid, describedBy, required }) {
   };
 }
 
-export const Input = React.forwardRef(({ className, type = 'text', invalid, ...props }, ref) => {
+export const Input = React.forwardRef(({ className, type = 'text', invalid, onClick, ...props }, ref) => {
   const { controlId, isRequired, isInvalid, describedByValue } = useControlProps({
     id: props.id, invalid, required: props.required, describedBy: props['aria-describedby'],
   });
+
+  const handleClick = (e) => {
+    if (type === 'date') {
+      try {
+        e.currentTarget.showPicker?.();
+      } catch (err) {
+        // Ignore if picker already open or unsupported
+      }
+    }
+    if (onClick) onClick(e);
+  };
+
   return (
     <input
       type={type}
       ref={ref}
+      onClick={handleClick}
       {...props}
       id={controlId}
       required={isRequired}
       aria-invalid={isInvalid || undefined}
       aria-describedby={describedByValue}
-      className={twMerge(controlBase, 'h-9 py-1.5', isInvalid && invalidStyles, className)}
+      className={twMerge(
+        controlBase, 
+        'h-9 py-1.5', 
+        type === 'date' && 'cursor-pointer focus:ring-0 focus-visible:ring-0 focus:outline-none focus-visible:outline-none focus:border-border-strong focus-visible:border-border-strong',
+        isInvalid && invalidStyles, 
+        className
+      )}
     />
   );
 });

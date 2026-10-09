@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, FileText, CheckCircle, AlertCircle, Plus, 
@@ -38,6 +38,15 @@ export default function SeatingPlanPage() {
   // Preview / Summary State
   const [previewData, setPreviewData] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const previewRef = useRef(null);
+
+  useEffect(() => {
+    if (previewData && previewRef.current) {
+      setTimeout(() => {
+        previewRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 50);
+    }
+  }, [previewData]);
 
   // State B: Generated Report State
   const [generatedPlan, setGeneratedPlan] = useState(null);
@@ -132,6 +141,17 @@ export default function SeatingPlanPage() {
         : [...prev, classId]
     );
     setPreviewData(null); // Clear preview since classes changed
+  };
+
+  const isAllClassesSelected = classes.length > 0 && selectedClassIds.length === classes.length;
+
+  const handleSelectAllClasses = () => {
+    if (isAllClassesSelected) {
+      setSelectedClassIds([]);
+    } else {
+      setSelectedClassIds(classes.map(c => c.id));
+    }
+    setPreviewData(null);
   };
 
   // Handle room count change
@@ -584,7 +604,18 @@ export default function SeatingPlanPage() {
             </CardHeader>
             <CardContent className="p-6 space-y-4">
               <div>
-                <label className="text-xs font-bold uppercase text-text-secondary tracking-wider mb-2 block">Classes to Include</label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-bold uppercase text-text-secondary tracking-wider block">Classes to Include</label>
+                  {classes.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleSelectAllClasses}
+                      className="text-xs font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer transition-colors"
+                    >
+                      {isAllClassesSelected ? 'Deselect All' : 'Select All'}
+                    </button>
+                  )}
+                </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-zinc-50 dark:bg-zinc-900/40 p-4 rounded-xl border border-border">
                   {classes.map(c => {
                     const isSelected = selectedClassIds.includes(c.id);
@@ -592,17 +623,13 @@ export default function SeatingPlanPage() {
                     return (
                       <label 
                         key={c.id} 
-                        className={`flex items-center gap-3 p-2.5 rounded-lg border text-xs cursor-pointer select-none transition-all duration-200 ${
-                          isSelected 
-                            ? 'bg-primary/5 border-primary font-bold text-text-primary' 
-                            : 'bg-surface border-border text-text-secondary hover:border-zinc-300 dark:hover:border-zinc-700'
-                        }`}
+                        className="flex items-center gap-3 p-2.5 rounded-lg border border-border bg-surface text-xs text-text-primary cursor-pointer select-none transition-all duration-200 hover:border-zinc-300 dark:hover:border-zinc-700"
                       >
                         <input 
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => handleClassToggle(c.id)}
-                          className="rounded border-zinc-300 text-primary focus:ring-primary h-4 w-4"
+                          className="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500 accent-emerald-600 h-4 w-4 cursor-pointer"
                         />
                         <div className="flex flex-col">
                           <span>{c.name} {c.section ? `- ${c.section}` : ''}</span>
@@ -744,7 +771,7 @@ export default function SeatingPlanPage() {
 
       {/* INSTANT SEATING PREVIEW AREA - Displayed directly below form inside State A */}
       {currentView === 'config' && previewData && (
-        <div className="max-w-5xl mx-auto mt-6 space-y-6 animate-in fade-in duration-300 no-print">
+        <div ref={previewRef} className="max-w-5xl mx-auto mt-6 space-y-6 animate-in fade-in duration-300 no-print scroll-mt-20">
           <Card>
             <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
               <CardTitle className="text-sm font-bold text-text-primary">Seating Allocation Preview</CardTitle>
@@ -827,7 +854,7 @@ export default function SeatingPlanPage() {
 
       {/* STATE B: GENERATED SLIPS VIEW */}
       {currentView === 'slips' && generatedPlan ? (
-        <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in duration-300">
+        <div className="w-full space-y-6 animate-in fade-in duration-300">
           {/* Back Button Panel */}
           <div className="flex justify-between items-center no-print">
             <Button 
@@ -840,83 +867,75 @@ export default function SeatingPlanPage() {
             </Button>
           </div>
 
-          {/* Action Header Card */}
-          <Card className="no-print">
-            <CardContent className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center text-green-600">
-                  <Check className="h-5 w-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-text-primary font-display font-bold">Student Slips Generated</h3>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  className="flex items-center gap-1.5 font-bold"
-                  onClick={() => setIsRegenerateOpen(true)}
-                >
-                  <RefreshCw className="h-4 w-4" /> Regenerate Plan
-                </Button>
-                {(() => {
-                  const allAdmitCardsPublished = selectedClassIds.length > 0 && selectedClassIds.every(classId => 
-                    examClassStatuses.find(c => c.id === classId)?.admit_card_published === 1
-                  );
-                  if (allAdmitCardsPublished) {
-                    return (
-                      <Button 
-                        variant="secondary"
-                        className="flex items-center gap-1.5 font-bold border-rose-200 text-rose-600 hover:bg-rose-50 cursor-pointer"
-                        onClick={handleUnpublishAdmitClick}
-                      >
-                        <RotateCcw className="h-4 w-4" /> Revert to Draft
-                      </Button>
-                    );
-                  }
+          {/* Action Header & Filter Bar */}
+          <div className="no-print bg-zinc-50/50 dark:bg-zinc-900/50 border border-border rounded-2xl shadow-2xs p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            {/* Room Filter Tool */}
+            <div className="flex items-center gap-3">
+              <label className="text-xs font-bold uppercase text-text-primary tracking-wider flex-shrink-0">Room Filter:</label>
+              <Select 
+                value={selectedRoomFilter}
+                onChange={(e) => setSelectedRoomFilter(e.target.value)}
+                className="w-44 bg-surface border-border focus:ring-0 focus-visible:ring-0 focus:outline-none"
+              >
+                <option value="all">All Rooms</option>
+                {uniqueRooms.map(roomName => (
+                  <option key={roomName} value={roomName}>{roomName}</option>
+                ))}
+              </Select>
+              <span className="text-xs font-bold text-text-secondary bg-primary/10 text-primary px-3 py-1.5 rounded-lg whitespace-nowrap">
+                Slips Shown: {filteredAllocations.length}
+              </span>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-wrap items-center gap-2.5">
+              <Button 
+                variant="outline" 
+                className="flex items-center gap-1.5 font-bold whitespace-nowrap"
+                onClick={() => setIsRegenerateOpen(true)}
+              >
+                <RefreshCw className="h-4 w-4" /> Regenerate Plan
+              </Button>
+              {(() => {
+                const allAdmitCardsPublished = selectedClassIds.length > 0 && selectedClassIds.every(classId => 
+                  examClassStatuses.find(c => c.id === classId)?.admit_card_published === 1
+                );
+                if (allAdmitCardsPublished) {
                   return (
                     <Button 
-                      variant="default"
-                      className="flex items-center gap-1.5 font-bold cursor-pointer"
-                      onClick={handlePublishAdmitClick}
+                      variant="secondary"
+                      className="flex items-center gap-1.5 font-bold border-rose-200 text-rose-600 hover:bg-rose-50 cursor-pointer whitespace-nowrap"
+                      onClick={handleUnpublishAdmitClick}
                     >
-                      <Check className="h-4 w-4" /> Publish Admit Cards
+                      <RotateCcw className="h-4 w-4" /> Revert to Draft
                     </Button>
                   );
-                })()}
-                <Button 
-                  variant="outline"
-                  className="flex items-center gap-1.5 font-bold"
-                  onClick={() => handleDownloadPDF('print-slips', `Examination_Slips_${selectedRoomFilter}`)}
-                >
-                  <Download className="h-4 w-4" /> Download PDF
-                </Button>
-                <Button 
-                  className="flex items-center gap-1.5 font-bold"
-                  onClick={() => handlePrint('print-slips', `Examination Slips ${selectedRoomFilter}`)}
-                >
-                  <Printer className="h-4 w-4" /> Print Slips
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Room Filter Tool */}
-          <div className="flex items-center gap-3 bg-zinc-50 dark:bg-zinc-900/60 p-4 rounded-xl border border-border no-print">
-            <label className="text-xs font-bold uppercase text-text-primary tracking-wider flex-shrink-0">Room Filter:</label>
-            <Select 
-              value={selectedRoomFilter}
-              onChange={(e) => setSelectedRoomFilter(e.target.value)}
-              className="w-48 bg-white dark:bg-surface border-border"
-            >
-              <option value="all">All Rooms</option>
-              {uniqueRooms.map(roomName => (
-                <option key={roomName} value={roomName}>{roomName}</option>
-              ))}
-            </Select>
-            <span className="text-xs font-bold text-text-secondary ml-auto bg-primary/10 text-primary px-3 py-1.5 rounded-lg">
-              Slips Shown: {filteredAllocations.length}
-            </span>
+                }
+                return (
+                  <Button 
+                    variant="outline"
+                    className="flex items-center gap-1.5 font-bold cursor-pointer whitespace-nowrap"
+                    onClick={handlePublishAdmitClick}
+                  >
+                    <Check className="h-4 w-4" /> Publish Admit Cards
+                  </Button>
+                );
+              })()}
+              <Button 
+                variant="outline"
+                className="flex items-center gap-1.5 font-bold whitespace-nowrap"
+                onClick={() => handleDownloadPDF('print-slips', `Examination_Slips_${selectedRoomFilter}`)}
+              >
+                <Download className="h-4 w-4" /> Download PDF
+              </Button>
+              <Button 
+                variant="outline"
+                className="flex items-center gap-1.5 font-bold whitespace-nowrap"
+                onClick={() => handlePrint('print-slips', `Examination Slips ${selectedRoomFilter}`)}
+              >
+                <Printer className="h-4 w-4" /> Print Slips
+              </Button>
+            </div>
           </div>
 
           {/* RENDERED CARDS - 100% width cells in grid, scaling dynamically */}
@@ -997,9 +1016,9 @@ export default function SeatingPlanPage() {
 
                         {/* Middle Student Info Section (Using borderless tables to resolve column baselines) */}
                         <div className="flex flex-col justify-center py-1 flex-1 min-h-0">
-                          {/* Candidate Name block */}
+                          {/* Student Name block */}
                           <div className="w-full" style={{ marginBottom: '6px' }}>
-                            <p className="text-[7px] font-bold text-zinc-400 uppercase tracking-wider" style={{ lineHeight: '10px', fontFamily: 'Arial, Helvetica, sans-serif' }}>Candidate Name</p>
+                            <p className="text-[7px] font-bold text-zinc-400 uppercase tracking-wider" style={{ lineHeight: '10px', fontFamily: 'Arial, Helvetica, sans-serif' }}>Student Name</p>
                             <p className="text-[12px] font-bold text-zinc-955 truncate uppercase" style={{ lineHeight: '16px', marginTop: '2px', fontFamily: 'Arial, Helvetica, sans-serif' }}>
                               {alloc.student_name}
                             </p>

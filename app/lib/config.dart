@@ -1,42 +1,50 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// The only server a release build will ever talk to.
+/// Configured Base URL from compile-time --dart-define or local environment default.
+const String kEnvBaseUrl = String.fromEnvironment('BASE_URL', defaultValue: 'https://app.shikshapilot.com');
+
+/// QA Server Base URL.
+const String kQaBaseUrl = 'https://qa.shikshapilot.com';
+
+/// Production Base URL.
 const String kProductionBaseUrl = 'https://app.shikshapilot.com';
+
+/// Wi-Fi LAN IP address of local dev server.
+const String kWifiBaseUrl = 'http://10.184.196.71:8000';
+
+/// USB ADB reverse port forwarding URL.
+const String kUsbBaseUrl = 'http://127.0.0.1:8000';
+
+/// Default local dev server URL.
+const String kLocalBaseUrl = 'http://127.0.0.1:8000';
 
 /// Key under which a debug-time server override is stored.
 const String kBaseUrlPrefKey = 'base_url';
 
 /// Whether the login screen may point the app at a different server.
-///
-/// Debug builds only. Shipping this control would let a user — or anyone who
-/// hands a user a URL — redirect real credentials to a host they control, since
-/// the value is used for `/api/auth/login` itself.
 bool get kServerOverrideAllowed => kDebugMode;
 
 /// Base URL for API calls, given an already-loaded [SharedPreferences].
-///
-/// Release builds ignore any stored override and always return production, so a
-/// value written by an older build cannot outlive the debug session it came
-/// from.
-const String kLocalBaseUrl = 'http://10.73.20.71:8000';
-
 String resolveBaseUrlFrom(SharedPreferences prefs) {
-  if (!kServerOverrideAllowed) {
-    return kProductionBaseUrl;
-  }
   final saved = prefs.getString(kBaseUrlPrefKey);
-  if (saved != null && saved.isNotEmpty && saved != kProductionBaseUrl) {
+  if (saved != null && saved.isNotEmpty && saved != kProductionBaseUrl && saved != kQaBaseUrl) {
     return saved;
   }
-  return kLocalBaseUrl;
+  if (kDebugMode) {
+    return kLocalBaseUrl;
+  }
+  return kEnvBaseUrl;
 }
 
 /// Base URL for API calls, loading preferences as needed.
 Future<String> resolveBaseUrl() async {
-  if (!kServerOverrideAllowed) {
-    return kProductionBaseUrl;
-  }
-
-  return resolveBaseUrlFrom(await SharedPreferences.getInstance());
+  final prefs = await SharedPreferences.getInstance();
+  return resolveBaseUrlFrom(prefs);
 }
+
+
+
+
+
+

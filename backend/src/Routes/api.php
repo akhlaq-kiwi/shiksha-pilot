@@ -60,6 +60,7 @@ return function (App $app) {
 
     // Super Admin Report Card Templates
     $app->get('/api/platform/report-card-templates', [ReportCardTemplateController::class, 'listTemplates']);
+    $app->get('/api/platform/report-card-templates/{id}/schools', [ReportCardTemplateController::class, 'getAssignedSchools']);
     $app->post('/api/platform/report-card-templates', [ReportCardTemplateController::class, 'createTemplate']);
     $app->put('/api/platform/report-card-templates/{id}', [ReportCardTemplateController::class, 'updateTemplate']);
     $app->delete('/api/platform/report-card-templates/{id}', [ReportCardTemplateController::class, 'deleteTemplate']);
@@ -69,6 +70,7 @@ return function (App $app) {
     $app->get('/api/school/stats', [SchoolAdminController::class, 'getDashboardStats']);
     $app->get('/api/school/students', [SchoolAdminController::class, 'getStudents']);
     $app->get('/api/school/students/check-sr-no', [SchoolAdminController::class, 'checkSrNo']);
+    $app->get('/api/school/students/next-sr-no', [SchoolAdminController::class, 'getNextSrNo']);
     $app->get('/api/school/students/check-roll-no', [SchoolAdminController::class, 'checkRollNo']);
     $app->get('/api/school/students/{id}', [SchoolAdminController::class, 'getStudentById']);
     $app->get('/api/school/students/{student_id}/fees/receipt', [SchoolAdminController::class, 'getFeeReceipt']);
@@ -80,6 +82,8 @@ return function (App $app) {
     $app->post('/api/school/staff', [SchoolAdminController::class, 'createStaff']);
     $app->put('/api/school/staff/{id}', [SchoolAdminController::class, 'updateStaff']);
     $app->get('/api/school/staff/{id}', [SchoolAdminController::class, 'getStaffDetails']);
+    $app->post('/api/school/staff/{id}/request-principal-otp', [SchoolAdminController::class, 'requestPrincipalOtp']);
+    $app->post('/api/school/staff/{id}/assign-principal', [SchoolAdminController::class, 'assignPrincipalRole']);
     $app->get('/api/school/staff-payments', [SchoolAdminController::class, 'getStaffPayments']);
     $app->post('/api/school/staff-payments', [SchoolAdminController::class, 'payStaffSalary']);
     $app->post('/api/school/staff-payments/disburse-previous-year', [SchoolAdminController::class, 'disbursePreviousYearStaffSalary']);
@@ -106,6 +110,7 @@ return function (App $app) {
     $app->get('/api/school/additional-fees/payments', [SchoolAdminController::class, 'getAdditionalFeePayments']);
     $app->post('/api/school/additional-fees/payments/{id}/pay', [SchoolAdminController::class, 'collectAdditionalFeePayment']);
     $app->post('/api/school/additional-fees/payments/{id}/revert', [SchoolAdminController::class, 'revertAdditionalFeePayment']);
+    $app->post('/api/school/fees/request-revert-otp', [SchoolAdminController::class, 'requestFeeRevertOtp']);
 
     // Transport Fee Management
     $app->get('/api/school/transport-fees', [SchoolAdminController::class, 'getTransportFees']);
@@ -166,6 +171,8 @@ return function (App $app) {
     $app->get('/api/school/exams-new/{id}', [SchoolAdminController::class, 'getExaminationDetails']);
     $app->put('/api/school/exams-new/{id}', [SchoolAdminController::class, 'updateExamination']);
     $app->delete('/api/school/exams-new/{id}', [SchoolAdminController::class, 'deleteExamination']);
+    $app->post('/api/school/exams-new/{id}/request-delete-otp', [SchoolAdminController::class, 'requestExamDeleteOtp']);
+    $app->get('/api/school/exams-new/{id}/all-schemes', [SchoolAdminController::class, 'getAllExamSchemes']);
     $app->get('/api/school/exams-new/{id}/timetable', [SchoolAdminController::class, 'getExamTimetable']);
     $app->post('/api/school/exams-new/{id}/timetable', [SchoolAdminController::class, 'saveExamTimetable']);
     $app->get('/api/school/exams-new/{id}/marks', [SchoolAdminController::class, 'getExamMarksSheet']);
@@ -240,6 +247,7 @@ return function (App $app) {
     $app->get('/api/school/timetable', [SchoolAdminController::class, 'getTimetable']);
     $app->post('/api/school/timetable', [SchoolAdminController::class, 'addTimetablePeriod']);
     $app->delete('/api/school/timetable/{id}', [SchoolAdminController::class, 'deleteTimetablePeriod']);
+    $app->post('/api/school/timetable/delete-day', [SchoolAdminController::class, 'deleteDayTimetable']);
     $app->post('/api/school/timetable/backup', [SchoolAdminController::class, 'assignBackupTeacher']);
     $app->post('/api/school/timetable/replace', [SchoolAdminController::class, 'replaceTeacher']);
     $app->post('/api/school/timetable/publish', [SchoolAdminController::class, 'publishTimetable']);

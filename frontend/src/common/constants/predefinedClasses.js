@@ -44,25 +44,31 @@ export const detectSectionType = (sections = []) => {
 
 export const getClassIndex = (className) => {
   if (!className) return -1;
-  const cleanName = className.trim().toLowerCase();
-  
-  // Legacy / Alias mapping for Play Group -> Pre Nursery
-  if (cleanName === 'play group' || cleanName === 'playgroup' || cleanName === 'pg') {
+  const clean = className.trim();
+  const lower = clean.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  if (lower.includes('prenursery') || lower === 'pnc' || lower === 'playgroup' || lower === 'pg') {
     return PREDEFINED_CLASSES.findIndex(c => c.name === 'Pre Nursery');
   }
+  if (lower.includes('nursery') || lower === 'nc') {
+    return PREDEFINED_CLASSES.findIndex(c => c.name === 'Nursery');
+  }
+  if (lower.includes('lowerkindergarten') || lower.includes('lowerkg') || lower.includes('lkg') || lower === 'lkg') {
+    return PREDEFINED_CLASSES.findIndex(c => c.name.includes('LKG'));
+  }
+  if (lower.includes('upperkindergarten') || lower.includes('upperkg') || lower.includes('ukg') || lower === 'ukg') {
+    return PREDEFINED_CLASSES.findIndex(c => c.name.includes('UKG'));
+  }
+  if (lower === 'kg' || lower === 'kindergarten') {
+    return PREDEFINED_CLASSES.findIndex(c => c.name === 'KG');
+  }
 
-  // Exact match
-  const idx = PREDEFINED_CLASSES.findIndex(c => c.name.toLowerCase() === cleanName);
+  // Exact match fallback
+  const idx = PREDEFINED_CLASSES.findIndex(c => c.name.toLowerCase().replace(/[^a-z0-9]/g, '') === lower);
   if (idx !== -1) return idx;
 
-  // Short-name matching fallbacks
-  if (cleanName === 'lkg') return PREDEFINED_CLASSES.findIndex(c => c.name.includes('LKG'));
-  if (cleanName === 'ukg') return PREDEFINED_CLASSES.findIndex(c => c.name.includes('UKG'));
-  if (cleanName === 'kg') return PREDEFINED_CLASSES.findIndex(c => c.name === 'KG');
-  if (cleanName === 'pre nursery' || cleanName === 'prenursery') return PREDEFINED_CLASSES.findIndex(c => c.name === 'Pre Nursery');
-
-  // Numeric fallback
-  const match = cleanName.match(/\d+/);
+  // Numeric fallback for Class 1..12
+  const match = clean.match(/\d+/);
   if (match) {
     const num = parseInt(match[0], 10);
     return 4 + num;
@@ -73,14 +79,25 @@ export const getClassIndex = (className) => {
 export const getShortClassName = (className) => {
   if (!className) return '';
   const clean = className.trim();
-  if (clean.toLowerCase() === 'play group' || clean.toLowerCase() === 'playgroup' || clean.toLowerCase() === 'pg') {
-    return 'Pre Nursery';
-  }
-  if (clean.toLowerCase().includes('lower kindergarten') || clean.toLowerCase() === 'lkg') {
+  const lower = clean.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  if (lower.includes('lowerkindergarten') || lower.includes('lowerkg') || lower.includes('lkg') || lower === 'lkg') {
     return 'LKG';
   }
-  if (clean.toLowerCase().includes('upper kindergarten') || clean.toLowerCase() === 'ukg') {
+  if (lower.includes('upperkindergarten') || lower.includes('upperkg') || lower.includes('ukg') || lower === 'ukg') {
     return 'UKG';
+  }
+  if (lower === 'playgroup' || lower === 'pg') {
+    return 'Playgroup';
+  }
+  if (lower.includes('prenursery') || lower === 'pnc') {
+    return 'PNC';
+  }
+  if (lower.includes('nursery') || lower === 'nc') {
+    return 'NC';
+  }
+  if (lower === 'kg' || lower === 'kindergarten') {
+    return 'KG';
   }
   return clean;
 };

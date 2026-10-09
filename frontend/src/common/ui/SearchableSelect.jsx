@@ -156,6 +156,11 @@ export function SearchableSelect({ label, placeholder, value, onChange, options,
     setSearch(value || '');
   }, [value]);
 
+  const handleOpen = () => {
+    if (disabled) return;
+    setIsOpen(true);
+  };
+
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (containerRef.current && !containerRef.current.contains(e.target)) {
@@ -182,31 +187,33 @@ export function SearchableSelect({ label, placeholder, value, onChange, options,
         value={search}
         onChange={e => {
           setSearch(e.target.value);
-          setIsOpen(true);
+          handleOpen();
         }}
-        onFocus={() => setIsOpen(true)}
+        onFocus={handleOpen}
         disabled={disabled}
-        className="flex h-9 w-full rounded-lg border border-border bg-surface px-3 py-1 text-sm shadow-xs transition-all placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex h-9 w-full rounded-full border border-border bg-surface px-4 py-1.5 text-xs font-bold text-text-primary shadow-2xs outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border transition-colors cursor-pointer placeholder:font-normal placeholder:text-text-muted disabled:cursor-not-allowed disabled:opacity-50"
       />
       {isOpen && !disabled && (
-        <div className="absolute left-0 right-0 top-[60px] max-h-40 overflow-y-auto bg-surface border border-border rounded-xl shadow-lg z-50 py-1 bg-white dark:bg-zinc-950 animate-in fade-in slide-in-from-top-1 duration-200">
-          {filteredOptions.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-text-muted">No options found</div>
-          ) : (
-            filteredOptions.map((opt, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => {
-                  onChange(opt);
-                  setIsOpen(false);
-                }}
-                className="w-full text-left px-3 py-2 text-xs font-semibold text-text-primary hover:bg-secondary border-b border-border last:border-b-0"
-              >
-                {opt}
-              </button>
-            ))
-          )}
+        <div className="absolute left-0 right-0 top-full mt-1.5 rounded-2xl border border-border bg-surface shadow-2xl z-50 overflow-hidden animate-in fade-in duration-150">
+          <div className="max-h-52 overflow-y-auto p-1.5 space-y-0.5 scrollbar-thin">
+            {filteredOptions.length === 0 ? (
+              <div className="px-3.5 py-2 text-xs text-text-muted font-medium">No options found</div>
+            ) : (
+              filteredOptions.map((opt, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => {
+                    onChange(opt);
+                    setIsOpen(false);
+                  }}
+                  className={`w-full text-left px-3.5 py-2 rounded-xl text-xs font-semibold outline-none focus:outline-none select-none transition-colors hover:bg-primary/10 ${opt === value ? 'bg-primary/10 text-primary font-bold' : 'text-text-primary'}`}
+                >
+                  {opt}
+                </button>
+              ))
+            )}
+          </div>
         </div>
       )}
       {error && <p className="text-[11px] text-red-500 font-semibold">{error}</p>}

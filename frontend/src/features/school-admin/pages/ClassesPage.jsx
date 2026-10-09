@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
-import { Plus, Search, Users, User, X, MoreVertical, Check, AlertTriangle } from 'lucide-react';
+import { Plus, Search, Users, User, X, MoreVertical, Check, AlertTriangle, ChevronDown } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardContent } from '../../../common/ui/card';
 import { Input } from '../../../common/ui/input';
@@ -23,6 +24,127 @@ import {
   getShortClassName
 } from '../../../common/constants/predefinedClasses';
 
+const CustomSelect = ({
+  value,
+  onChange,
+  options = [],
+  placeholder = "Select...",
+  disabled = false,
+  className = "",
+  buttonClassName = "",
+  dropdownClassName = ""
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
+  const buttonRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  const selectedOption = options.find(o => String(o.value) === String(value));
+
+  const updateCoords = useCallback(() => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setCoords({
+        top: rect.bottom + 6,
+        left: rect.left,
+        width: rect.width
+      });
+    }
+  }, []);
+
+  const toggleOpen = () => {
+    if (disabled) return;
+    if (!isOpen) {
+      updateCoords();
+      setIsOpen(true);
+    } else {
+      setIsOpen(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleOutsideClick = (e) => {
+      if (
+        buttonRef.current && !buttonRef.current.contains(e.target) &&
+        dropdownRef.current && !dropdownRef.current.contains(e.target)
+      ) {
+        setIsOpen(false);
+      }
+    };
+
+    const handleScrollOrResize = () => {
+      updateCoords();
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    window.addEventListener('scroll', handleScrollOrResize, true);
+    window.addEventListener('resize', handleScrollOrResize);
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+      window.removeEventListener('resize', handleScrollOrResize);
+    };
+  }, [isOpen, updateCoords]);
+
+  return (
+    <div className={`relative ${className}`}>
+      <button
+        ref={buttonRef}
+        type="button"
+        disabled={disabled}
+        onClick={toggleOpen}
+        className={`flex h-9 w-full items-center justify-between rounded-full border border-border bg-surface px-4 py-2 text-xs font-bold text-text-primary shadow-2xs outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border active:outline-none select-none transition-colors ${
+          disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-border-strong'
+        } ${buttonClassName}`}
+      >
+        <span className="truncate">
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <ChevronDown className={`h-4 w-4 text-text-muted transition-transform duration-200 flex-shrink-0 ml-1 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && !disabled && createPortal(
+        <div
+          ref={dropdownRef}
+          style={{
+            position: 'fixed',
+            top: `${coords.top}px`,
+            left: `${coords.left}px`,
+            width: `${coords.width}px`,
+            zIndex: 99999,
+          }}
+          className={`rounded-2xl border border-border bg-surface shadow-2xl overflow-hidden animate-in fade-in duration-150 ${dropdownClassName}`}
+        >
+          <div className="max-h-60 overflow-y-auto p-1.5 space-y-0.5 scrollbar-thin">
+            {options.map((opt) => {
+              const isSelected = String(opt.value) === String(value);
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(String(opt.value));
+                    setIsOpen(false);
+                  }}
+                  className={`w-full text-left px-3.5 py-2 rounded-xl text-xs font-semibold outline-none focus:outline-none select-none transition-colors hover:bg-primary/10 ${
+                    isSelected ? 'bg-primary/10 text-primary font-bold' : 'text-text-primary'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+};
+
 // Self-healing avatar image component to handle loading errors gracefully
 const StudentAvatar = ({ src, name, updatedAt }) => {
   const [error, setError] = useState(false);
@@ -35,14 +157,17 @@ const StudentAvatar = ({ src, name, updatedAt }) => {
         src={cleanUrl} 
         alt={name} 
         onError={() => setError(true)} 
-        className="w-full h-full object-cover" 
+        className="w-full h-full object-cover animate-in fade-in duration-200" 
       />
     );
   }
   
-  const initials = name ? name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'ST';
+  const initials = name
+    ? name.split(' ').filter(n => n).filter((_, i) => i < 2).map(n => n[0]).join('').toUpperCase()
+    : 'S';
+
   return (
-    <div className="w-full h-full bg-zinc-100 dark:bg-zinc-800 text-text-secondary flex items-center justify-center font-bold text-lg uppercase select-none">
+    <div className="w-full h-full bg-teal-500/10 text-teal-600 dark:bg-teal-500/20 dark:text-teal-400 flex items-center justify-center text-xl font-bold select-none">
       {initials}
     </div>
   );
@@ -415,7 +540,26 @@ export default function ClassesPage() {
     setIsDeletingClass(true);
     setDeleteClassError('');
     try {
-      await schoolService.deleteClass(deleteClassTarget.name);
+      const namesToDelete = (deleteClassTarget.originalNames && deleteClassTarget.originalNames.length > 0)
+        ? deleteClassTarget.originalNames
+        : [deleteClassTarget.name];
+
+      let deletedCount = 0;
+      let lastErr = null;
+
+      for (const name of namesToDelete) {
+        try {
+          await schoolService.deleteClass(name);
+          deletedCount++;
+        } catch (e) {
+          lastErr = e;
+        }
+      }
+
+      if (deletedCount === 0) {
+        await schoolService.deleteClass(deleteClassTarget.name);
+      }
+
       setDeleteClassTarget(null);
       await loadData();
     } catch (err) {
@@ -426,35 +570,43 @@ export default function ClassesPage() {
     }
   };
 
-  // Group classes by name for the card grid view
+  // Group classes by short name for the card grid view to avoid duplicates (e.g. Upper Kindergarten (UKG) vs UKG)
   const getGroupedClasses = () => {
     const groups = {};
     classes.forEach(c => {
-      if (!groups[c.name]) {
-        const preObj = PREDEFINED_CLASSES.find(p => p.name.trim().toLowerCase() === c.name.trim().toLowerCase());
-        groups[c.name] = {
-          name: c.name,
+      const shortName = getShortClassName(c.name);
+      if (!groups[shortName]) {
+        const preObj = PREDEFINED_CLASSES.find(p => p.name.trim().toLowerCase() === c.name.trim().toLowerCase() || getShortClassName(p.name) === shortName);
+        groups[shortName] = {
+          name: shortName,
+          originalNames: [c.name],
           category: preObj ? preObj.category : 'Academic Class',
           sections: [],
           studentCount: 0,
           minId: c.id
         };
+      } else {
+        if (!groups[shortName].originalNames.includes(c.name)) {
+          groups[shortName].originalNames.push(c.name);
+        }
       }
-      if (c.section) {
-        groups[c.name].sections.push(c.section);
+      if (c.section && !groups[shortName].sections.includes(c.section)) {
+        groups[shortName].sections.push(c.section);
       }
-      if (c.id < groups[c.name].minId) {
-        groups[c.name].minId = c.id;
+      if (c.id < groups[shortName].minId) {
+        groups[shortName].minId = c.id;
       }
     });
 
     // Populate student counts by grouping matching class names
-    Object.keys(groups).forEach(name => {
-      groups[name].sections.sort();
-      const matchingClassIds = classes.filter(c => c.name && c.name.trim().toLowerCase() === name.trim().toLowerCase()).map(c => c.id);
+    Object.keys(groups).forEach(shortName => {
+      groups[shortName].sections.sort();
+      const matchingOrigNames = groups[shortName].originalNames.map(n => n.trim().toLowerCase());
+      const matchingClassIds = classes.filter(c => c.name && matchingOrigNames.includes(c.name.trim().toLowerCase())).map(c => c.id);
       
-      groups[name].studentCount = students.filter(s => {
-        const matchesName = s.class_name && s.class_name.trim().toLowerCase() === name.trim().toLowerCase();
+      groups[shortName].studentCount = students.filter(s => {
+        const sShort = getShortClassName(s.class_name);
+        const matchesName = sShort === shortName || (s.class_name && matchingOrigNames.includes(s.class_name.trim().toLowerCase()));
         const matchesId = s.class_id && matchingClassIds.includes(s.class_id);
         return matchesName || matchesId;
       }).length;
@@ -475,7 +627,7 @@ export default function ClassesPage() {
       <div className="flex items-center justify-center min-h-[400px] w-full">
         <div className="flex flex-col items-center gap-3">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          <p className="text-xs font-bold text-text-muted uppercase tracking-wider">Loading Classes...</p>
+          <p className="text-xs font-bold text-text-primary uppercase tracking-wider">LOADING CLASSES...</p>
         </div>
       </div>
     );
@@ -659,12 +811,13 @@ export default function ClassesPage() {
           </div>
 
           {/* Combined Filter Toolbar */}
-          <div className="bg-surface border border-border rounded-xl p-4 shadow-xs flex flex-col md:flex-row gap-4 items-center justify-between">
+          <div className="bg-zinc-50/50 dark:bg-zinc-900/50 border border-border rounded-2xl p-4 shadow-2xs flex flex-col md:flex-row gap-4 items-center justify-between">
             <div className="relative w-full md:max-w-xs">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-text-muted" />
-              <Input aria-label="Search roster by name or roll number..." 
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" />
+              <Input 
+                aria-label="Search roster by name or roll number..." 
                 placeholder="Search roster by name or roll number..." 
-                className="pl-9" 
+                className="pl-9 text-xs py-2 rounded-full border border-border bg-surface outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border" 
                 value={rosterSearch} 
                 onChange={e => setRosterSearch(e.target.value)} 
               />
@@ -674,30 +827,28 @@ export default function ClassesPage() {
               {/* Section Filter (Only if sections exist for class) */}
               {rosterSections.length > 0 && (
                 <div className="w-full md:w-40">
-                  <select
+                  <CustomSelect
                     value={rosterSectionFilter}
-                    onChange={e => setRosterSectionFilter(e.target.value)}
-                    className="flex h-9 w-full rounded-md border border-zinc-200 bg-surface px-3 py-1.5 text-sm text-text-primary shadow-xs transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-950 dark:border-zinc-800"
-                  >
-                    <option value="All">All Sections</option>
-                    {rosterSections.map(sec => (
-                      <option key={sec} value={sec}>Section {sec}</option>
-                    ))}
-                  </select>
+                    onChange={setRosterSectionFilter}
+                    options={[
+                      { value: 'All', label: 'All Sections' },
+                      ...rosterSections.map(sec => ({ value: sec, label: `Section ${sec}` }))
+                    ]}
+                  />
                 </div>
               )}
 
               {/* Student Status Filter */}
               <div className="w-full md:w-40">
-                <select
+                <CustomSelect
                   value={rosterStatusFilter}
-                  onChange={e => setRosterStatusFilter(e.target.value)}
-                  className="flex h-9 w-full rounded-md border border-zinc-200 bg-surface px-3 py-1.5 text-sm text-text-primary shadow-xs transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-950 dark:border-zinc-800"
-                >
-                  <option value="All">All Statuses</option>
-                  <option value="Active">Active</option>
-                  <option value="Inactive">Inactive</option>
-                </select>
+                  onChange={setRosterStatusFilter}
+                  options={[
+                    { value: 'All', label: 'All Statuses' },
+                    { value: 'Active', label: 'Active' },
+                    { value: 'Inactive', label: 'Inactive' }
+                  ]}
+                />
               </div>
             </div>
           </div>
@@ -713,7 +864,7 @@ export default function ClassesPage() {
                 <div 
                   key={s.id}
                   onClick={() => { setSelectedStudentId(s.id); setView('details'); }}
-                  className="relative flex flex-col items-center justify-center p-6 bg-surface border border-border rounded-2xl hover:border-primary/50 hover:shadow-md cursor-pointer transition-all duration-200 text-center select-none"
+                  className="group relative flex flex-col items-center justify-center p-6 bg-surface border border-border rounded-2xl hover:border-primary/50 hover:shadow-md cursor-pointer transition-all duration-200 text-center select-none"
                 >
                   <div className="absolute top-3 right-3 z-10" onClick={(e) => e.stopPropagation()}>
                     <DropdownMenu>
@@ -769,7 +920,7 @@ export default function ClassesPage() {
                   </div>
                   
                   {/* Name */}
-                  <h3 className="font-bold text-text-primary text-base hover:text-primary transition-colors leading-tight truncate w-full px-1">
+                  <h3 className="font-bold text-text-primary text-base group-hover:text-primary transition-colors leading-tight truncate w-full px-1">
                     {s.name}
                   </h3>
                   
@@ -941,8 +1092,9 @@ export default function ClassesPage() {
             isOpen={isTransferModalOpen}
             title={`Transfer Students — ${selectedClassName}`}
             onClose={() => setIsTransferModalOpen(false)}
+            contentClassName="overflow-visible min-h-[300px] pb-32"
           >
-            <div className="space-y-4 text-xs font-semibold text-text-secondary max-w-md">
+            <div className="space-y-4 text-xs font-semibold text-text-secondary max-w-md min-h-[260px] pb-28">
               {transferError && (
                 <div className="p-3 bg-red-500/10 text-red-600 border border-red-500/20 rounded-xl text-xs font-semibold">
                   {transferError}
@@ -952,33 +1104,39 @@ export default function ClassesPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-text-muted uppercase tracking-wider block">Source Section *</label>
-                  <select
+                  <CustomSelect
                     value={transferSourceSec}
-                    onChange={(e) => {
-                      setTransferSourceSec(e.target.value);
+                    onChange={(val) => {
+                      setTransferSourceSec(val);
                       setSelectedTransferStudents([]);
                     }}
-                    className="w-full rounded-xl border border-border bg-surface text-text-primary px-3 py-2 text-xs font-bold outline-none"
-                  >
-                    <option value="">Select Source...</option>
-                    {(classes.filter(c => c.name === selectedClassName && c.section).map(c => c.section).sort()).map(sec => (
-                      <option key={sec} value={sec}>Section {sec}</option>
-                    ))}
-                  </select>
+                    placeholder="Select Source..."
+                    options={[
+                      { value: '', label: 'Select Source...' },
+                      ...(classes.filter(c => c.name === selectedClassName && c.section).map(c => c.section).sort()).map(sec => ({
+                        value: sec,
+                        label: `Section ${sec}`
+                      }))
+                    ]}
+                  />
                 </div>
 
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-text-muted uppercase tracking-wider block">Destination Section *</label>
-                  <select
+                  <CustomSelect
                     value={transferDestSec}
-                    onChange={(e) => setTransferDestSec(e.target.value)}
-                    className="w-full rounded-xl border border-border bg-surface text-text-primary px-3 py-2 text-xs font-bold outline-none"
-                  >
-                    <option value="">Select Destination...</option>
-                    {(classes.filter(c => c.name === selectedClassName && c.section).map(c => c.section).sort()).filter(sec => sec !== transferSourceSec).map(sec => (
-                      <option key={sec} value={sec}>Section {sec}</option>
-                    ))}
-                  </select>
+                    onChange={(val) => setTransferDestSec(val)}
+                    placeholder="Select Destination..."
+                    options={[
+                      { value: '', label: 'Select Destination...' },
+                      ...(classes.filter(c => c.name === selectedClassName && c.section).map(c => c.section).sort())
+                        .filter(sec => sec !== transferSourceSec)
+                        .map(sec => ({
+                          value: sec,
+                          label: `Section ${sec}`
+                        }))
+                    ]}
+                  />
                 </div>
               </div>
 
@@ -1120,13 +1278,14 @@ export default function ClassesPage() {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       
-      {/* Page Header */}
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Classes</h2>
-        </div>
+      {/* Page Header Container */}
+      <div className="p-5 rounded-2xl border border-border bg-zinc-50/50 dark:bg-zinc-900/50 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <h1 className="text-xl md:text-2xl font-bold text-text-primary tracking-tight font-display uppercase leading-none">
+          CLASSES
+        </h1>
+
         {!isReadOnly && (
-          <Button className="flex items-center gap-2 font-bold" onClick={() => setShowCreateForm(true)}>
+          <Button className="flex items-center gap-1.5 font-bold text-xs uppercase tracking-wider h-10 px-4 shadow-2xs whitespace-nowrap shrink-0" onClick={() => setShowCreateForm(true)}>
             <Plus className="h-4 w-4" /> Add Class
           </Button>
         )}
@@ -1149,9 +1308,9 @@ export default function ClassesPage() {
             <div 
               key={gc.name}
               onClick={() => { setSelectedClassName(gc.name); setRosterSearch(''); setView('roster'); }}
-              className="relative flex items-center justify-center p-6 bg-surface border border-border hover:border-primary/50 hover:shadow-md rounded-2xl cursor-pointer transition-all duration-200 select-none h-28 md:h-32 text-center"
+              className="group relative flex items-center justify-center p-6 bg-zinc-50/50 dark:bg-zinc-900/50 border border-border hover:border-primary/50 hover:shadow-md rounded-2xl cursor-pointer transition-all duration-200 select-none h-28 md:h-32 text-center"
             >
-              <h3 className="font-bold text-text-primary text-xl tracking-tight font-display px-6 text-center truncate">
+              <h3 className="font-bold text-text-primary text-xl group-hover:text-primary transition-colors tracking-tight font-display px-6 text-center truncate">
                 {getShortClassName(gc.name)}
               </h3>
 
@@ -1184,10 +1343,10 @@ export default function ClassesPage() {
       {/* Add/Manage Class Modal Overlay Popup */}
       {showCreateForm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-          <div className="bg-surface border border-border rounded-2xl w-full max-w-md shadow-xl overflow-hidden flex flex-col">
+          <div className="bg-surface border border-border rounded-2xl w-full max-w-md shadow-xl flex flex-col">
             
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-zinc-50 dark:bg-zinc-900/50">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50 rounded-t-2xl">
               <h3 className="font-bold text-text-primary text-base tracking-tight font-display">
                 {isEditing ? 'Manage Class Sections' : 'Add Class'}
               </h3>
@@ -1244,7 +1403,7 @@ export default function ClassesPage() {
                     </div>
                   </div>
 
-                  <div className="max-h-56 overflow-y-auto p-2 bg-zinc-50 dark:bg-zinc-900/50 border border-border rounded-xl space-y-1 divide-y divide-border/30">
+                  <div className="max-h-56 overflow-y-auto p-2 bg-zinc-50/50 dark:bg-zinc-900/50 border border-border rounded-2xl space-y-1 divide-y divide-border/30">
                     {availablePredefinedClasses.length === 0 ? (
                       <p className="text-xs text-text-muted text-center py-4 italic">All standard classes have been added.</p>
                     ) : (
@@ -1298,15 +1457,15 @@ export default function ClassesPage() {
                   {/* Field 2: Section Type (Optional) */}
                   <div className="space-y-1.5 animate-in fade-in duration-200">
                     <label className="text-xs font-bold text-text-secondary uppercase">Section Type (Optional)</label>
-                    <select
+                    <CustomSelect 
                       value={sectionTypeInput}
-                      onChange={e => handleSectionTypeChange(e.target.value)}
-                      className="flex h-9 w-full rounded-md border bg-surface px-3 py-1.5 text-sm text-text-primary shadow-xs transition-colors focus:outline-none focus:ring-1 focus:ring-zinc-950 dark:border-zinc-800"
-                    >
-                      <option value="">No Sections (Optional)</option>
-                      <option value={SECTION_TYPES.ALPHABET}>Alphabet Sections (A, B, C, D)</option>
-                      <option value={SECTION_TYPES.COLOR}>Color Sections (Red, Blue, Green, Yellow)</option>
-                    </select>
+                      onChange={val => handleSectionTypeChange(val)}
+                      options={[
+                        { value: '', label: 'No Sections (Optional)' },
+                        { value: SECTION_TYPES.ALPHABET, label: 'Alphabet Sections (A, B, C, D)' },
+                        { value: SECTION_TYPES.COLOR, label: 'Color Sections (Red, Blue, Green, Yellow)' }
+                      ]}
+                    />
                     {sectionTypeError && (
                       <p className="text-[11px] text-red-500 font-semibold">{sectionTypeError}</p>
                     )}
@@ -1322,20 +1481,21 @@ export default function ClassesPage() {
                         <span className="text-[11px] font-bold text-text-muted">Max 4</span>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2 p-3 bg-zinc-50 dark:bg-zinc-900/50 border border-border rounded-xl">
+                      <div className="grid grid-cols-2 gap-2 p-3 bg-zinc-50/50 dark:bg-zinc-900/50 border border-border rounded-2xl">
                         {(sectionTypeInput === SECTION_TYPES.ALPHABET ? ALPHABET_SECTIONS : COLOR_SECTIONS).map(sec => {
                           const isChecked = selectedSections.includes(sec);
                           return (
                             <div 
                               key={sec}
                               onClick={() => handleToggleSection(sec)}
-                              className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer select-none transition-all ${
+                              className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer select-none transition-all ${
                                 isChecked 
-                                  ? 'border-primary bg-primary/10 text-primary font-bold shadow-2xs' 
+                                  ? 'border-primary/50 bg-primary/10 text-primary font-bold shadow-2xs' 
                                   : 'border-border bg-surface text-text-primary hover:border-zinc-300 hover:bg-zinc-50/50 dark:hover:bg-zinc-800/40'
                               }`}
                             >
-                              <div className={`w-4.5 h-4.5 rounded-md border flex items-center justify-center transition-all shrink-0 ${
+                              <span className="text-sm font-semibold">{sec}</span>
+                              <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all shrink-0 ${
                                 isChecked
                                   ? 'bg-primary border-primary text-white shadow-2xs'
                                   : 'border-zinc-300 dark:border-zinc-700 bg-surface'
@@ -1346,7 +1506,6 @@ export default function ClassesPage() {
                                   </svg>
                                 )}
                               </div>
-                              <span className="text-sm font-semibold">{sec}</span>
                             </div>
                           );
                         })}
