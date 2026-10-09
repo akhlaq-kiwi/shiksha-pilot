@@ -1118,7 +1118,7 @@ export function TeacherAttendanceView() {
         {detailModalInfo && (
           <div className="space-y-4">
             {/* Header bar */}
-            <div className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-100 dark:bg-zinc-800/60 border border-border">
+            <div className="flex items-center justify-between p-3.5 rounded-xl bg-[#FAF6EC] dark:bg-zinc-900 border border-border">
               <span className="text-xs font-bold text-text-secondary uppercase tracking-wider">
                 Teacher: <strong className="text-text-primary">{detailModalInfo.teacherName}</strong> ({detailModalInfo.empId})
               </span>
@@ -1134,7 +1134,7 @@ export function TeacherAttendanceView() {
                 <button
                   type="button"
                   onClick={() => setDetailModalInfo(null)}
-                  className="h-7 w-7 rounded-full inline-flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                  className="h-7 w-7 rounded-full inline-flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-black/5 dark:hover:bg-zinc-700 transition-colors"
                   title="Close"
                 >
                   <X className="h-4 w-4" />
@@ -1152,7 +1152,7 @@ export function TeacherAttendanceView() {
                   <div
                     key={item.date + '-' + idx}
                     onClick={() => handleNavigateToDateAttendance(item.date)}
-                    className="flex items-center justify-between p-3.5 rounded-xl border border-border bg-background hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-all cursor-pointer group hover:border-primary/40 hover:shadow-sm"
+                    className="flex items-center justify-between p-3.5 rounded-xl border border-border bg-background hover:bg-[#FAF6EC] dark:hover:bg-zinc-900/80 transition-all cursor-pointer group hover:border-primary/50 hover:shadow-xs"
                   >
                     <div className="space-y-1">
                       <div className="font-semibold text-sm text-text-primary group-hover:text-primary transition-colors flex items-center gap-2">
