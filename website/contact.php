@@ -35,6 +35,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if ($values['school'] === '') { $errors['school'] = 'Please tell us your school\'s name.'; }
 
+        // Digits only, ignoring the punctuation people type in phone numbers.
+        $phoneDigits = preg_replace('/\D+/', '', $values['phone']);
+        if ($values['phone'] === '') {
+            $errors['phone'] = 'Please enter your phone number.';
+        } elseif (strlen($phoneDigits) < 10 || strlen($phoneDigits) > 15) {
+            $errors['phone'] = 'Please enter a valid phone number.';
+        }
+
         if (empty($errors)) {
             try {
                 save_website_lead($values);
@@ -98,8 +106,9 @@ require_once __DIR__ . '/includes/header.php';
         </div>
 
         <div class="form-row">
-          <label for="phone">Phone number <span style="font-weight:400;">(optional)</span></label>
-          <input type="tel" id="phone" name="phone" value="<?php echo htmlspecialchars($values['phone'], ENT_QUOTES); ?>">
+          <label for="phone">Phone number</label>
+          <input type="tel" id="phone" name="phone" value="<?php echo htmlspecialchars($values['phone'], ENT_QUOTES); ?>" required autocomplete="tel" inputmode="tel" aria-describedby="phone-err">
+          <?php if (!empty($errors['phone'])): ?><p class="form-error" id="phone-err"><?php echo htmlspecialchars($errors['phone'], ENT_QUOTES); ?></p><?php endif; ?>
         </div>
 
         <div class="form-row">

@@ -59,7 +59,7 @@ class PlatformService extends BaseService
     {
         $pdo = $this->earlyAccess->getPdo();
 
-        $sql    = 'SELECT id, email, name, school, status, notes, invited_at, created_at
+        $sql    = 'SELECT id, email, phone, name, school, status, notes, invited_at, created_at
                      FROM early_access_requests';
         $params = [];
 
