@@ -2190,7 +2190,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                       placeholder="-- Choose Teacher --"
                       options={teachersWithPerms.map(t => ({
                         value: t.id,
-                        label: `${t.name}${t.department ? ` (${t.department})` : ''}`
+                        label: t.name
                       }))}
                       buttonClassName="h-10"
                     />
@@ -2274,7 +2274,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                       const classLabel = getShortClassName(c.name) + (c.section ? `-${c.section}` : '');
                       const val = localAssignments[c.id] || '';
                       return (
-                        <TableRow key={c.id}>
+                        <TableRow key={c.id} className="hover:bg-[#FAF6EC] dark:hover:bg-zinc-900/50 transition-colors">
                           <TableCell className="font-bold text-text-primary text-xs tracking-tight">
                             {classLabel}
                           </TableCell>
@@ -2287,7 +2287,7 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
                                 placeholder="-- Unassigned --"
                                 options={teachersWithPerms.map(t => ({
                                   value: t.id,
-                                  label: `${t.name}${t.department ? ` (${t.department})` : ''}`
+                                  label: t.name
                                 }))}
                                 className="w-full max-w-md"
                                 buttonClassName="h-9"

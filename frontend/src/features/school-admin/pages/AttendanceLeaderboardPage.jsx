@@ -3,7 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { ChevronLeft, Award, Calendar, Users, Trophy, Download, Printer, ShieldAlert } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardContent } from '../../../common/ui/card';
-import { Select } from '../../../common/ui/select';
+import CustomSelect from '../../../common/ui/CustomSelect';
+import { getClassIndex, getShortClassName } from '../../../common/constants/predefinedClasses';
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 import { schoolService } from '../../../common/services/schoolService';
 import { useToast } from '../../../common/components/Toast';
@@ -24,6 +25,42 @@ export default function AttendanceLeaderboardPage() {
   const [schoolProfile, setSchoolProfile] = useState(null);
 
   const printAreaRef = useRef(null);
+
+  // Compute sorted, deduplicated class options (PNC -> NC -> LKG -> UKG -> KG -> Class 1..12)
+  const classOptions = React.useMemo(() => {
+    const mapByLabel = new Map();
+
+    (classes || []).forEach(c => {
+      if (!c || !c.id) return;
+      const shortName = getShortClassName(c.name);
+      const label = `${shortName}${c.section ? ` (${c.section})` : ''}`;
+      const key = label.toLowerCase();
+      if (!mapByLabel.has(key)) {
+        mapByLabel.set(key, {
+          value: String(c.id),
+          label: label,
+          name: c.name,
+          section: c.section
+        });
+      }
+    });
+
+    const sortedList = Array.from(mapByLabel.values()).sort((a, b) => {
+      const idxA = getClassIndex(a.name);
+      const idxB = getClassIndex(b.name);
+      if (idxA !== -1 && idxB !== -1 && idxA !== idxB) return idxA - idxB;
+      if (idxA !== -1 && idxB === -1) return -1;
+      if (idxA === -1 && idxB !== -1) return 1;
+      const nameComp = String(a.name || '').localeCompare(String(b.name || ''), undefined, { numeric: true });
+      if (nameComp !== 0) return nameComp;
+      return String(a.section || '').localeCompare(String(b.section || ''));
+    });
+
+    return [
+      { value: 'ALL', label: 'School Overall' },
+      ...sortedList
+    ];
+  }, [classes]);
 
   // Fetch classes and school profile
   useEffect(() => {
@@ -235,16 +272,14 @@ export default function AttendanceLeaderboardPage() {
 
           <div className="w-full sm:w-[220px] space-y-1">
             <label className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Select Leaderboard Category</label>
-            <Select 
+            <CustomSelect 
               value={selectedClassId} 
-              onChange={e => setSelectedClassId(e.target.value)}
-              className="text-xs font-bold cursor-pointer bg-surface h-9"
-            >
-              <option value="ALL">School Overall</option>
-              {classes.map(c => (
-                <option key={c.id} value={c.id}>{c.name} {c.section ? `(${c.section})` : ''}</option>
-              ))}
-            </Select>
+              onChange={setSelectedClassId}
+              options={classOptions}
+              placeholder="School Overall"
+              className="w-full"
+              buttonClassName="h-9 text-xs font-bold"
+            />
           </div>
         </div>
       </Card>

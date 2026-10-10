@@ -539,7 +539,7 @@ export default function FinancePage() {
               </TableHeader>
               <TableBody>
                 {paginatedStudents.map((s) => (
-                  <TableRow key={s.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/50 transition-colors cursor-pointer">
+                  <TableRow key={s.id} className="hover:bg-[#FAF6EC] dark:hover:bg-zinc-900/50 transition-colors cursor-pointer">
                     <TableCell className="font-semibold text-text-primary text-xs py-3.5">
                       {s.name}
                     </TableCell>

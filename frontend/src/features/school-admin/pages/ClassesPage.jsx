@@ -622,6 +622,29 @@ export default function ClassesPage() {
     });
   };
 
+  const getRosterClassRows = (shortName) => {
+    if (!shortName) return [];
+    return classes.filter(c => 
+      c.name === shortName || 
+      getShortClassName(c.name) === shortName ||
+      c.name.trim().toLowerCase() === shortName.trim().toLowerCase()
+    );
+  };
+
+  const getRosterStudents = (shortName) => {
+    if (!shortName) return [];
+    const classRows = getRosterClassRows(shortName);
+    const matchingOrigNames = classRows.map(c => c.name.trim().toLowerCase());
+    const matchingClassIds = classRows.map(c => c.id);
+
+    return students.filter(s => {
+      const sShort = getShortClassName(s.class_name);
+      const matchesName = sShort === shortName || (s.class_name && matchingOrigNames.includes(s.class_name.trim().toLowerCase()));
+      const matchesId = s.class_id && matchingClassIds.includes(s.class_id);
+      return matchesName || matchesId;
+    });
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px] w-full">
@@ -635,7 +658,7 @@ export default function ClassesPage() {
 
   // Nested Navigation Handling
   if (view === 'enroll') {
-    const rosterClassRows = classes.filter(c => c.name === selectedClassName);
+    const rosterClassRows = getRosterClassRows(selectedClassName);
     let defaultClassId = '';
     if (rosterClassRows.length > 0) {
       if (rosterSectionFilter !== 'All') {
@@ -660,7 +683,7 @@ export default function ClassesPage() {
   }
 
   if (view === 'edit') {
-    const rosterClassRows = classes.filter(c => c.name === selectedClassName);
+    const rosterClassRows = getRosterClassRows(selectedClassName);
     let defaultClassId = '';
     if (rosterClassRows.length > 0) {
       if (rosterSectionFilter !== 'All') {
@@ -718,7 +741,7 @@ export default function ClassesPage() {
   }
 
   if (view === 'identity-cards') {
-    const classStudents = students.filter(s => s.class_name === selectedClassName && s.status === 'ACTIVE');
+    const classStudents = getRosterStudents(selectedClassName).filter(s => s.status === 'ACTIVE');
     return (
       <ClassIdentityCardPreview
         className={selectedClassName}
@@ -731,10 +754,10 @@ export default function ClassesPage() {
   }
 
   if (view === 'roster') {
-    const rosterStudents = students.filter(s => s.class_name === selectedClassName);
+    const rosterStudents = getRosterStudents(selectedClassName);
     
     // Resolve unique sections for the class filters dynamically
-    const rosterClassRows = classes.filter(c => c.name === selectedClassName);
+    const rosterClassRows = getRosterClassRows(selectedClassName);
     const rosterSections = Array.from(new Set(rosterClassRows.filter(c => c.section).map(c => c.section))).sort();
 
     // Roster filters combination (Search + Section + Status)
