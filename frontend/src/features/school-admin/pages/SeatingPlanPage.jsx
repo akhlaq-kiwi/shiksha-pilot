@@ -9,6 +9,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/car
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
 import { Input } from '../../../common/ui/input';
 import { Select } from '../../../common/ui/select';
+import CustomSelect from '../../../common/ui/CustomSelect';
 import { schoolService } from '../../../common/services/schoolService';
 import { schoolAdminService } from '../../../common/services/schoolAdminService';
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
@@ -66,6 +67,26 @@ export default function SeatingPlanPage() {
   // Alerts
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  const handleBackToExams = () => {
+    const passedExamId = location.state?.examId || selectedExamId;
+    const passedClassId = location.state?.classId || (selectedClassIds && selectedClassIds.length > 0 ? selectedClassIds[0] : '');
+    const activeView = location.state?.activeView || 'classes';
+
+    if (passedExamId) {
+      navigate('/school-admin/exams', { 
+        state: { 
+          activeView: activeView,
+          examId: passedExamId,
+          classId: passedClassId
+        } 
+      });
+    } else {
+      navigate('/school-admin/exams', {
+        state: { activeView: 'classes' }
+      });
+    }
+  };
 
   // Unified initial data & seating plan loading
   useEffect(() => {
@@ -543,10 +564,17 @@ export default function SeatingPlanPage() {
   if (!selectedExamId) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center gap-3 no-print">
-          <Button variant="outline" size="sm" onClick={() => navigate('/school-admin/exams')} className="flex items-center gap-1.5 font-bold text-xs">
-            <ArrowLeft className="h-4 w-4" /> Go to Examinations
-          </Button>
+        <div className="sticky top-14 z-20 flex items-center justify-between border border-border gap-4 bg-zinc-50/50 dark:bg-zinc-900/50 p-4 rounded-2xl shadow-2xs no-print">
+          <div className="flex items-center gap-6">
+            <button 
+              type="button"
+              onClick={handleBackToExams} 
+              className="font-bold text-zinc-900 dark:text-zinc-50 border border-zinc-200 dark:border-zinc-800 bg-surface hover:bg-zinc-50 px-4 py-2 rounded-lg text-sm transition-all shadow-2xs cursor-pointer"
+            >
+              Back
+            </button>
+            <h2 className="text-2xl font-bold text-text-primary tracking-tight font-display">Examination Seating Plan</h2>
+          </div>
         </div>
         <Card className="border border-dashed border-border py-12 text-center text-text-muted text-sm font-semibold flex flex-col items-center justify-center gap-2 no-print animate-in fade-in duration-300">
           <AlertCircle className="h-10 w-10 text-amber-500 opacity-80" />
@@ -559,10 +587,19 @@ export default function SeatingPlanPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-5 no-print">
-        <div>
-          <h2 className="text-3xl font-bold text-text-primary tracking-tight font-display">Examination Seating Plan</h2>
-          <p className="text-text-secondary text-sm mt-1">Automatically assign student seating layouts and generate invigilator sheets or cut-out seating slips.</p>
+      <div className="sticky top-14 z-20 flex flex-col md:flex-row md:items-center justify-between gap-4 border border-border bg-zinc-50/50 dark:bg-zinc-900/50 p-4 rounded-2xl shadow-2xs no-print">
+        <div className="flex items-center gap-6">
+          <button 
+            type="button"
+            onClick={handleBackToExams} 
+            className="font-bold text-zinc-900 dark:text-zinc-50 border border-zinc-200 dark:border-zinc-800 bg-surface hover:bg-zinc-50 px-4 py-2 rounded-lg text-sm transition-all shadow-2xs cursor-pointer"
+          >
+            Back
+          </button>
+          <div>
+            <h2 className="text-2xl font-bold text-text-primary tracking-tight font-display">Examination Seating Plan</h2>
+            <p className="text-text-secondary text-xs mt-0.5">Automatically assign student seating layouts and generate invigilator sheets or cut-out seating slips.</p>
+          </div>
         </div>
       </div>
 
@@ -585,18 +622,6 @@ export default function SeatingPlanPage() {
       {/* STATE A: GENERATION FORM */}
       {currentView === 'config' ? (
         <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in duration-300 no-print">
-          {/* Back Button Panel */}
-          <div className="flex justify-between items-center no-print">
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => navigate('/school-admin/exams')}
-              className="flex items-center gap-1.5 font-bold text-xs"
-            >
-              <ArrowLeft className="h-4 w-4" /> Back to Examinations
-            </Button>
-          </div>
-
           {/* Step 1 Card: Classes Selection */}
           <Card>
             <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
@@ -649,28 +674,29 @@ export default function SeatingPlanPage() {
             </CardContent>
           </Card>
 
-          {/* Step 2 & 3 Card: Seating & Rooms Setup */}
+          {/* Step 2 Card: Rooms Setup */}
           <Card>
             <CardHeader className="py-4 border-b border-border bg-zinc-50/50 dark:bg-zinc-900/50">
-              <CardTitle className="text-sm font-bold text-text-primary">Step 2 & 3: Seating & Rooms Setup</CardTitle>
+              <CardTitle className="text-sm font-bold text-text-primary">Step 2: Rooms Setup</CardTitle>
             </CardHeader>
             <CardContent className="p-6 space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-bold uppercase text-text-secondary tracking-wider">Students Per Bench</label>
-                  <Select
+                  <CustomSelect
                     value={studentsPerBench}
                     disabled={selectedClassIds.length === 0}
-                    onChange={(e) => {
-                      setStudentsPerBench(e.target.value);
+                    onChange={(val) => {
+                      setStudentsPerBench(val);
                       setPreviewData(null);
                     }}
+                    options={[
+                      { value: '1', label: '1 Student' },
+                      { value: '2', label: '2 Students' },
+                      { value: '3', label: '3 Students' },
+                    ]}
                     className="mt-1"
-                  >
-                    <option value="1">1 Student</option>
-                    <option value="2">2 Students</option>
-                    <option value="3">3 Students</option>
-                  </Select>
+                  />
                 </div>
                 <div>
                   <label className="text-xs font-bold uppercase text-text-secondary tracking-wider">Number of Rooms</label>
@@ -855,33 +881,21 @@ export default function SeatingPlanPage() {
       {/* STATE B: GENERATED SLIPS VIEW */}
       {currentView === 'slips' && generatedPlan ? (
         <div className="w-full space-y-6 animate-in fade-in duration-300">
-          {/* Back Button Panel */}
-          <div className="flex justify-between items-center no-print">
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => navigate('/school-admin/exams')}
-              className="flex items-center gap-1.5 font-bold text-xs"
-            >
-              <ArrowLeft className="h-4 w-4" /> Back to Examinations
-            </Button>
-          </div>
-
           {/* Action Header & Filter Bar */}
           <div className="no-print bg-zinc-50/50 dark:bg-zinc-900/50 border border-border rounded-2xl shadow-2xs p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
             {/* Room Filter Tool */}
             <div className="flex items-center gap-3">
               <label className="text-xs font-bold uppercase text-text-primary tracking-wider flex-shrink-0">Room Filter:</label>
-              <Select 
+              <CustomSelect 
                 value={selectedRoomFilter}
-                onChange={(e) => setSelectedRoomFilter(e.target.value)}
-                className="w-44 bg-surface border-border focus:ring-0 focus-visible:ring-0 focus:outline-none"
-              >
-                <option value="all">All Rooms</option>
-                {uniqueRooms.map(roomName => (
-                  <option key={roomName} value={roomName}>{roomName}</option>
-                ))}
-              </Select>
+                onChange={(val) => setSelectedRoomFilter(val)}
+                options={[
+                  { value: 'all', label: 'All Rooms' },
+                  ...uniqueRooms.map(roomName => ({ value: roomName, label: roomName }))
+                ]}
+                className="w-44"
+                buttonClassName="h-9 font-semibold"
+              />
               <span className="text-xs font-bold text-text-secondary bg-primary/10 text-primary px-3 py-1.5 rounded-lg whitespace-nowrap">
                 Slips Shown: {filteredAllocations.length}
               </span>

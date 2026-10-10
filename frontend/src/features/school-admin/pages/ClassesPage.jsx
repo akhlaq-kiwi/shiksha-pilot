@@ -676,9 +676,9 @@ export default function ClassesPage() {
         studentId={selectedStudentId} 
         currentClassName={selectedClassName}
         currentClassId={defaultClassId}
-        onCancel={() => setView('roster')} 
+        onCancel={() => setView(selectedStudentId ? 'details' : 'roster')} 
         onSuccess={async () => {
-          setView('roster');
+          setView(selectedStudentId ? 'details' : 'roster');
           await loadData();
         }} 
       />
@@ -695,7 +695,15 @@ export default function ClassesPage() {
             return;
           }
           if (searchParams.get('studentId')) {
-            navigate('/school-admin/classes');
+            if (window.history.length > 1) {
+              navigate(-1);
+            } else {
+              navigate('/school-admin/finance');
+            }
+            return;
+          }
+          if (!selectedClassName) {
+            navigate('/school-admin/finance');
             return;
           }
           await loadData();

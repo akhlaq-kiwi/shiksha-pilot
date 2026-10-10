@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Plus, ArrowLeft, Calendar, Clock, BookOpen, UserCheck, 
   Settings, Award, Printer, Trash, FileText, CheckCircle, 
@@ -11,6 +11,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/car
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
 import { Input } from '../../../common/ui/input';
 import { Select } from '../../../common/ui/select';
+import CustomSelect from '../../../common/ui/CustomSelect';
 import { Dialog } from '../../../common/ui/dialog';
 import { schoolService } from '../../../common/services/schoolService';
 import { schoolAdminService } from '../../../common/services/schoolAdminService';
@@ -535,85 +536,6 @@ const CalendarDatePicker = ({ value, onChange, min, max, required, className, on
   );
 };
 
-const CustomSelect = ({
-  value,
-  onChange,
-  options = [],
-  placeholder = "Select...",
-  disabled = false,
-  className = "",
-  buttonClassName = "",
-  dropdownClassName = ""
-}) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef(null);
-
-  const selectedOption = options.find(o => String(o.value) === String(value));
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  return (
-    <div ref={containerRef} className={`relative w-full ${isOpen ? 'z-40' : ''} ${className}`}>
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => !disabled && setIsOpen(!isOpen)}
-        className={`flex w-full items-center justify-between rounded-xl border border-border bg-surface px-4 py-2 text-xs font-semibold text-text-primary shadow-2xs outline-none focus:outline-none focus:ring-0 focus-visible:outline-none active:outline-none select-none ${
-          disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-border-strong'
-        } ${buttonClassName}`}
-      >
-        <span className="truncate">
-          {selectedOption ? selectedOption.label : placeholder}
-        </span>
-        <ChevronDown className={`h-4 w-4 text-text-muted transition-transform duration-200 flex-shrink-0 ml-1 ${isOpen ? 'rotate-180' : ''}`} />
-      </button>
-
-      {isOpen && !disabled && (
-        <div className={`absolute left-0 right-0 top-full mt-1.5 rounded-xl border border-border bg-surface shadow-xl z-50 overflow-hidden animate-in fade-in duration-150 ${dropdownClassName}`}>
-          <div className="max-h-60 overflow-y-auto py-1 scrollbar-thin">
-            {placeholder && (
-              <button
-                type="button"
-                onClick={() => {
-                  onChange('');
-                  setIsOpen(false);
-                }}
-                className={`w-full text-left px-4 py-2 text-xs font-semibold outline-none focus:outline-none select-none transition-colors hover:bg-primary/10 ${!value ? 'bg-primary/10 text-primary font-bold' : 'text-text-secondary'}`}
-              >
-                {placeholder}
-              </button>
-            )}
-            {options.map((opt) => {
-              const isSelected = String(opt.value) === String(value);
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => {
-                    onChange(String(opt.value));
-                    setIsOpen(false);
-                  }}
-                  className={`w-full text-left px-4 py-2 text-xs font-semibold outline-none focus:outline-none select-none transition-colors hover:bg-primary/10 ${isSelected ? 'bg-primary/10 text-primary font-bold' : 'text-text-primary'}`}
-                >
-                  {opt.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
 const sortAndDeduplicateClasses = (rawClasses) => {
   const uniqueMap = new Map();
   (rawClasses || []).forEach(c => {
@@ -644,6 +566,7 @@ const CustomClassSelect = ({ value, onChange, options = [], placeholder = "Selec
 
 export default function ExamsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { currentAcademicYear, isReadOnly } = useAcademicYear();
   const [activeView, setActiveView] = useState('dashboard'); // 'dashboard', 'classes', 'timetable', 'marks', 'reports', 'grade_scale'
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
@@ -664,6 +587,7 @@ export default function ExamsPage() {
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const [examClassStatuses, setExamClassStatuses] = useState([]);
   const [hasSeatingPlan, setHasSeatingPlan] = useState(false);
+  const hasRestoredStateRef = useRef(false);
 
   // Dialog States
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -1033,6 +957,46 @@ export default function ExamsPage() {
       window.removeEventListener('academic-year-switched', handleYearSwitch);
     };
   }, []);
+
+  const findExamById = (examsList = [], targetId) => {
+    if (!examsList || !targetId) return null;
+    const strId = String(targetId);
+    for (const e of examsList) {
+      if (String(e.id) === strId) return e;
+      if (e.sub_tests && Array.isArray(e.sub_tests)) {
+        const sub = e.sub_tests.find(st => String(st.id) === strId);
+        if (sub) return sub;
+      }
+    }
+    return null;
+  };
+
+  // Restore view state when navigating back from seating plan or sub-views (ONCE)
+  useEffect(() => {
+    if (!loading && location.state && !hasRestoredStateRef.current) {
+      hasRestoredStateRef.current = true;
+      if (location.state.activeView) {
+        setActiveView(location.state.activeView);
+      }
+      if (location.state.examId && exams.length > 0) {
+        const foundExam = findExamById(exams, location.state.examId);
+        if (foundExam) {
+          setSelectedExam(foundExam);
+          if (location.state.classId) {
+            setSelectedClassId(String(location.state.classId));
+          }
+          if (['classes', 'timetable', 'marks', 'reports'].includes(location.state.activeView || 'classes')) {
+            schoolService.getExamClassStatuses(foundExam.id).then(statuses => {
+              setExamClassStatuses(statuses || []);
+            }).catch(console.error);
+          }
+        }
+      }
+      try {
+        navigate(location.pathname, { replace: true, state: null });
+      } catch {}
+    }
+  }, [loading, location.state, exams, navigate, location.pathname]);
 
   // Scroll to top when view changes
   useEffect(() => {
@@ -1485,29 +1449,34 @@ export default function ExamsPage() {
     setError('');
     setInfo('');
     setSuccess('');
-    if (!exam || !exam.start_date || !exam.end_date) {
+    const targetExam = exam || selectedExam;
+    const targetClassId = classId || selectedClassId;
+    if (!targetExam || !targetClassId) return;
+
+    if (!targetExam.start_date || !targetExam.end_date) {
       setInfo('Please edit and configure the examination period (Start Date and End Date) before scheduling paper timetables.');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
-    setSelectedExam(exam);
-    setSelectedClassId(classId.toString());
+    setSelectedExam(targetExam);
+    setSelectedClassId(targetClassId.toString());
     setLoading(true);
     try {
       setEditingPaper(null);
-      const [list, insts] = await Promise.all([
-        schoolService.getExamTimetable(exam.id, classId),
-        schoolService.getExamInstructions(exam.id, classId).catch(() => [])
+      const [resList, insts] = await Promise.all([
+        schoolService.getExamTimetable(targetExam.id, targetClassId),
+        schoolService.getExamInstructions(targetExam.id, targetClassId).catch(() => [])
       ]);
-      setTimetablePapers(list || []);
+      const list = Array.isArray(resList) ? resList : (resList?.papers || resList?.data || []);
+      setTimetablePapers(list);
       setInstructions((insts || []).map(i => i.instruction) || []);
-      const examMaxMarks = parseFloat(exam.max_marks) || 30;
+      const examMaxMarks = parseFloat(targetExam.max_marks) || 30;
       const examPassMarks = Math.ceil(examMaxMarks * 0.33);
 
       setNewPaper({
         subject_id: '',
-        exam_date: suggestNextExamDate(exam, list || [], holidays),
+        exam_date: suggestNextExamDate(targetExam, list, holidays),
         start_time: '09:00',
         end_time: '11:00',
         max_marks: String(examMaxMarks),
@@ -1908,29 +1877,42 @@ export default function ExamsPage() {
     setSuccess('');
     setLoading(true);
     try {
-      const papers = await schoolService.getExamTimetable(exam.id, classId);
+      const targetExam = exam || selectedExam;
+      const targetClassId = classId || selectedClassId;
+      if (!targetExam || !targetClassId) {
+        setError('Please select an examination and a class first.');
+        setLoading(false);
+        return;
+      }
+
+      const res = await schoolService.getExamTimetable(targetExam.id, targetClassId);
+      const papers = Array.isArray(res) ? res : (res?.papers || res?.data || []);
       
       if (!papers || papers.length === 0) {
         setPendingSubjects(['timetable_missing']);
         setPendingValidationSource('marks_entry_empty_timetable');
         setShowPendingAlert(true);
         setLoading(false);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
 
-      setTimetablePapers(papers || []);
-      setSelectedExam(exam);
-      setSelectedClassId(classId.toString());
+      setTimetablePapers(papers);
+      setSelectedExam(targetExam);
+      setSelectedClassId(targetClassId.toString());
       setPendingSubjects([]);
       setShowPendingAlert(false);
       setPendingValidationSource('');
 
-      setSelectedSubjectId(papers[0].subject_id.toString());
-      await loadMarksSheet(exam.id, classId, papers[0].subject_id);
+      const firstSubId = String(papers[0]?.subject_id ?? papers[0]?.id ?? '');
+      setSelectedSubjectId(firstSubId);
+      if (firstSubId) {
+        await loadMarksSheet(targetExam.id, targetClassId, firstSubId);
+      }
       setActiveView('marks');
     } catch (err) {
-      console.error(err);
-      setError('Failed to load marks entry context.');
+      console.error('Error opening marks entry:', err);
+      setError(err?.message || 'Failed to load marks entry context.');
     } finally {
       setLoading(false);
     }
@@ -1948,7 +1930,7 @@ export default function ExamsPage() {
   };
 
   const handleSubjectChange = async (e) => {
-    const subId = e.target.value;
+    const subId = (typeof e === 'object' && e?.target) ? e.target.value : String(e || '');
     setSelectedSubjectId(subId);
     if (subId) {
       setLoading(true);
@@ -2065,7 +2047,16 @@ export default function ExamsPage() {
     setSuccess('');
     setLoading(true);
     try {
-      const papers = await schoolService.getExamTimetable(exam.id, classId);
+      const targetExam = exam || selectedExam;
+      const targetClassId = classId || selectedClassId;
+      if (!targetExam || !targetClassId) {
+        setError('Please select an examination and a class first.');
+        setLoading(false);
+        return;
+      }
+
+      const resTimetable = await schoolService.getExamTimetable(targetExam.id, targetClassId);
+      const papers = Array.isArray(resTimetable) ? resTimetable : (resTimetable?.papers || resTimetable?.data || []);
       
       // Step 1: Check papers exists
       if (!papers || papers.length === 0) {
@@ -2073,20 +2064,22 @@ export default function ExamsPage() {
         setPendingValidationSource('reports_empty_timetable');
         setShowPendingAlert(true);
         setLoading(false);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
 
-      setSelectedExam(exam);
-      setSelectedClassId(classId.toString());
+      setSelectedExam(targetExam);
+      setSelectedClassId(targetClassId.toString());
       setPendingSubjects([]);
       setShowPendingAlert(false);
       setPendingValidationSource('');
 
-      const reports = await schoolService.getReportCards(exam.id, classId);
-      setReportCards(reports || []);
+      const resReports = await schoolService.getReportCards(targetExam.id, targetClassId);
+      const reports = Array.isArray(resReports) ? resReports : (resReports?.report_cards || resReports?.reports || resReports?.data || []);
+      setReportCards(reports);
       setActiveView('reports');
     } catch (err) {
-      console.error(err);
+      console.error('Error opening report cards:', err);
       setError('Failed to load report cards.');
     } finally {
       setLoading(false);
@@ -2514,7 +2507,12 @@ export default function ExamsPage() {
     setSuccess('');
     setLoading(true);
     try {
-      const papers = await schoolService.getExamTimetable(exam.id, classId);
+      const targetExam = exam || selectedExam;
+      const targetClassId = classId || selectedClassId;
+      if (!targetExam || !targetClassId) return;
+
+      const res = await schoolService.getExamTimetable(targetExam.id, targetClassId);
+      const papers = Array.isArray(res) ? res : (res?.papers || res?.data || []);
       
       // Step 1: Check papers exists
       if (!papers || papers.length === 0) {
@@ -2522,6 +2520,7 @@ export default function ExamsPage() {
         setPendingValidationSource('publish_empty_timetable');
         setShowPendingAlert(true);
         setLoading(false);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
 
@@ -2532,13 +2531,14 @@ export default function ExamsPage() {
         setPendingValidationSource('publish_pending_marks');
         setShowPendingAlert(true);
         setLoading(false);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
 
       setPendingSubjects([]);
       setShowPendingAlert(false);
       setPendingValidationSource('');
-      setPublishTarget({ exam, classId });
+      setPublishTarget({ exam: targetExam, classId: targetClassId });
       setIsPublishConfirmOpen(true);
     } catch (err) {
       console.error(err);
@@ -2578,7 +2578,9 @@ export default function ExamsPage() {
   };
 
   const handleUnpublishClassResults = (exam, classId) => {
-    setUnpublishTarget({ exam, classId });
+    const targetExam = exam || selectedExam;
+    const targetClassId = classId || selectedClassId;
+    setUnpublishTarget({ exam: targetExam, classId: targetClassId });
     setIsUnpublishConfirmOpen(true);
   };
 
@@ -2698,14 +2700,13 @@ export default function ExamsPage() {
         {/* Top Sticky Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface border border-border p-4 rounded-xl shadow-xs sticky top-16 z-20 no-print">
           <div className="flex items-center gap-3">
-            <Button
+            <button
               type="button"
-              variant="ghost"
-              className="flex items-center gap-1.5 text-xs font-bold"
               onClick={handleCloseReportCardView}
+              className="font-bold text-zinc-900 dark:text-zinc-50 border border-zinc-200 dark:border-zinc-800 bg-surface hover:bg-zinc-50 px-4 py-2 rounded-lg text-sm transition-all shadow-2xs cursor-pointer"
             >
-              <ArrowLeft className="h-4 w-4" /> Back to Student List
-            </Button>
+              Back
+            </button>
             <div>
               <h2 className="text-base font-bold text-text-primary font-display">
                 Report Card: {studentName}
@@ -3181,9 +3182,13 @@ export default function ExamsPage() {
       {effectiveActiveView === 'classes' && selectedExam && (
         <div className="space-y-6 animate-in fade-in duration-300 no-print">
           <div className="flex items-center gap-3">
-            <Button type="button" variant="ghost" className="h-8 w-8 p-0" onClick={() => setActiveView('dashboard')}>
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
+            <button
+              type="button"
+              onClick={() => setActiveView('dashboard')}
+              className="font-bold text-zinc-900 dark:text-zinc-50 border border-zinc-200 dark:border-zinc-800 bg-surface hover:bg-zinc-50 px-4 py-2 rounded-lg text-sm transition-all shadow-2xs cursor-pointer"
+            >
+              Back
+            </button>
             <div>
               <h3 className="text-xl font-bold text-text-primary">Class-wise Exam Management</h3>
               <p className="text-xs text-text-secondary">{selectedExam.name} ({formatDateString(selectedExam.start_date)} to {formatDateString(selectedExam.end_date)})</p>
@@ -3219,8 +3224,11 @@ export default function ExamsPage() {
 
           {/* Scoped Class Workspace Grid */}
           {selectedClassId && (() => {
-            const currentClass = examClassStatuses.find(c => c.id === parseInt(selectedClassId));
-            if (!currentClass) return null;
+            const currentClass = examClassStatuses.find(c => String(c.id || c.class_id) === String(selectedClassId))
+              || classes.find(c => String(c.id || c.class_id) === String(selectedClassId))
+              || { id: selectedClassId, class_id: selectedClassId, name: 'Class', status: 'Draft' };
+            
+            const targetClassId = String(currentClass?.id || currentClass?.class_id || selectedClassId);
 
             const isAnnualExam = !!(selectedExam?.name && (
               selectedExam.name.toLowerCase().includes('annual') ||
@@ -3373,7 +3381,7 @@ export default function ExamsPage() {
                       </p>
                     </div>
                     <div className="pt-2">
-                      <Button className="w-full flex items-center justify-center gap-2 text-xs font-bold" onClick={() => handleOpenTimetable(selectedExam, currentClass.id)}>
+                      <Button className="w-full flex items-center justify-center gap-2 text-xs font-bold cursor-pointer" onClick={() => handleOpenTimetable(selectedExam, targetClassId)}>
                         <Calendar className="h-4 w-4" /> Open Timetable
                       </Button>
                     </div>
@@ -3394,10 +3402,12 @@ export default function ExamsPage() {
                     </div>
                     <div className="pt-2">
                       <Button 
-                        className="w-full flex items-center justify-center gap-2 text-xs font-bold" 
+                        className="w-full flex items-center justify-center gap-2 text-xs font-bold cursor-pointer" 
                         onClick={() => navigate('/school-admin/exams/seating-plan', { 
                           state: { 
                             examId: selectedExam.id, 
+                            classId: targetClassId,
+                            activeView: effectiveActiveView || 'classes',
                             view: hasSeatingPlan ? 'slips' : 'config' 
                           } 
                         })}
@@ -3422,11 +3432,12 @@ export default function ExamsPage() {
                     </div>
                     <div className="pt-2">
                       <Button 
-                        className="w-full flex items-center justify-center gap-2 text-xs font-bold" 
+                        className="w-full flex items-center justify-center gap-2 text-xs font-bold cursor-pointer" 
                         onClick={() => navigate('/school-admin/exams/question-paper-designer', { 
                           state: { 
                             examId: selectedExam?.id,
-                            classId: currentClass?.id,
+                            classId: targetClassId,
+                            activeView: effectiveActiveView || 'classes',
                             examName: selectedExam?.name
                           } 
                         })}
@@ -3450,7 +3461,7 @@ export default function ExamsPage() {
                       </p>
                     </div>
                     <div className="pt-2">
-                      <Button className="w-full flex items-center justify-center gap-2 text-xs font-bold" onClick={() => handleOpenMarksEntry(selectedExam, currentClass.id)}>
+                      <Button className="w-full flex items-center justify-center gap-2 text-xs font-bold cursor-pointer" onClick={() => handleOpenMarksEntry(selectedExam, targetClassId)}>
                         <Edit3 className="h-4 w-4" /> Open Marks Entry
                       </Button>
                     </div>
@@ -3472,7 +3483,7 @@ export default function ExamsPage() {
                       </p>
                     </div>
                     <div className="pt-2">
-                      <Button className="w-full flex items-center justify-center gap-2 text-xs font-bold" onClick={() => handleOpenReportCards(selectedExam, currentClass.id)}>
+                      <Button className="w-full flex items-center justify-center gap-2 text-xs font-bold cursor-pointer" onClick={() => handleOpenReportCards(selectedExam, targetClassId)}>
                         <Award className="h-4 w-4" /> Open {selectedExam?.name || 'Test'} Report Cards
                       </Button>
                     </div>
@@ -3499,7 +3510,7 @@ export default function ExamsPage() {
                             }`}
                             onClick={() => {
                               if (currentClass.status === 'Published') {
-                                handleUnpublishClassResults(selectedExam, currentClass.id);
+                                handleUnpublishClassResults(selectedExam, targetClassId);
                               }
                             }}
                           >
@@ -3514,14 +3525,14 @@ export default function ExamsPage() {
                     </div>
                     <div className="pt-2">
                       {currentClass.status === 'Draft' ? (
-                        <Button className="w-full flex items-center justify-center gap-2 text-xs font-bold font-sans cursor-pointer" onClick={() => handlePublishClassResults(selectedExam, currentClass.id)}>
+                        <Button className="w-full flex items-center justify-center gap-2 text-xs font-bold font-sans cursor-pointer" onClick={() => handlePublishClassResults(selectedExam, targetClassId)}>
                           <CheckCircle className="h-4 w-4" /> Publish Result
                         </Button>
                       ) : (
                         <Button 
                           type="button"
                           className="w-full text-xs font-bold bg-amber-600/10 hover:bg-amber-600/20 text-amber-600 border border-amber-600/20 cursor-pointer flex items-center justify-center gap-2" 
-                          onClick={() => handleUnpublishClassResults(selectedExam, currentClass.id)}
+                          onClick={() => handleUnpublishClassResults(selectedExam, targetClassId)}
                         >
                           <AlertCircle className="h-4 w-4" /> Move to Draft
                         </Button>
@@ -3545,9 +3556,13 @@ export default function ExamsPage() {
         return (
         <div className="space-y-6 animate-in fade-in duration-300 no-print">
           <div className="flex items-center gap-3">
-            <Button type="button" variant="ghost" className="h-8 w-8 p-0" onClick={() => setActiveView('classes')}>
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
+            <button
+              type="button"
+              onClick={() => setActiveView('classes')}
+              className="font-bold text-zinc-900 dark:text-zinc-50 border border-zinc-200 dark:border-zinc-800 bg-surface hover:bg-zinc-50 px-4 py-2 rounded-lg text-sm transition-all shadow-2xs cursor-pointer"
+            >
+              Back
+            </button>
             <div>
               <h3 className="text-xl font-bold text-text-primary">Manage Exam Timetable</h3>
               <p className="text-xs text-text-secondary">
@@ -3881,9 +3896,13 @@ export default function ExamsPage() {
       {effectiveActiveView === 'marks' && selectedExam && (
         <div className="space-y-6 animate-in fade-in duration-300 no-print">
           <div className="flex items-center gap-3">
-            <Button type="button" variant="ghost" className="h-8 w-8 p-0" onClick={() => setActiveView('classes')}>
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
+            <button
+              type="button"
+              onClick={() => setActiveView('classes')}
+              className="font-bold text-zinc-900 dark:text-zinc-50 border border-zinc-200 dark:border-zinc-800 bg-surface hover:bg-zinc-50 px-4 py-2 rounded-lg text-sm transition-all shadow-2xs cursor-pointer"
+            >
+              Back
+            </button>
             <div>
               <h3 className="text-xl font-bold text-text-primary">Subject Marks Sheet</h3>
               <p className="text-xs text-text-secondary">
@@ -3901,11 +3920,15 @@ export default function ExamsPage() {
             <Card className="flex flex-col justify-center p-4 h-24">
               <div className="space-y-1.5 w-full">
                 <label className="text-xs font-bold text-text-secondary uppercase">Select Scheduled Subject</label>
-                <Select value={selectedSubjectId} onChange={handleSubjectChange}>
-                  {timetablePapers.map(p => (
-                    <option key={p.subject_id} value={p.subject_id}>{p.subject_name}</option>
-                  ))}
-                </Select>
+                <CustomSelect 
+                  value={selectedSubjectId} 
+                  onChange={handleSubjectChange}
+                  options={timetablePapers.map(p => ({
+                    value: String(p?.subject_id ?? p?.id ?? ''),
+                    label: p?.subject_name || p?.name || 'Subject'
+                  }))}
+                  buttonClassName="h-9 font-semibold"
+                />
               </div>
             </Card>
 
@@ -3927,7 +3950,7 @@ export default function ExamsPage() {
 
           {loading ? (
             <div className="text-center py-10 text-text-muted text-xs font-bold">Loading marks spreadsheet...</div>
-          ) : marksSheet ? (
+          ) : marksSheet && Array.isArray(marksSheet.students) ? (
             <Card>
               <Table>
                 <TableHeader>
@@ -3943,7 +3966,7 @@ export default function ExamsPage() {
                 <TableBody>
                   {marksSheet.students.map((s, idx) => {
                     const isReadOnlyField = false;
-                    const currentPaper = timetablePapers.find(p => p.subject_id.toString() === selectedSubjectId);
+                    const currentPaper = timetablePapers.find(p => String(p?.subject_id ?? p?.id ?? '') === String(selectedSubjectId));
                     const isGradeSheet = marksSheet.evaluation_type === 'grade' || parseFloat(marksSheet.max_marks) === 0 || currentPaper?.evaluation_type === 'grade';
 
                     return (
@@ -4083,9 +4106,13 @@ export default function ExamsPage() {
       {effectiveActiveView === 'reports' && selectedExam && (
         <div className="space-y-6 animate-in fade-in duration-300 no-print">
           <div className="flex items-center gap-3">
-            <Button type="button" variant="ghost" className="h-8 w-8 p-0" onClick={() => setActiveView('classes')}>
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
+            <button
+              type="button"
+              onClick={() => setActiveView('classes')}
+              className="font-bold text-zinc-900 dark:text-zinc-50 border border-zinc-200 dark:border-zinc-800 bg-surface hover:bg-zinc-50 px-4 py-2 rounded-lg text-sm transition-all shadow-2xs cursor-pointer"
+            >
+              Back
+            </button>
             <div>
               <h3 className="text-xl font-bold text-text-primary">Student Report Cards</h3>
               <p className="text-xs text-text-secondary">
@@ -4153,9 +4180,13 @@ export default function ExamsPage() {
       {effectiveActiveView === 'grade_scale' && (
         <div className="space-y-6 animate-in fade-in duration-300 no-print">
           <div className="flex items-center gap-3">
-            <Button type="button" variant="ghost" className="flex items-center gap-1.5 text-xs font-bold" onClick={() => { setActiveView('dashboard'); setGradeError(''); setGradeSuccess(''); }}>
-              <ArrowLeft className="h-4 w-4" /> Back
-            </Button>
+            <button
+              type="button"
+              onClick={() => { setActiveView('dashboard'); setGradeError(''); setGradeSuccess(''); }}
+              className="font-bold text-zinc-900 dark:text-zinc-50 border border-zinc-200 dark:border-zinc-800 bg-surface hover:bg-zinc-50 px-4 py-2 rounded-lg text-sm transition-all shadow-2xs cursor-pointer"
+            >
+              Back
+            </button>
             <div>
               <h3 className="text-xl font-bold text-text-primary">Grade Configuration Scale</h3>
               <p className="text-xs text-text-secondary">Configure grade scale ranges to automatically calculate marks grades.</p>
@@ -4403,9 +4434,13 @@ export default function ExamsPage() {
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 no-print">
             <div className="flex items-center gap-3">
-              <Button type="button" variant="ghost" className="h-8 w-8 p-0" onClick={() => setActiveView('classes')}>
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
+              <button
+                type="button"
+                onClick={() => setActiveView('classes')}
+                className="font-bold text-zinc-900 dark:text-zinc-50 border border-zinc-200 dark:border-zinc-800 bg-surface hover:bg-zinc-50 px-4 py-2 rounded-lg text-sm transition-all shadow-2xs cursor-pointer"
+              >
+                Back
+              </button>
               <div>
                 <h3 className="text-xl font-bold text-text-primary">Final Academic Report Cards</h3>
                 <p className="text-xs text-text-secondary">

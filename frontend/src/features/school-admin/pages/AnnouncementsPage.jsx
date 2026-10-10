@@ -8,6 +8,7 @@ import { Button } from '../../../common/ui/button';
 import { Input } from '../../../common/ui/input';
 import { Dialog } from '../../../common/ui/dialog';
 import { Select } from '../../../common/ui/select';
+import CustomSelect from '../../../common/ui/CustomSelect';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../../common/ui/table';
 import { useToast } from '../../../common/components/Toast';
 import PageTitle from '../../../common/components/PageTitle';
@@ -352,17 +353,13 @@ export default function AnnouncementsPage() {
         </h1>
 
         <div className="flex items-center gap-3 self-start md:self-center">
-          <Select
+          <CustomSelect
             value={audienceFilter}
-            onChange={(e) => setAudienceFilter(e.target.value)}
-            className="text-xs font-bold cursor-pointer bg-surface h-10 w-[185px]"
-          >
-            {filterOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </Select>
+            onChange={(val) => setAudienceFilter(val)}
+            options={filterOptions}
+            className="w-[185px]"
+            buttonClassName="h-10 text-xs font-bold bg-surface rounded-xl px-3"
+          />
 
           <Button 
             onClick={handleOpenCreateModal}
