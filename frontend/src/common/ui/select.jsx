@@ -7,7 +7,7 @@ export const Select = React.forwardRef(({ className, children, ...props }, ref) 
     <select
       ref={ref}
       className={twMerge(
-        'flex h-9 w-full cursor-pointer rounded-full border border-border-strong bg-surface px-4 py-1.5 text-body-md text-text-primary shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary disabled:cursor-not-allowed disabled:opacity-60',
+        'flex h-9 w-full cursor-pointer rounded-full border border-border-strong bg-surface px-4 py-1.5 text-body-md text-text-primary shadow-sm transition-colors outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border-strong focus-visible:border-border-strong disabled:cursor-not-allowed disabled:opacity-60',
         className
       )}
       {...props}
@@ -18,3 +18,4 @@ export const Select = React.forwardRef(({ className, children, ...props }, ref) 
 });
 
 Select.displayName = 'Select';
+

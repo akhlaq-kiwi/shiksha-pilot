@@ -12,6 +12,8 @@ import { achievementsService } from '../../../common/services/achievementsServic
 import { schoolService } from '../../../common/services/schoolService';
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 import { useToast } from '../../../common/components/Toast';
+import CustomSelect from '../../../common/ui/CustomSelect';
+import { getClassIndex, getShortClassName } from '../../../common/constants/predefinedClasses';
 import html2pdf from 'html2pdf.js';
 
 const formatClassName = (rawClass) => {
@@ -53,6 +55,7 @@ export default function AchievementsPage() {
     academic_years: []
   });
   const [schoolProfile, setSchoolProfile] = useState(null);
+  const [allSchoolClasses, setAllSchoolClasses] = useState([]);
 
   // Filter States
   const [selectedYearId, setSelectedYearId] = useState('');
@@ -69,12 +72,53 @@ export default function AchievementsPage() {
 
   const certPrintRef = useRef(null);
 
-  // Load School Profile
+  // Load School Profile and Classes
   useEffect(() => {
     schoolService.getSchoolProfile()
       .then(res => setSchoolProfile(res))
       .catch(err => console.error("Failed to load school profile", err));
+
+    schoolService.getClasses()
+      .then(list => setAllSchoolClasses(list || []))
+      .catch(err => console.error("Failed to load school classes", err));
   }, []);
+
+  // Compute sorted, deduplicated class options (PNC -> NC -> LKG -> UKG -> KG -> Class 1..12)
+  const classOptions = React.useMemo(() => {
+    const rawClassesList = [...(data.classes || []), ...allSchoolClasses];
+    const mapByLabel = new Map();
+
+    rawClassesList.forEach(c => {
+      if (!c || !c.id) return;
+      const shortName = getShortClassName(c.name);
+      const label = `${shortName}${c.section ? ` - ${c.section}` : ''}`;
+      const key = label.toLowerCase();
+      if (!mapByLabel.has(key)) {
+        mapByLabel.set(key, {
+          value: String(c.id),
+          label: label,
+          name: c.name,
+          section: c.section
+        });
+      }
+    });
+
+    const sortedList = Array.from(mapByLabel.values()).sort((a, b) => {
+      const idxA = getClassIndex(a.name);
+      const idxB = getClassIndex(b.name);
+      if (idxA !== -1 && idxB !== -1 && idxA !== idxB) return idxA - idxB;
+      if (idxA !== -1 && idxB === -1) return -1;
+      if (idxA === -1 && idxB !== -1) return 1;
+      const nameComp = String(a.name || '').localeCompare(String(b.name || ''), undefined, { numeric: true });
+      if (nameComp !== 0) return nameComp;
+      return String(a.section || '').localeCompare(String(b.section || ''));
+    });
+
+    return [
+      { value: 'ALL', label: 'All Classes' },
+      ...sortedList
+    ];
+  }, [data.classes, allSchoolClasses]);
 
   // Load Achievements Data on Filter change
   useEffect(() => {
@@ -230,15 +274,6 @@ export default function AchievementsPage() {
 
   const availableYears = data.available_achievement_years || [];
   const currentYearObj = availableYears.find(y => String(y.id) === String(selectedYearCardId));
-
-  if (loading) {
-    return (
-      <div className="flex-1 flex flex-col justify-center items-center py-24 min-h-[400px] gap-3">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        <p className="text-xs font-bold text-text-primary uppercase tracking-wider">LOADING ACHIEVEMENTS...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300 pb-12">
@@ -473,16 +508,14 @@ export default function AchievementsPage() {
               {/* Class Filter (Right) */}
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Class Filter</label>
-                <select
+                <CustomSelect
                   value={selectedClassId}
-                  onChange={e => setSelectedClassId(e.target.value)}
-                  className="w-full h-10 px-3 rounded-xl border border-border bg-surface text-xs font-bold focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs cursor-pointer"
-                >
-                  <option value="ALL">All Classes</option>
-                  {(data.classes || []).map(c => (
-                    <option key={c.id} value={c.id}>{c.name} {c.section ? ` - ${c.section}` : ''}</option>
-                  ))}
-                </select>
+                  onChange={setSelectedClassId}
+                  options={classOptions}
+                  placeholder="All Classes"
+                  className="w-full"
+                  buttonClassName="h-10 text-xs font-bold rounded-xl"
+                />
               </div>
 
             </div>
@@ -490,13 +523,12 @@ export default function AchievementsPage() {
 
           {/* Loader */}
           {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {[1, 2, 3, 4, 5, 6].map(i => (
-                <div key={i} className="h-72 bg-surface border border-border rounded-3xl animate-pulse"></div>
-              ))}
+            <div className="flex-1 min-h-[460px] min-h-[calc(100vh-320px)] flex flex-col items-center justify-center py-20 gap-3 bg-surface/50 border border-border/60 rounded-3xl animate-in fade-in duration-150">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <p className="text-xs font-bold text-text-primary uppercase tracking-wider">LOADING ACHIEVEMENTS...</p>
             </div>
           ) : filteredAchievements.length === 0 ? (
-            <Card className="p-16 text-center border-dashed border-2 border-border/80 rounded-3xl bg-zinc-50/50 dark:bg-zinc-950/20">
+            <Card className="flex-1 min-h-[460px] min-h-[calc(100vh-320px)] flex flex-col items-center justify-center p-16 text-center border-dashed border-2 border-border/80 rounded-3xl bg-zinc-50/50 dark:bg-zinc-950/20">
               <Trophy className="h-12 w-12 text-text-muted/40 mx-auto mb-3" />
               <h4 className="text-base font-bold text-text-primary">
                 {currentYearObj?.status !== 'Archived' && currentYearObj?.migration_status !== 'Completed'
@@ -515,7 +547,16 @@ export default function AchievementsPage() {
               {/* SECTION B: CLASS WISE CHAMPIONS */}
               {Object.keys(classGroups).length > 0 && (selectedLevel === 'all' || selectedLevel === 'class') && (
                 <div className="space-y-8">
-                  {Object.entries(classGroups).map(([className, items]) => {
+                  {Object.entries(classGroups)
+                    .sort(([classA], [classB]) => {
+                      const idxA = getClassIndex(classA);
+                      const idxB = getClassIndex(classB);
+                      if (idxA !== -1 && idxB !== -1 && idxA !== idxB) return idxA - idxB;
+                      if (idxA !== -1 && idxB === -1) return -1;
+                      if (idxA === -1 && idxB !== -1) return 1;
+                      return String(classA).localeCompare(String(classB), undefined, { numeric: true });
+                    })
+                    .map(([className, items]) => {
                     const sortedItems = [...items].sort((a, b) => parseInt(a.rank || 0) - parseInt(b.rank || 0));
                     return (
                       <div key={className} className="space-y-4">

@@ -362,6 +362,26 @@ export default function QuestionPaperDesignerPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  const handleBackToExams = () => {
+    const passedExamId = location.state?.examId || examName || initialExamId;
+    const passedClassId = location.state?.classId || selectedClassId || initialClassId;
+    const activeView = location.state?.activeView || 'classes';
+
+    if (passedExamId) {
+      navigate('/school-admin/exams', { 
+        state: { 
+          activeView: activeView,
+          examId: passedExamId,
+          classId: passedClassId
+        } 
+      });
+    } else {
+      navigate('/school-admin/exams', {
+        state: { activeView: 'classes' }
+      });
+    }
+  };
+
   // Zoom/scale States for identical PDF preview and zero global horizontal scrolling
   const [previewWidth, setPreviewWidth] = useState(720);
   const wrapperRef = useRef(null);
@@ -2152,8 +2172,8 @@ export default function QuestionPaperDesignerPage() {
         <div className="flex items-center gap-3">
           <button 
             type="button" 
-            onClick={() => navigate('/school-admin/exams')}
-            className="font-bold text-zinc-900 dark:text-zinc-50 border border-zinc-200 dark:border-zinc-800 bg-surface hover:bg-zinc-50 px-4 py-2 rounded-lg text-sm transition-all shadow-2xs"
+            onClick={handleBackToExams}
+            className="font-bold text-zinc-900 dark:text-zinc-50 border border-zinc-200 dark:border-zinc-800 bg-surface hover:bg-zinc-50 px-4 py-2 rounded-lg text-sm transition-all shadow-2xs cursor-pointer"
           >
             Back
           </button>
