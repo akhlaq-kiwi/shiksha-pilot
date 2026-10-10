@@ -1640,7 +1640,6 @@ export default function ExamsPage() {
         passing_marks: String(examPassMarks),
         room: ''
       });
-      setSuccess(editingPaper ? 'Exam paper updated successfully.' : 'Exam paper saved successfully.');
     } catch (err) {
       console.error(err);
       setError(err.message || 'Failed to save timetable changes.');
@@ -3618,10 +3617,19 @@ export default function ExamsPage() {
                     <Button 
                       type="submit" 
                       form="add-paper-form"
-                      className="flex items-center gap-2 text-xs font-bold" 
-                      disabled={(allSubjectsScheduled && !editingPaper) || (filteredClassSubjects.length === 0 && !editingPaper)}
+                      className="flex items-center gap-2 text-xs font-bold min-w-[110px] justify-center" 
+                      disabled={submitting || (allSubjectsScheduled && !editingPaper) || (filteredClassSubjects.length === 0 && !editingPaper)}
                     >
-                      <Plus className="h-4 w-4" /> {editingPaper ? 'Save Changes' : 'Add Paper'}
+                      {submitting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span>{editingPaper ? 'Saving...' : 'Adding...'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="h-4 w-4" /> {editingPaper ? 'Save Changes' : 'Add Paper'}
+                        </>
+                      )}
                     </Button>
                   </div>
                 </CardHeader>
