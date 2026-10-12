@@ -123,7 +123,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
   void _showSchemeModal() {
     final List<dynamic> scheme = _details['scheme'] ?? [];
     final List<dynamic> publishedClassSchemes = (_details['published_class_schemes'] as List<dynamic>?) ?? [];
-    final bool isTeacher = (widget.userRole == 'TEACHER');
+    final bool isTeacher = (widget.userRole == 'TEACHER' || widget.userRole == 'PRINCIPAL');
 
     showModalBottomSheet(
       context: context,
@@ -1838,7 +1838,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
   }
 
   void _showResultModal() {
-    if (widget.userRole == 'TEACHER') {
+    if (widget.userRole == 'TEACHER' || widget.userRole == 'PRINCIPAL') {
       _showTeacherResultsModal();
     } else {
       _showStudentResultsModal();
@@ -3429,7 +3429,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                     ),
 
                     // 1b. Enter Marks Card (TEACHER only - Requires papers added)
-                    if (widget.userRole == 'TEACHER')
+                    if (widget.userRole == 'TEACHER' || widget.userRole == 'PRINCIPAL')
                       _buildFeatureCard(
                         title: 'Enter Marks',
                         subtitle: hasPapers ? 'Input student marks for assigned class' : 'No Papers Added Yet',
@@ -3440,7 +3440,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                       ),
 
                     // 2. Admit Card Card (STUDENT/PARENT only)
-                    if (widget.userRole != 'TEACHER')
+                    if (widget.userRole != 'TEACHER' && widget.userRole != 'PRINCIPAL')
                       _buildFeatureCard(
                         title: 'Admit Card',
                         subtitle: admitPub ? 'View room & seat allocations' : 'Not Published Yet',
@@ -3467,7 +3467,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                       ),
 
                     // 3. Result Card (STUDENT/PARENT only - Hidden for Teachers to protect fee dues compliance)
-                    if (widget.userRole != 'TEACHER')
+                    if (widget.userRole != 'TEACHER' && widget.userRole != 'PRINCIPAL')
                       _buildFeatureCard(
                         title: 'Exam Result',
                         subtitle: resultPub ? 'View your report card' : 'Not Published Yet',

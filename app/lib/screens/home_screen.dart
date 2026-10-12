@@ -33,6 +33,7 @@ import 'package:school_hub/widgets/change_password_dialog.dart';
 import 'package:school_hub/screens/teacher_qr_scanner_screen.dart';
 import 'package:school_hub/screens/teacher_attendance_history_screen.dart';
 import 'package:school_hub/screens/question_paper_designer_screen.dart';
+import 'package:school_hub/screens/principal_tar_screen.dart';
 
 class LauncherFeature {
   final String name;
@@ -76,6 +77,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   String _activeStudentName = '';
   String _activeStudentClass = '';
   String _userPhoto = '';
+  bool _isPrincipal = false;
   
   List<dynamic> _children = [];
   bool _isLoadingChildren = false;
@@ -91,120 +93,109 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       name: 'Attendance',
       icon: Icons.calendar_month_rounded,
       color: Colors.teal,
-      allowedRoles: ['PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL', 'STUDENT'],
+      allowedRoles: ['PARENT', 'TEACHER', 'PRINCIPAL', 'STUDENT'],
       isAvailable: true,
     ),
     LauncherFeature(
       name: 'Leaves',
       icon: Icons.edit_document,
       color: Colors.amber.shade800,
-      allowedRoles: ['PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL', 'STUDENT'],
+      allowedRoles: ['PARENT', 'TEACHER', 'PRINCIPAL', 'STUDENT'],
       isAvailable: true,
     ),
     LauncherFeature(
       name: 'Fees Card',
       icon: Icons.payments_rounded,
       color: Colors.green,
-      allowedRoles: ['PARENT', 'SCHOOL_ADMIN', 'PRINCIPAL', 'STUDENT'],
+      allowedRoles: ['PARENT', 'STUDENT'],
       isAvailable: true,
     ),
     LauncherFeature(
       name: 'Mark Attendance',
       icon: Icons.qr_code_scanner_rounded,
       color: Colors.indigo,
-      allowedRoles: ['TEACHER'],
+      allowedRoles: ['TEACHER', 'PRINCIPAL'],
       isAvailable: true,
     ),
     LauncherFeature(
       name: 'Salary',
       icon: Icons.currency_rupee_rounded,
       color: Colors.teal,
-      allowedRoles: ['TEACHER'],
+      allowedRoles: ['TEACHER', 'PRINCIPAL'],
       isAvailable: true,
     ),
     LauncherFeature(
       name: 'Homework',
       icon: Icons.menu_book_rounded,
       color: Colors.indigo,
-      allowedRoles: ['PARENT', 'TEACHER', 'STUDENT'],
+      allowedRoles: ['PARENT', 'TEACHER', 'PRINCIPAL', 'STUDENT'],
       isAvailable: true,
     ),
     LauncherFeature(
       name: 'Timetable',
       icon: Icons.schedule_rounded,
       color: Colors.blue,
-      allowedRoles: ['PARENT', 'TEACHER', 'STUDENT'],
+      allowedRoles: ['PARENT', 'TEACHER', 'PRINCIPAL', 'STUDENT'],
       isAvailable: true,
     ),
     LauncherFeature(
       name: 'Exams',
       icon: Icons.assignment_turned_in_rounded,
       color: Colors.red,
-      allowedRoles: ['PARENT', 'TEACHER', 'STUDENT'],
+      allowedRoles: ['PARENT', 'TEACHER', 'PRINCIPAL', 'STUDENT'],
       isAvailable: true,
-    ),
-    LauncherFeature(
-      name: 'Reports',
-      icon: Icons.bar_chart_rounded,
-      color: Colors.deepPurple,
-      allowedRoles: ['SCHOOL_ADMIN', 'PRINCIPAL'],
     ),
     LauncherFeature(
       name: 'Notice',
       icon: Icons.campaign_rounded,
       color: Colors.orange.shade700,
-      allowedRoles: ['PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL', 'STUDENT'],
+      allowedRoles: ['PARENT', 'TEACHER', 'PRINCIPAL', 'STUDENT'],
       isAvailable: true,
     ),
-
     LauncherFeature(
       name: 'Notifications',
       icon: Icons.notifications_rounded,
       color: Colors.indigo,
-      allowedRoles: ['PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL', 'STUDENT'],
+      allowedRoles: ['PARENT', 'TEACHER', 'PRINCIPAL', 'STUDENT'],
       isAvailable: true,
     ),
     LauncherFeature(
       name: 'Settings',
       icon: Icons.settings_rounded,
       color: Colors.grey.shade700,
-      allowedRoles: ['PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL', 'STUDENT'],
+      allowedRoles: ['PARENT', 'TEACHER', 'PRINCIPAL', 'STUDENT'],
       isAvailable: true,
-    ),
-    LauncherFeature(
-      name: 'Teachers',
-      icon: Icons.people_rounded,
-      color: Colors.pink,
-      allowedRoles: ['SCHOOL_ADMIN', 'PRINCIPAL'],
     ),
     LauncherFeature(
       name: 'Outstanding',
       icon: Icons.receipt_long_rounded,
       color: Colors.cyan,
-      allowedRoles: ['TEACHER'],
+      allowedRoles: ['TEACHER', 'PRINCIPAL'],
       isAvailable: true,
-    ),
-    LauncherFeature(
-      name: 'Finance',
-      icon: Icons.monetization_on_rounded,
-      color: Colors.green.shade700,
-      allowedRoles: ['SCHOOL_ADMIN', 'PRINCIPAL'],
     ),
     LauncherFeature(
       name: 'Achievements',
       icon: Icons.emoji_events_rounded,
       color: Colors.amber.shade700,
-      allowedRoles: ['PARENT', 'STUDENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL'],
+      allowedRoles: ['PARENT', 'STUDENT', 'TEACHER', 'PRINCIPAL'],
       isAvailable: true,
     ),
     LauncherFeature(
       name: 'Paper Designer',
       icon: Icons.design_services_rounded,
       color: Colors.deepOrange,
-      allowedRoles: ['TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL'],
+      allowedRoles: ['TEACHER', 'PRINCIPAL'],
+      isAvailable: true,
+    ),
+    LauncherFeature(
+      name: 'TAR',
+      icon: Icons.assignment_ind_rounded,
+      color: const Color(0xFF0F766E),
+      allowedRoles: ['TEACHER', 'PRINCIPAL'],
       isAvailable: true,
     ),
   ];
+
 
   @override
   void initState() {
@@ -251,6 +242,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _schoolName = (prefs.getString('school_name') ?? 'Shiksha Pilot Academy').toUpperCase();
       _userPhone = prefs.getString('user_phone') ?? '';
       _userPhoto = prefs.getString('user_photo') ?? '';
+      _isPrincipal = (prefs.getBool('is_principal') ?? false) || (roleUpper == 'PRINCIPAL');
 
       if ((roleUpper == 'PARENT' || roleUpper == 'STUDENT') && savedId != null) {
         _activeStudentId = savedId;
@@ -259,7 +251,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (roleUpper == 'PARENT') {
         _userRoleDisplay = 'Parent Profile';
       } else if (roleUpper == 'TEACHER') {
-        _userRoleDisplay = 'Teacher Profile';
+        _userRoleDisplay = _isPrincipal ? 'Teacher (Principal)' : 'Teacher Profile';
       } else if (roleUpper == 'SCHOOL_ADMIN' || roleUpper == 'PRINCIPAL') {
         _userRoleDisplay = 'Principal Profile';
       } else {
@@ -286,11 +278,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       
       final latestPhoto = (profile['photo_path'] as String?) ?? (profile['staff_photo_path'] as String?) ?? '';
       final latestName = (profile['name'] as String?) ?? '';
+      final bool isPrincipal = profile['is_principal'] == true ||
+          profile['is_principal'] == 1 ||
+          profile['is_principal'] == '1' ||
+          (profile['role']?.toString().toUpperCase() == 'PRINCIPAL');
       
       final role = widget.userRole.toUpperCase();
       final isStaff = role == 'TEACHER' || role == 'SCHOOL_ADMIN' || role == 'PRINCIPAL';
       
       final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('is_principal', isPrincipal);
+
       if (isStaff) {
         await prefs.setString('user_photo', latestPhoto);
         await prefs.setString('user_name', latestName);
@@ -299,6 +297,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           setState(() {
             _userPhoto = latestPhoto;
             _userName = latestName;
+            _isPrincipal = isPrincipal;
+            if (role == 'TEACHER' && isPrincipal) {
+              _userRoleDisplay = 'Teacher (Principal)';
+            }
           });
         }
       }
@@ -383,10 +385,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       final roleUpper = widget.userRole.toUpperCase();
       final String path;
       final bool isSchoolStaff;
-      if (roleUpper == 'TEACHER') {
+      if (roleUpper == 'TEACHER' || roleUpper == 'PRINCIPAL') {
         path = '/api/teacher/notifications';
         isSchoolStaff = true;
-      } else if (roleUpper == 'SCHOOL_ADMIN' || roleUpper == 'PRINCIPAL' || roleUpper == 'SUPER_ADMIN') {
+      } else if (roleUpper == 'SCHOOL_ADMIN' || roleUpper == 'SUPER_ADMIN') {
         path = '/api/school/notifications';
         isSchoolStaff = true;
       } else {
@@ -615,12 +617,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   List<LauncherFeature> _getFilteredFeatures() {
     final role = widget.userRole.toUpperCase();
+    final bool isStaffTeacher = (role == 'TEACHER' || role == 'PRINCIPAL');
     
     // Filter by allowed role first
     final List<LauncherFeature> roleScoped = _allFeatures.where((f) {
-      return f.allowedRoles.contains(role) || 
-             (role == 'SCHOOL_ADMIN' && f.allowedRoles.contains('PRINCIPAL')) ||
-             (role == 'PRINCIPAL' && f.allowedRoles.contains('SCHOOL_ADMIN'));
+      if (f.name == 'TAR') {
+        return (_isPrincipal == true || role == 'PRINCIPAL');
+      }
+      if (isStaffTeacher) {
+        return f.allowedRoles.contains('TEACHER') || f.allowedRoles.contains('PRINCIPAL');
+      }
+      return f.allowedRoles.contains(role);
     }).toList();
 
     // Filter by search query
@@ -895,8 +902,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
         );
+      } else if (feature.name == 'TAR') {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PrincipalTarScreen(
+              leaveService: widget.leaveService,
+            ),
+          ),
+        );
       }
     } else {
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('${feature.name} feature is currently under development.'),

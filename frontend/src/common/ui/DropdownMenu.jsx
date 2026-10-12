@@ -138,7 +138,7 @@ export function DropdownItem({ children, className, onClick, destructive = false
             ? "opacity-40 cursor-not-allowed text-text-muted hover:bg-transparent" 
             : destructive 
               ? "text-danger-700 hover:bg-danger-50 cursor-pointer" 
-              : "text-text-primary hover:bg-secondary/80 cursor-pointer",
+              : "text-text-primary hover:bg-[#FAF6EC] dark:hover:bg-zinc-900/50 cursor-pointer",
           className
         )
       )}

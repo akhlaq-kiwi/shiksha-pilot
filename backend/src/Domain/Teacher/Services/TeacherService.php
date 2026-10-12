@@ -58,7 +58,7 @@ class TeacherService extends BaseService
         $stmtUser = $pdo->prepare("SELECT phone, role FROM users WHERE id = :id LIMIT 1");
         $stmtUser->execute([':id' => $teacherId]);
         $userObj = $stmtUser->fetch();
-        if (!$userObj || $userObj['role'] !== 'TEACHER') {
+        if (!$userObj || !in_array($userObj['role'], ['TEACHER', 'PRINCIPAL'])) {
             return [];
         }
         $phone = $userObj['phone'];
@@ -222,7 +222,7 @@ class TeacherService extends BaseService
         $stmtUser = $pdo->prepare("SELECT phone, role FROM users WHERE id = :id AND school_id = :sid LIMIT 1");
         $stmtUser->execute([':id' => $user['id'], ':sid' => $schoolId]);
         $userObj = $stmtUser->fetch();
-        if (!$userObj || ($userObj['role'] !== 'TEACHER' && $userObj['role'] !== 'SCHOOL_ADMIN' && $userObj['role'] !== 'ADMIN')) {
+        if (!$userObj || (!in_array($userObj['role'], ['TEACHER', 'PRINCIPAL', 'SCHOOL_ADMIN', 'ADMIN']))) {
             throw new \App\Shared\Exceptions\ForbiddenException("Access denied.");
         }
     }
@@ -838,7 +838,7 @@ class TeacherService extends BaseService
         $stmtUser = $pdo->prepare("SELECT phone, role FROM users WHERE id = :id LIMIT 1");
         $stmtUser->execute([':id' => $userId]);
         $userObj = $stmtUser->fetch();
-        if (!$userObj || $userObj['role'] !== 'TEACHER') {
+        if (!$userObj || !in_array($userObj['role'], ['TEACHER', 'PRINCIPAL'])) {
             return $defaultSalaryResponse;
         }
         $phone = $userObj['phone'];

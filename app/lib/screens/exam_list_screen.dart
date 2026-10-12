@@ -38,7 +38,7 @@ class _ExamListScreenState extends State<ExamListScreen> {
     });
 
     try {
-      if (widget.userRole == 'TEACHER') {
+      if (widget.userRole == 'TEACHER' || widget.userRole == 'PRINCIPAL') {
         final assigned = await widget.examService.getTeacherAssignedClasses();
         _assignedClasses = assigned;
 
@@ -285,7 +285,7 @@ class _ExamListScreenState extends State<ExamListScreen> {
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         title: Text(
-          widget.userRole == 'TEACHER' && _assignedClasses.length > 1 && _selectedClass == null
+          (widget.userRole == 'TEACHER' || widget.userRole == 'PRINCIPAL') && _assignedClasses.length > 1 && _selectedClass == null
               ? 'Select Class'
               : 'Examinations',
           style: const TextStyle(
@@ -332,11 +332,11 @@ class _ExamListScreenState extends State<ExamListScreen> {
                           ),
                         ),
                       )
-                : widget.userRole == 'TEACHER' && _assignedClasses.length > 1 && _selectedClass == null
+                : (widget.userRole == 'TEACHER' || widget.userRole == 'PRINCIPAL') && _assignedClasses.length > 1 && _selectedClass == null
                     ? _buildClassSelectionList()
                     : Column(
                         children: [
-                          if (widget.userRole == 'TEACHER' && _assignedClasses.length > 1 && _selectedClass != null)
+                          if ((widget.userRole == 'TEACHER' || widget.userRole == 'PRINCIPAL') && _assignedClasses.length > 1 && _selectedClass != null)
                             Container(
                               width: double.infinity,
                               color: Colors.indigo.shade50,

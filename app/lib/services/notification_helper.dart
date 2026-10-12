@@ -18,6 +18,7 @@ import '../screens/exam_list_screen.dart';
 import '../screens/homework_list_screen.dart';
 import '../screens/achievements_screen.dart';
 import '../screens/attendance_screen.dart';
+import '../screens/principal_tar_screen.dart';
 import '../services/attendance_service.dart';
 import '../services/leave_service.dart';
 import '../services/exam_service.dart';
@@ -325,6 +326,10 @@ class NotificationHelper {
         userRole: userRole,
         studentId: notifStudentId ?? studentId,
       );
+    } else if (link.contains('teacher-attendance') || link.contains('tar') || title.contains('late teachers') || message.contains('were late') || eventKey == 'LATE_TEACHERS_ALERT') {
+      targetScreen = PrincipalTarScreen(
+        leaveService: leaveService,
+      );
     } else if (link.contains('attendance') || title.contains('absent') || message.contains('absent') || eventKey.toLowerCase().contains('absent') || eventKey.toLowerCase().contains('attendance')) {
       targetScreen = AttendanceScreen(
         attendanceService: AttendanceService(baseUrl: baseUrl, token: token),
@@ -454,6 +459,12 @@ class NotificationHelper {
           attendanceService: AttendanceService(baseUrl: baseUrl, token: token),
           userRole: userRole,
           selectedStudentId: studentId,
+        );
+
+      case NotificationEvent.lateTeachersAlert:
+      case 'TAR_REPORT':
+        return PrincipalTarScreen(
+          leaveService: leaveService,
         );
 
       case NotificationEvent.announcementPublished:

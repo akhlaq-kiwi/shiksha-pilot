@@ -327,7 +327,8 @@ class _TimetableScreenState extends State<TimetableScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isTeacher = widget.userRole.toUpperCase() == 'TEACHER';
+    final roleUpper = widget.userRole.toUpperCase();
+    final isTeacher = roleUpper == 'TEACHER' || roleUpper == 'PRINCIPAL';
     final now = DateTime.now();
     final isTodaySelected = _formatDateYYYYMMDD(now) == _formatDateYYYYMMDD(_selectedDate);
     final dateStr = _formatDateYYYYMMDD(_selectedDate);

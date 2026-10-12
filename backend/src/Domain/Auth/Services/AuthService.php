@@ -177,6 +177,15 @@ class AuthService extends BaseService
         }
 
         $safeUser = array_diff_key($user, ['password' => true]);
+        $isPrincipal = (strtoupper((string)($user['role'] ?? '')) === 'PRINCIPAL');
+        if (!$isPrincipal && in_array(strtoupper((string)($user['role'] ?? '')), ['TEACHER', 'STAFF'], true)) {
+            try {
+                $stmtPr = $this->repo->getPdo()->prepare("SELECT is_principal FROM staff WHERE phone = :phone AND school_id = :sid AND status = 'ACTIVE' LIMIT 1");
+                $stmtPr->execute([':phone' => $user['phone'], ':sid' => $user['school_id']]);
+                $isPrincipal = ((int)$stmtPr->fetchColumn() === 1);
+            } catch (\Throwable $e) {}
+        }
+        $safeUser['is_principal'] = $isPrincipal;
 
         $token = $this->tokenService->encode([
             'id'        => $user['id'],
@@ -322,9 +331,10 @@ class AuthService extends BaseService
 
         $profile = array_diff_key($user, ['password' => true]);
 
-        if ($user['role'] === 'TEACHER') {
+        $isPrincipal = (strtoupper((string)($user['role'] ?? '')) === 'PRINCIPAL');
+        if (in_array(strtoupper((string)($user['role'] ?? '')), ['TEACHER', 'PRINCIPAL', 'STAFF'], true)) {
             $stmt = $this->repo->getPdo()->prepare("
-                SELECT department, employee_id, photo_path FROM staff 
+                SELECT department, employee_id, photo_path, is_principal FROM staff 
                 WHERE phone = :phone AND school_id = :sid AND status = 'ACTIVE'
                 LIMIT 1
             ");
@@ -334,8 +344,12 @@ class AuthService extends BaseService
                 $profile['department'] = $staff['department'] ?? null;
                 $profile['employee_id'] = $staff['employee_id'] ?? null;
                 $profile['photo_path'] = $staff['photo_path'] ?? null;
+                if ((int)($staff['is_principal'] ?? 0) === 1) {
+                    $isPrincipal = true;
+                }
             }
         }
+        $profile['is_principal'] = $isPrincipal;
 
         return $profile;
     }

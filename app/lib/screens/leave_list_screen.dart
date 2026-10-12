@@ -55,7 +55,8 @@ class _LeaveListScreenState extends State<LeaveListScreen> {
     });
 
     try {
-      final viewType = widget.userRole == 'TEACHER' ? 'OWN' : null;
+      final roleUpper = widget.userRole.toUpperCase();
+      final viewType = (roleUpper == 'TEACHER' || roleUpper == 'PRINCIPAL') ? 'OWN' : null;
       final data = await widget.leaveService.getLeaveRequests(
         viewType: viewType,
         studentId: widget.selectedStudentId,

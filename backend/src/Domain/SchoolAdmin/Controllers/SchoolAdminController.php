@@ -988,9 +988,21 @@ class SchoolAdminController extends BaseController
     protected function requireRole(array $user, string|array $roles): void
     {
         $userRole = $user['role'] ?? '';
-        if ($userRole === 'TEACHER') {
-            $uri = $_SERVER['REQUEST_URI'] ?? '';
+        $uri = $_SERVER['REQUEST_URI'] ?? '';
+
+        // Principal teacher attendance route authorization
+        if (str_contains($uri, '/api/school/teacher-attendance')) {
+            if ($userRole === 'SCHOOL_ADMIN' || $userRole === 'PRINCIPAL' || $this->service->isPrincipal($user)) {
+                if ($this->service->checkSubscriptionExpired($user)) {
+                    throw new \App\Shared\Exceptions\ForbiddenException('Subscription Expired. Access Denied.');
+                }
+                return;
+            }
+        }
+
+        if ($userRole === 'TEACHER' || $userRole === 'PRINCIPAL') {
             $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+
 
             // 1. Shared/Bootstrap endpoints (always allowed for teachers)
             $isShared = false;
@@ -2245,7 +2257,7 @@ class SchoolAdminController extends BaseController
     public function getTeacherAttendance(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'PRINCIPAL']);
 
         $params = $request->getQueryParams();
         $date = $params['date'] ?? date('Y-m-d');
@@ -2258,7 +2270,7 @@ class SchoolAdminController extends BaseController
     public function markTeacherAttendance(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'PRINCIPAL']);
 
         $body = RequestParser::body($request);
         $data = $this->teacherAttendanceService->markTeacherAttendanceByAdmin($user, $body);
@@ -2269,7 +2281,7 @@ class SchoolAdminController extends BaseController
     public function getTeacherAttendanceReport(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'PRINCIPAL']);
 
         $params = $request->getQueryParams();
         $month = isset($params['month']) ? (int)$params['month'] : (int)date('n');
@@ -2283,7 +2295,7 @@ class SchoolAdminController extends BaseController
     public function getTeacherAttendanceSettings(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'PRINCIPAL']);
 
         $data = $this->teacherAttendanceService->getSettings($user);
 
@@ -2293,7 +2305,7 @@ class SchoolAdminController extends BaseController
     public function saveTeacherAttendanceSettings(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'PRINCIPAL']);
 
         $body = RequestParser::body($request);
         $data = $this->teacherAttendanceService->saveSettings($user, $body);
@@ -2304,7 +2316,7 @@ class SchoolAdminController extends BaseController
     public function getTeacherAttendanceQrToken(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'PRINCIPAL']);
 
         $data = $this->teacherAttendanceService->getQrToken($user);
 
@@ -2314,10 +2326,24 @@ class SchoolAdminController extends BaseController
     public function refreshTeacherAttendanceQrToken(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'PRINCIPAL']);
 
         $data = $this->teacherAttendanceService->refreshQrToken($user);
 
         return $this->success($response, $data, 'QR code regenerated successfully');
+    }
+
+    public function checkLateTeacherAlerts(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'PRINCIPAL']);
+
+        $body = RequestParser::body($request);
+        $schoolId = (int)($user['school_id'] ?? 0);
+        $force = !empty($body['force']);
+
+        $data = $this->teacherAttendanceService->checkAndSendLateTeachersAlert($schoolId, $force);
+
+        return $this->success($response, $data, 'Late teacher alert check processed');
     }
 }

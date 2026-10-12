@@ -67,7 +67,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       ayStart = DateTime(now.year - 1, 4, 1);
     }
 
-    if (widget.userRole.toUpperCase() == 'TEACHER') {
+    final roleUpper = widget.userRole.toUpperCase();
+    final isTeacherRole = roleUpper == 'TEACHER' || roleUpper == 'PRINCIPAL';
+
+    if (isTeacherRole) {
       _teacherToday = DateTime(now.year, now.month, now.day);
       _teacherAcademicYearStart = ayStart;
       _teacherTotalDays = _teacherToday.difference(_teacherAcademicYearStart).inDays + 1;
@@ -88,7 +91,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     // Auto-retry connection timer
     _offlineRetryTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
       if (_isOffline) {
-        if (widget.userRole.toUpperCase() == 'TEACHER') {
+        if (isTeacherRole) {
           if (_classes.isEmpty) {
             _loadTeacherData();
           } else {
@@ -104,7 +107,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   @override
   void dispose() {
     _offlineRetryTimer?.cancel();
-    if (widget.userRole.toUpperCase() == 'TEACHER') {
+    final roleUpper = widget.userRole.toUpperCase();
+    final isTeacherRole = roleUpper == 'TEACHER' || roleUpper == 'PRINCIPAL';
+    if (isTeacherRole) {
       _teacherPageController.dispose();
     } else {
       _studentMonthPageController.dispose();
@@ -509,7 +514,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   // -----------------------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
-    final isTeacher = widget.userRole.toUpperCase() == 'TEACHER';
+    final roleUpper = widget.userRole.toUpperCase();
+    final isTeacher = roleUpper == 'TEACHER' || roleUpper == 'PRINCIPAL';
 
     if (!isTeacher) {
       return _buildStudentView();

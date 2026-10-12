@@ -60,7 +60,7 @@ abstract class BaseController
             }
 
             // For Teacher/Staff role: check if staff profile in school was marked Inactive or exit_date set
-            if (!$isInactive && ($userRole === 'TEACHER' || $userRole === 'STAFF') && $schoolId > 0 && !empty($phone)) {
+            if (!$isInactive && ($userRole === 'TEACHER' || $userRole === 'STAFF' || $userRole === 'PRINCIPAL') && $schoolId > 0 && !empty($phone)) {
                 $stmtStaff = $pdo->prepare("
                     SELECT status, exit_date FROM staff 
                     WHERE school_id = :sid AND phone = :phone 
@@ -114,6 +114,11 @@ abstract class BaseController
     {
         $allowed  = is_array($roles) ? $roles : [$roles];
         $userRole = (string) ($user['role'] ?? '');
+
+        // A PRINCIPAL user has all capabilities and access of a TEACHER
+        if ($userRole === 'PRINCIPAL' && in_array('TEACHER', $allowed, true)) {
+            return;
+        }
 
         if (!in_array($userRole, $allowed, true)) {
             throw new ForbiddenException();

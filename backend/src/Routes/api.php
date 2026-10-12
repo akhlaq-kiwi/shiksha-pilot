@@ -156,6 +156,7 @@ return function (App $app) {
     $app->post('/api/school/teacher-attendance/settings', [SchoolAdminController::class, 'saveTeacherAttendanceSettings']);
     $app->get('/api/school/teacher-attendance/qr-token', [SchoolAdminController::class, 'getTeacherAttendanceQrToken']);
     $app->post('/api/school/teacher-attendance/qr-token/refresh', [SchoolAdminController::class, 'refreshTeacherAttendanceQrToken']);
+    $app->post('/api/school/teacher-attendance/check-late-alerts', [SchoolAdminController::class, 'checkLateTeacherAlerts']);
     $app->get('/api/school/holidays', [SchoolAdminController::class, 'getHolidays']);
     $app->post('/api/school/holidays', [SchoolAdminController::class, 'createHoliday']);
     $app->put('/api/school/holidays/{id}', [SchoolAdminController::class, 'updateHoliday']);

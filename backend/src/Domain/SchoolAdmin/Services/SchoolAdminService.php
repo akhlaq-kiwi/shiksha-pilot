@@ -18859,7 +18859,7 @@ Only approve the settlement after reviewing all financial records.
         $stmtTeachers = $pdo->prepare("
             SELECT id, name, phone, employee_id, department
             FROM staff 
-            WHERE school_id = :sid AND academic_year_id = :ayid AND (role = 'TEACHER' OR role = 'Teacher') AND status = 'ACTIVE'
+            WHERE school_id = :sid AND academic_year_id = :ayid AND (role = 'TEACHER' OR role = 'Teacher' OR role = 'PRINCIPAL' OR is_principal = 1) AND status = 'ACTIVE'
             ORDER BY name ASC
         ");
         $stmtTeachers->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
@@ -20081,6 +20081,36 @@ Only approve the settlement after reviewing all financial records.
             ];
         }
     }
+
+    public function isPrincipal(array $user): bool
+    {
+        if (strtoupper((string)($user['role'] ?? '')) === 'PRINCIPAL') {
+            return true;
+        }
+        if (!empty($user['is_principal'])) {
+            return true;
+        }
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = (int)($user['school_id'] ?? 0);
+        $userId = (int)($user['id'] ?? 0);
+        if ($schoolId <= 0 || $userId <= 0) {
+            return false;
+        }
+        $stmt = $pdo->prepare("SELECT phone FROM users WHERE id = :id LIMIT 1");
+        $stmt->execute([':id' => $userId]);
+        $phone = $stmt->fetchColumn();
+        if (!$phone) {
+            return false;
+        }
+        $stmtStaff = $pdo->prepare("SELECT is_principal, role FROM staff WHERE school_id = :sid AND phone = :phone AND status = 'ACTIVE' LIMIT 1");
+        $stmtStaff->execute([':sid' => $schoolId, ':phone' => $phone]);
+        $staff = $stmtStaff->fetch(\PDO::FETCH_ASSOC);
+        if (!$staff) {
+            return false;
+        }
+        return ((int)($staff['is_principal'] ?? 0) === 1 || strtoupper((string)($staff['role'] ?? '')) === 'PRINCIPAL');
+    }
 }
+
 
 

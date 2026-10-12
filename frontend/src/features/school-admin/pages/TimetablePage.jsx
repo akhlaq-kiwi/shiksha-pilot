@@ -21,29 +21,38 @@ const CustomSelect = ({
   disabled = false,
   className = "",
   buttonClassName = "",
-  dropdownClassName = ""
+  dropdownClassName = "",
+  onOpenChange
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef(null);
 
   const selectedOption = options.find(o => String(o.value) === String(value));
 
+  const toggleOpen = () => {
+    if (disabled) return;
+    const next = !isOpen;
+    setIsOpen(next);
+    onOpenChange?.(next);
+  };
+
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (containerRef.current && !containerRef.current.contains(e.target)) {
         setIsOpen(false);
+        onOpenChange?.(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [onOpenChange]);
 
   return (
     <div ref={containerRef} className={`relative ${isOpen ? 'z-50' : 'z-10'} ${className}`}>
       <button
         type="button"
         disabled={disabled}
-        onClick={() => !disabled && setIsOpen(!isOpen)}
+        onClick={toggleOpen}
         className={`flex h-10 items-center justify-between gap-2.5 rounded-full border border-border bg-surface px-4 py-2 text-xs font-bold text-text-primary shadow-2xs outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border active:outline-none select-none transition-colors min-w-[150px] ${
           disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-border-strong'
         } ${buttonClassName}`}
@@ -67,7 +76,7 @@ const CustomSelect = ({
                     onChange(String(opt.value));
                     setIsOpen(false);
                   }}
-                  className={`w-full text-left px-3.5 py-2 rounded-xl text-xs font-semibold outline-none focus:outline-none select-none transition-colors hover:bg-primary/10 ${isSelected ? 'bg-primary/10 text-primary font-bold' : 'text-text-primary'}`}
+                  className={`w-full text-left px-3.5 py-2 rounded-xl text-xs font-semibold outline-none focus:outline-none select-none transition-colors cursor-pointer hover:bg-[#FAF6EC] dark:hover:bg-zinc-900/50 ${isSelected ? 'text-primary font-bold' : 'text-text-primary'}`}
                 >
                   {opt.label}
                 </button>
@@ -166,6 +175,7 @@ export default function TimetablePage() {
   const [pasteDestinationDay, setPasteDestinationDay] = useState('');
   const [isDeleteDayConfirmOpen, setIsDeleteDayConfirmOpen] = useState(false);
   const [dayToDelete, setDayToDelete] = useState('');
+  const [activeDropdownDay, setActiveDropdownDay] = useState(null);
 
   // Inline forms for adding period per day
   const [addPeriodForm, setAddPeriodForm] = useState({
@@ -1078,6 +1088,8 @@ export default function TimetablePage() {
                     }
                   }}
                   className={`flex flex-col justify-between border-2 rounded-3xl p-6 transition-all duration-300 min-h-[460px] bg-surface-sunken ${
+                    activeDropdownDay === dayName ? 'relative z-40' : 'relative z-0 focus-within:z-30 hover:z-20'
+                  } ${
                     isSelectionMode ? 'cursor-pointer select-none' : ''
                   } ${
                     isToday 
@@ -1258,6 +1270,7 @@ export default function TimetablePage() {
                                   [dayName]: ''
                                 }));
                               }}
+                              onOpenChange={open => setActiveDropdownDay(open ? dayName : null)}
                               placeholder="Select Subject"
                               options={[
                                 { value: '', label: 'Select Subject' },
@@ -1281,12 +1294,21 @@ export default function TimetablePage() {
                                   [dayName]: ''
                                 }));
                               }}
+                              onOpenChange={open => setActiveDropdownDay(open ? dayName : null)}
                               placeholder="Select Teacher"
                               options={[
                                 { value: '', label: 'Select Teacher' },
                                 ...staff
                                   .filter(t => {
-                                    if (t.status !== 'ACTIVE' || t.role !== 'Teacher') return false;
+                                    const isTeacher = t.status === 'ACTIVE' && (
+                                      t.role === 'Teacher' || 
+                                      t.role === 'TEACHER' || 
+                                      t.role === 'PRINCIPAL' || 
+                                      t.is_principal == 1 || 
+                                      t.is_principal === true || 
+                                      t.is_principal === '1'
+                                    );
+                                    if (!isTeacher) return false;
                                     const isOccupiedInPeriod = allTimetableEntries.some(entry => {
                                       return entry.day_of_week === dayName &&
                                              entry.period_number === nextPeriodNum &&
@@ -1582,12 +1604,13 @@ export default function TimetablePage() {
         onClose={() => setIsBackupModalOpen(false)}
         title="Assign Backup Teacher"
         description={`Temporarily assign a backup teacher for Period ${activeTimetableItem?.period_number} on ${formatLocalDate(activeDate)} only.`}
+        contentClassName="overflow-visible min-h-[280px] pb-32"
         footer={<>
           <Button variant="secondary" onClick={() => setIsBackupModalOpen(false)}>Cancel</Button>
           <Button onClick={handleAssignBackup} disabled={actionLoading === 'modal'}>Assign Backup</Button>
         </>}
       >
-        <div className="space-y-4 pt-4">
+        <div className="space-y-4 pt-2 min-h-[220px] pb-24">
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-text-secondary uppercase">Select Backup Teacher</label>
             <CustomSelect
@@ -1598,7 +1621,15 @@ export default function TimetablePage() {
                 { value: '', label: 'Select Backup Teacher' },
                 ...staff
                   .filter(t => {
-                    if (t.status !== 'ACTIVE' || t.role !== 'Teacher' || t.id === activeTimetableItem?.teacher_id) return false;
+                    const isTeacher = t.status === 'ACTIVE' && (
+                      t.role === 'Teacher' || 
+                      t.role === 'TEACHER' || 
+                      t.role === 'PRINCIPAL' || 
+                      t.is_principal == 1 || 
+                      t.is_principal === true || 
+                      t.is_principal === '1'
+                    );
+                    if (!isTeacher || t.id === activeTimetableItem?.teacher_id) return false;
                     const dayName = activeTimetableItem?.day_of_week;
                     const periodNum = activeTimetableItem?.period_number;
                     const isOccupiedInPeriod = allTimetableEntries.some(entry => {
@@ -1629,12 +1660,13 @@ export default function TimetablePage() {
         onClose={() => setIsReplaceModalOpen(false)}
         title="Replace Teacher Permanently"
         description={`Permanently replace the teacher for Period ${activeTimetableItem?.period_number} on all future recurring ${activeTimetableItem?.day_of_week}s.`}
+        contentClassName="overflow-visible min-h-[280px] pb-32"
         footer={<>
           <Button variant="secondary" onClick={() => setIsReplaceModalOpen(false)}>Cancel</Button>
           <Button onClick={handleReplaceTeacher} disabled={actionLoading === 'modal'}>Replace permanently</Button>
         </>}
       >
-        <div className="space-y-4 pt-4">
+        <div className="space-y-4 pt-2 min-h-[220px] pb-24">
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-text-secondary uppercase">Select Replacement Teacher</label>
             <CustomSelect
@@ -1645,7 +1677,15 @@ export default function TimetablePage() {
                 { value: '', label: 'Select Replacement Teacher' },
                 ...staff
                   .filter(t => {
-                    if (t.status !== 'ACTIVE' || t.role !== 'Teacher' || t.id === activeTimetableItem?.teacher_id) return false;
+                    const isTeacher = t.status === 'ACTIVE' && (
+                      t.role === 'Teacher' || 
+                      t.role === 'TEACHER' || 
+                      t.role === 'PRINCIPAL' || 
+                      t.is_principal == 1 || 
+                      t.is_principal === true || 
+                      t.is_principal === '1'
+                    );
+                    if (!isTeacher || t.id === activeTimetableItem?.teacher_id) return false;
                     const dayName = activeTimetableItem?.day_of_week;
                     const periodNum = activeTimetableItem?.period_number;
                     const isOccupiedInPeriod = allTimetableEntries.some(entry => {

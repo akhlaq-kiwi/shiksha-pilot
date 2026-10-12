@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription } from '../../../common/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
 import { Input } from '../../../common/ui/input';
-import { Select } from '../../../common/ui/select';
+import CustomSelect from '../../../common/ui/CustomSelect';
 import { Button } from '../../../common/ui/button';
 import { schoolAdminService } from '../../../common/services/schoolAdminService';
 import AccountDeletionRequests from '../components/AccountDeletionRequests';
@@ -163,45 +163,40 @@ export default function SecurityPage() {
             </div>
 
             {/* Module Filter */}
-            <Select
+            <CustomSelect
               value={selectedModule}
-              onChange={(e) => setSelectedModule(e.target.value)}
-              className="h-9 text-xs"
-            >
-              <option value="">All Modules</option>
-              {modules.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </Select>
+              onChange={setSelectedModule}
+              options={[
+                { value: '', label: 'All Modules' },
+                ...modules.map((m) => ({ value: m, label: m }))
+              ]}
+              buttonClassName="h-9 text-xs"
+            />
 
             {/* Performed By Filter */}
-            <Select
+            <CustomSelect
               value={selectedUser}
-              onChange={(e) => setSelectedUser(e.target.value)}
-              className="h-9 text-xs"
-            >
-              <option value="">All Performers</option>
-              {usersList.map((u) => (
-                <option key={u.user} value={u.user}>
-                  {u.performed_by || u.user}
-                </option>
-              ))}
-            </Select>
+              onChange={setSelectedUser}
+              options={[
+                { value: '', label: 'All Performers' },
+                ...usersList.map((u) => ({ value: u.user, label: u.performed_by || u.user }))
+              ]}
+              buttonClassName="h-9 text-xs"
+            />
 
             {/* Date Range Option Dropdown */}
-            <Select
+            <CustomSelect
               value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
-              className="h-9 text-xs"
-            >
-              <option value="">All Time</option>
-              <option value="today">Today</option>
-              <option value="7days">Last 7 Days</option>
-              <option value="30days">Last 30 Days</option>
-              <option value="custom">Custom Date Range</option>
-            </Select>
+              onChange={setDateFilter}
+              options={[
+                { value: '', label: 'All Time' },
+                { value: 'today', label: 'Today' },
+                { value: '7days', label: 'Last 7 Days' },
+                { value: '30days', label: 'Last 30 Days' },
+                { value: 'custom', label: 'Custom Date Range' }
+              ]}
+              buttonClassName="h-9 text-xs"
+            />
           </div>
 
           {/* Custom Date Inputs */}
@@ -276,7 +271,7 @@ export default function SecurityPage() {
                 </TableRow>
               ) : (
                 logs.map((log) => (
-                  <TableRow key={log.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/50 transition-colors">
+                  <TableRow key={log.id} className="hover:bg-[#FAF6EC] dark:hover:bg-zinc-900/50 transition-colors cursor-pointer">
                     <TableCell className="text-xs font-semibold text-text-primary">
                       {log.module || '—'}
                     </TableCell>
@@ -392,7 +387,7 @@ export default function SecurityPage() {
                 </TableRow>
               ) : (
                 loginHistory.map((l) => (
-                  <TableRow key={l.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/50 transition-colors">
+                  <TableRow key={l.id} className="hover:bg-[#FAF6EC] dark:hover:bg-zinc-900/50 transition-colors cursor-pointer">
                     <TableCell className="font-mono text-xs text-text-primary">
                       {l.user || '—'}
                     </TableCell>

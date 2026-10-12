@@ -53,6 +53,7 @@ dependencies:
   # Reads the real versionName/versionCode out of the build, so the About
   # dialog cannot drift from what was actually shipped.
   package_info_plus: ^8.1.1
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:

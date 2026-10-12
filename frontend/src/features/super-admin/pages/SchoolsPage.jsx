@@ -719,7 +719,7 @@ export default function SchoolsPage({ schools, onCreateSchool, onToggleStatus, o
                             setMenuOpenSchoolId(null);
                             setEditingSchool(school);
                           }}
-                          className="w-full text-left px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-text-primary flex items-center gap-2"
+                          className="w-full text-left px-3 py-2 hover:bg-[#FAF6EC] dark:hover:bg-zinc-900/50 cursor-pointer text-text-primary flex items-center gap-2"
                         >
                           <Edit2 className="h-3.5 w-3.5" /> Edit details
                         </button>
@@ -728,25 +728,25 @@ export default function SchoolsPage({ schools, onCreateSchool, onToggleStatus, o
                             setMenuOpenSchoolId(null);
                             handleOpenCredentials(school);
                           }}
-                          className="w-full text-left px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-text-primary flex items-center gap-2"
+                          className="w-full text-left px-3 py-2 hover:bg-[#FAF6EC] dark:hover:bg-zinc-900/50 cursor-pointer text-text-primary flex items-center gap-2"
                         >
                           <Key className="h-3.5 w-3.5" /> Credentials
                         </button>
                         <button
                           onClick={() => nav(`/super-admin/schools/${school.id}/teachers`)}
-                          className="w-full text-left px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-text-primary flex items-center gap-2"
+                          className="w-full text-left px-3 py-2 hover:bg-[#FAF6EC] dark:hover:bg-zinc-900/50 cursor-pointer text-text-primary flex items-center gap-2"
                         >
                           <Users className="h-3.5 w-3.5" /> View Teachers
                         </button>
                         <button
                           onClick={() => nav(`/super-admin/schools/${school.id}/students`)}
-                          className="w-full text-left px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-text-primary flex items-center gap-2"
+                          className="w-full text-left px-3 py-2 hover:bg-[#FAF6EC] dark:hover:bg-zinc-900/50 cursor-pointer text-text-primary flex items-center gap-2"
                         >
                           <GraduationCap className="h-3.5 w-3.5" /> View Students
                         </button>
                         <button
                           onClick={() => nav(`/super-admin/schools/${school.id}/history`)}
-                          className="w-full text-left px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-text-primary flex items-center gap-2"
+                          className="w-full text-left px-3 py-2 hover:bg-[#FAF6EC] dark:hover:bg-zinc-900/50 cursor-pointer text-text-primary flex items-center gap-2"
                         >
                           <Clock className="h-3.5 w-3.5" /> History
                         </button>

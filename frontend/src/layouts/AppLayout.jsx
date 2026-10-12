@@ -269,7 +269,7 @@ const AppLayout = ({ children }) => {
                                   console.error(err);
                                 }
                               }}
-                              className={`p-3 text-left hover:bg-hover cursor-pointer transition-colors ${!n.is_read ? 'bg-primary/5' : ''}`}
+                              className={`p-3 text-left hover:bg-[#FAF6EC] dark:hover:bg-zinc-900/50 cursor-pointer transition-colors ${!n.is_read ? 'bg-primary/5' : ''}`}
                             >
                               <div className="flex items-start justify-between gap-1">
                                 <span className={`text-xs font-bold ${!n.is_read ? 'text-primary' : 'text-text-primary'}`}>

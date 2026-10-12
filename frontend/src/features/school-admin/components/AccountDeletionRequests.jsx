@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription } from '../../../common/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
-import { Select } from '../../../common/ui/select';
+import CustomSelect from '../../../common/ui/CustomSelect';
 import { Input } from '../../../common/ui/input';
 import { Dialog } from '../../../common/ui/dialog';
 import { Button } from '../../../common/ui/button';
@@ -113,18 +113,19 @@ export default function AccountDeletionRequests() {
             <CardTitle className="text-sm font-bold text-text-primary">Account Deletion Requests</CardTitle>
           </div>
           <div>
-            <Select
+            <CustomSelect
               value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="h-8 text-xs min-w-[120px]"
-              aria-label="Filter by status"
-            >
-              <option value="PENDING">Pending</option>
-              <option value="COMPLETED">Completed</option>
-              <option value="REJECTED">Rejected</option>
-              <option value="CANCELLED">Withdrawn</option>
-              <option value="">All</option>
-            </Select>
+              onChange={setStatus}
+              options={[
+                { value: 'PENDING', label: 'Pending' },
+                { value: 'COMPLETED', label: 'Completed' },
+                { value: 'REJECTED', label: 'Rejected' },
+                { value: 'CANCELLED', label: 'Withdrawn' },
+                { value: '', label: 'All' },
+              ]}
+              className="min-w-[130px]"
+              buttonClassName="h-8 text-xs"
+            />
           </div>
         </div>
       </CardHeader>
@@ -168,7 +169,7 @@ export default function AccountDeletionRequests() {
             )}
 
             {!loading && requests.map((r) => (
-              <TableRow key={r.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/50 transition-colors">
+              <TableRow key={r.id} className="hover:bg-[#FAF6EC] dark:hover:bg-zinc-900/50 transition-colors cursor-pointer">
                 <TableCell className="text-xs">
                   <div className="font-semibold text-text-primary">{r.contact_name || '—'}</div>
                   <div className="text-text-secondary tabular-nums">{r.contact_phone}</div>

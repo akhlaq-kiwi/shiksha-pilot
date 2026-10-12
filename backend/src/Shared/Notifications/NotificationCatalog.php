@@ -205,6 +205,14 @@ final class NotificationCatalog
             'link'     => '/attendance',
             'label'    => "Reminder to mark today's attendance (scheduled on device)",
         ],
+        'LATE_TEACHERS_ALERT' => [
+            'category' => self::CAT_ATTENDANCE,
+            'delivery' => self::DELIVERY_PUSH,
+            'audience' => ['TEACHER'],
+            'priority' => 'high',
+            'link'     => '/school-admin/teacher-attendance',
+            'label'    => 'Late teachers entry alert for principal',
+        ],
 
         // ---------------- FEES ----------------
         'FEE_ADMISSION_ADDED' => [

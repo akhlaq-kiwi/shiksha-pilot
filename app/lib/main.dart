@@ -29,10 +29,10 @@ void callbackDispatcher() {
           final roleUpper = userRole.toUpperCase();
           final String path;
           final bool isSchoolStaff;
-          if (roleUpper == 'TEACHER') {
+          if (roleUpper == 'TEACHER' || roleUpper == 'PRINCIPAL') {
             path = '/api/teacher/notifications';
             isSchoolStaff = true;
-          } else if (roleUpper == 'SCHOOL_ADMIN' || roleUpper == 'PRINCIPAL' || roleUpper == 'SUPER_ADMIN') {
+          } else if (roleUpper == 'SCHOOL_ADMIN' || roleUpper == 'SUPER_ADMIN') {
             path = '/api/school/notifications';
             isSchoolStaff = true;
           } else {
@@ -394,6 +394,11 @@ class _LoginScreenState extends State<LoginScreen> {
       await prefs.setString('user_phone', (user['phone'] as String?) ?? '');
       await prefs.setString('school_name', ((user['school_name'] as String?) ?? 'Shiksha Pilot Academy').toUpperCase());
       await prefs.setString('user_photo', (user['staff_photo_path'] as String?) ?? (user['photo_path'] as String?) ?? (user['photo'] as String?) ?? '');
+      final bool isPrincipal = user['is_principal'] == true ||
+          user['is_principal'] == 1 ||
+          user['is_principal'] == '1' ||
+          (user['role']?.toString().toUpperCase() == 'PRINCIPAL');
+      await prefs.setBool('is_principal', isPrincipal);
 
       final leaveService = LeaveService(baseUrl: activeBaseUrl, token: token);
 

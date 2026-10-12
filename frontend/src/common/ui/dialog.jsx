@@ -135,10 +135,10 @@ export const Dialog = ({
           </div>
         )}
 
-        <div className={`flex-1 overflow-y-auto p-6 text-body-md ${contentClassName}`}>{children}</div>
+        <div className={`flex-1 ${contentClassName?.includes('overflow-') ? '' : 'overflow-y-auto'} relative z-20 p-6 text-body-md ${contentClassName}`}>{children}</div>
 
         {footer && (
-          <div className="flex items-center justify-end gap-3 rounded-b-2xl border-t border-border/60 bg-surface-sunken p-4">
+          <div className="relative z-10 flex items-center justify-end gap-3 rounded-b-2xl border-t border-border/60 bg-surface-sunken p-4">
             {footer}
           </div>
         )}

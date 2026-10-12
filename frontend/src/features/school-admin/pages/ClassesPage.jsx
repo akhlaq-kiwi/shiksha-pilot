@@ -129,8 +129,8 @@ const CustomSelect = ({
                     onChange(String(opt.value));
                     setIsOpen(false);
                   }}
-                  className={`w-full text-left px-3.5 py-2 rounded-xl text-xs font-semibold outline-none focus:outline-none select-none transition-colors hover:bg-primary/10 ${
-                    isSelected ? 'bg-primary/10 text-primary font-bold' : 'text-text-primary'
+                  className={`w-full text-left px-3.5 py-2 rounded-xl text-xs font-semibold outline-none focus:outline-none select-none transition-colors cursor-pointer hover:bg-[#FAF6EC] dark:hover:bg-zinc-900/50 ${
+                    isSelected ? 'text-primary font-bold' : 'text-text-primary'
                   }`}
                 >
                   {opt.label}

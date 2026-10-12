@@ -152,6 +152,7 @@ class NotificationEvent {
 
   static const attendanceMarkedAbsent = 'ATTENDANCE_MARKED_ABSENT';
   static const attendanceNotMarkedReminder = 'ATTENDANCE_NOT_MARKED_REMINDER';
+  static const lateTeachersAlert = 'LATE_TEACHERS_ALERT';
 
   static const feeAdmissionAdded = 'FEE_ADMISSION_ADDED';
   static const feeAnnualAdded = 'FEE_ANNUAL_ADDED';

@@ -438,6 +438,12 @@ class TeacherAttendanceService
             throw $e;
         }
 
+        try {
+            $this->checkAndSendLateTeachersAlert($schoolId);
+        } catch (\Throwable $e) {
+            // Best-effort check
+        }
+
         return $this->getDailyAttendance($user, $date);
     }
 
@@ -1127,4 +1133,166 @@ class TeacherAttendanceService
         $minutes = (int)date('i', $timestamp);
         return ($hours * 60) + $minutes;
     }
+
+    /**
+     * Check official entry time and send Late Teachers Entry Alert to Principal Teacher
+     * exact 1 hour after official entry time.
+     * Only sent to Principal Teacher if late count > 0.
+     */
+    public function checkAndSendLateTeachersAlert(?int $specificSchoolId = null, bool $forceCheck = false): array
+    {
+        $today = date('Y-m-d');
+        $dayOfWeek = (int)date('N');
+        // If Sunday and not forced, skip
+        if ($dayOfWeek === 7 && !$forceCheck) {
+            return ['status' => 'skipped', 'reason' => 'Today is Sunday (School closed).'];
+        }
+
+        // Schools to process
+        if ($specificSchoolId !== null && $specificSchoolId > 0) {
+            $stmt = $this->pdo->prepare("SELECT id, name FROM schools WHERE id = :sid");
+            $stmt->execute([':sid' => $specificSchoolId]);
+            $schools = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } else {
+            $stmt = $this->pdo->query("SELECT id, name FROM schools");
+            $schools = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        $results = [];
+
+        foreach ($schools as $sc) {
+            $sid = (int)$sc['id'];
+
+            // 1. Check if today is a school holiday
+            $stmtHol = $this->pdo->prepare("SELECT id, name FROM holidays WHERE school_id = :sid AND date = :dt LIMIT 1");
+            $stmtHol->execute([':sid' => $sid, ':dt' => $today]);
+            $holiday = $stmtHol->fetch(PDO::FETCH_ASSOC);
+            if (!empty($holiday) && !$forceCheck) {
+                $results[$sid] = ['status' => 'skipped', 'reason' => "Today is a school holiday ({$holiday['name']})."];
+                continue;
+            }
+
+            // 2. Get working academic year
+            try {
+                $ay = $this->getWorkingAcademicYear($sid);
+            } catch (\Throwable $e) {
+                $results[$sid] = ['status' => 'skipped', 'reason' => 'No active academic year.'];
+                continue;
+            }
+
+            // 3. Get school entry time
+            $settings = $this->getSettings(['school_id' => $sid]);
+            $entryTimeStr = $settings['entry_time'] ?? '08:30 AM';
+            $officialMinutes = $this->parseTimeToMinutes($entryTimeStr);
+            $alertTriggerMinutes = $officialMinutes + 60; // Exact 1 hour after official entry time
+
+            $currentMinutes = ((int)date('G') * 60) + (int)date('i');
+            if ($currentMinutes < $alertTriggerMinutes && !$forceCheck) {
+                $results[$sid] = [
+                    'status' => 'skipped',
+                    'reason' => "Current time is before alert window (Alert scheduled at entry time + 1 hour).",
+                    'entry_time' => $entryTimeStr,
+                    'alert_time_minutes' => $alertTriggerMinutes,
+                    'current_minutes' => $currentMinutes,
+                ];
+                continue;
+            }
+
+            // 4. Find the Principal Teacher for this school (only Principal Teacher, no other teacher)
+            $stmtPrincipal = $this->pdo->prepare("
+                SELECT s.id AS staff_id, s.name AS staff_name, s.phone, s.role, s.is_principal,
+                       u.id AS user_id, u.name AS user_name
+                FROM staff s
+                LEFT JOIN users u ON (u.phone = s.phone AND (u.school_id = s.school_id OR u.school_id IS NULL))
+                WHERE s.school_id = :sid 
+                  AND (s.is_principal = 1 OR UPPER(s.role) = 'PRINCIPAL')
+                  AND s.status = 'ACTIVE'
+                ORDER BY s.is_principal DESC, s.id ASC
+                LIMIT 1
+            ");
+            $stmtPrincipal->execute([':sid' => $sid]);
+            $principal = $stmtPrincipal->fetch(PDO::FETCH_ASSOC);
+
+            if (!$principal || empty($principal['user_id'])) {
+                if ($principal && !empty($principal['phone'])) {
+                    $stmtUser = $this->pdo->prepare("SELECT id, name FROM users WHERE phone = :ph LIMIT 1");
+                    $stmtUser->execute([':ph' => $principal['phone']]);
+                    $usr = $stmtUser->fetch(PDO::FETCH_ASSOC);
+                    if ($usr) {
+                        $principal['user_id'] = $usr['id'];
+                        $principal['user_name'] = $usr['name'];
+                    }
+                }
+            }
+
+            if (!$principal || empty($principal['user_id'])) {
+                $results[$sid] = ['status' => 'skipped', 'reason' => 'No active principal user account found.'];
+                continue;
+            }
+
+            $principalUserId = (int)$principal['user_id'];
+            $principalName = !empty($principal['staff_name']) ? trim($principal['staff_name']) : (!empty($principal['user_name']) ? trim($principal['user_name']) : 'Principal');
+
+            // 5. Prevent duplicate notification today
+            $stmtAlreadySent = $this->pdo->prepare("
+                SELECT id FROM dashboard_notifications
+                WHERE school_id = :sid AND user_id = :uid AND event_key = 'LATE_TEACHERS_ALERT'
+                  AND DATE(created_at) = :today
+                LIMIT 1
+            ");
+            $stmtAlreadySent->execute([':sid' => $sid, ':uid' => $principalUserId, ':today' => $today]);
+            if ($stmtAlreadySent->fetch() && !$forceCheck) {
+                $results[$sid] = ['status' => 'already_sent', 'message' => 'Alert already sent to principal today.'];
+                continue;
+            }
+
+            // 6. Calculate daily attendance and late teachers count for today
+            $dailyAtt = $this->getDailyAttendance(['school_id' => $sid], $today);
+            $lateCount = (int)($dailyAtt['late_count'] ?? 0);
+
+            // 7. If 0 teachers were late, do NOT send notification
+            if ($lateCount <= 0) {
+                $results[$sid] = ['status' => 'skipped', 'reason' => 'No teachers were late today (late count is 0).'];
+                continue;
+            }
+
+            // 8. Notification copy
+            $title = "Late Teachers Entry Alert";
+            $message = "Hey {$principalName}, {$lateCount} were Late today. Tap here to check it out";
+            $link = "/school-admin/teacher-attendance";
+
+            try {
+                $dispatcher = new \App\Shared\Notifications\PushDispatcher(
+                    $this->pdo,
+                    new \App\Shared\Notifications\FcmClient($this->pdo)
+                );
+                $dispatcher->toUser(
+                    $sid,
+                    $principalUserId,
+                    'TEACHER',
+                    'LATE_TEACHERS_ALERT',
+                    $title,
+                    $message,
+                    $link
+                );
+
+                $results[$sid] = [
+                    'status' => 'sent',
+                    'principal_id' => $principalUserId,
+                    'principal_name' => $principalName,
+                    'late_count' => $lateCount,
+                    'title' => $title,
+                    'message' => $message,
+                ];
+            } catch (\Throwable $e) {
+                $results[$sid] = [
+                    'status' => 'error',
+                    'error' => $e->getMessage(),
+                ];
+            }
+        }
+
+        return $results;
+    }
 }
+

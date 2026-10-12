@@ -14,6 +14,7 @@ import 'homework_list_screen.dart';
 import 'achievements_screen.dart';
 import 'attendance_screen.dart';
 import '../services/attendance_service.dart';
+import 'principal_tar_screen.dart';
 
 class NotificationCenterScreen extends StatefulWidget {
   final String baseUrl;
@@ -658,6 +659,23 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                       baseUrl: widget.baseUrl,
                                       token: widget.token,
                                       studentId: widget.studentId,
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+
+                              final isTarNotif = linkStr.contains('teacher-attendance') ||
+                                  linkStr.contains('tar') ||
+                                  titleLower.contains('late teachers') ||
+                                  msgLower.contains('were late') ||
+                                  (notif['event_key'] ?? '').toString().toUpperCase() == 'LATE_TEACHERS_ALERT';
+                              if (isTarNotif) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => PrincipalTarScreen(
+                                      leaveService: LeaveService(baseUrl: widget.baseUrl, token: widget.token),
                                     ),
                                   ),
                                 );
