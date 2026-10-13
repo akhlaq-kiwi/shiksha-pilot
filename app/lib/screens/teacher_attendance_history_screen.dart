@@ -581,9 +581,10 @@ class _TeacherAttendanceHistoryScreenState extends State<TeacherAttendanceHistor
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Teacher Attendance"),
-        backgroundColor: Colors.indigo.shade800,
-        foregroundColor: Colors.white,
+        title: const Text("Teacher Attendance", style: TextStyle(fontWeight: FontWeight.w900)),
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF1E293B),
+        elevation: 0,
         actions: [
           IconButton(
             icon: const Icon(Icons.camera_alt_rounded, size: 34),

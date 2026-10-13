@@ -6246,6 +6246,10 @@ class SchoolAdminService extends BaseService
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
         $startDate = $data['start_date'] ?? ($workingYear ? $workingYear['start_date'] : date('Y-m-d'));
 
+        if ($startDate < date('Y-m-d')) {
+            throw new ValidationException(['date' => 'Cannot add or modify timetable periods for past dates.']);
+        }
+
         if ($this->isDateHoliday($schoolId, $startDate)) {
             throw new ValidationException(['date' => 'Cannot create or publish timetable on a school holiday.']);
         }
@@ -6981,27 +6985,23 @@ class SchoolAdminService extends BaseService
         }
         $academicYearId = $workingYear ? (int)$workingYear['id'] : 0;
 
-        // 1. Report card marks safety check: Only block if actual marks have been entered for this subject in the working academic year
-        if ($academicYearId > 0) {
-            $stmtMarks = $pdo->prepare("
-                SELECT COUNT(*) FROM examination_marks em
-                JOIN examination_papers ep ON em.paper_id = ep.id
-                JOIN classes c ON ep.class_id = c.id
-                WHERE ep.subject_id = :id AND c.academic_year_id = :ayid AND (em.marks_obtained IS NOT NULL OR em.is_absent = 1)
-            ");
-            $stmtMarks->execute([':id' => $id, ':ayid' => $academicYearId]);
-        } else {
-            $stmtMarks = $pdo->prepare("
-                SELECT COUNT(*) FROM examination_marks em
-                JOIN examination_papers ep ON em.paper_id = ep.id
-                WHERE ep.subject_id = :id AND (em.marks_obtained IS NOT NULL OR em.is_absent = 1)
-            ");
-            $stmtMarks->execute([':id' => $id]);
-        }
+        // Retrieve subject name for validation message
+        $stmtSub = $pdo->prepare("SELECT name FROM subjects WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtSub->execute([':id' => $id, ':sid' => $schoolId]);
+        $subName = $stmtSub->fetchColumn() ?: 'Subject';
 
-        if ((int)$stmtMarks->fetchColumn() > 0) {
+        // 1. Report card safety check: Block if subject is included in report card (examination papers or examination marks)
+        $stmtReportCard = $pdo->prepare("
+            SELECT (
+                (SELECT COUNT(*) FROM examination_papers WHERE subject_id = :id1) +
+                (SELECT COUNT(*) FROM examination_marks em JOIN examination_papers ep ON em.paper_id = ep.id WHERE ep.subject_id = :id2)
+            ) AS total_count
+        ");
+        $stmtReportCard->execute([':id1' => $id, ':id2' => $id]);
+
+        if ((int)$stmtReportCard->fetchColumn() > 0) {
             throw new ValidationException([
-                'subject' => 'This subject has recorded examination marks in report cards for the current academic year. It cannot be deleted as it would alter report card records.'
+                'subject' => "{$subName} is already included in report card it can not be deleted"
             ]);
         }
 

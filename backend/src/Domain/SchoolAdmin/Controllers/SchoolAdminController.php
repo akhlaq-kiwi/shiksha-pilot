@@ -1000,6 +1000,16 @@ class SchoolAdminController extends BaseController
             }
         }
 
+        // Principal timetable & subjects route authorization
+        if (str_contains($uri, '/api/school/timetable') || str_contains($uri, '/api/school/period-configurations') || str_contains($uri, '/api/school/subjects')) {
+            if ($userRole === 'SCHOOL_ADMIN' || $userRole === 'PRINCIPAL' || $this->service->isPrincipal($user)) {
+                if ($this->service->checkSubscriptionExpired($user)) {
+                    throw new \App\Shared\Exceptions\ForbiddenException('Subscription Expired. Access Denied.');
+                }
+                return;
+            }
+        }
+
         if ($userRole === 'TEACHER' || $userRole === 'PRINCIPAL') {
             $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 

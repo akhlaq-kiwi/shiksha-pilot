@@ -134,7 +134,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     LauncherFeature(
       name: 'Timetable',
       icon: Icons.schedule_rounded,
-      color: Colors.blue,
+      color: const Color(0xFFC26600),
       allowedRoles: ['PARENT', 'TEACHER', 'PRINCIPAL', 'STUDENT'],
       isAvailable: true,
     ),
@@ -494,6 +494,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       token: widget.leaveService.token,
                       userRole: widget.userRole,
                       selectedStudentId: _activeStudentId,
+                      isPrincipal: _isPrincipal,
                     ),
                   ),
                 );
@@ -849,6 +850,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               token: widget.leaveService.token,
               userRole: widget.userRole,
               selectedStudentId: _activeStudentId,
+              isPrincipal: _isPrincipal,
             ),
           ),
         );

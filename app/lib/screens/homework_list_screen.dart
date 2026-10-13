@@ -234,16 +234,16 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
       appBar: AppBar(
         title: const Text(
           'Homework',
-          style: TextStyle(fontWeight: FontWeight.bold),
+          style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF1E293B)),
         ),
-        backgroundColor: Colors.indigo,
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF1E293B),
         elevation: 0,
       ),
       floatingActionButton: _isTeacher
           ? FloatingActionButton.extended(
               onPressed: _openCreateModal,
-              backgroundColor: Colors.indigo,
+              backgroundColor: const Color(0xFFC26600),
               foregroundColor: Colors.white,
               icon: const Icon(Icons.add),
               label: const Text('Assign Homework', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -251,7 +251,7 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
           : null,
       body: RefreshIndicator(
         onRefresh: _fetchHomework,
-        color: Colors.indigo,
+        color: const Color(0xFFC26600),
         child: _buildBody(),
       ),
     );

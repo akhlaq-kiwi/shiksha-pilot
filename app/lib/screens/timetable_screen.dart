@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/timetable_service.dart';
+import 'principal_timetable_manage_screen.dart';
 
 class TimetableScreen extends StatefulWidget {
   final String baseUrl;
@@ -8,15 +9,17 @@ class TimetableScreen extends StatefulWidget {
   final String userRole;
   final int? selectedStudentId;
   final DateTime? targetDate;
+  final bool? isPrincipal;
 
   const TimetableScreen({
-    Key? key,
+    super.key,
     required this.baseUrl,
     required this.token,
     required this.userRole,
     this.selectedStudentId,
     this.targetDate,
-  }) : super(key: key);
+    this.isPrincipal,
+  });
 
   @override
   State<TimetableScreen> createState() => _TimetableScreenState();
@@ -37,10 +40,14 @@ class _TimetableScreenState extends State<TimetableScreen> {
   int _totalPeriods = 0;
   int _completedPeriods = 0;
   int _remainingPeriods = 0;
+  late bool _isPrincipal;
 
   @override
   void initState() {
     super.initState();
+    _isPrincipal = widget.isPrincipal ??
+        (widget.userRole.toUpperCase() == 'PRINCIPAL');
+    _checkPrincipal();
     _service = TimetableService(baseUrl: widget.baseUrl, token: widget.token);
     _selectedDate = widget.targetDate ?? DateTime.now();
     // If target day is Sunday, default to Monday
@@ -48,6 +55,18 @@ class _TimetableScreenState extends State<TimetableScreen> {
       _selectedDate = _selectedDate.add(const Duration(days: 1));
     }
     _loadSchedule();
+  }
+
+  Future<void> _checkPrincipal() async {
+    final prefs = await SharedPreferences.getInstance();
+    final isPrinc = (prefs.getBool('is_principal') ?? false) ||
+        (widget.userRole.toUpperCase() == 'PRINCIPAL') ||
+        (widget.isPrincipal ?? false);
+    if (mounted && _isPrincipal != isPrinc) {
+      setState(() {
+        _isPrincipal = isPrinc;
+      });
+    }
   }
 
   @override
@@ -286,12 +305,15 @@ class _TimetableScreenState extends State<TimetableScreen> {
     _loadSchedule();
   }
 
+  DateTime get _mondayDate {
+    final diff = _selectedDate.weekday - DateTime.monday;
+    return DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day).subtract(Duration(days: diff));
+  }
+
   void _selectWeekday(int index) {
-    final currentDayOfWeek = _selectedDate.weekday; // Mon=1, Sat=6
-    final targetDayOfWeek = index + 1; // index 0 = Mon (1)
-    final diff = targetDayOfWeek - currentDayOfWeek;
+    final target = _mondayDate.add(Duration(days: index));
     setState(() {
-      _selectedDate = _selectedDate.add(Duration(days: diff));
+      _selectedDate = target;
     });
     _loadSchedule();
   }
@@ -306,10 +328,10 @@ class _TimetableScreenState extends State<TimetableScreen> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: Colors.indigo.shade800,
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFFC26600),
               onPrimary: Colors.white,
-              onSurface: Colors.black87,
+              onSurface: Color(0xFF1E293B),
             ),
           ),
           child: child!,
@@ -336,61 +358,52 @@ class _TimetableScreenState extends State<TimetableScreen> {
     final isSunday = _selectedDate.weekday == DateTime.sunday;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF9F6EE),
       appBar: AppBar(
         title: Text(
-          isTeacher ? "Today's Schedule" : "Today's Timetable",
-          style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white),
-        ),
-        backgroundColor: Colors.indigo.shade800,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.calendar_today_rounded, color: Colors.white),
-            onPressed: _pickDate,
+          isTeacher ? "TODAY'S SCHEDULE" : "TODAY'S TIMETABLE",
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0.5,
+            color: Color(0xFF1E293B),
           ),
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Color(0xFF1E293B)),
+        actions: [
+          if (_isPrincipal)
+            IconButton(
+              icon: const Icon(Icons.settings_outlined, color: Color(0xFF1E293B)),
+              tooltip: 'Manage Timetable',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => PrincipalTimetableManageScreen(
+                      baseUrl: widget.baseUrl,
+                      token: widget.token,
+                    ),
+                  ),
+                ).then((_) => _loadSchedule());
+              },
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.calendar_today_rounded, color: Color(0xFF1E293B)),
+              onPressed: _pickDate,
+            ),
         ],
       ),
       body: Column(
         children: [
-          // Weekly Nav Row
-          Container(
-            color: Colors.indigo.shade800,
-            padding: const EdgeInsets.only(bottom: 12, left: 8, right: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: List.generate(6, (index) {
-                final dayShort = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][index];
-                // Check if this weekday matches current selected date
-                final isSelected = _selectedDate.weekday == (index + 1);
-
-                return InkWell(
-                  onTap: () => _selectWeekday(index),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: isSelected ? Colors.white : Colors.transparent,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      dayShort,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: isSelected ? Colors.indigo.shade900 : Colors.white70,
-                      ),
-                    ),
-                  ),
-                );
-              }),
-            ),
-          ),
+          // Weekly Nav Row (Mon-Sat identical to PrincipalTimetableManageScreen)
+          _buildWeekdaySelector(),
 
           // Date display bar
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            color: Colors.white,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -400,35 +413,36 @@ class _TimetableScreenState extends State<TimetableScreen> {
                     Text(
                       _getWeekdayName(_selectedDate.weekday),
                       style: const TextStyle(
-                        fontSize: 18,
+                        fontSize: 22,
                         fontWeight: FontWeight.w900,
-                        color: Colors.black87,
+                        color: Color(0xFF1E293B),
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       _formatDateFriendly(_selectedDate),
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
-                        color: Colors.grey.shade600,
+                        color: Color(0xFF64748B),
                       ),
                     ),
                   ],
                 ),
                 if (isTodaySelected)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.indigo.shade50,
-                      borderRadius: BorderRadius.circular(8),
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(20),
                     ),
                     child: const Text(
                       'TODAY',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w900,
-                        color: Colors.indigo,
+                        color: Color(0xFFD97706),
+                        letterSpacing: 0.5,
                       ),
                     ),
                   ),
@@ -465,12 +479,12 @@ class _TimetableScreenState extends State<TimetableScreen> {
           // Main List
           Expanded(
             child: RefreshIndicator(
-              color: Colors.indigo,
+              color: const Color(0xFFC26600),
               onRefresh: _loadSchedule,
               child: GestureDetector(
                 onHorizontalDragEnd: _onSwipe,
                 child: _isLoading
-                    ? const Center(child: CircularProgressIndicator(color: Colors.indigo))
+                    ? const Center(child: CircularProgressIndicator(color: Color(0xFFC26600)))
                     : _errorText.isNotEmpty
                         ? ListView(
                             physics: const AlwaysScrollableScrollPhysics(),
@@ -484,7 +498,7 @@ class _TimetableScreenState extends State<TimetableScreen> {
                             : ListView.builder(
                                 controller: _scrollController,
                                 physics: const AlwaysScrollableScrollPhysics(),
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                 itemCount: _periods.length,
                                 itemBuilder: (context, index) {
                                   final p = _periods[index];
@@ -504,16 +518,76 @@ class _TimetableScreenState extends State<TimetableScreen> {
     );
   }
 
+  Widget _buildWeekdaySelector() {
+    final monday = _mondayDate;
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Row(
+        children: List.generate(6, (idx) {
+          final dayShort = days[idx];
+          final date = monday.add(Duration(days: idx));
+          final isSelected = _selectedDate.weekday == (idx + 1);
+
+          return Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2.5),
+              child: InkWell(
+                onTap: () => _selectWeekday(idx),
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  height: 54,
+                  decoration: BoxDecoration(
+                    color: isSelected ? const Color(0xFF1E293B) : Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isSelected ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+                      width: isSelected ? 1.5 : 1,
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        dayShort,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w900,
+                          color: isSelected ? Colors.white : const Color(0xFF1E293B),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${date.day}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: isSelected ? Colors.white70 : const Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
   Widget _buildTeacherSummaryCard() {
     return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        color: const Color(0xFFFFFDF7),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withOpacity(0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -522,9 +596,9 @@ class _TimetableScreenState extends State<TimetableScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildSummaryItem('Today\'s Classes', _totalPeriods.toString(), Colors.black87),
-          _buildSummaryItem('Completed', _completedPeriods.toString(), Colors.green.shade700),
-          _buildSummaryItem('Remaining', _remainingPeriods.toString(), Colors.indigo.shade800),
+          _buildSummaryItem('Today\'s Classes', _totalPeriods.toString(), const Color(0xFF1E293B)),
+          _buildSummaryItem('Completed', _completedPeriods.toString(), const Color(0xFF16A34A)),
+          _buildSummaryItem('Remaining', _remainingPeriods.toString(), const Color(0xFFC26600)),
         ],
       ),
     );
@@ -540,7 +614,7 @@ class _TimetableScreenState extends State<TimetableScreen> {
         const SizedBox(height: 4),
         Text(
           label,
-          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey.shade500),
+          style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
         ),
       ],
     );
@@ -550,106 +624,113 @@ class _TimetableScreenState extends State<TimetableScreen> {
     final isSub = p['is_substitute'] == true;
     final tName = p['teacher_name'] ?? 'No Teacher';
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      elevation: 1,
-      color: Colors.white,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Row(
-          children: [
-            // Period Number circle
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: Colors.indigo.shade50,
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: Text(
-                  'P${p['period_number']}',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.indigo.shade800,
-                  ),
+      padding: const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Period Number circle
+          Container(
+            width: 44,
+            height: 44,
+            decoration: const BoxDecoration(
+              color: Color(0xFFFEF3C7),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(
+                'P${p['period_number']}',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFFC26600),
                 ),
               ),
             ),
-            const SizedBox(width: 16),
-            // Middle Details
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          p['subject_name'] ?? 'No Subject',
-                          style: const TextStyle(
-                            fontSize: 16,
+          ),
+          const SizedBox(width: 16),
+          // Middle Details
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        p['subject_name'] ?? 'No Subject',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF1E293B),
+                        ),
+                      ),
+                    ),
+                    if (isSub)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF3C7),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text(
+                          'Substitute',
+                          style: TextStyle(
+                            fontSize: 10,
                             fontWeight: FontWeight.w900,
-                            color: Colors.black87,
+                            color: Color(0xFFD97706),
                           ),
                         ),
                       ),
-                      if (isSub)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.amber.shade100,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            'Substitute',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.amber.shade900,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Icon(Icons.person_outline, size: 14, color: Colors.grey.shade600),
-                      const SizedBox(width: 4),
-                      Text(
-                        tName,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: isSub ? Colors.amber.shade900 : Colors.grey.shade700,
-                        ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Icon(Icons.person_outline, size: 14, color: Color(0xFF64748B)),
+                    const SizedBox(width: 4),
+                    Text(
+                      tName,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: isSub ? const Color(0xFFD97706) : const Color(0xFF475569),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(Icons.access_time_rounded, size: 14, color: Colors.grey.shade500),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${_formatTime12Hr(p['start_time'])} – ${_formatTime12Hr(p['end_time'])}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey.shade500,
-                        ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    const Icon(Icons.access_time_rounded, size: 14, color: Color(0xFF64748B)),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${_formatTime12Hr(p['start_time'])} – ${_formatTime12Hr(p['end_time'])}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF64748B),
                       ),
-                    ],
-                  ),
-                ],
-              ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
-          ],
-        ),
+          ),
+          const SizedBox(width: 12),
+        ],
       ),
     );
   }
@@ -673,21 +754,21 @@ class _TimetableScreenState extends State<TimetableScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
-        color: isCurrent ? const Color(0xFFEEF2FF) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        color: isCurrent ? const Color(0xFFFFFDF7) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isCurrent ? Colors.indigo.shade600 : Colors.grey.shade200, 
+          color: isCurrent ? const Color(0xFFC26600) : const Color(0xFFE2E8F0), 
           width: isCurrent ? 2 : 1,
         ),
-        boxShadow: isCurrent 
-            ? [
-                BoxShadow(
-                  color: Colors.indigo.shade800.withOpacity(0.08),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                )
-              ]
-            : null,
+        boxShadow: [
+          BoxShadow(
+            color: isCurrent 
+                ? const Color(0xFFC26600).withOpacity(0.08)
+                : Colors.black.withOpacity(0.02),
+            blurRadius: isCurrent ? 12 : 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -695,10 +776,10 @@ class _TimetableScreenState extends State<TimetableScreen> {
           Row(
             children: [
               Container(
-                width: 38,
-                height: 38,
+                width: 42,
+                height: 42,
                 decoration: BoxDecoration(
-                  color: isCurrent ? Colors.indigo.shade100 : Colors.indigo.shade50,
+                  color: isCurrent ? const Color(0xFFFEF3C7) : const Color(0xFFF1F5F9),
                   shape: BoxShape.circle,
                 ),
                 child: Center(
@@ -707,7 +788,7 @@ class _TimetableScreenState extends State<TimetableScreen> {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w900,
-                      color: Colors.indigo.shade800,
+                      color: isCurrent ? const Color(0xFFC26600) : const Color(0xFF1E293B),
                     ),
                   ),
                 ),
@@ -720,18 +801,18 @@ class _TimetableScreenState extends State<TimetableScreen> {
                     Text(
                       p['subject_name'] ?? 'No Subject',
                       style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF1E293B),
                       ),
                     ),
                     const SizedBox(height: 3),
                     Text(
                       '${_formatTime12Hr(p['start_time'])} – ${_formatTime12Hr(p['end_time'])}',
-                      style: TextStyle(
-                        fontSize: 11.5,
+                      style: const TextStyle(
+                        fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: Colors.grey.shade500,
+                        color: Color(0xFF64748B),
                       ),
                     ),
                   ],
@@ -744,10 +825,10 @@ class _TimetableScreenState extends State<TimetableScreen> {
                   if (classDisplay.isNotEmpty)
                     Text(
                       classDisplay,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w900,
-                        color: Colors.indigo.shade800,
+                        color: Color(0xFFC26600),
                       ),
                     ),
                   if (isBackup) ...[
@@ -755,15 +836,15 @@ class _TimetableScreenState extends State<TimetableScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
                       decoration: BoxDecoration(
-                        color: Colors.amber.shade100,
+                        color: const Color(0xFFFEF3C7),
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      child: Text(
+                      child: const Text(
                         'Backup',
                         style: TextStyle(
                           fontSize: 9,
                           fontWeight: FontWeight.w900,
-                          color: Colors.amber.shade900,
+                          color: Color(0xFFD97706),
                         ),
                       ),
                     ),
@@ -809,9 +890,16 @@ class _TimetableScreenState extends State<TimetableScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200, width: 1),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -819,19 +907,19 @@ class _TimetableScreenState extends State<TimetableScreen> {
           Row(
             children: [
               Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
+                width: 42,
+                height: 42,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF1F5F9),
                   shape: BoxShape.circle,
                 ),
                 child: Center(
                   child: Text(
                     'P${p['period_number']}',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w900,
-                      color: Colors.grey.shade600,
+                      color: Color(0xFF64748B),
                     ),
                   ),
                 ),
@@ -845,23 +933,23 @@ class _TimetableScreenState extends State<TimetableScreen> {
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black54,
+                      color: Color(0xFF64748B),
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     '${_formatTime12Hr(p['start_time'])} – ${_formatTime12Hr(p['end_time'])}',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 11.5,
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey.shade500,
+                      color: Color(0xFF94A3B8),
                     ),
                   ),
                 ],
               ),
             ],
           ),
-          Icon(Icons.coffee_rounded, size: 20, color: Colors.grey.shade400),
+          const Icon(Icons.coffee_rounded, size: 20, color: Color(0xFF94A3B8)),
         ],
       ),
     );
@@ -886,24 +974,24 @@ class _TimetableScreenState extends State<TimetableScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.beach_access_rounded, size: 64, color: Colors.indigo.shade400),
+              const Icon(Icons.beach_access_rounded, size: 64, color: Color(0xFFC26600)),
               const SizedBox(height: 16),
               Text(
                 hName,
                 style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w900,
-                  color: Colors.black87,
+                  color: Color(0xFF1E293B),
                 ),
               ),
               const SizedBox(height: 8),
-              Text(
+              const Text(
                 'No periods are scheduled today.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  color: Colors.grey.shade500,
+                  color: Color(0xFF64748B),
                 ),
               ),
             ],
@@ -916,15 +1004,15 @@ class _TimetableScreenState extends State<TimetableScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 64, color: Colors.grey.shade400),
+          Icon(icon, size: 64, color: const Color(0xFFCBD5E1)),
           const SizedBox(height: 16),
           Text(
             msg,
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: Colors.grey.shade600,
+              color: Color(0xFF64748B),
             ),
           ),
         ],
@@ -948,7 +1036,7 @@ class _TimetableScreenState extends State<TimetableScreen> {
             ElevatedButton(
               onPressed: _loadSchedule,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.indigo.shade800,
+                backgroundColor: const Color(0xFF1E293B),
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),

@@ -276,9 +276,10 @@ class _TeacherQrScannerScreenState extends State<TeacherQrScannerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Mark Teacher Attendance"),
-        backgroundColor: Colors.indigo,
-        foregroundColor: Colors.white,
+        title: const Text("Mark Teacher Attendance", style: TextStyle(fontWeight: FontWeight.w900)),
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF1E293B),
+        elevation: 0,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),

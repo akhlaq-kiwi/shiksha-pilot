@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Plus, CheckCircle2, ChevronRight, ChevronDown, UserCog, Users, ShieldAlert, Award, FileSpreadsheet, ArrowLeft, RefreshCw, Check, Lock, Save, Trash2, Loader2, AlertTriangle, AlertCircle, X, Download, GraduationCap } from 'lucide-react';
+import { Plus, CheckCircle2, ChevronRight, ChevronDown, UserCog, Users, ShieldAlert, Award, FileSpreadsheet, ArrowLeft, RefreshCw, Check, Lock, Save, Trash2, Loader2, AlertTriangle, AlertCircle, X, Download, GraduationCap, Clock } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
@@ -86,6 +86,141 @@ const CustomSelect = ({
                 </button>
               );
             })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const CurvedTimePicker = ({ value, onChange, disabled }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  const parseTime = (timeStr) => {
+    if (!timeStr) return { hour: '08', minute: '00', ampm: 'AM' };
+    const [hStr, mStr] = timeStr.split(':');
+    let h = parseInt(hStr, 10);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    return {
+      hour: String(h).padStart(2, '0'),
+      minute: mStr ? String(parseInt(mStr, 10)).padStart(2, '0') : '00',
+      ampm,
+    };
+  };
+
+  const { hour: curHour, minute: curMinute, ampm: curAmpm } = parseTime(value);
+
+  const setTime = (h, m, ap) => {
+    let hourNum = parseInt(h, 10);
+    if (ap === 'PM' && hourNum < 12) hourNum += 12;
+    if (ap === 'AM' && hourNum === 12) hourNum = 0;
+    const finalStr = `${String(hourNum).padStart(2, '0')}:${m}`;
+    onChange(finalStr);
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
+
+  const hoursList = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
+  const minutesList = ['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'];
+
+  return (
+    <div className="relative w-full" ref={containerRef}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className="flex w-full items-center justify-between h-10 px-3 rounded-xl border border-border bg-surface text-xs font-bold text-text-primary shadow-2xs outline-none focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer disabled:opacity-50"
+      >
+        <span>{curHour}:{curMinute} {curAmpm}</span>
+        <Clock className="h-4 w-4 text-text-muted" />
+      </button>
+
+      {isOpen && !disabled && (
+        <div className="absolute left-0 top-full mt-1.5 rounded-2xl border border-border bg-surface shadow-xl z-50 p-3 w-64 animate-in fade-in zoom-in-95 duration-150">
+          <div className="grid grid-cols-3 gap-2 text-center">
+            {/* Hours */}
+            <div>
+              <div className="text-[10px] font-bold text-text-muted uppercase mb-1.5">Hour</div>
+              <div className="max-h-48 overflow-y-auto space-y-1 pr-1 scrollbar-thin">
+                {hoursList.map(h => {
+                  const isSel = curHour === h;
+                  return (
+                    <button
+                      key={h}
+                      type="button"
+                      onClick={() => setTime(h, curMinute, curAmpm)}
+                      className={`w-full py-1.5 text-xs font-bold rounded-xl transition-colors cursor-pointer ${
+                        isSel
+                          ? 'bg-primary text-white shadow-2xs'
+                          : 'hover:bg-[#FAF6EC] dark:hover:bg-zinc-800 text-text-primary'
+                      }`}
+                    >
+                      {h}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Minutes */}
+            <div>
+              <div className="text-[10px] font-bold text-text-muted uppercase mb-1.5">Minute</div>
+              <div className="max-h-48 overflow-y-auto space-y-1 pr-1 scrollbar-thin">
+                {minutesList.map(m => {
+                  const isSel = curMinute === m;
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setTime(curHour, m, curAmpm)}
+                      className={`w-full py-1.5 text-xs font-bold rounded-xl transition-colors cursor-pointer ${
+                        isSel
+                          ? 'bg-primary text-white shadow-2xs'
+                          : 'hover:bg-[#FAF6EC] dark:hover:bg-zinc-800 text-text-primary'
+                      }`}
+                    >
+                      {m}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* AM/PM */}
+            <div>
+              <div className="text-[10px] font-bold text-text-muted uppercase mb-1.5">Period</div>
+              <div className="space-y-1">
+                {['AM', 'PM'].map(ap => {
+                  const isSel = curAmpm === ap;
+                  return (
+                    <button
+                      key={ap}
+                      type="button"
+                      onClick={() => setTime(curHour, curMinute, ap)}
+                      className={`w-full py-2 text-xs font-bold rounded-xl transition-colors cursor-pointer ${
+                        isSel
+                          ? 'bg-primary text-white shadow-2xs'
+                          : 'hover:bg-[#FAF6EC] dark:hover:bg-zinc-800 text-text-primary'
+                      }`}
+                    >
+                      {ap}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -2018,14 +2153,11 @@ export default function AuditsSettingsPage({ onYearsUpdated }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-text-secondary uppercase">School Start Time</label>
-                <input
-                  type="time"
+                <CurvedTimePicker
                   value={schoolStartTime}
                   disabled={isReadOnly || periodLoading}
-                  onChange={e => setSchoolStartTime(e.target.value)}
-                  className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs"
+                  onChange={val => setSchoolStartTime(val)}
                 />
-                <p className="text-[11px] text-text-muted mt-1">Selected: {formatTime12h(schoolStartTime + ':00')}</p>
               </div>
 
               <div className="space-y-1.5">

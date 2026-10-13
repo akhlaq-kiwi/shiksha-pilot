@@ -380,10 +380,10 @@ class _NoticeScreenState extends State<NoticeScreen> {
       appBar: AppBar(
         title: const Text(
           'Notice Board',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
+          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Color(0xFF1E293B)),
         ),
-        iconTheme: const IconThemeData(color: Colors.white),
-        backgroundColor: Colors.indigo.shade800,
+        iconTheme: const IconThemeData(color: Color(0xFF1E293B)),
+        backgroundColor: Colors.white,
         elevation: 0,
       ),
       body: bodyContent,
@@ -481,10 +481,10 @@ class NoticeDetailsScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text(
           'Notice Details',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
+          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Color(0xFF1E293B)),
         ),
-        iconTheme: const IconThemeData(color: Colors.white),
-        backgroundColor: Colors.indigo.shade800,
+        iconTheme: const IconThemeData(color: Color(0xFF1E293B)),
+        backgroundColor: Colors.white,
         elevation: 0,
       ),
       body: SingleChildScrollView(
