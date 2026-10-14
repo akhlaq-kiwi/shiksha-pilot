@@ -2424,6 +2424,10 @@ class SchoolAdminService extends BaseService
             throw new NotFoundException('Teacher profile not found');
         }
 
+        if (empty($member['employee_id'])) {
+            $member['employee_id'] = 'EMP-' . str_pad((string)$member['id'], 3, '0', STR_PAD_LEFT);
+        }
+
         // Dynamic workload sync
         if (strcasecmp($member['role'], 'Teacher') === 0) {
             $stmtCount = $pdo->prepare("
@@ -9604,7 +9608,9 @@ class SchoolAdminService extends BaseService
             $results[] = [
                 'id' => (int)$row['staff_id'],
                 'name' => $row['name'],
-                'designation' => trim(($row['role'] ?? '') . ' ' . ($row['department'] ?? '')),
+                'role' => $row['role'] ?? 'Teacher',
+                'department' => $row['department'] ?? '',
+                'designation' => $row['role'] ?? 'Teacher',
                 'salary' => (float)$row['salary'],
                 'payable_salary' => $payableSalary,
                 'proration_details' => $prorDetails['is_prorated'] ? $prorDetails : null,

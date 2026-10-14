@@ -1032,13 +1032,14 @@ class SchoolAdminController extends BaseController
             return;
         }
 
-        // Fee Collector route authorization
+        // Fee Collector route authorization (Fees Portal + TSD: Teacher Salary Disbursement)
         if (str_contains($uri, '/api/school/fee-payments') || 
             str_contains($uri, '/api/school/class-fee-configurations') || 
             str_contains($uri, '/api/school/additional-fees') || 
             str_contains($uri, '/api/school/collection-history') ||
             str_contains($uri, '/api/school/fee-structures') ||
-            (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && (str_contains($uri, '/api/school/students') || str_contains($uri, '/api/school/classes')))) {
+            str_contains($uri, '/api/school/staff-payments') ||
+            (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && (str_contains($uri, '/api/school/students') || str_contains($uri, '/api/school/classes') || str_contains($uri, '/api/school/staff')))) {
             if ($userRole === 'SCHOOL_ADMIN' || $this->service->isFeeCollector($user)) {
                 if ($this->service->checkSubscriptionExpired($user)) {
                     throw new \App\Shared\Exceptions\ForbiddenException('Subscription Expired. Access Denied.');

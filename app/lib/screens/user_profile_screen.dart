@@ -154,11 +154,13 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                           child: const Icon(Icons.person, size: 50, color: Color(0xFF2196F3)),
                         ),
                         errorWidget: (context, url, error) {
+                          final currentBase = widget.baseUrl;
                           if ((url.contains('127.0.0.1') || url.contains('localhost')) &&
-                              widget.baseUrl.isNotEmpty &&
-                              !widget.baseUrl.contains('127.0.0.1') &&
-                              !widget.baseUrl.contains('localhost')) {
-                            final fallbackUrl = url.replaceAll(RegExp(r'http://(127\.0\.0\.1|localhost):8000'), widget.baseUrl);
+                              currentBase != null &&
+                              currentBase.isNotEmpty &&
+                              !currentBase.contains('127.0.0.1') &&
+                              !currentBase.contains('localhost')) {
+                            final fallbackUrl = url.replaceAll(RegExp(r'http://(127\.0\.0\.1|localhost):8000'), currentBase);
                             return CachedNetworkImage(
                               imageUrl: fallbackUrl,
                               width: 100,

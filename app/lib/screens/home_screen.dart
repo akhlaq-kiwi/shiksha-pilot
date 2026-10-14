@@ -35,6 +35,7 @@ import 'package:school_hub/screens/teacher_attendance_history_screen.dart';
 import 'package:school_hub/screens/question_paper_designer_screen.dart';
 import 'package:school_hub/screens/principal_tar_screen.dart';
 import 'package:school_hub/screens/fees_portal_screen.dart';
+import 'package:school_hub/screens/teacher_salary_disbursement_screen.dart';
 
 class LauncherFeature {
   final String name;
@@ -209,6 +210,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       name: 'Fees Portal',
       icon: Icons.account_balance_rounded,
       color: const Color(0xFFD97706),
+      allowedRoles: ['TEACHER', 'PRINCIPAL', 'SCHOOL_ADMIN'],
+      isAvailable: true,
+    ),
+    LauncherFeature(
+      name: 'TSD',
+      icon: Icons.payments_rounded,
+      color: const Color(0xFF0D9488),
       allowedRoles: ['TEACHER', 'PRINCIPAL', 'SCHOOL_ADMIN'],
       isAvailable: true,
     ),
@@ -694,6 +702,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (f.name == 'Fees Portal') {
         return _isFeeCollector == true || _isPrincipal == true || role == 'PRINCIPAL' || role == 'SCHOOL_ADMIN';
       }
+      if (f.name == 'TSD') {
+        return _isFeeCollector == true;
+      }
       if (isStaffTeacher) {
         return f.allowedRoles.contains('TEACHER') || f.allowedRoles.contains('PRINCIPAL');
       }
@@ -997,6 +1008,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           context,
           MaterialPageRoute(
             builder: (context) => FeesPortalScreen(
+              baseUrl: effectiveBase,
+              token: token,
+            ),
+          ),
+        );
+      } else if (feature.name == 'TSD') {
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('auth_token') ?? widget.leaveService.token;
+        String effectiveBase = widget.leaveService.baseUrl;
+        if (effectiveBase.isEmpty || effectiveBase.contains('127.0.0.1')) {
+          final savedBase = prefs.getString('base_url') ?? _workingBaseUrl;
+          if (savedBase.isNotEmpty && !savedBase.contains('127.0.0.1')) {
+            effectiveBase = savedBase;
+          }
+        }
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => TeacherSalaryDisbursementScreen(
               baseUrl: effectiveBase,
               token: token,
             ),

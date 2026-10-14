@@ -178,16 +178,19 @@ class _PrincipalTarScreenState extends State<PrincipalTarScreen> with SingleTick
         centerTitle: false,
         titleSpacing: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF1E293B), size: 20),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF1E293B), size: 18),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'TEACHERS ATTENDANCE REPORT',
-          style: TextStyle(
-            color: Color(0xFF0F172A),
-            fontWeight: FontWeight.w900,
-            fontSize: 16,
-            letterSpacing: 0.6,
+        title: const Padding(
+          padding: EdgeInsets.only(top: 4.0),
+          child: Text(
+            'TEACHERS ATTENDANCE REPORT',
+            style: TextStyle(
+              color: Color(0xFF0F172A),
+              fontWeight: FontWeight.w900,
+              fontSize: 16,
+              letterSpacing: 0.6,
+            ),
           ),
         ),
         actions: [
