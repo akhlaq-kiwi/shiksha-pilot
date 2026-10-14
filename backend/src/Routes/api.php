@@ -84,6 +84,8 @@ return function (App $app) {
     $app->get('/api/school/staff/{id}', [SchoolAdminController::class, 'getStaffDetails']);
     $app->post('/api/school/staff/{id}/request-principal-otp', [SchoolAdminController::class, 'requestPrincipalOtp']);
     $app->post('/api/school/staff/{id}/assign-principal', [SchoolAdminController::class, 'assignPrincipalRole']);
+    $app->post('/api/school/staff/{id}/request-fee-collector-otp', [SchoolAdminController::class, 'requestFeeCollectorOtp']);
+    $app->post('/api/school/staff/{id}/assign-fee-collector', [SchoolAdminController::class, 'assignFeeCollectorRole']);
     $app->get('/api/school/staff-payments', [SchoolAdminController::class, 'getStaffPayments']);
     $app->post('/api/school/staff-payments', [SchoolAdminController::class, 'payStaffSalary']);
     $app->post('/api/school/staff-payments/disburse-previous-year', [SchoolAdminController::class, 'disbursePreviousYearStaffSalary']);

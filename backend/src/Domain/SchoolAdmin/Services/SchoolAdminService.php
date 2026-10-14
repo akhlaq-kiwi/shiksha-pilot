@@ -20110,7 +20110,280 @@ Only approve the settlement after reviewing all financial records.
         }
         return ((int)($staff['is_principal'] ?? 0) === 1 || strtoupper((string)($staff['role'] ?? '')) === 'PRINCIPAL');
     }
+
+    public function requestFeeCollectorOtp(array $user, int $teacherId, string $action = 'assign'): array
+    {
+        $pdo = $this->staffRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+        $userId = (int)($user['id'] ?? 0);
+
+        // Fetch staff teacher
+        $stmtTeacher = $pdo->prepare("SELECT id, name, role FROM staff WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtTeacher->execute([':id' => $teacherId, ':sid' => $schoolId]);
+        $teacher = $stmtTeacher->fetch(\PDO::FETCH_ASSOC);
+        if (!$teacher) {
+            throw new NotFoundException('Teacher member not found.');
+        }
+
+        // Fetch school admin email
+        $stmtSchool = $pdo->prepare("SELECT name, contact_email FROM schools WHERE id = :sid LIMIT 1");
+        $stmtSchool->execute([':sid' => $schoolId]);
+        $schoolRow = $stmtSchool->fetch(\PDO::FETCH_ASSOC);
+
+        $toEmail = trim((string)($schoolRow['contact_email'] ?? ''));
+        if (empty($toEmail) && !empty($user['email'])) {
+            $toEmail = trim((string)$user['email']);
+        }
+        if (empty($toEmail)) {
+            $stmtUserEmail = $pdo->prepare("SELECT email FROM users WHERE school_id = :sid AND role IN ('SCHOOL_ADMIN', 'SUPER_ADMIN', 'ADMIN') AND email IS NOT NULL AND email != '' ORDER BY id ASC LIMIT 1");
+            $stmtUserEmail->execute([':sid' => $schoolId]);
+            $toEmail = trim((string)$stmtUserEmail->fetchColumn());
+        }
+        if (empty($toEmail)) {
+            $stmtAnyUser = $pdo->prepare("SELECT email FROM users WHERE id = :uid AND email IS NOT NULL AND email != '' LIMIT 1");
+            $stmtAnyUser->execute([':uid' => $userId]);
+            $toEmail = trim((string)$stmtAnyUser->fetchColumn());
+        }
+
+        if (empty($toEmail)) {
+            throw new ValidationException(['email' => 'No registered school admin email address found to send OTP. Please update contact email in school settings.']);
+        }
+
+        // Auto-create table if missing
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS fee_collector_assign_otps (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                school_id INT NOT NULL,
+                user_id INT NOT NULL,
+                teacher_id INT NOT NULL,
+                otp_code VARCHAR(10) NOT NULL,
+                attempts INT DEFAULT 0,
+                is_used TINYINT(1) DEFAULT 0,
+                expires_at DATETIME NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        ");
+
+        // Rate limiting check: 30 seconds
+        $stmtRate = $pdo->prepare("
+            SELECT created_at FROM fee_collector_assign_otps
+            WHERE school_id = :sid AND user_id = :uid AND teacher_id = :tid AND is_used = 0
+            ORDER BY id DESC LIMIT 1
+        ");
+        $stmtRate->execute([':sid' => $schoolId, ':uid' => $userId, ':tid' => $teacherId]);
+        $lastOtpTime = $stmtRate->fetchColumn();
+        if ($lastOtpTime && (time() - strtotime((string)$lastOtpTime)) < 30) {
+            $wait = 30 - (time() - strtotime((string)$lastOtpTime));
+            throw new ValidationException(['rate_limit' => "Please wait {$wait} seconds before requesting a new OTP."]);
+        }
+
+        // Generate 4-digit OTP
+        $otpCode = sprintf("%04d", random_int(1000, 9999));
+
+        // Invalidate unused OTPs
+        $pdo->prepare("
+            UPDATE fee_collector_assign_otps SET is_used = 1
+            WHERE school_id = :sid AND teacher_id = :tid AND is_used = 0
+        ")->execute([':sid' => $schoolId, ':tid' => $teacherId]);
+
+        // Insert new OTP with 5 min expiration
+        $expiresAt = date('Y-m-d H:i:s', strtotime('+5 minutes'));
+        $stmtIns = $pdo->prepare("
+            INSERT INTO fee_collector_assign_otps (school_id, user_id, teacher_id, otp_code, attempts, is_used, expires_at)
+            VALUES (:sid, :uid, :tid, :code, 0, 0, :exp)
+        ");
+        $stmtIns->execute([
+            ':sid'  => $schoolId,
+            ':uid'  => $userId,
+            ':tid'  => $teacherId,
+            ':code' => $otpCode,
+            ':exp'  => $expiresAt
+        ]);
+
+        $teacherNameHtml = htmlspecialchars($teacher['name']);
+        $schoolNameHtml = htmlspecialchars($schoolRow['name'] ?? 'School Admin Portal');
+        
+        $isUnassign = (strtolower(trim($action)) === 'unassign');
+        $subject = $isUnassign 
+            ? "Security Verification: Unassign Fee Collector Role - ShikshaPilot"
+            : "Security Verification: Assign Fee Collector Role - ShikshaPilot";
+        $actionVerb = $isUnassign ? "unassign the Fee Collector role from" : "assign the Fee Collector role to";
+
+        $bodyHtml = "
+        <div style=\"font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; background-color: #ffffff;\">
+          <div style=\"background-color: #0f172a; color: #ffffff; padding: 20px; text-align: center;\">
+            <h2 style=\"margin: 0; font-size: 20px; font-weight: 600;\">ShikshaPilot Security Verification</h2>
+            <p style=\"margin: 5px 0 0 0; font-size: 13px; color: #94a3b8;\">Fee Collector Role Authorization</p>
+          </div>
+          <div style=\"padding: 24px;\">
+            <p style=\"font-size: 14px; color: #334155; line-height: 1.6; margin-top: 0;\">
+              A request has been initiated to {$actionVerb} <strong>{$teacherNameHtml}</strong> on your school portal (<strong>{$schoolNameHtml}</strong>).
+            </p>
+            <div style=\"background-color: #f8fafc; border-left: 4px solid #10b981; padding: 16px; margin: 20px 0; border-radius: 0 4px 4px 0;\">
+              <p style=\"font-size: 13px; color: #64748b; margin: 0 0 8px 0;\">Your Security OTP Code:</p>
+              <div style=\"font-size: 28px; font-weight: 700; color: #0f172a; letter-spacing: 6px; font-family: monospace;\">
+                {$otpCode}
+              </div>
+              <p style=\"font-size: 12px; color: #94a3b8; margin: 8px 0 0 0;\">(Valid for 5 minutes)</p>
+            </div>
+            <p style=\"font-size: 13px; color: #64748b; line-height: 1.5;\">
+              <strong>Important Security Notice:</strong> If you did not initiate this action, please do not share this OTP and review your account activity immediately.
+            </p>
+          </div>
+          <div style=\"background-color: #f1f5f9; padding: 15px; text-align: center; font-size: 12px; color: #64748b;\">
+            This is an automated security notification from ShikshaPilot.
+          </div>
+        </div>";
+
+        try {
+            SmtpMailer::send($toEmail, $subject, $bodyHtml, '', '');
+        } catch (\Throwable $e) {
+            $this->log('Failed to send Fee Collector assign OTP email', ['error' => $e->getMessage(), 'email' => $toEmail, 'otp' => $otpCode]);
+        }
+
+        // Mask email address
+        $parts = explode('@', $toEmail);
+        $namePart = $parts[0];
+        $domainPart = $parts[1] ?? '';
+        $maskedName = strlen($namePart) > 2 ? substr($namePart, 0, 2) . str_repeat('*', strlen($namePart) - 2) : $namePart . '***';
+        $maskedEmail = $maskedName . '@' . $domainPart;
+
+        return [
+            'success' => true,
+            'message' => 'OTP sent successfully to registered email address.',
+            'email_masked' => $maskedEmail
+        ];
+    }
+
+    public function assignFeeCollectorRole(array $user, int $teacherId, ?string $otpCode, string $action = 'assign'): array
+    {
+        $pdo = $this->staffRepo->getPdo();
+        $schoolId = $this->getSchoolId($user);
+
+        if (empty($otpCode)) {
+            throw new ValidationException(['otp' => 'OTP verification is required.']);
+        }
+
+        // Fetch staff teacher
+        $stmtTeacher = $pdo->prepare("SELECT id, name, phone, role FROM staff WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtTeacher->execute([':id' => $teacherId, ':sid' => $schoolId]);
+        $teacher = $stmtTeacher->fetch(\PDO::FETCH_ASSOC);
+        if (!$teacher) {
+            throw new NotFoundException('Teacher member not found.');
+        }
+
+        // Fetch active OTP
+        $stmt = $pdo->prepare("
+            SELECT * FROM fee_collector_assign_otps
+            WHERE school_id = :sid AND teacher_id = :tid AND is_used = 0
+            ORDER BY id DESC LIMIT 1
+        ");
+        $stmt->execute([':sid' => $schoolId, ':tid' => $teacherId]);
+        $otpRow = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+        if (!$otpRow) {
+            throw new ValidationException(['otp' => 'No active OTP request found. Please click Send OTP again.']);
+        }
+
+        if (strtotime($otpRow['expires_at']) < time()) {
+            $pdo->prepare("UPDATE fee_collector_assign_otps SET is_used = 1 WHERE id = :id")->execute([':id' => $otpRow['id']]);
+            throw new ValidationException(['otp' => 'OTP code has expired. Please request a new OTP.']);
+        }
+
+        if ((int)$otpRow['attempts'] >= 3) {
+            $pdo->prepare("UPDATE fee_collector_assign_otps SET is_used = 1 WHERE id = :id")->execute([':id' => $otpRow['id']]);
+            throw new ValidationException(['otp' => 'Maximum invalid attempts reached. Please request a new OTP.']);
+        }
+
+        if (trim((string)$otpCode) !== trim((string)$otpRow['otp_code'])) {
+            $newAttempts = (int)$otpRow['attempts'] + 1;
+            if ($newAttempts >= 3) {
+                $pdo->prepare("UPDATE fee_collector_assign_otps SET attempts = :att, is_used = 1 WHERE id = :id")->execute([':att' => $newAttempts, ':id' => $otpRow['id']]);
+                throw new ValidationException(['otp' => 'Maximum invalid attempts reached. Please request a new OTP.']);
+            } else {
+                $pdo->prepare("UPDATE fee_collector_assign_otps SET attempts = :att WHERE id = :id")->execute([':att' => $newAttempts, ':id' => $otpRow['id']]);
+                throw new ValidationException(['otp' => 'Invalid OTP code. Please try again.']);
+            }
+        }
+
+        // OTP Verified -> Mark as used
+        $pdo->prepare("UPDATE fee_collector_assign_otps SET is_used = 1 WHERE id = :id")->execute([':id' => $otpRow['id']]);
+
+        // Ensure is_fee_collector column in staff table
+        try {
+            $pdo->exec("ALTER TABLE staff ADD COLUMN is_fee_collector TINYINT(1) DEFAULT 0");
+        } catch (\Throwable $e) {}
+
+        $isUnassign = (strtolower(trim($action)) === 'unassign');
+        $newFlag = $isUnassign ? 0 : 1;
+        $teacherPhone = trim((string)($teacher['phone'] ?? ''));
+
+        $stmtUpdateStaff = $pdo->prepare("
+            UPDATE staff 
+            SET is_fee_collector = :flag 
+            WHERE (id = :tid OR (phone = :phone AND phone IS NOT NULL AND phone != '' AND school_id = :sid)) 
+              AND school_id = :sid
+        ");
+        $stmtUpdateStaff->execute([':flag' => $newFlag, ':tid' => $teacherId, ':phone' => $teacherPhone, ':sid' => $schoolId]);
+
+        if ($isUnassign) {
+            $this->log("Unassigned Fee Collector role from teacher ID {$teacherId} ({$teacher['name']})", ['teacher_id' => $teacherId, 'school_id' => $schoolId]);
+            return [
+                'success' => true,
+                'message' => 'Fee Collector role unassigned successfully.'
+            ];
+        } else {
+            $this->log("Assigned Fee Collector role to teacher ID {$teacherId} ({$teacher['name']})", ['teacher_id' => $teacherId, 'school_id' => $schoolId]);
+            return [
+                'success' => true,
+                'message' => 'Fee Collector role assigned successfully.'
+            ];
+        }
+    }
+
+    public function isFeeCollector(array $user): bool
+    {
+        if (!empty($user['is_fee_collector'])) {
+            return true;
+        }
+        $pdo = $this->classRepo->getPdo();
+        $schoolId = (int)($user['school_id'] ?? 0);
+        $userId = (int)($user['id'] ?? 0);
+        if ($schoolId <= 0 || $userId <= 0) {
+            return false;
+        }
+        $stmt = $pdo->prepare("SELECT phone FROM users WHERE id = :id LIMIT 1");
+        $stmt->execute([':id' => $userId]);
+        $phone = $stmt->fetchColumn();
+        if (!$phone) {
+            return false;
+        }
+        $phoneClean = (string)$phone;
+        $phone10 = substr(preg_replace('/[^0-9]/', '', $phoneClean), -10);
+        $params = [':sid' => $schoolId, ':phone' => $phoneClean];
+        $phoneCond = "phone = :phone";
+        if (strlen($phone10) === 10) {
+            $phoneCond .= " OR RIGHT(phone, 10) = :phone10";
+            $params[':phone10'] = $phone10;
+        }
+
+        $stmtStaff = $pdo->prepare("
+            SELECT is_fee_collector 
+            FROM staff 
+            WHERE school_id = :sid 
+              AND ($phoneCond)
+            ORDER BY is_fee_collector DESC, id DESC 
+            LIMIT 1
+        ");
+        $stmtStaff->execute($params);
+        $staff = $stmtStaff->fetch(\PDO::FETCH_ASSOC);
+        if (!$staff) {
+            return false;
+        }
+        return ((int)($staff['is_fee_collector'] ?? 0) === 1);
+    }
 }
+
 
 
 

@@ -73,6 +73,14 @@ export const schoolService = {
     return apiClient.post(`/api/school/staff/${teacherId}/assign-principal`, { otp_code: otpCode, action });
   },
 
+  requestFeeCollectorOtp(teacherId, action = 'assign') {
+    return apiClient.post(`/api/school/staff/${teacherId}/request-fee-collector-otp`, { action });
+  },
+
+  assignFeeCollectorRole(teacherId, otpCode, action = 'assign') {
+    return apiClient.post(`/api/school/staff/${teacherId}/assign-fee-collector`, { otp_code: otpCode, action });
+  },
+
   getAvailableStaff() {
     return this.getStaff().then(list => (list || []).filter(s => s.status === 'ACTIVE' && (s.assigned_periods || 0) < (s.max_periods || 8)));
   },

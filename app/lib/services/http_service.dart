@@ -8,7 +8,8 @@ import 'package:school_hub/main.dart';
 
 export 'package:http/http.dart' hide get, post, put, delete;
 
-const String _kWifiBaseUrl = 'http://10.184.196.71:8000';
+const String _kWifiBaseUrl = 'http://10.57.197.71:8000';
+const String _kWifiBaseUrlOld = 'http://10.184.196.71:8000';
 const String _kUsbBaseUrl = 'http://127.0.0.1:8000';
 
 Future<void> _saveWorkingBaseUrl(String base) async {
@@ -26,12 +27,21 @@ Future<http.Response> _executeWithFallback(
 ) async {
   final origin = originalUrl.origin;
   final bool isProductionOrQa = origin.contains('shikshapilot.com');
+  
+  String? savedBase;
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    savedBase = prefs.getString('base_url');
+  } catch (_) {}
+
   final List<String> candidateBaseUrls = isProductionOrQa
       ? [origin]
       : [
+          if (savedBase != null && savedBase.isNotEmpty) savedBase,
           origin,
-          _kUsbBaseUrl,
           _kWifiBaseUrl,
+          _kUsbBaseUrl,
+          _kWifiBaseUrlOld,
         ];
 
   // Remove duplicates while preserving order

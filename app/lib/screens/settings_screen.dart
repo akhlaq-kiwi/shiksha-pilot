@@ -32,6 +32,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _schoolName = '';
   String _userPhone = '';
   String _userPhoto = '';
+  String _workingBaseUrl = '';
   bool _notificationsEnabled = true;
   String _currentTheme = 'Light Mode';
   
@@ -88,6 +89,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _schoolName = (prefs.getString('school_name') ?? 'Shiksha Pilot Academy').toUpperCase();
       _userPhone = prefs.getString('user_phone') ?? '';
       _userPhoto = prefs.getString('user_photo') ?? '';
+      _workingBaseUrl = prefs.getString('base_url') ?? '';
       _notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
       _currentTheme = prefs.getString('theme_mode') ?? 'Light Mode';
       _activeStudentId = prefs.getInt('selected_student_id') ?? widget.selectedStudentId;
@@ -499,7 +501,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     Widget avatarWidget;
     if (photoUrl.isNotEmpty) {
       final String cleanPath = photoUrl.startsWith('/') ? photoUrl : '/$photoUrl';
-      final fullUrl = photoUrl.startsWith('http') ? photoUrl : '${widget.leaveService.baseUrl}$cleanPath';
+      final String base = (_workingBaseUrl.isNotEmpty && !_workingBaseUrl.contains('127.0.0.1'))
+          ? _workingBaseUrl
+          : widget.leaveService.baseUrl;
+      final fullUrl = photoUrl.startsWith('http') ? photoUrl : '${base.replaceAll(RegExp(r'/+$'), '')}$cleanPath';
       avatarWidget = CircleAvatar(
         radius: 46,
         backgroundImage: CachedNetworkImageProvider(fullUrl),

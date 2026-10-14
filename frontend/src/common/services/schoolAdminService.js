@@ -86,6 +86,12 @@ export const schoolAdminService = {
   async assignPrincipalRole(teacherId, otpCode, action = 'assign') {
     return apiClient.post(`/api/school/staff/${teacherId}/assign-principal`, { otp_code: otpCode, action });
   },
+  async requestFeeCollectorOtp(teacherId, action = 'assign') {
+    return apiClient.post(`/api/school/staff/${teacherId}/request-fee-collector-otp`, { action });
+  },
+  async assignFeeCollectorRole(teacherId, otpCode, action = 'assign') {
+    return apiClient.post(`/api/school/staff/${teacherId}/assign-fee-collector`, { otp_code: otpCode, action });
+  },
   async deleteStaff(id) {
     return apiClient.delete(`/api/school/staff/${id}`);
   },

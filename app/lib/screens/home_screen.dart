@@ -34,6 +34,7 @@ import 'package:school_hub/screens/teacher_qr_scanner_screen.dart';
 import 'package:school_hub/screens/teacher_attendance_history_screen.dart';
 import 'package:school_hub/screens/question_paper_designer_screen.dart';
 import 'package:school_hub/screens/principal_tar_screen.dart';
+import 'package:school_hub/screens/fees_portal_screen.dart';
 
 class LauncherFeature {
   final String name;
@@ -55,12 +56,20 @@ class HomeScreen extends StatefulWidget {
   final LeaveService leaveService;
   final String userRole;
   final int? selectedStudentId;
+  final bool? isPrincipal;
+  final bool? isFeeCollector;
+  final String? userPhoto;
+  final String? userName;
 
   const HomeScreen({
     Key? key,
     required this.leaveService,
     required this.userRole,
     this.selectedStudentId,
+    this.isPrincipal,
+    this.isFeeCollector,
+    this.userPhoto,
+    this.userName,
   }) : super(key: key);
 
   @override
@@ -78,6 +87,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   String _activeStudentClass = '';
   String _userPhoto = '';
   bool _isPrincipal = false;
+  bool _isFeeCollector = false;
+  String _workingBaseUrl = '';
   
   List<dynamic> _children = [];
   bool _isLoadingChildren = false;
@@ -194,6 +205,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       allowedRoles: ['TEACHER', 'PRINCIPAL'],
       isAvailable: true,
     ),
+    LauncherFeature(
+      name: 'Fees Portal',
+      icon: Icons.account_balance_rounded,
+      color: const Color(0xFFD97706),
+      allowedRoles: ['TEACHER', 'PRINCIPAL', 'SCHOOL_ADMIN'],
+      isAvailable: true,
+    ),
   ];
 
 
@@ -202,6 +220,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _activeStudentId = widget.selectedStudentId;
+    if (widget.isPrincipal == true) _isPrincipal = true;
+    if (widget.isFeeCollector == true) _isFeeCollector = true;
+    if (widget.userPhoto != null && widget.userPhoto!.isNotEmpty) _userPhoto = widget.userPhoto!;
+    if (widget.userName != null && widget.userName!.isNotEmpty) _userName = widget.userName!;
     _loadSessionInfo();
     _fetchChildrenList();
     _notifTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
@@ -229,20 +251,46 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
+  String _buildFullPhotoUrl(String photoUrl) {
+    if (photoUrl.isEmpty) return '';
+    if (photoUrl.startsWith('http://') || photoUrl.startsWith('https://')) {
+      return photoUrl;
+    }
+    final String base = (_workingBaseUrl.isNotEmpty && !_workingBaseUrl.contains('127.0.0.1'))
+        ? _workingBaseUrl
+        : widget.leaveService.baseUrl;
+    final cleanBase = base.replaceAll(RegExp(r'/+$'), '');
+    final cleanPath = photoUrl.startsWith('/') ? photoUrl : '/$photoUrl';
+    return '$cleanBase$cleanPath';
+  }
+
   Future<void> _loadSessionInfo() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('base_url', widget.leaveService.baseUrl);
+    final savedBase = prefs.getString('base_url');
+    if (savedBase != null && savedBase.isNotEmpty) {
+      _workingBaseUrl = savedBase;
+    } else {
+      _workingBaseUrl = widget.leaveService.baseUrl;
+      await prefs.setString('base_url', widget.leaveService.baseUrl);
+    }
     await prefs.setString('user_role', widget.userRole);
 
     final roleUpper = widget.userRole.toUpperCase();
     final savedId = prefs.getInt('selected_student_id');
 
     setState(() {
-      _userName = prefs.getString('user_name') ?? 'User';
+      _userName = (widget.userName != null && widget.userName!.isNotEmpty)
+          ? widget.userName!
+          : (prefs.getString('user_name') ?? 'User');
       _schoolName = (prefs.getString('school_name') ?? 'Shiksha Pilot Academy').toUpperCase();
       _userPhone = prefs.getString('user_phone') ?? '';
-      _userPhoto = prefs.getString('user_photo') ?? '';
-      _isPrincipal = (prefs.getBool('is_principal') ?? false) || (roleUpper == 'PRINCIPAL');
+      final savedPhoto = prefs.getString('user_photo') ?? '';
+      _userPhoto = savedPhoto.isNotEmpty ? savedPhoto : (widget.userPhoto ?? _userPhoto);
+      _isPrincipal = (prefs.getBool('is_principal') == true) ||
+          (widget.isPrincipal == true) ||
+          (roleUpper == 'PRINCIPAL');
+      _isFeeCollector = (prefs.getBool('is_fee_collector') == true) ||
+          (widget.isFeeCollector == true);
 
       if ((roleUpper == 'PARENT' || roleUpper == 'STUDENT') && savedId != null) {
         _activeStudentId = savedId;
@@ -251,7 +299,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (roleUpper == 'PARENT') {
         _userRoleDisplay = 'Parent Profile';
       } else if (roleUpper == 'TEACHER') {
-        _userRoleDisplay = _isPrincipal ? 'Teacher (Principal)' : 'Teacher Profile';
+        if (_isPrincipal) {
+          _userRoleDisplay = 'Teacher (Principal)';
+        } else if (_isFeeCollector) {
+          _userRoleDisplay = 'Teacher (Fee Collector)';
+        } else {
+          _userRoleDisplay = 'Teacher Profile';
+        }
       } else if (roleUpper == 'SCHOOL_ADMIN' || roleUpper == 'PRINCIPAL') {
         _userRoleDisplay = 'Principal Profile';
       } else {
@@ -273,7 +327,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _syncProfileDetails(String token) async {
     try {
-      final authService = AuthService(baseUrl: widget.leaveService.baseUrl);
+      final effectiveBase = (_workingBaseUrl.isNotEmpty && !_workingBaseUrl.contains('127.0.0.1'))
+          ? _workingBaseUrl
+          : widget.leaveService.baseUrl;
+      final authService = AuthService(baseUrl: effectiveBase);
       final profile = await authService.fetchProfile(token);
       
       final latestPhoto = (profile['photo_path'] as String?) ?? (profile['staff_photo_path'] as String?) ?? '';
@@ -282,27 +339,36 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           profile['is_principal'] == 1 ||
           profile['is_principal'] == '1' ||
           (profile['role']?.toString().toUpperCase() == 'PRINCIPAL');
+      final bool isFeeCollector = profile['is_fee_collector'] == true ||
+          profile['is_fee_collector'] == 1 ||
+          profile['is_fee_collector'] == '1';
       
       final role = widget.userRole.toUpperCase();
       final isStaff = role == 'TEACHER' || role == 'SCHOOL_ADMIN' || role == 'PRINCIPAL';
       
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('is_principal', isPrincipal);
+      await prefs.setBool('is_fee_collector', isFeeCollector);
 
-      if (isStaff) {
-        await prefs.setString('user_photo', latestPhoto);
-        await prefs.setString('user_name', latestName);
+      if (latestPhoto.isNotEmpty) await prefs.setString('user_photo', latestPhoto);
+      if (latestName.isNotEmpty) await prefs.setString('user_name', latestName);
 
-        if (mounted) {
-          setState(() {
-            _userPhoto = latestPhoto;
-            _userName = latestName;
-            _isPrincipal = isPrincipal;
-            if (role == 'TEACHER' && isPrincipal) {
+      if (mounted) {
+        setState(() {
+          if (latestPhoto.isNotEmpty) _userPhoto = latestPhoto;
+          if (latestName.isNotEmpty) _userName = latestName;
+          _isPrincipal = isPrincipal;
+          _isFeeCollector = isFeeCollector;
+          if (role == 'TEACHER') {
+            if (isPrincipal) {
               _userRoleDisplay = 'Teacher (Principal)';
+            } else if (isFeeCollector) {
+              _userRoleDisplay = 'Teacher (Fee Collector)';
+            } else {
+              _userRoleDisplay = 'Teacher Profile';
             }
-          });
-        }
+          }
+        });
       }
     } catch (e) {
       debugPrint('Error syncing profile details: $e');
@@ -625,6 +691,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (f.name == 'TAR') {
         return (_isPrincipal == true || role == 'PRINCIPAL');
       }
+      if (f.name == 'Fees Portal') {
+        return _isFeeCollector == true || _isPrincipal == true || role == 'PRINCIPAL' || role == 'SCHOOL_ADMIN';
+      }
       if (isStaffTeacher) {
         return f.allowedRoles.contains('TEACHER') || f.allowedRoles.contains('PRINCIPAL');
       }
@@ -701,9 +770,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       photoUrl = _userPhoto;
     }
 
-    final fullPhotoUrl = photoUrl.isNotEmpty
-        ? (photoUrl.startsWith('http') ? photoUrl : '${widget.leaveService.baseUrl}$photoUrl')
-        : '';
+    final fullPhotoUrl = _buildFullPhotoUrl(photoUrl);
+    final effectiveBase = (_workingBaseUrl.isNotEmpty && !_workingBaseUrl.contains('127.0.0.1'))
+        ? _workingBaseUrl
+        : widget.leaveService.baseUrl;
 
     Navigator.push(
       context,
@@ -716,7 +786,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           photoUrl: fullPhotoUrl,
           children: _children,
           activeStudentId: _activeStudentId,
-          baseUrl: widget.leaveService.baseUrl,
+          baseUrl: effectiveBase,
           onSwitchChild: (newId) {
             setState(() {
               _activeStudentId = newId;
@@ -913,6 +983,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
         );
+      } else if (feature.name == 'Fees Portal') {
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('auth_token') ?? widget.leaveService.token;
+        String effectiveBase = widget.leaveService.baseUrl;
+        if (effectiveBase.isEmpty || effectiveBase.contains('127.0.0.1')) {
+          final savedBase = prefs.getString('base_url') ?? _workingBaseUrl;
+          if (savedBase.isNotEmpty && !savedBase.contains('127.0.0.1')) {
+            effectiveBase = savedBase;
+          }
+        }
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => FeesPortalScreen(
+              baseUrl: effectiveBase,
+              token: token,
+            ),
+          ),
+        );
       }
     } else {
 
@@ -982,15 +1071,41 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                               }
 
                               if (photoUrl.isNotEmpty) {
-                                final fullUrl = photoUrl.startsWith('http') ? photoUrl : '${widget.leaveService.baseUrl}$photoUrl';
+                                final fullUrl = _buildFullPhotoUrl(photoUrl);
                                 return ClipOval(
                                   child: CachedNetworkImage(
                                     imageUrl: fullUrl,
                                     width: 48,
                                     height: 48,
                                     fit: BoxFit.cover,
-                                    placeholder: (context, url) => Icon(Icons.person, size: 28, color: Colors.indigo.shade800),
-                                    errorWidget: (context, url, error) => Icon(Icons.person, size: 28, color: Colors.indigo.shade800),
+                                    placeholder: (context, url) => Container(
+                                      width: 48,
+                                      height: 48,
+                                      color: Colors.indigo.shade50,
+                                      child: Center(
+                                        child: SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.indigo.shade400),
+                                        ),
+                                      ),
+                                    ),
+                                    errorWidget: (context, url, error) {
+                                      if ((url.contains('127.0.0.1') || url.contains('localhost')) &&
+                                          _workingBaseUrl.isNotEmpty &&
+                                          !_workingBaseUrl.contains('127.0.0.1') &&
+                                          !_workingBaseUrl.contains('localhost')) {
+                                        final fallbackUrl = url.replaceAll(RegExp(r'http://(127\.0\.0\.1|localhost):8000'), _workingBaseUrl);
+                                        return CachedNetworkImage(
+                                          imageUrl: fallbackUrl,
+                                          width: 48,
+                                          height: 48,
+                                          fit: BoxFit.cover,
+                                          errorWidget: (c, u, e) => Icon(Icons.person, size: 28, color: Colors.indigo.shade800),
+                                        );
+                                      }
+                                      return Icon(Icons.person, size: 28, color: Colors.indigo.shade800);
+                                    },
                                   ),
                                 );
                               }

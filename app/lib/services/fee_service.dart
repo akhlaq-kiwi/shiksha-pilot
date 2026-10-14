@@ -1,0 +1,99 @@
+import 'dart:convert';
+import 'package:school_hub/services/http_service.dart' as http;
+
+class FeeService {
+  final String baseUrl;
+  final String token;
+
+  FeeService({required this.baseUrl, required this.token});
+
+  Map<String, String> get _headers => {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer $token',
+  };
+
+  /// Loads all data required to calculate student outstanding balances
+  Future<Map<String, dynamic>> fetchPortalData() async {
+    final results = await Future.wait([
+      http.get(Uri.parse('$baseUrl/api/school/students'), headers: _headers),
+      http.get(Uri.parse('$baseUrl/api/school/classes'), headers: _headers),
+      http.get(Uri.parse('$baseUrl/api/school/fee-payments'), headers: _headers),
+      http.get(Uri.parse('$baseUrl/api/school/class-fee-configurations'), headers: _headers),
+      http.get(Uri.parse('$baseUrl/api/school/additional-fees/payments'), headers: _headers),
+    ]);
+
+    final studentsRes = results[0];
+    final classesRes = results[1];
+    final feePaymentsRes = results[2];
+    final feeConfigsRes = results[3];
+    final additionalPaymentsRes = results[4];
+
+    if (studentsRes.statusCode != 200) {
+      final err = json.decode(studentsRes.body);
+      throw Exception(err['message'] ?? 'Failed to load students');
+    }
+
+    final studentsData = json.decode(studentsRes.body)['data'] ?? [];
+    final classesData = classesRes.statusCode == 200 ? (json.decode(classesRes.body)['data'] ?? []) : [];
+    final feePaymentsData = feePaymentsRes.statusCode == 200 ? (json.decode(feePaymentsRes.body)['data'] ?? []) : [];
+    final feeConfigsData = feeConfigsRes.statusCode == 200 ? (json.decode(feeConfigsRes.body)['data'] ?? []) : [];
+    final additionalPaymentsData = additionalPaymentsRes.statusCode == 200 ? (json.decode(additionalPaymentsRes.body)['data'] ?? []) : [];
+
+    return {
+      'students': studentsData,
+      'classes': classesData,
+      'fee_payments': feePaymentsData,
+      'class_fee_configs': feeConfigsData,
+      'additional_payments': additionalPaymentsData,
+    };
+  }
+
+  /// Fetch full student details with payments and class_fee_config
+  Future<Map<String, dynamic>> fetchStudentDetail(int studentId) async {
+    final uri = Uri.parse('$baseUrl/api/school/students/$studentId');
+    final res = await http.get(uri, headers: _headers);
+    if (res.statusCode == 200) {
+      final decoded = json.decode(res.body);
+      return decoded['data'] ?? {};
+    } else {
+      final err = json.decode(res.body);
+      throw Exception(err['message'] ?? 'Failed to load student details');
+    }
+  }
+
+  /// Deposit tuition fee payment
+  Future<Map<String, dynamic>> depositFeePayment(Map<String, dynamic> payload) async {
+    final uri = Uri.parse('$baseUrl/api/school/fee-payments');
+    final res = await http.post(uri, headers: _headers, body: json.encode(payload));
+    final decoded = json.decode(res.body);
+    if (res.statusCode == 200 || res.statusCode == 201) {
+      return decoded;
+    } else {
+      String msg = 'Failed to deposit fee.';
+      if (decoded['message'] != null && decoded['message'].toString().isNotEmpty) {
+        msg = decoded['message'].toString();
+      } else if (decoded['errors'] != null) {
+        final errs = decoded['errors'];
+        if (errs is Map) {
+          msg = errs.values.first.toString();
+        } else {
+          msg = errs.toString();
+        }
+      }
+      throw Exception(msg);
+    }
+  }
+
+  /// Collect additional fee payment (e.g. Previous Year Dues)
+  Future<Map<String, dynamic>> collectAdditionalFeePayment(int paymentId, Map<String, dynamic> payload) async {
+    final uri = Uri.parse('$baseUrl/api/school/additional-fees/payments/$paymentId/pay');
+    final res = await http.post(uri, headers: _headers, body: json.encode(payload));
+    final decoded = json.decode(res.body);
+    if (res.statusCode == 200 || res.statusCode == 201) {
+      return decoded;
+    } else {
+      final msg = decoded['message'] ?? 'Failed to deposit additional fee.';
+      throw Exception(msg.toString());
+    }
+  }
+}

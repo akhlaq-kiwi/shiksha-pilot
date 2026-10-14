@@ -153,12 +153,32 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                           color: Colors.blue.shade50,
                           child: const Icon(Icons.person, size: 50, color: Color(0xFF2196F3)),
                         ),
-                        errorWidget: (context, url, error) => Container(
-                          width: 100,
-                          height: 100,
-                          color: Colors.blue.shade50,
-                          child: const Icon(Icons.person, size: 50, color: Color(0xFF2196F3)),
-                        ),
+                        errorWidget: (context, url, error) {
+                          if ((url.contains('127.0.0.1') || url.contains('localhost')) &&
+                              widget.baseUrl.isNotEmpty &&
+                              !widget.baseUrl.contains('127.0.0.1') &&
+                              !widget.baseUrl.contains('localhost')) {
+                            final fallbackUrl = url.replaceAll(RegExp(r'http://(127\.0\.0\.1|localhost):8000'), widget.baseUrl);
+                            return CachedNetworkImage(
+                              imageUrl: fallbackUrl,
+                              width: 100,
+                              height: 100,
+                              fit: BoxFit.cover,
+                              errorWidget: (c, u, e) => Container(
+                                width: 100,
+                                height: 100,
+                                color: Colors.blue.shade50,
+                                child: const Icon(Icons.person, size: 50, color: Color(0xFF2196F3)),
+                              ),
+                            );
+                          }
+                          return Container(
+                            width: 100,
+                            height: 100,
+                            color: Colors.blue.shade50,
+                            child: const Icon(Icons.person, size: 50, color: Color(0xFF2196F3)),
+                          );
+                        },
                       )
                     : Container(
                         width: 100,

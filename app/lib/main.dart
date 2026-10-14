@@ -248,6 +248,10 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         }
       } else {
         // Teacher / School Admin
+        final bool isPrincipal = (prefs.getBool('is_principal') ?? false) || (roleUpper == 'PRINCIPAL');
+        final bool isFeeCollector = prefs.getBool('is_fee_collector') ?? false;
+        final String userPhoto = prefs.getString('user_photo') ?? '';
+        final String userName = prefs.getString('user_name') ?? '';
         if (mounted) {
           Navigator.pushReplacement(
             context,
@@ -255,6 +259,10 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               builder: (context) => HomeScreen(
                 leaveService: leaveService,
                 userRole: role,
+                isPrincipal: isPrincipal,
+                isFeeCollector: isFeeCollector,
+                userPhoto: userPhoto,
+                userName: userName,
               ),
             ),
           );
@@ -393,14 +401,21 @@ class _LoginScreenState extends State<LoginScreen> {
       await prefs.setString('user_name', name);
       await prefs.setString('user_phone', (user['phone'] as String?) ?? '');
       await prefs.setString('school_name', ((user['school_name'] as String?) ?? 'Shiksha Pilot Academy').toUpperCase());
-      await prefs.setString('user_photo', (user['staff_photo_path'] as String?) ?? (user['photo_path'] as String?) ?? (user['photo'] as String?) ?? '');
+      final String userPhoto = (user['staff_photo_path'] as String?) ?? (user['photo_path'] as String?) ?? (user['photo'] as String?) ?? '';
+      await prefs.setString('user_photo', userPhoto);
       final bool isPrincipal = user['is_principal'] == true ||
           user['is_principal'] == 1 ||
           user['is_principal'] == '1' ||
           (user['role']?.toString().toUpperCase() == 'PRINCIPAL');
       await prefs.setBool('is_principal', isPrincipal);
 
-      final leaveService = LeaveService(baseUrl: activeBaseUrl, token: token);
+      final bool isFeeCollector = user['is_fee_collector'] == true ||
+          user['is_fee_collector'] == 1 ||
+          user['is_fee_collector'] == '1';
+      await prefs.setBool('is_fee_collector', isFeeCollector);
+
+      final workingBaseUrl = prefs.getString('base_url') ?? activeBaseUrl;
+      final leaveService = LeaveService(baseUrl: workingBaseUrl, token: token);
 
       final pendingPayload = prefs.getString('pending_notification_payload');
       if (pendingPayload != null && pendingPayload.isNotEmpty) {
@@ -480,6 +495,10 @@ class _LoginScreenState extends State<LoginScreen> {
               builder: (context) => HomeScreen(
                 leaveService: leaveService,
                 userRole: role,
+                isPrincipal: isPrincipal,
+                isFeeCollector: isFeeCollector,
+                userPhoto: userPhoto,
+                userName: name,
               ),
             ),
           );

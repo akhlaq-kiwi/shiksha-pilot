@@ -267,6 +267,34 @@ class SchoolAdminController extends BaseController
         return $this->success($response, $result, $result['message'] ?? 'Principal role updated successfully.');
     }
 
+    public function requestFeeCollectorOtp(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int)$args['id'];
+        $body = RequestParser::body($request);
+        $action = $body['action'] ?? $request->getQueryParams()['action'] ?? 'assign';
+        $result = $this->service->requestFeeCollectorOtp($user, $id, $action);
+
+        return $this->success($response, $result, 'OTP sent to school admin email address.');
+    }
+
+    public function assignFeeCollectorRole(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int)$args['id'];
+        $body = RequestParser::body($request);
+        $otpCode = $body['otp_code'] ?? null;
+        $action = $body['action'] ?? 'assign';
+
+        $result = $this->service->assignFeeCollectorRole($user, $id, $otpCode, $action);
+
+        return $this->success($response, $result, $result['message'] ?? 'Fee Collector role updated successfully.');
+    }
+
     // -------------------------------------------------------------------------
     // Classes
     // -------------------------------------------------------------------------
@@ -987,8 +1015,37 @@ class SchoolAdminController extends BaseController
 
     protected function requireRole(array $user, string|array $roles): void
     {
-        $userRole = $user['role'] ?? '';
+        $userRole = strtoupper((string)($user['role'] ?? ''));
         $uri = $_SERVER['REQUEST_URI'] ?? '';
+
+        // Strict School Admin authorization for Principal & Fee Collector role management
+        if (str_contains($uri, 'request-principal-otp') || 
+            str_contains($uri, 'assign-principal') || 
+            str_contains($uri, 'request-fee-collector-otp') || 
+            str_contains($uri, 'assign-fee-collector')) {
+            if ($userRole !== 'SCHOOL_ADMIN' && $userRole !== 'SUPER_ADMIN') {
+                throw new \App\Shared\Exceptions\ForbiddenException('Access Denied. Only School Admin can assign or unassign Principal and Fee Collector roles.');
+            }
+            if ($this->service->checkSubscriptionExpired($user)) {
+                throw new \App\Shared\Exceptions\ForbiddenException('Subscription Expired. Access Denied.');
+            }
+            return;
+        }
+
+        // Fee Collector route authorization
+        if (str_contains($uri, '/api/school/fee-payments') || 
+            str_contains($uri, '/api/school/class-fee-configurations') || 
+            str_contains($uri, '/api/school/additional-fees') || 
+            str_contains($uri, '/api/school/collection-history') ||
+            str_contains($uri, '/api/school/fee-structures') ||
+            (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && (str_contains($uri, '/api/school/students') || str_contains($uri, '/api/school/classes')))) {
+            if ($userRole === 'SCHOOL_ADMIN' || $this->service->isFeeCollector($user)) {
+                if ($this->service->checkSubscriptionExpired($user)) {
+                    throw new \App\Shared\Exceptions\ForbiddenException('Subscription Expired. Access Denied.');
+                }
+                return;
+            }
+        }
 
         // Principal teacher attendance route authorization
         if (str_contains($uri, '/api/school/teacher-attendance')) {
