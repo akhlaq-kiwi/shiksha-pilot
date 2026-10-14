@@ -18917,13 +18917,15 @@ Only approve the settlement after reviewing all financial records.
             $numB = isset($matchB[0]) ? (int)$matchB[0] : null;
 
             $getPrePrimaryRank = function ($name) {
-                $lower = strtolower($name);
-                if (str_contains($lower, 'play')) return 1;
-                if (str_contains($lower, 'nurs')) return 2;
-                if (str_contains($lower, 'lkg'))  return 3;
-                if (str_contains($lower, 'ukg'))  return 4;
-                if (str_contains($lower, 'kg'))   return 5;
-                if (str_contains($lower, 'prep')) return 6;
+                $lower = strtolower(trim($name));
+                $clean = preg_replace('/[^a-z0-9]/', '', $lower);
+                if (str_contains($clean, 'play') || $clean === 'pg') return 1;
+                if (str_contains($clean, 'prenurs') || $clean === 'pnc' || str_contains($clean, 'prek')) return 2;
+                if (str_contains($clean, 'nurs') || $clean === 'nc') return 3;
+                if (str_contains($clean, 'lowerkindergarten') || str_contains($clean, 'lowerkg') || str_contains($clean, 'lkg')) return 4;
+                if (str_contains($clean, 'upperkindergarten') || str_contains($clean, 'upperkg') || str_contains($clean, 'ukg')) return 5;
+                if ($clean === 'kg' || str_contains($clean, 'kindergarten')) return 6;
+                if (str_contains($clean, 'prep')) return 7;
                 return 999;
             };
 
@@ -18958,8 +18960,9 @@ Only approve the settlement after reviewing all financial records.
     public function saveClassTeacherAssignments(array $user, array $data): array
     {
         $userRole = strtolower($user['role'] ?? '');
-        if ($userRole !== 'school_admin' && $userRole !== 'admin') {
-            throw new \App\Shared\Exceptions\ValidationException(['permission' => 'Only School Admin has permission to assign user roles and menu permissions.']);
+        $isPrincipal = $this->isPrincipal($user);
+        if ($userRole !== 'school_admin' && $userRole !== 'admin' && !$isPrincipal && $userRole !== 'principal') {
+            throw new \App\Shared\Exceptions\ValidationException(['permission' => 'Only School Admin or Principal has permission to assign user roles and class teacher assignments.']);
         }
 
         $pdo = $this->classRepo->getPdo();

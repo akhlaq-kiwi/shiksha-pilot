@@ -1068,6 +1068,16 @@ class SchoolAdminController extends BaseController
             }
         }
 
+        // Principal class teacher assignments route authorization
+        if (str_contains($uri, '/api/school/class-teacher-assignments')) {
+            if ($userRole === 'SCHOOL_ADMIN' || $userRole === 'PRINCIPAL' || $this->service->isPrincipal($user)) {
+                if ($this->service->checkSubscriptionExpired($user)) {
+                    throw new \App\Shared\Exceptions\ForbiddenException('Subscription Expired. Access Denied.');
+                }
+                return;
+            }
+        }
+
         if ($userRole === 'TEACHER' || $userRole === 'PRINCIPAL') {
             $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
