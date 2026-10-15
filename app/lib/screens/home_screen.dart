@@ -211,14 +211,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       name: 'Fees Portal',
       icon: Icons.account_balance_rounded,
       color: const Color(0xFFD97706),
-      allowedRoles: ['TEACHER', 'PRINCIPAL', 'SCHOOL_ADMIN'],
+      allowedRoles: ['TEACHER', 'FEE_COLLECTOR'],
       isAvailable: true,
     ),
     LauncherFeature(
       name: 'TSD',
       icon: Icons.payments_rounded,
       color: const Color(0xFF0D9488),
-      allowedRoles: ['TEACHER', 'PRINCIPAL', 'SCHOOL_ADMIN'],
+      allowedRoles: ['TEACHER', 'FEE_COLLECTOR'],
       isAvailable: true,
     ),
     LauncherFeature(
@@ -564,6 +564,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       userRole: widget.userRole,
                       selectedStudentId: _activeStudentId,
                       initialTabIndex: isLeaveApprovalOrReqNotif ? 1 : 0,
+                      isPrincipal: _isPrincipal,
                     ),
                   ),
                 ).then((_) => _loadSessionInfo());
@@ -708,7 +709,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         return (_isPrincipal == true || role == 'PRINCIPAL');
       }
       if (f.name == 'Fees Portal') {
-        return _isFeeCollector == true || _isPrincipal == true || role == 'PRINCIPAL' || role == 'SCHOOL_ADMIN';
+        return _isFeeCollector == true;
       }
       if (f.name == 'TSD') {
         return _isFeeCollector == true;
@@ -832,6 +833,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               userRole: widget.userRole,
               selectedStudentId: _activeStudentId,
               initialTabIndex: 0, // Always open Official Holidays on normal icon click
+              isPrincipal: _isPrincipal,
             ),
           ),
         ).then((_) => _loadSessionInfo()); // reload details in case anything changed

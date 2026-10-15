@@ -46,7 +46,7 @@ class LeaveRequestController extends BaseController
     public function updateLeaveStatus(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER']);
+        $this->requireRole($user, ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'PRINCIPAL']);
 
         $id = (int)$args['id'];
         $body = RequestParser::body($request);

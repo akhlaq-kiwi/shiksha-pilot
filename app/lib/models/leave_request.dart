@@ -14,6 +14,7 @@ class LeaveRequest {
   final String? rejectReason;
   final String? studentName;
   final String? teacherName;
+  final String? teacherDepartment;
   final String? classLabel;
 
   LeaveRequest({
@@ -32,6 +33,7 @@ class LeaveRequest {
     this.rejectReason,
     this.studentName,
     this.teacherName,
+    this.teacherDepartment,
     this.classLabel,
   });
 
@@ -52,6 +54,7 @@ class LeaveRequest {
       rejectReason: json['reject_reason'],
       studentName: json['student_name'],
       teacherName: json['teacher_name'],
+      teacherDepartment: json['teacher_department'],
       classLabel: json['class_name'] != null ? "${json['class_name']}-${json['class_section'] ?? ''}" : null,
     );
   }

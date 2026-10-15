@@ -15,10 +15,19 @@ class LeaveService {
         'Authorization': 'Bearer $token',
       };
 
-  Future<List<LeaveRequest>> getLeaveRequests({String? viewType, int? studentId}) async {
+  Future<List<LeaveRequest>> getLeaveRequests({
+    String? viewType,
+    int? studentId,
+    String? status,
+    String? applicantRole,
+    int? classId,
+  }) async {
     final queryParams = <String, String>{};
     if (viewType != null) queryParams['view_type'] = viewType;
     if (studentId != null) queryParams['student_id'] = studentId.toString();
+    if (status != null && status != 'ALL') queryParams['status'] = status;
+    if (applicantRole != null && applicantRole != 'ALL') queryParams['applicant_role'] = applicantRole;
+    if (classId != null) queryParams['class_id'] = classId.toString();
 
     final uri = Uri.parse('$baseUrl/api/school/leave-requests').replace(queryParameters: queryParams);
     final response = await http.get(uri, headers: _headers);
@@ -29,6 +38,54 @@ class LeaveService {
     } else {
       _handleErrorResponse(response, 'Failed to load leave history.');
       throw Exception('Failed to load leave history.');
+    }
+  }
+
+  Future<void> updateLeaveRequestStatus(
+    int id, {
+    required String status,
+    String? rejectReason,
+  }) async {
+    final body = {
+      'status': status,
+      if (rejectReason != null && rejectReason.trim().isNotEmpty) 'reject_reason': rejectReason.trim(),
+    };
+    final uri = Uri.parse('$baseUrl/api/school/leave-requests/$id/status');
+    final response = await http.put(uri, headers: _headers, body: json.encode(body));
+
+    if (response.statusCode != 200) {
+      _handleErrorResponse(response, 'Failed to update leave request status.');
+      throw Exception('Failed to update leave request status.');
+    }
+  }
+
+  Future<void> createHoliday({
+    required String name,
+    required String startDate,
+    String? endDate,
+  }) async {
+    final body = {
+      'name': name.trim(),
+      'start_date': startDate,
+      'end_date': (endDate != null && endDate.trim().isNotEmpty) ? endDate.trim() : startDate,
+      'date': startDate,
+    };
+    final uri = Uri.parse('$baseUrl/api/school/holidays');
+    final response = await http.post(uri, headers: _headers, body: json.encode(body));
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      _handleErrorResponse(response, 'Failed to create holiday.');
+      throw Exception('Failed to create holiday.');
+    }
+  }
+
+  Future<void> deleteHoliday(int id) async {
+    final uri = Uri.parse('$baseUrl/api/school/holidays/$id');
+    final response = await http.delete(uri, headers: _headers);
+
+    if (response.statusCode != 200) {
+      _handleErrorResponse(response, 'Failed to delete holiday.');
+      throw Exception('Failed to delete holiday.');
     }
   }
 

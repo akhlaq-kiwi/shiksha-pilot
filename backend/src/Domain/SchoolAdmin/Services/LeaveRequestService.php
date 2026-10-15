@@ -42,11 +42,10 @@ class LeaveRequestService extends BaseService
             $filters['academic_year_id'] = $workingYear ? (int)$workingYear['id'] : 0;
         }
 
-        $role = $user['role'] ?? '';
+        $role = strtoupper((string)($user['role'] ?? ''));
+        $isPrincipal = $role === 'PRINCIPAL' || $this->schoolAdminService->isPrincipal($user);
 
-        if ($role === 'SUPER_ADMIN') {
-            return $this->repo->findWithDetails($schoolId, $filters);
-        } elseif ($role === 'SCHOOL_ADMIN') {
+        if ($role === 'SUPER_ADMIN' || $role === 'SCHOOL_ADMIN' || $isPrincipal) {
             return $this->repo->findWithDetails($schoolId, $filters);
         } elseif ($role === 'TEACHER') {
             $teacher = $this->resolveTeacher($user);
