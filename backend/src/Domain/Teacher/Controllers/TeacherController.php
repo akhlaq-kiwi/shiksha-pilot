@@ -53,7 +53,7 @@ class TeacherController extends BaseController
     public function getMyClasses(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, 'TEACHER');
+        $this->requireRole($user, ['TEACHER', 'PRINCIPAL', 'SCHOOL_ADMIN', 'ADMIN']);
 
         $params = $request->getQueryParams();
         $rawOnlyAssigned = strtolower(trim((string)($params['only_assigned'] ?? '')));
@@ -225,7 +225,7 @@ class TeacherController extends BaseController
     public function getExamsList(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, 'TEACHER');
+        $this->requireRole($user, ['TEACHER', 'PRINCIPAL', 'SCHOOL_ADMIN', 'ADMIN']);
         $queryParams = $request->getQueryParams();
         $classId = isset($queryParams['class_id']) ? (int)$queryParams['class_id'] : null;
         $data = $this->service->getExamsList($user, $classId);
@@ -235,7 +235,7 @@ class TeacherController extends BaseController
     public function getExamDetails(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, 'TEACHER');
+        $this->requireRole($user, ['TEACHER', 'PRINCIPAL', 'SCHOOL_ADMIN', 'ADMIN']);
         $examId = (int)$args['id'];
         $queryParams = $request->getQueryParams();
         $classId = isset($queryParams['class_id']) ? (int)$queryParams['class_id'] : null;
@@ -246,7 +246,7 @@ class TeacherController extends BaseController
     public function getMarksSheet(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, 'TEACHER');
+        $this->requireRole($user, ['TEACHER', 'PRINCIPAL', 'SCHOOL_ADMIN', 'ADMIN']);
         $examId = (int)$args['id'];
         $queryParams = $request->getQueryParams();
         $subjectId = (int)($queryParams['subject_id'] ?? 0);
@@ -258,7 +258,7 @@ class TeacherController extends BaseController
     public function saveMarksSheet(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, 'TEACHER');
+        $this->requireRole($user, ['TEACHER', 'PRINCIPAL', 'SCHOOL_ADMIN', 'ADMIN']);
         $examId = (int)$args['id'];
         $body = (array)$request->getParsedBody();
         $data = $this->service->saveMarksSheet($user, $examId, $body);

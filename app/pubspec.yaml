@@ -54,6 +54,8 @@ dependencies:
   # dialog cannot drift from what was actually shipped.
   package_info_plus: ^8.1.1
   qr_flutter: ^4.1.0
+  record: ^7.1.2
+  audioplayers: ^6.8.1
 
 dev_dependencies:
   flutter_test:

@@ -184,7 +184,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                       color: Colors.white,
                                       borderRadius: BorderRadius.circular(16),
                                       border: Border.all(
-                                        color: isExpanded ? Colors.indigo.shade300 : Colors.grey.shade200,
+                                        color: isExpanded ? const Color(0xFF0F766E) : Colors.grey.shade200,
                                         width: isExpanded ? 1.5 : 1,
                                       ),
                                       boxShadow: [
@@ -214,12 +214,12 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                                     Container(
                                                       padding: const EdgeInsets.all(8),
                                                       decoration: BoxDecoration(
-                                                        color: isExpanded ? Colors.indigo.shade50 : Colors.grey.shade100,
+                                                        color: isExpanded ? const Color(0xFFF0FDFA) : Colors.grey.shade100,
                                                         borderRadius: BorderRadius.circular(10),
                                                       ),
                                                       child: Icon(
                                                         Icons.class_rounded,
-                                                        color: isExpanded ? Colors.indigo.shade800 : Colors.grey.shade600,
+                                                        color: isExpanded ? const Color(0xFF0F766E) : Colors.grey.shade600,
                                                         size: 20,
                                                       ),
                                                     ),
@@ -229,14 +229,14 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                                       style: TextStyle(
                                                         fontSize: 15,
                                                         fontWeight: FontWeight.bold,
-                                                        color: isExpanded ? Colors.indigo.shade900 : Colors.black87,
+                                                        color: isExpanded ? const Color(0xFF0F766E) : Colors.black87,
                                                       ),
                                                     ),
                                                   ],
                                                 ),
                                                 Icon(
                                                   isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                                                  color: isExpanded ? Colors.indigo.shade800 : Colors.grey.shade500,
+                                                  color: isExpanded ? const Color(0xFF0F766E) : Colors.grey.shade500,
                                                 ),
                                               ],
                                             ),
@@ -3336,20 +3336,29 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
     final double outstandingDue = double.tryParse(_details['outstanding_due']?.toString() ?? '0') ?? 0.0;
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: const Color(0xFFFBF8F2),
       appBar: AppBar(
-        title: Text(
-          widget.examName,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-            color: Colors.white,
+        backgroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: false,
+        titleSpacing: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF1E293B), size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Padding(
+          padding: const EdgeInsets.only(top: 4.0),
+          child: Text(
+            widget.examName.toUpperCase(),
+            style: const TextStyle(
+              color: Color(0xFF0F172A),
+              fontWeight: FontWeight.w900,
+              fontSize: 16,
+              letterSpacing: 0.6,
+            ),
           ),
         ),
-        centerTitle: true,
-        elevation: 0,
-        backgroundColor: Colors.indigo.shade800,
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(color: Color(0xFF1E293B)),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -3393,8 +3402,11 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                             ElevatedButton(
                               onPressed: _loadDetails,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.indigo.shade700,
+                                backgroundColor: const Color(0xFF0F766E),
                                 foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
                               ),
                               child: const Text('Try Again'),
                             ),
@@ -3407,12 +3419,12 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
               : ListView(
                   padding: const EdgeInsets.all(20),
                   children: [
-                    Text(
+                    const Text(
                       'Examination Components',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w900,
-                        color: Colors.indigo.shade900,
+                        color: Color(0xFF0F172A),
                         letterSpacing: 0.5,
                       ),
                     ),
@@ -3511,7 +3523,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
         color: isPublished ? Colors.white : Colors.grey.shade100,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isPublished ? Colors.indigo.shade50 : Colors.grey.shade200,
+          color: isPublished ? const Color(0xFFE2E8F0) : Colors.grey.shade200,
           width: 1.5,
         ),
         boxShadow: isPublished
@@ -3549,12 +3561,12 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                   width: 50,
                   height: 50,
                   decoration: BoxDecoration(
-                    color: isPublished ? Colors.indigo.shade50 : Colors.grey.shade200,
+                    color: isPublished ? const Color(0xFFF0FDFA) : Colors.grey.shade200,
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Icon(
                     icon,
-                    color: isPublished ? Colors.indigo.shade800 : Colors.grey.shade400,
+                    color: isPublished ? const Color(0xFF0F766E) : Colors.grey.shade400,
                     size: 26,
                   ),
                 ),
@@ -3577,7 +3589,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: isPublished ? Colors.indigo.shade600 : Colors.grey.shade400,
+                          color: isPublished ? const Color(0xFF0F766E) : Colors.grey.shade400,
                         ),
                       ),
                     ],
@@ -3585,7 +3597,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                 ),
                 Icon(
                   isPublished ? Icons.arrow_forward_ios_rounded : Icons.lock_outline_rounded,
-                  color: isPublished ? Colors.indigo.shade800 : Colors.grey.shade400,
+                  color: isPublished ? const Color(0xFF0F766E) : Colors.grey.shade400,
                   size: 16,
                 ),
               ],

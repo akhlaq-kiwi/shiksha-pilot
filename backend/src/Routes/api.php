@@ -232,6 +232,7 @@ return function (App $app) {
     // Announcements Domain
     $app->get('/api/school/announcements', [SchoolAdminController::class, 'getAnnouncements']);
     $app->post('/api/school/announcements', [SchoolAdminController::class, 'createAnnouncement']);
+    $app->post('/api/school/announcements/upload-audio', [SchoolAdminController::class, 'uploadAnnouncementAudio']);
     $app->put('/api/school/announcements/{id}', [SchoolAdminController::class, 'updateAnnouncement']);
     $app->delete('/api/school/announcements/{id}', [SchoolAdminController::class, 'deleteAnnouncement']);
 

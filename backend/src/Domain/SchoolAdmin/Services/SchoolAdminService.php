@@ -2517,11 +2517,12 @@ class SchoolAdminService extends BaseService
                 ]);
                 $p['is_locked'] = ((int)$stmtCheckReport->fetchColumn() > 0) ? 1 : 0;
 
-                // Attach dynamic proration details for already paid months
+                // Attach dynamic proration details for already paid months (only if genuine joining proration)
                 $prorDetails = $this->getSalaryProrationDetails((float)$member['salary'], $member['joining_date'] ?? null, $p['payment_month'], $workingYear);
-                $isPror = ((float)$p['amount_paid'] < (float)$member['salary']) || $prorDetails['is_prorated'];
+                $isPror = !empty($prorDetails['is_prorated']);
                 $p['is_prorated'] = $isPror;
                 $p['proration_details'] = $isPror ? $prorDetails : null;
+                $p['attendance_breakdown'] = $this->getStaffSalaryAttendanceBreakdown($pdo, $schoolId, (int)$member['id'], (float)$member['salary'], $member['joining_date'] ?? null, $p['payment_month'], $workingYear);
             }
             $member['salary_payments'] = $payments;
 
@@ -13210,6 +13211,186 @@ Only approve the settlement after reviewing all financial records.
         return $res;
     }
 
+    public function getStaffSalaryAttendanceBreakdown(PDO $pdo, int $schoolId, int $staffId, float $baseSalary, ?string $joiningDate, string $month, array $workingYear): array
+    {
+        $monthMapNums = [
+            'January' => '01', 'February' => '02', 'March' => '03',
+            'April' => '04', 'May' => '05', 'June' => '06',
+            'July' => '07', 'August' => '08', 'September' => '09',
+            'October' => '10', 'November' => '11', 'December' => '12'
+        ];
+        $allAcademicMonths = [
+            'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'
+        ];
+        $ayStartYear = !empty($workingYear['start_date']) ? (int)date('Y', strtotime($workingYear['start_date'])) : (int)date('Y');
+        $mNum = $monthMapNums[$month] ?? '01';
+        $mYearIndex = array_search($month, $allAcademicMonths);
+        $mYear = ($mYearIndex !== false && $mYearIndex >= 9) ? ($ayStartYear + 1) : $ayStartYear;
+        $ymPrefix = sprintf("%04d-%02d", $mYear, (int)$mNum);
+
+        $startDate = "{$ymPrefix}-01";
+        $totalDaysInMonth = (int)date('t', strtotime($startDate));
+        $endDate = sprintf("%04d-%02d-%02d", $mYear, (int)$mNum, $totalDaysInMonth);
+
+        // Settings
+        $stmtSett = $pdo->prepare("SELECT allowed_leaves, late_penalty_amount FROM teacher_attendance_settings WHERE school_id = :sid LIMIT 1");
+        $stmtSett->execute([':sid' => $schoolId]);
+        $settRow = $stmtSett->fetch(PDO::FETCH_ASSOC);
+        $allowedLeaves = (isset($settRow['allowed_leaves']) && $settRow['allowed_leaves'] !== '') ? (int)$settRow['allowed_leaves'] : 0;
+        $latePenaltyAmount = (float)($settRow['late_penalty_amount'] ?? 0.0);
+
+        // Holidays
+        $stmtHol = $pdo->prepare("SELECT date, name FROM holidays WHERE school_id = :sid AND date >= :sdate AND date <= :edate");
+        $stmtHol->execute([':sid' => $schoolId, ':sdate' => $startDate, ':edate' => $endDate]);
+        $holidayRows = $stmtHol->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $holidayMap = [];
+        foreach ($holidayRows as $h) {
+            $holidayMap[$h['date']] = $h['name'];
+        }
+
+        // Attendance
+        $stmtAtt = $pdo->prepare("SELECT date, status, is_late FROM teacher_attendance WHERE school_id = :sid AND staff_id = :st_id AND date >= :sdate AND date <= :edate ORDER BY date ASC");
+        $stmtAtt->execute([':sid' => $schoolId, ':st_id' => $staffId, ':sdate' => $startDate, ':edate' => $endDate]);
+        $attRows = $stmtAtt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $attendanceMap = [];
+        foreach ($attRows as $a) {
+            $attendanceMap[$a['date']] = $a;
+        }
+
+        $presentDates = [];
+        $leaveDates = [];
+        $absentDates = [];
+        $sundayDates = [];
+        $holidayDates = [];
+        $lateDates = [];
+        $preJoiningDates = [];
+
+        for ($d = 1; $d <= $totalDaysInMonth; $d++) {
+            $dateStr = sprintf("%04d-%02d-%02d", $mYear, (int)$mNum, $d);
+
+            if (!empty($joiningDate) && $dateStr < $joiningDate) {
+                $preJoiningDates[] = $dateStr;
+                continue;
+            }
+
+            if (date('N', strtotime($dateStr)) == 7) {
+                $sundayDates[] = $dateStr;
+                continue;
+            }
+
+            if (isset($holidayMap[$dateStr])) {
+                $holidayDates[] = $dateStr;
+                continue;
+            }
+
+            if (isset($attendanceMap[$dateStr])) {
+                $rec = $attendanceMap[$dateStr];
+                if ($rec['status'] === 'Present') {
+                    $presentDates[] = $dateStr;
+                    if (!empty($rec['is_late'])) {
+                        $lateDates[] = $dateStr;
+                    }
+                } elseif ($rec['status'] === 'Leave') {
+                    $leaveDates[] = $dateStr;
+                } else {
+                    $absentDates[] = $dateStr;
+                }
+            } else {
+                $absentDates[] = $dateStr;
+            }
+        }
+
+        $presentCount = count($presentDates);
+        $leaveCount = count($leaveDates);
+        $sundayCount = count($sundayDates);
+        $holidayCount = count($holidayDates);
+        $preJoiningCount = count($preJoiningDates);
+
+        $paidLeaveDays = min($leaveCount, $allowedLeaves);
+        $unpaidLeaveDays = max(0, $leaveCount - $allowedLeaves);
+        
+        $paidLeaveDates = [];
+        $unpaidLeaveDates = [];
+        if ($paidLeaveDays > 0) {
+            $paidLeaveDates = array_slice($leaveDates, 0, $paidLeaveDays);
+        }
+        if ($unpaidLeaveDays > 0) {
+            $unpaidLeaveDates = array_slice($leaveDates, $paidLeaveDays);
+        }
+        
+        $allUnpaidDates = array_merge($absentDates, $unpaidLeaveDates);
+        sort($allUnpaidDates);
+
+        $paidDays = $presentCount + $paidLeaveDays + $sundayCount + $holidayCount;
+        
+        $latePenaltyDeduction = 0.0;
+        if ($latePenaltyAmount > 0 && count($lateDates) > 0) {
+            $latePenaltyDeduction = count($lateDates) * $latePenaltyAmount;
+        }
+
+        $monthShort = substr($month, 0, 3);
+
+        $formattedPureAbsentDates = [];
+        foreach ($absentDates as $ad) {
+            $formattedPureAbsentDates[] = date('d', strtotime($ad));
+        }
+        $pureAbsentDatesDisplay = !empty($formattedPureAbsentDates)
+            ? implode(', ', $formattedPureAbsentDates) . ' ' . $monthShort
+            : '';
+
+        $formattedUnpaidLeaveDates = [];
+        foreach ($unpaidLeaveDates as $uld) {
+            $formattedUnpaidLeaveDates[] = date('d', strtotime($uld));
+        }
+        $unpaidLeaveDatesDisplay = !empty($formattedUnpaidLeaveDates)
+            ? implode(', ', $formattedUnpaidLeaveDates) . ' ' . $monthShort
+            : '';
+
+        $formattedPaidLeaveDates = [];
+        foreach ($paidLeaveDates as $pld) {
+            $formattedPaidLeaveDates[] = date('d', strtotime($pld));
+        }
+        $paidLeaveDatesDisplay = !empty($formattedPaidLeaveDates)
+            ? implode(', ', $formattedPaidLeaveDates) . ' ' . $monthShort
+            : '';
+
+        $formattedAbsentDates = [];
+        foreach ($allUnpaidDates as $ud) {
+            $formattedAbsentDates[] = date('d', strtotime($ud));
+        }
+        $absentDatesDisplay = !empty($formattedAbsentDates) 
+            ? implode(', ', $formattedAbsentDates) . ' ' . $monthShort
+            : 'None (Full Attendance)';
+
+        return [
+            'base_salary' => $baseSalary,
+            'total_days' => $totalDaysInMonth,
+            'paid_days' => $paidDays,
+            'present_count' => $presentCount,
+            'leave_count' => $leaveCount,
+            'allowed_leaves' => $allowedLeaves,
+            'paid_leave_count' => $paidLeaveDays,
+            'paid_leave_dates' => $paidLeaveDates,
+            'paid_leave_dates_display' => $paidLeaveDatesDisplay,
+            'unpaid_leave_count' => $unpaidLeaveDays,
+            'unpaid_leave_dates' => $unpaidLeaveDates,
+            'unpaid_leave_dates_display' => $unpaidLeaveDatesDisplay,
+            'pure_absent_count' => count($absentDates),
+            'pure_absent_dates' => $absentDates,
+            'pure_absent_dates_display' => $pureAbsentDatesDisplay,
+            'sunday_count' => $sundayCount,
+            'holiday_count' => $holidayCount,
+            'pre_joining_count' => $preJoiningCount,
+            'absent_count' => count($allUnpaidDates),
+            'absent_dates' => $allUnpaidDates,
+            'absent_dates_display' => $absentDatesDisplay,
+            'late_count' => count($lateDates),
+            'late_penalty_deduction' => $latePenaltyDeduction,
+            'month' => $month,
+            'year' => $mYear
+        ];
+    }
+
     private function calculateTransportCharge(string $startDateStr, float $monthlyFee, string $targetMonthStr): float
     {
         return round($this->calculateProratedAmount($startDateStr, $monthlyFee, $targetMonthStr, false));
@@ -19159,7 +19340,50 @@ Only approve the settlement after reviewing all financial records.
             ORDER BY created_at DESC
         ");
         $stmt->execute([':sid' => $schoolId]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        if (empty($announcements)) {
+            return [];
+        }
+
+        $creators = array_unique(array_filter(array_column($announcements, 'created_by')));
+        $authorMap = [];
+        if (!empty($creators)) {
+            $placeholders = implode(',', array_fill(0, count($creators), '?'));
+            $paramsMap = array_merge(array_values($creators), array_values($creators));
+
+            $stmtUsers = $pdo->prepare("SELECT phone, id, name, role FROM users WHERE phone IN ($placeholders) OR id IN ($placeholders)");
+            $stmtUsers->execute($paramsMap);
+            while ($row = $stmtUsers->fetch(PDO::FETCH_ASSOC)) {
+                if (!empty($row['name'])) {
+                    $roleLabel = ($row['role'] === 'PRINCIPAL' || $row['role'] === 'SCHOOL_ADMIN') ? 'Principal' : 'Teacher';
+                    $authorMap[$row['phone']] = $row['name'] . ' (' . $roleLabel . ')';
+                    $authorMap[(string)$row['id']] = $row['name'] . ' (' . $roleLabel . ')';
+                }
+            }
+
+            $stmtStaff = $pdo->prepare("SELECT phone, id, name, role, is_principal FROM staff WHERE phone IN ($placeholders) OR id IN ($placeholders)");
+            $stmtStaff->execute($paramsMap);
+            while ($row = $stmtStaff->fetch(PDO::FETCH_ASSOC)) {
+                if (!empty($row['name'])) {
+                    $isPrinc = !empty($row['is_principal']) || strtoupper($row['role'] ?? '') === 'PRINCIPAL';
+                    $roleLabel = $isPrinc ? 'Principal' : 'Teacher';
+                    if (empty($authorMap[$row['phone']])) {
+                        $authorMap[$row['phone']] = $row['name'] . ' (' . $roleLabel . ')';
+                    }
+                    if (empty($authorMap[(string)$row['id']])) {
+                        $authorMap[(string)$row['id']] = $row['name'] . ' (' . $roleLabel . ')';
+                    }
+                }
+            }
+        }
+
+        foreach ($announcements as &$a) {
+            $cb = $a['created_by'] ?? '';
+            $a['author_name'] = $authorMap[$cb] ?? (!empty($cb) && !is_numeric($cb) ? $cb : 'Principal');
+        }
+        unset($a);
+
+        return $announcements;
     }
 
     public function createAnnouncement(array $user, array $data): array
@@ -19171,10 +19395,25 @@ Only approve the settlement after reviewing all financial records.
         $description = isset($data['description']) ? trim((string)$data['description']) : '';
         $audience = isset($data['audience']) ? trim((string)$data['audience']) : '';
         $status = isset($data['status']) ? trim((string)$data['status']) : 'Draft';
+        $audioUrl = isset($data['audio_url']) ? trim((string)$data['audio_url']) : null;
+        $audioDuration = isset($data['audio_duration']) && $data['audio_duration'] !== '' ? (int)$data['audio_duration'] : null;
+
+        if ($audioUrl !== null && $audioUrl !== '') {
+            if ($subject === '') {
+                $subject = 'Voice Announcement';
+            }
+            if ($description === '') {
+                $description = '<p>Voice Announcement</p>';
+            }
+        }
 
         // Validation
         if ($subject === '') {
-            throw new ValidationException(['subject' => 'Subject is mandatory.']);
+            if (!empty($audioUrl)) {
+                $subject = 'Voice Note';
+            } else {
+                throw new ValidationException(['subject' => 'Subject is mandatory.']);
+            }
         }
         if (mb_strlen($subject) > 100) {
             throw new ValidationException(['subject' => 'Subject cannot exceed 100 characters.']);
@@ -19182,7 +19421,7 @@ Only approve the settlement after reviewing all financial records.
         
         // Strip tags to check if description has actual text content
         $textCheck = trim(strip_tags($description));
-        if ($textCheck === '') {
+        if ($textCheck === '' && empty($audioUrl)) {
             throw new ValidationException(['description' => 'Description is mandatory.']);
         }
 
@@ -19196,17 +19435,41 @@ Only approve the settlement after reviewing all financial records.
         }
 
         $publishedAt = ($status === 'Published') ? date('Y-m-d H:i:s') : null;
-        $actorName = $user['name'] ?? $user['phone'] ?? $user['email'] ?? 'School Admin';
+
+        $actorName = null;
+        if (!empty($user['id'])) {
+            $stmtUser = $pdo->prepare("SELECT name, role FROM users WHERE id = :id LIMIT 1");
+            $stmtUser->execute([':id' => $user['id']]);
+            $uRow = $stmtUser->fetch(PDO::FETCH_ASSOC);
+            if (!empty($uRow['name'])) {
+                $roleLabel = ($uRow['role'] === 'PRINCIPAL' || $uRow['role'] === 'SCHOOL_ADMIN') ? 'Principal' : 'Teacher';
+                $actorName = $uRow['name'] . ' (' . $roleLabel . ')';
+            }
+        }
+        if (empty($actorName) && !empty($user['phone'])) {
+            $stmtStaff = $pdo->prepare("SELECT name, role, is_principal FROM staff WHERE phone = :phone AND school_id = :sid ORDER BY id DESC LIMIT 1");
+            $stmtStaff->execute([':phone' => $user['phone'], ':sid' => $schoolId]);
+            $sRow = $stmtStaff->fetch(PDO::FETCH_ASSOC);
+            if (!empty($sRow['name'])) {
+                $roleLabel = (!empty($sRow['is_principal']) || strtoupper($sRow['role'] ?? '') === 'PRINCIPAL') ? 'Principal' : 'Teacher';
+                $actorName = $sRow['name'] . ' (' . $roleLabel . ')';
+            }
+        }
+        if (empty($actorName)) {
+            $actorName = $user['name'] ?? $user['phone'] ?? $user['email'] ?? 'Principal';
+        }
 
         // Insert
         $stmt = $pdo->prepare("
-            INSERT INTO announcements (school_id, subject, description, audience, status, published_at, created_by)
-            VALUES (:sch, :sub, :desc, :aud, :status, :pub, :by)
+            INSERT INTO announcements (school_id, subject, description, audio_url, audio_duration, audience, status, published_at, created_by)
+            VALUES (:sch, :sub, :desc, :audio, :dur, :aud, :status, :pub, :by)
         ");
         $stmt->execute([
             ':sch' => $schoolId,
             ':sub' => $subject,
             ':desc' => $description,
+            ':audio' => $audioUrl,
+            ':dur' => $audioDuration,
             ':aud' => $audience,
             ':status' => $status,
             ':pub' => $publishedAt,
@@ -19222,7 +19485,7 @@ Only approve the settlement after reviewing all financial records.
             $this->logAudit($pdo, $user, 'Announcements', 'Announcement Draft Created', "Created announcement draft: '{$subject}'");
         }
 
-        return ['id' => $announcementId, 'subject' => $subject, 'status' => $status];
+        return ['id' => $announcementId, 'subject' => $subject, 'status' => $status, 'audio_url' => $audioUrl, 'audio_duration' => $audioDuration];
     }
 
     public function updateAnnouncement(array $user, int $id, array $data): array

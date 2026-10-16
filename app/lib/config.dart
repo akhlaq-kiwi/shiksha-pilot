@@ -11,7 +11,7 @@ const String kQaBaseUrl = 'https://qa.shikshapilot.com';
 const String kProductionBaseUrl = 'https://app.shikshapilot.com';
 
 /// Wi-Fi LAN IP address of local dev server.
-const String kWifiBaseUrl = 'http://10.184.196.71:8000';
+const String kWifiBaseUrl = 'http://10.155.82.71:8000';
 
 /// USB ADB reverse port forwarding URL.
 const String kUsbBaseUrl = 'http://127.0.0.1:8000';
@@ -29,10 +29,13 @@ bool get kServerOverrideAllowed => kDebugMode;
 String resolveBaseUrlFrom(SharedPreferences prefs) {
   final saved = prefs.getString(kBaseUrlPrefKey);
   if (saved != null && saved.isNotEmpty && saved != kProductionBaseUrl && saved != kQaBaseUrl) {
+    if (saved.contains('10.') && !saved.contains('10.155.82.71')) {
+      return kWifiBaseUrl;
+    }
     return saved;
   }
   if (kDebugMode) {
-    return kLocalBaseUrl;
+    return kWifiBaseUrl;
   }
   return kEnvBaseUrl;
 }

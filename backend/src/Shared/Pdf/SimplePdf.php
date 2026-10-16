@@ -504,20 +504,43 @@ class SimplePdf
             $stream .= "ET";
         } elseif ($isSalarySlip) {
             // =========================================================================
-            // REDESIGNED SALARY SLIP
+            // REDESIGNED SALARY SLIP (ATTENDANCE & TRANSPARENCY ENHANCED)
             // =========================================================================
             $schoolName = strtoupper(trim($fields['School'] ?? 'SHIKSHA PILOT SCHOOL'));
             $slipTitle = "SALARY DISBURSEMENT SLIP";
             
             $staffName = $fields['Employee Name'] ?? '—';
             $employeeId = $fields['Employee ID'] ?? '—';
+            $designation = $fields['Designation'] ?? 'Teacher';
             $salaryMonth = $fields['Month'] ?? '—';
             $amountDisbursed = $fields['Amount Disbursed'] ?? '—';
             $disbursedDate = $fields['Disbursed Date'] ?? '—';
             $statusVal = $fields['Status'] ?? 'PAID';
+            $txnId = $fields['Transaction ID'] ?? '—';
 
-            // Draw Graphics elements
-            $stream .= "0.85 0.85 0.85 RG\n";
+            // Attendance breakdown fields
+            $baseSalary = $fields['Base Salary'] ?? $amountDisbursed;
+            $totalDays = $fields['Total Days'] ?? '—';
+            $paidDays = $fields['Paid Days'] ?? '—';
+            $presentDays = $fields['Present Days'] ?? '0 Days';
+            $paidLeaves = $fields['Paid Leaves'] ?? '0 Days';
+            $unpaidLeaves = $fields['Unpaid Leaves'] ?? '0 Days';
+            $sundaysHolidays = $fields['Sundays & Holidays'] ?? '0 Days';
+            $absentDays = $fields['Absent Days'] ?? '0 Days';
+            $absentDates = $fields['Absent Dates'] ?? 'None';
+            $unpaidLeaveDates = $fields['Unpaid Leave Dates'] ?? 'None';
+            $paidLeaveDates = $fields['Paid Leave Dates'] ?? 'None';
+            $allUnpaidDates = $fields['All Unpaid Dates'] ?? $absentDates;
+            $attDeduction = $fields['Attendance Deduction'] ?? 'INR 0.00';
+            $lateDeduction = $fields['Late Penalty Deduction'] ?? 'INR 0.00';
+
+            $absentCount = (int)filter_var($absentDays, FILTER_SANITIZE_NUMBER_INT);
+            $unpaidLeaveCount = (int)filter_var($unpaidLeaves, FILTER_SANITIZE_NUMBER_INT);
+            $totalDeductedDays = $absentCount + $unpaidLeaveCount;
+            $hasLateDeduction = !empty($fields['Late Penalty Deduction']) && !in_array($fields['Late Penalty Deduction'], ['INR 0.00', '0.00', '0']);
+
+            // 1. Draw Graphics & Boxes
+            $stream .= "0.82 0.85 0.90 RG\n";
             $stream .= "0.75 w\n";
             $stream .= "45 45 505.28 751.89 re\n";
             $stream .= "S\n";
@@ -531,108 +554,357 @@ class SimplePdf
                 $stream .= "Q\n";
             }
 
-            // Divider line below header/logo
+            // Divider line below header
             $stream .= "0.09 0.17 0.35 RG\n";
             $stream .= "0.75 w\n";
-            $stream .= "50 655 m 545.28 655 l S\n";
+            $stream .= "50 660 m 545.28 660 l S\n";
 
-            $stream .= "0.88 0.90 0.94 RG\n";
-            $stream .= "0.5 w\n";
-            $stream .= "45 545 505.28 65 re\n";
-            $stream .= "S\n";
-
-            // Centered amount box
-            $stream .= "0.92 0.94 0.98 rg\n";
-            $amtX = (595.28 - 220) / 2;
-            $stream .= "{$amtX} 365 220 80 re\n";
+            // Box 1: Employee Information (Y: 590 to 650, H: 60)
+            $stream .= "0.96 0.97 0.99 rg\n";
+            $stream .= "45 590 505.28 60 re\n";
             $stream .= "f\n";
-            $stream .= "0.70 0.78 0.92 RG\n";
-            $stream .= "1 w\n";
-            $stream .= "{$amtX} 365 220 80 re\n";
+            $stream .= "0.85 0.88 0.93 RG\n";
+            $stream .= "0.5 w\n";
+            $stream .= "45 590 505.28 60 re\n";
             $stream .= "S\n";
 
-            // Draw Text elements
+            // Box 2: Attendance Breakdown (H: 112 if absent/unpaid days exist, else 75)
+            $attBoxH = ($totalDeductedDays > 0) ? 112 : 75;
+            $attBoxY = 575 - $attBoxH;
+
+            $stream .= "0.98 0.98 0.99 rg\n";
+            $stream .= "45 " . $attBoxY . " 505.28 " . $attBoxH . " re\n";
+            $stream .= "f\n";
+            $stream .= "0.85 0.88 0.93 RG\n";
+            $stream .= "0.5 w\n";
+            $stream .= "45 " . $attBoxY . " 505.28 " . $attBoxH . " re\n";
+            $stream .= "S\n";
+
+            // Highlight box for absent/unpaid dates (Neutral slate tone, no red)
+            if ($totalDeductedDays > 0) {
+                $stream .= "0.96 0.97 0.98 rg\n"; // Soft neutral slate tint
+                $stream .= "55 " . ($attBoxY + 8) . " 485.28 42 re\n";
+                $stream .= "f\n";
+                $stream .= "0.85 0.88 0.92 RG\n"; // Clean slate border
+                $stream .= "0.5 w\n";
+                $stream .= "55 " . ($attBoxY + 8) . " 485.28 42 re\n";
+                $stream .= "S\n";
+            }
+
+            // Box 3: Salary Breakdown Table (H: 120)
+            $tableY = $attBoxY - 14 - 120;
+            $tableH = 120;
+
+            $stream .= "1.0 1.0 1.0 rg\n";
+            $stream .= "45 " . $tableY . " 505.28 " . $tableH . " re\n";
+            $stream .= "f\n";
+            $stream .= "0.85 0.88 0.93 RG\n";
+            $stream .= "0.5 w\n";
+            $stream .= "45 " . $tableY . " 505.28 " . $tableH . " re\n";
+            $stream .= "S\n";
+
+            // Table Header row (H: 22)
+            $thY = $tableY + $tableH - 22;
+            $stream .= "0.92 0.94 0.98 rg\n";
+            $stream .= "45 " . $thY . " 505.28 22 re\n";
+            $stream .= "f\n";
+            $stream .= "0.85 0.88 0.93 RG\n";
+            $stream .= "0.5 w\n";
+            $stream .= "45 " . $thY . " m 550.28 " . $thY . " l S\n";
+
+            // Table Rows dividers
+            $r1Y = $thY - 24;
+            $stream .= "0.90 0.92 0.95 RG\n";
+            $stream .= "0.5 w\n";
+            $stream .= "45 " . $r1Y . " m 550.28 " . $r1Y . " l S\n";
+
+            $r2Y = $r1Y - 24;
+            $stream .= "45 " . $r2Y . " m 550.28 " . $r2Y . " l S\n";
+
+            // Net Disbursed Row highlight (at bottom of table)
+            $stream .= "0.92 0.98 0.95 rg\n"; // Light mint green fill
+            $stream .= "45 " . $tableY . " 505.28 " . ($r2Y - $tableY) . " re\n";
+            $stream .= "f\n";
+
+            // Box 4: Centered Disbursed Amount Box (H: 65)
+            $amtX = (595.28 - 250) / 2;
+            $amtBoxY = $tableY - 14 - 65;
+            $stream .= "0.93 0.96 1.0 rg\n";
+            $stream .= "{$amtX} " . $amtBoxY . " 250 65 re\n";
+            $stream .= "f\n";
+            $stream .= "0.68 0.78 0.95 RG\n";
+            $stream .= "1 w\n";
+            $stream .= "{$amtX} " . $amtBoxY . " 250 65 re\n";
+            $stream .= "S\n";
+
+            // 2. Draw Text elements
             $stream .= "BT\n";
 
             // School Name (Centered)
             $stream .= "0.09 0.17 0.35 rg\n";
             $stream .= "/F2 18 Tf\n";
             $schNameX = (595.28 - $this->getStringWidth($schoolName, 18)) / 2;
-            $stream .= "1 0 0 1 " . number_format($schNameX, 2, '.', '') . " 700 Tm\n";
+            $stream .= "1 0 0 1 " . number_format($schNameX, 2, '.', '') . " 705 Tm\n";
             $stream .= "(" . $this->escape($schoolName) . ") Tj\n";
 
             // Title (Centered)
             $stream .= "/F2 11 Tf\n";
-            $stream .= "0.3 0.3 0.3 rg\n";
+            $stream .= "0.25 0.25 0.25 rg\n";
             $titleX = (595.28 - $this->getStringWidth($slipTitle, 11)) / 2;
-            $stream .= "1 0 0 1 " . number_format($titleX, 2, '.', '') . " 680 Tm\n";
+            $stream .= "1 0 0 1 " . number_format($titleX, 2, '.', '') . " 686 Tm\n";
             $stream .= "(" . $this->escape($slipTitle) . ") Tj\n";
 
-            // Month / Date Subtitle (Centered)
+            // Month / Subtitle (Centered)
             $stream .= "/F1 9 Tf\n";
             $stream .= "0.4 0.4 0.4 rg\n";
-            $metaStr = "Month: {$salaryMonth}   |   Date: {$disbursedDate}";
+            $metaStr = "Month: {$salaryMonth}   |   Status: {$statusVal}   |   Ref: {$txnId}";
             $metaX = (595.28 - $this->getStringWidth($metaStr, 9)) / 2;
-            $stream .= "1 0 0 1 " . number_format($metaX, 2, '.', '') . " 663 Tm\n";
+            $stream .= "1 0 0 1 " . number_format($metaX, 2, '.', '') . " 670 Tm\n";
             $stream .= "(" . $this->escape($metaStr) . ") Tj\n";
 
-            // Employee Information Section
-            $stream .= "0.09 0.17 0.35 rg\n";
-            $stream .= "/F2 10 Tf\n";
-            $stream .= "1 0 0 1 50 618 Tm\n";
-            $stream .= "(EMPLOYEE INFORMATION) Tj\n";
-
-            $stream .= "0.3 0.3 0.3 rg\n";
-            $stream .= "/F2 9 Tf\n";
-            $stream .= "1 0 0 1 60 590 Tm\n";
-            $stream .= "(Employee Name:) Tj\n";
-            $stream .= "/F1 9 Tf\n";
-            $stream .= "1 0 0 1 145 590 Tm\n";
-            $stream .= "(" . $this->escape($staffName) . ") Tj\n";
-
-            $stream .= "/F2 9 Tf\n";
-            $stream .= "1 0 0 1 310 590 Tm\n";
-            $stream .= "(Disbursement Month:) Tj\n";
-            $stream .= "/F1 9 Tf\n";
-            $stream .= "1 0 0 1 420 590 Tm\n";
-            $stream .= "(" . $this->escape($salaryMonth) . ") Tj\n";
-
-            $stream .= "/F2 9 Tf\n";
-            $stream .= "1 0 0 1 60 560 Tm\n";
-            $stream .= "(Employee ID:) Tj\n";
-            $stream .= "/F1 9 Tf\n";
-            $stream .= "1 0 0 1 145 560 Tm\n";
-            $stream .= "(" . $this->escape($employeeId) . ") Tj\n";
-
-            $stream .= "/F2 9 Tf\n";
-            $stream .= "1 0 0 1 310 560 Tm\n";
-            $stream .= "(Status:) Tj\n";
-            $stream .= "/F1 9 Tf\n";
-            $stream .= "1 0 0 1 420 560 Tm\n";
-            $stream .= "(" . $statusVal . ") Tj\n";
-
-            // Amount Box Text (100% Centered inside Box)
-            $amtLabelStr = "TOTAL AMOUNT DISBURSED";
+            // --- SECTION 1: EMPLOYEE INFORMATION ---
             $stream .= "0.09 0.17 0.35 rg\n";
             $stream .= "/F2 9.5 Tf\n";
-            $amtLabelX = $amtX + (220 - $this->getStringWidth($amtLabelStr, 9.5)) / 2;
-            $stream .= "1 0 0 1 " . number_format($amtLabelX, 2, '.', '') . " 423 Tm\n";
+            $stream .= "1 0 0 1 55 636 Tm\n";
+            $stream .= "(EMPLOYEE INFORMATION) Tj\n";
+
+            $stream .= "0.4 0.4 0.4 rg\n";
+            $stream .= "/F2 8.5 Tf\n";
+            $stream .= "1 0 0 1 60 618 Tm\n";
+            $stream .= "(Employee Name:) Tj\n";
+            $stream .= "0.1 0.1 0.1 rg\n";
+            $stream .= "/F2 8.5 Tf\n";
+            $stream .= "1 0 0 1 145 618 Tm\n";
+            $stream .= "(" . $this->escape($staffName) . ") Tj\n";
+
+            $stream .= "0.4 0.4 0.4 rg\n";
+            $stream .= "/F2 8.5 Tf\n";
+            $stream .= "1 0 0 1 320 618 Tm\n";
+            $stream .= "(Employee ID:) Tj\n";
+            $stream .= "0.1 0.1 0.1 rg\n";
+            $stream .= "/F1 8.5 Tf\n";
+            $stream .= "1 0 0 1 400 618 Tm\n";
+            $stream .= "(" . $this->escape($employeeId) . ") Tj\n";
+
+            $stream .= "0.4 0.4 0.4 rg\n";
+            $stream .= "/F2 8.5 Tf\n";
+            $stream .= "1 0 0 1 60 600 Tm\n";
+            $stream .= "(Designation:) Tj\n";
+            $stream .= "0.1 0.1 0.1 rg\n";
+            $stream .= "/F1 8.5 Tf\n";
+            $stream .= "1 0 0 1 145 600 Tm\n";
+            $stream .= "(" . $this->escape($designation) . ") Tj\n";
+
+            $stream .= "0.4 0.4 0.4 rg\n";
+            $stream .= "/F2 8.5 Tf\n";
+            $stream .= "1 0 0 1 320 600 Tm\n";
+            $stream .= "(Disbursement Date:) Tj\n";
+            $stream .= "0.1 0.1 0.1 rg\n";
+            $stream .= "/F1 8.5 Tf\n";
+            $stream .= "1 0 0 1 415 600 Tm\n";
+            $stream .= "(" . $this->escape($disbursedDate) . ") Tj\n";
+
+            // --- SECTION 2: ATTENDANCE SUMMARY ---
+            $stream .= "0.09 0.17 0.35 rg\n";
+            $stream .= "/F2 9.5 Tf\n";
+            $stream .= "1 0 0 1 55 " . ($attBoxY + $attBoxH - 16) . " Tm\n";
+            $stream .= "(ATTENDANCE & LEAVE BREAKDOWN - " . strtoupper($salaryMonth) . ") Tj\n";
+
+            // Attendance stats line 1
+            $stream .= "0.35 0.35 0.35 rg\n";
+            $stream .= "/F1 8.5 Tf\n";
+            $line1Y = $attBoxY + $attBoxH - 33;
+            $stream .= "1 0 0 1 60 " . $line1Y . " Tm\n";
+            $stream .= "(Total Days: ) Tj\n";
+            $stream .= "/F2 8.5 Tf\n";
+            $stream .= "0.1 0.1 0.1 rg\n";
+            $stream .= "(" . $this->escape($totalDays) . ") Tj\n";
+
+            $stream .= "/F1 8.5 Tf\n";
+            $stream .= "0.35 0.35 0.35 rg\n";
+            $stream .= "1 0 0 1 180 " . $line1Y . " Tm\n";
+            $stream .= "(Present Days: ) Tj\n";
+            $stream .= "/F2 8.5 Tf\n";
+            $stream .= "0.1 0.1 0.1 rg\n";
+            $stream .= "(" . $this->escape($presentDays) . ") Tj\n";
+
+            $stream .= "/F1 8.5 Tf\n";
+            $stream .= "0.35 0.35 0.35 rg\n";
+            $stream .= "1 0 0 1 320 " . $line1Y . " Tm\n";
+            $stream .= "(Paid Leaves: ) Tj\n";
+            $stream .= "/F2 8.5 Tf\n";
+            $stream .= "0.1 0.1 0.1 rg\n";
+            $stream .= "(" . $this->escape($paidLeaves) . ") Tj\n";
+
+            $stream .= "/F1 8.5 Tf\n";
+            $stream .= "0.35 0.35 0.35 rg\n";
+            $stream .= "1 0 0 1 430 " . $line1Y . " Tm\n";
+            $stream .= "(Off Days: ) Tj\n";
+            $stream .= "/F2 8.5 Tf\n";
+            $stream .= "0.1 0.1 0.1 rg\n";
+            $stream .= "(" . $this->escape($sundaysHolidays) . ") Tj\n";
+
+            // Attendance stats line 2
+            $line2Y = $attBoxY + $attBoxH - 50;
+            $stream .= "/F1 8.5 Tf\n";
+            $stream .= "0.35 0.35 0.35 rg\n";
+            $stream .= "1 0 0 1 60 " . $line2Y . " Tm\n";
+            $stream .= "(Total Paid Days: ) Tj\n";
+            $stream .= "/F2 8.5 Tf\n";
+            $stream .= "0.06 0.45 0.30 rg\n"; // dark green
+            $stream .= "(" . $this->escape($paidDays) . ") Tj\n";
+
+            $stream .= "/F1 8.5 Tf\n";
+            $stream .= "0.35 0.35 0.35 rg\n";
+            $stream .= "1 0 0 1 250 " . $line2Y . " Tm\n";
+            $stream .= "(Absent / Unpaid Days: ) Tj\n";
+            $stream .= "/F2 8.5 Tf\n";
+            if ($totalDeductedDays > 0) {
+                $stream .= "0.20 0.25 0.35 rg\n"; // Neutral dark slate (no red)
+            } else {
+                $stream .= "0.06 0.45 0.30 rg\n"; // green
+            }
+            $stream .= "(" . $totalDeductedDays . " Days) Tj\n";
+
+            // Absent / Unpaid Dates details callout (Clean neutral styling)
+            if ($totalDeductedDays > 0) {
+                $calloutY = $attBoxY + 36;
+                $stream .= "/F2 8.5 Tf\n";
+                $stream .= "0.15 0.20 0.35 rg\n"; // Neutral slate
+                $stream .= "1 0 0 1 65 " . $calloutY . " Tm\n";
+
+                $calloutTitle = "Deducted Dates (" . $totalDeductedDays . " Days):";
+                if ($unpaidLeaveCount > 0 && $absentCount > 0) {
+                    $calloutTitle = "Absent (" . $absentCount . "d) & Unpaid Leaves (" . $unpaidLeaveCount . "d):";
+                } elseif ($unpaidLeaveCount > 0) {
+                    $calloutTitle = "Unpaid Leaves (" . $unpaidLeaveCount . " Days exceeding quota):";
+                } else {
+                    $calloutTitle = "Absent Dates (" . $absentCount . " Days):";
+                }
+                $stream .= "(" . $this->escape($calloutTitle) . ") Tj\n";
+
+                $stream .= "/F1 8 Tf\n";
+                $stream .= "0.25 0.25 0.25 rg\n";
+
+                $datesStr = ($unpaidLeaveCount > 0 && $absentCount > 0) 
+                    ? "Absent: " . $absentDates . "  |  Unpaid Leaves: " . $unpaidLeaveDates 
+                    : ($unpaidLeaveCount > 0 ? $unpaidLeaveDates : $absentDates);
+
+                // If dates string is long, wrap into two lines
+                if (strlen($datesStr) > 75) {
+                    $commaPos = strpos($datesStr, ',', 60);
+                    if ($commaPos === false) {
+                        $commaPos = strpos($datesStr, '|', 40);
+                    }
+                    if ($commaPos !== false) {
+                        $part1 = trim(substr($datesStr, 0, $commaPos + 1));
+                        $part2 = trim(substr($datesStr, $commaPos + 1));
+                        $stream .= "1 0 0 1 65 " . ($calloutY - 12) . " Tm\n";
+                        $stream .= "(" . $this->escape($part1) . ") Tj\n";
+                        $stream .= "1 0 0 1 65 " . ($calloutY - 22) . " Tm\n";
+                        $stream .= "(" . $this->escape($part2) . ") Tj\n";
+                    } else {
+                        $stream .= "1 0 0 1 65 " . ($calloutY - 12) . " Tm\n";
+                        $stream .= "(" . $this->escape($datesStr) . ") Tj\n";
+                    }
+                } else {
+                    $stream .= "1 0 0 1 65 " . ($calloutY - 12) . " Tm\n";
+                    $stream .= "(" . $this->escape($datesStr) . ") Tj\n";
+                }
+            }
+
+            // --- SECTION 3: SALARY COMPUTATION & DEDUCTIONS ---
+            $stream .= "0.09 0.17 0.35 rg\n";
+            $stream .= "/F2 9.5 Tf\n";
+            $stream .= "1 0 0 1 55 " . ($tableY + $tableH + 5) . " Tm\n";
+            $stream .= "(SALARY COMPUTATION & DEDUCTIONS) Tj\n";
+
+            // Table Header
+            $stream .= "0.2 0.25 0.35 rg\n";
+            $stream .= "/F2 8.5 Tf\n";
+            $stream .= "1 0 0 1 60 " . ($thY + 6) . " Tm\n";
+            $stream .= "(DESCRIPTION) Tj\n";
+            $stream .= "1 0 0 1 330 " . ($thY + 6) . " Tm\n";
+            $stream .= "(EARNINGS) Tj\n";
+            $stream .= "1 0 0 1 445 " . ($thY + 6) . " Tm\n";
+            $stream .= "(DEDUCTIONS) Tj\n";
+
+            // Row 1: Basic Monthly Salary
+            $stream .= "0.15 0.15 0.15 rg\n";
+            $stream .= "/F1 8.5 Tf\n";
+            $stream .= "1 0 0 1 60 " . ($r1Y + 7) . " Tm\n";
+            $stream .= "(Basic Monthly Salary (Full Month)) Tj\n";
+            $stream .= "1 0 0 1 330 " . ($r1Y + 7) . " Tm\n";
+            $stream .= "(" . $this->escape($baseSalary) . ") Tj\n";
+            $stream .= "1 0 0 1 465 " . ($r1Y + 7) . " Tm\n";
+            $stream .= "(—) Tj\n";
+
+            // Row 2: Attendance & Leave Deduction
+            $deductLabel = ($unpaidLeaveCount > 0 && $absentCount > 0)
+                ? "Attendance & Unpaid Leave Deduction (" . $totalDeductedDays . " Days)"
+                : ($unpaidLeaveCount > 0
+                    ? "Unpaid Leave Deduction (" . $unpaidLeaveCount . " Days)"
+                    : "Attendance Deduction (" . $totalDeductedDays . " Absent Days)");
+
+            $stream .= "1 0 0 1 60 " . ($r2Y + 7) . " Tm\n";
+            $stream .= "(" . $this->escape($deductLabel) . ") Tj\n";
+            $stream .= "1 0 0 1 350 " . ($r2Y + 7) . " Tm\n";
+            $stream .= "(—) Tj\n";
+            if ($totalDeductedDays > 0) {
+                $stream .= "0.15 0.15 0.15 rg\n"; // Clean dark neutral text (no red)
+                $stream .= "/F2 8.5 Tf\n";
+                $stream .= "1 0 0 1 445 " . ($r2Y + 7) . " Tm\n";
+                $stream .= "(- " . $this->escape($attDeduction) . ") Tj\n";
+            } else {
+                $stream .= "0.15 0.15 0.15 rg\n";
+                $stream .= "/F1 8.5 Tf\n";
+                $stream .= "1 0 0 1 465 " . ($r2Y + 7) . " Tm\n";
+                $stream .= "(0.00) Tj\n";
+            }
+
+            // Net Payable Row (Mint Green background)
+            $netY = $tableY + (($r2Y - $tableY) / 2) - 4;
+            $stream .= "0.06 0.40 0.30 rg\n"; // dark emerald
+            $stream .= "/F2 9.5 Tf\n";
+            $stream .= "1 0 0 1 60 " . $netY . " Tm\n";
+            $stream .= "(NET PAYABLE SALARY) Tj\n";
+            $stream .= "/F2 10.5 Tf\n";
+            $stream .= "1 0 0 1 430 " . $netY . " Tm\n";
+            $stream .= "(" . $this->escape($amountDisbursed) . ") Tj\n";
+
+            // --- SECTION 4: AMOUNT DISBURSED BADGE ---
+            $amtLabelStr = "TOTAL AMOUNT DISBURSED";
+            $stream .= "0.09 0.17 0.35 rg\n";
+            $stream .= "/F2 9 Tf\n";
+            $amtLabelX = $amtX + (250 - $this->getStringWidth($amtLabelStr, 9)) / 2;
+            $stream .= "1 0 0 1 " . number_format($amtLabelX, 2, '.', '') . " " . ($amtBoxY + 45) . " Tm\n";
             $stream .= "(" . $amtLabelStr . ") Tj\n";
 
             $stream .= "0.09 0.17 0.35 rg\n";
-            $stream .= "/F2 18 Tf\n";
-            $amtValX = $amtX + (220 - $this->getStringWidth($amountDisbursed, 18)) / 2;
-            $stream .= "1 0 0 1 " . number_format($amtValX, 2, '.', '') . " 393 Tm\n";
+            $stream .= "/F2 17 Tf\n";
+            $amtValX = $amtX + (250 - $this->getStringWidth($amountDisbursed, 17)) / 2;
+            $stream .= "1 0 0 1 " . number_format($amtValX, 2, '.', '') . " " . ($amtBoxY + 22) . " Tm\n";
             $stream .= "(" . $this->escape($amountDisbursed) . ") Tj\n";
 
-            // Footer (Centered Disclaimer, No Powered By)
+            $subStr = "Net salary credited for {$salaryMonth}";
+            $stream .= "0.4 0.4 0.4 rg\n";
+            $stream .= "/F1 8 Tf\n";
+            $subX = $amtX + (250 - $this->getStringWidth($subStr, 8)) / 2;
+            $stream .= "1 0 0 1 " . number_format($subX, 2, '.', '') . " " . ($amtBoxY + 8) . " Tm\n";
+            $stream .= "(" . $this->escape($subStr) . ") Tj\n";
+
+            // --- SECTION 5: FOOTER ---
             $stream .= "0.5 0.5 0.5 rg\n";
             $stream .= "/F1 8.5 Tf\n";
-            
-            $foot1 = "This is a computer-generated salary slip. No signature is required.";
+            $foot1 = "Transaction Ref: {$txnId}   |   Disbursement Date: {$disbursedDate}";
             $foot1X = (595.28 - $this->getStringWidth($foot1, 8.5)) / 2;
             $stream .= "1 0 0 1 " . number_format($foot1X, 2, '.', '') . " 120 Tm\n";
             $stream .= "(" . $foot1 . ") Tj\n";
+
+            $foot2 = "This is a computer-generated salary slip. No signature is required.";
+            $foot2X = (595.28 - $this->getStringWidth($foot2, 8.5)) / 2;
+            $stream .= "1 0 0 1 " . number_format($foot2X, 2, '.', '') . " 105 Tm\n";
+            $stream .= "(" . $foot2 . ") Tj\n";
 
             $stream .= "ET";
         } else {

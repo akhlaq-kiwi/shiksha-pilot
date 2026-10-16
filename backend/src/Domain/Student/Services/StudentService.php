@@ -1411,15 +1411,18 @@ class StudentService extends BaseService
         $pdo = $this->repo->getPdo();
 
         $allowedAud = [];
-        if ($role === 'TEACHER') {
+        if ($role === 'SCHOOL_ADMIN' || $role === 'PRINCIPAL' || !empty($user['is_principal'])) {
+            $allowedAud = ['Teachers', 'Students', 'Both'];
+        } elseif ($role === 'TEACHER') {
             $allowedAud = ['Teachers', 'Both'];
         } elseif ($role === 'PARENT' || $role === 'STUDENT') {
             $allowedAud = ['Students', 'Both'];
-        } elseif ($role === 'SCHOOL_ADMIN' || $role === 'PRINCIPAL') {
-            $allowedAud = ['Teachers', 'Students', 'Both'];
         } else {
             return []; // Unauthorized roles see nothing
         }
+
+        $isPrincipalOrAdmin = ($role === 'SCHOOL_ADMIN' || $role === 'PRINCIPAL' || !empty($user['is_principal']));
+        $statusClause = $isPrincipalOrAdmin ? "1=1" : "a.status = 'Published'";
 
         // Build in clause query
         $inQuery = implode(',', array_fill(0, count($allowedAud), '?'));
@@ -1428,13 +1431,56 @@ class StudentService extends BaseService
                    (CASE WHEN ar.id IS NOT NULL THEN 1 ELSE 0 END) AS is_read
             FROM announcements a
             LEFT JOIN announcement_reads ar ON a.id = ar.announcement_id AND ar.user_id = ?
-            WHERE a.school_id = ? AND a.audience IN ({$inQuery}) AND a.status = 'Published'
+            WHERE a.school_id = ? AND a.audience IN ({$inQuery}) AND {$statusClause}
             ORDER BY a.created_at DESC
         ");
 
         $params = array_merge([$userId, $schoolId], $allowedAud);
         $stmt->execute($params);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        if (empty($announcements)) {
+            return [];
+        }
+
+        $creators = array_unique(array_filter(array_column($announcements, 'created_by')));
+        $authorMap = [];
+        if (!empty($creators)) {
+            $placeholders = implode(',', array_fill(0, count($creators), '?'));
+            $paramsMap = array_merge(array_values($creators), array_values($creators));
+
+            $stmtUsers = $pdo->prepare("SELECT phone, id, name, role FROM users WHERE phone IN ($placeholders) OR id IN ($placeholders)");
+            $stmtUsers->execute($paramsMap);
+            while ($row = $stmtUsers->fetch(PDO::FETCH_ASSOC)) {
+                if (!empty($row['name'])) {
+                    $roleLabel = ($row['role'] === 'PRINCIPAL' || $row['role'] === 'SCHOOL_ADMIN') ? 'Principal' : 'Teacher';
+                    $authorMap[$row['phone']] = $row['name'] . ' (' . $roleLabel . ')';
+                    $authorMap[(string)$row['id']] = $row['name'] . ' (' . $roleLabel . ')';
+                }
+            }
+
+            $stmtStaff = $pdo->prepare("SELECT phone, id, name, role, is_principal FROM staff WHERE phone IN ($placeholders) OR id IN ($placeholders)");
+            $stmtStaff->execute($paramsMap);
+            while ($row = $stmtStaff->fetch(PDO::FETCH_ASSOC)) {
+                if (!empty($row['name'])) {
+                    $isPrinc = !empty($row['is_principal']) || strtoupper($row['role'] ?? '') === 'PRINCIPAL';
+                    $roleLabel = $isPrinc ? 'Principal' : 'Teacher';
+                    if (empty($authorMap[$row['phone']])) {
+                        $authorMap[$row['phone']] = $row['name'] . ' (' . $roleLabel . ')';
+                    }
+                    if (empty($authorMap[(string)$row['id']])) {
+                        $authorMap[(string)$row['id']] = $row['name'] . ' (' . $roleLabel . ')';
+                    }
+                }
+            }
+        }
+
+        foreach ($announcements as &$a) {
+            $cb = $a['created_by'] ?? '';
+            $a['author_name'] = $authorMap[$cb] ?? (!empty($cb) && !is_numeric($cb) ? $cb : 'Principal');
+        }
+        unset($a);
+
+        return $announcements;
     }
 
     public function markNoticeRead(array $user, int $announcementId): array

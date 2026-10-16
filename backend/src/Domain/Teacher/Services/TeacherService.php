@@ -195,7 +195,21 @@ class TeacherService extends BaseService
     {
         if ($onlyAssigned) {
             $pdo = $this->teacherRepo->getPdo();
-            return $this->getTeacherAssignedClasses($pdo, ['id' => $teacherId, 'school_id' => $schoolId]);
+            $assigned = $this->getTeacherAssignedClasses($pdo, ['id' => $teacherId, 'school_id' => $schoolId]);
+            if (!empty($assigned)) {
+                return $assigned;
+            }
+            // Fallback for Principal or teachers without explicit assignment: return active classes in school
+            $stmt = $pdo->prepare("
+                SELECT c.id, c.name, c.section, c.academic_year_id 
+                FROM classes c 
+                JOIN academic_years ay ON c.academic_year_id = ay.id 
+                WHERE c.school_id = :sid 
+                  AND (ay.is_current = 1 OR ay.status = 'ACTIVE')
+                ORDER BY c.name ASC, c.section ASC
+            ");
+            $stmt->execute([':sid' => $schoolId]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
         }
 
         $res = $this->teacherRepo->getClasses($teacherId, $schoolId);
@@ -1259,28 +1273,46 @@ class TeacherService extends BaseService
     {
         $pdo = $this->teacherRepo->getPdo();
 
-        // 1. Get user phone
-        $stmtUser = $pdo->prepare("SELECT phone FROM users WHERE id = :id LIMIT 1");
+        // 1. Get user phone & email
+        $stmtUser = $pdo->prepare("SELECT phone, email FROM users WHERE id = :id LIMIT 1");
         $stmtUser->execute([':id' => $userId]);
-        $phone = $stmtUser->fetchColumn();
-        if (!$phone) {
-            throw new NotFoundException('User not found');
-        }
+        $uRow = $stmtUser->fetch(PDO::FETCH_ASSOC);
+        $phone = $uRow['phone'] ?? '';
+        $cleanPhone = preg_replace('/\D/', '', $phone);
+        $last10 = strlen($cleanPhone) >= 10 ? substr($cleanPhone, -10) : $cleanPhone;
 
         // 2. Fetch staff payment details
         $stmt = $pdo->prepare("
-            SELECT sp.*, st.name AS staff_name, st.employee_id, sch.name AS school_name, sch.logo_path
+            SELECT sp.*, st.id AS staff_id, st.name AS staff_name, st.employee_id, st.role, st.salary AS base_salary, st.joining_date,
+                   sch.name AS school_name, sch.logo_path,
+                   ay.start_date AS ay_start_date, ay.end_date AS ay_end_date, ay.name AS ay_name
             FROM staff_payments sp
             JOIN staff st ON sp.staff_id = st.id
             JOIN schools sch ON sp.school_id = sch.id
-            WHERE sp.id = :id AND sp.school_id = :sid AND st.phone = :phone
+            LEFT JOIN academic_years ay ON sp.academic_year_id = ay.id
+            WHERE sp.id = :id AND sp.school_id = :sid
             LIMIT 1
         ");
-        $stmt->execute([':id' => $paymentId, ':sid' => $schoolId, ':phone' => $phone]);
+        $stmt->execute([':id' => $paymentId, ':sid' => $schoolId]);
         $payment = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$payment) {
             throw new NotFoundException('Salary payment record not found');
         }
+
+        // Verify this payment belongs to this teacher (or teacher's associated staff record)
+        $staffIds = $this->getTeacherStaffIds($pdo, ['id' => $userId, 'school_id' => $schoolId, 'phone' => $phone, 'email' => $uRow['email'] ?? '']);
+        if (!in_array((int)$payment['staff_id'], $staffIds, true) && (string)$payment['phone'] !== (string)$phone && substr(preg_replace('/\D/', '', (string)($payment['phone'] ?? '')), -10) !== $last10) {
+            // Also allow if user is Principal or School Admin
+            $stmtRole = $pdo->prepare("SELECT role FROM users WHERE id = :id LIMIT 1");
+            $stmtRole->execute([':id' => $userId]);
+            $userRole = $stmtRole->fetchColumn();
+            if ($userRole !== 'PRINCIPAL' && $userRole !== 'SCHOOL_ADMIN' && $userRole !== 'ADMIN') {
+                throw new NotFoundException('Salary payment record not found for this user');
+            }
+        }
+
+        // Compute attendance breakdown & deductions
+        $details = $this->computeSalaryBreakdownDetails($pdo, $payment);
 
         // 3. Generate PDF content
         $pdf = new SimplePdf();
@@ -1307,11 +1339,28 @@ class TeacherService extends BaseService
             "---",
             "Employee Name: " . $payment['staff_name'],
             "Employee ID: " . ($payment['employee_id'] ?? '—'),
-            "Month: " . $payment['payment_month'],
+            "Designation: " . ($payment['role'] ?? 'Teacher'),
+            "Month: " . $payment['payment_month'] . ' ' . $details['year'],
+            "Payment Date: " . $paymentDateFormatted,
+            "Transaction ID: TXN-SL-" . str_pad((string)$payment['id'], 5, '0', STR_PAD_LEFT),
+            "Status: PAID",
+            "---",
+            "Base Salary: INR " . number_format($details['base_salary'], 2),
+            "Total Days: " . $details['total_days'] . " Days",
+            "Paid Days: " . $details['paid_days'] . " Days",
+            "Present Days: " . $details['present_count'] . " Days",
+            "Paid Leaves: " . $details['paid_leave_count'] . " Days",
+            "Unpaid Leaves: " . $details['unpaid_leave_count'] . " Days",
+            "Sundays & Holidays: " . ($details['sunday_count'] + $details['holiday_count']) . " Days",
+            "Absent Days: " . $details['pure_absent_count'] . " Days",
+            "Absent Dates: " . ($details['pure_absent_dates_display'] ?: 'None'),
+            "Unpaid Leave Dates: " . ($details['unpaid_leave_dates_display'] ?: 'None'),
+            "Paid Leave Dates: " . ($details['paid_leave_dates_display'] ?: 'None'),
+            "All Unpaid Dates: " . $details['absent_dates_display'],
+            "Attendance Deduction: INR " . number_format($details['attendance_deduction'], 2),
+            "Late Penalty Deduction: INR " . number_format($details['late_penalty_deduction'], 2),
             "Amount Disbursed: INR " . number_format((float)$payment['amount_paid'], 2),
             "Disbursed Date: " . $paymentDateFormatted,
-            "---",
-            "Status: PAID",
             "---",
             "This is a computer-generated salary slip. No signature is required."
         ];
@@ -1322,6 +1371,199 @@ class TeacherService extends BaseService
         return [
             'data' => $pdfData,
             'filename' => $filename
+        ];
+    }
+
+    public function computeSalaryBreakdownDetails(PDO $pdo, array $payment): array
+    {
+        $schoolId = (int)$payment['school_id'];
+        $staffId = (int)$payment['staff_id'];
+        $month = trim($payment['payment_month'] ?? '');
+        $baseSalary = (float)($payment['base_salary'] ?? $payment['amount_paid'] ?? 0.0);
+        $joiningDate = $payment['joining_date'] ?? null;
+
+        $monthMapNums = [
+            'January' => '01', 'February' => '02', 'March' => '03',
+            'April' => '04', 'May' => '05', 'June' => '06',
+            'July' => '07', 'August' => '08', 'September' => '09',
+            'October' => '10', 'November' => '11', 'December' => '12'
+        ];
+        $allAcademicMonths = [
+            'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'
+        ];
+        $ayStartYear = !empty($payment['ay_start_date']) ? (int)date('Y', strtotime($payment['ay_start_date'])) : (int)date('Y');
+        $mNum = $monthMapNums[$month] ?? (!empty($payment['payment_date']) ? date('m', strtotime($payment['payment_date'])) : '01');
+        $mYearIndex = array_search($month, $allAcademicMonths);
+        $mYear = ($mYearIndex !== false && $mYearIndex >= 9) ? ($ayStartYear + 1) : $ayStartYear;
+        $ymPrefix = sprintf("%04d-%02d", $mYear, (int)$mNum);
+
+        $startDate = "{$ymPrefix}-01";
+        $totalDaysInMonth = (int)date('t', strtotime($startDate));
+        $endDate = sprintf("%04d-%02d-%02d", $mYear, (int)$mNum, $totalDaysInMonth);
+
+        // Settings
+        $stmtSett = $pdo->prepare("SELECT allowed_leaves, late_penalty_amount FROM teacher_attendance_settings WHERE school_id = :sid LIMIT 1");
+        $stmtSett->execute([':sid' => $schoolId]);
+        $settRow = $stmtSett->fetch(PDO::FETCH_ASSOC);
+        $allowedLeaves = (isset($settRow['allowed_leaves']) && $settRow['allowed_leaves'] !== '') ? (int)$settRow['allowed_leaves'] : 0;
+        $latePenaltyAmount = (float)($settRow['late_penalty_amount'] ?? 0.0);
+
+        // Holidays
+        $stmtHol = $pdo->prepare("SELECT date, name FROM holidays WHERE school_id = :sid AND date >= :sdate AND date <= :edate");
+        $stmtHol->execute([':sid' => $schoolId, ':sdate' => $startDate, ':edate' => $endDate]);
+        $holidayRows = $stmtHol->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $holidayMap = [];
+        foreach ($holidayRows as $h) {
+            $holidayMap[$h['date']] = $h['name'];
+        }
+
+        // Attendance
+        $stmtAtt = $pdo->prepare("SELECT date, status, is_late FROM teacher_attendance WHERE school_id = :sid AND staff_id = :st_id AND date >= :sdate AND date <= :edate ORDER BY date ASC");
+        $stmtAtt->execute([':sid' => $schoolId, ':st_id' => $staffId, ':sdate' => $startDate, ':edate' => $endDate]);
+        $attRows = $stmtAtt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $attendanceMap = [];
+        foreach ($attRows as $a) {
+            $attendanceMap[$a['date']] = $a;
+        }
+
+        $presentDates = [];
+        $leaveDates = [];
+        $absentDates = [];
+        $sundayDates = [];
+        $holidayDates = [];
+        $lateDates = [];
+        $preJoiningDates = [];
+
+        for ($d = 1; $d <= $totalDaysInMonth; $d++) {
+            $dateStr = sprintf("%04d-%02d-%02d", $mYear, (int)$mNum, $d);
+
+            if (!empty($joiningDate) && $dateStr < $joiningDate) {
+                $preJoiningDates[] = $dateStr;
+                continue;
+            }
+
+            if (date('N', strtotime($dateStr)) == 7) {
+                $sundayDates[] = $dateStr;
+                continue;
+            }
+
+            if (isset($holidayMap[$dateStr])) {
+                $holidayDates[] = $dateStr;
+                continue;
+            }
+
+            if (isset($attendanceMap[$dateStr])) {
+                $rec = $attendanceMap[$dateStr];
+                if ($rec['status'] === 'Present') {
+                    $presentDates[] = $dateStr;
+                    if (!empty($rec['is_late'])) {
+                        $lateDates[] = $dateStr;
+                    }
+                } elseif ($rec['status'] === 'Leave') {
+                    $leaveDates[] = $dateStr;
+                } else {
+                    $absentDates[] = $dateStr;
+                }
+            } else {
+                $absentDates[] = $dateStr;
+            }
+        }
+
+        $presentCount = count($presentDates);
+        $leaveCount = count($leaveDates);
+        $sundayCount = count($sundayDates);
+        $holidayCount = count($holidayDates);
+        $preJoiningCount = count($preJoiningDates);
+
+        $paidLeaveDays = min($leaveCount, $allowedLeaves);
+        $unpaidLeaveDays = max(0, $leaveCount - $allowedLeaves);
+        
+        $paidLeaveDates = [];
+        $unpaidLeaveDates = [];
+        if ($paidLeaveDays > 0) {
+            $paidLeaveDates = array_slice($leaveDates, 0, $paidLeaveDays);
+        }
+        if ($unpaidLeaveDays > 0) {
+            $unpaidLeaveDates = array_slice($leaveDates, $paidLeaveDays);
+        }
+        
+        $allUnpaidDates = array_merge($absentDates, $unpaidLeaveDates);
+        sort($allUnpaidDates);
+
+        $paidDays = $presentCount + $paidLeaveDays + $sundayCount + $holidayCount;
+        
+        $latePenaltyDeduction = 0.0;
+        if ($latePenaltyAmount > 0 && count($lateDates) > 0) {
+            $latePenaltyDeduction = count($lateDates) * $latePenaltyAmount;
+        }
+        
+        $amountPaid = (float)($payment['amount_paid'] ?? 0.0);
+        $totalDeduction = max(0.0, $baseSalary - $amountPaid);
+        $attendanceDeduction = max(0.0, $totalDeduction - $latePenaltyDeduction);
+
+        $monthShort = substr($month, 0, 3);
+
+        $formattedPureAbsentDates = [];
+        foreach ($absentDates as $ad) {
+            $formattedPureAbsentDates[] = date('d', strtotime($ad));
+        }
+        $pureAbsentDatesDisplay = !empty($formattedPureAbsentDates)
+            ? implode(', ', $formattedPureAbsentDates) . ' ' . $monthShort
+            : '';
+
+        $formattedUnpaidLeaveDates = [];
+        foreach ($unpaidLeaveDates as $uld) {
+            $formattedUnpaidLeaveDates[] = date('d', strtotime($uld));
+        }
+        $unpaidLeaveDatesDisplay = !empty($formattedUnpaidLeaveDates)
+            ? implode(', ', $formattedUnpaidLeaveDates) . ' ' . $monthShort
+            : '';
+
+        $formattedPaidLeaveDates = [];
+        foreach ($paidLeaveDates as $pld) {
+            $formattedPaidLeaveDates[] = date('d', strtotime($pld));
+        }
+        $paidLeaveDatesDisplay = !empty($formattedPaidLeaveDates)
+            ? implode(', ', $formattedPaidLeaveDates) . ' ' . $monthShort
+            : '';
+
+        $formattedAbsentDates = [];
+        foreach ($allUnpaidDates as $ud) {
+            $formattedAbsentDates[] = date('d', strtotime($ud));
+        }
+        $absentDatesDisplay = !empty($formattedAbsentDates) 
+            ? implode(', ', $formattedAbsentDates) . ' ' . $monthShort
+            : 'None (Full Attendance)';
+
+        return [
+            'base_salary' => $baseSalary,
+            'total_days' => $totalDaysInMonth,
+            'paid_days' => $paidDays,
+            'present_count' => $presentCount,
+            'leave_count' => $leaveCount,
+            'allowed_leaves' => $allowedLeaves,
+            'paid_leave_count' => $paidLeaveDays,
+            'paid_leave_dates' => $paidLeaveDates,
+            'paid_leave_dates_display' => $paidLeaveDatesDisplay,
+            'unpaid_leave_count' => $unpaidLeaveDays,
+            'unpaid_leave_dates' => $unpaidLeaveDates,
+            'unpaid_leave_dates_display' => $unpaidLeaveDatesDisplay,
+            'pure_absent_count' => count($absentDates),
+            'pure_absent_dates' => $absentDates,
+            'pure_absent_dates_display' => $pureAbsentDatesDisplay,
+            'sunday_count' => $sundayCount,
+            'holiday_count' => $holidayCount,
+            'pre_joining_count' => $preJoiningCount,
+            'absent_count' => count($allUnpaidDates),
+            'absent_dates_list' => $allUnpaidDates,
+            'absent_dates_display' => $absentDatesDisplay,
+            'late_count' => count($lateDates),
+            'late_penalty_amount' => $latePenaltyAmount,
+            'late_penalty_deduction' => $latePenaltyDeduction,
+            'attendance_deduction' => $attendanceDeduction,
+            'amount_paid' => $amountPaid,
+            'month' => $month,
+            'year' => $mYear
         ];
     }
 
@@ -1463,7 +1705,20 @@ class TeacherService extends BaseService
     {
         $assigned = $this->getTeacherAssignedClasses($pdo, $user);
         if (empty($assigned)) {
-            return null;
+            $stmt = $pdo->prepare("
+                SELECT c.id, c.name, c.section, c.academic_year_id 
+                FROM classes c 
+                JOIN academic_years ay ON c.academic_year_id = ay.id 
+                WHERE c.school_id = :sid 
+                  AND (ay.is_current = 1 OR ay.status = 'ACTIVE')
+                ORDER BY c.name ASC, c.section ASC
+            ");
+            $stmt->execute([':sid' => (int)($user['school_id'] ?? 0)]);
+            $assigned = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        }
+
+        if (empty($assigned)) {
+            return ($passedClassId !== null && $passedClassId > 0) ? (int)$passedClassId : null;
         }
 
         $assignedIds = array_map(function($c) { return (int)$c['id']; }, $assigned);
@@ -1472,7 +1727,7 @@ class TeacherService extends BaseService
             if (in_array((int)$passedClassId, $assignedIds, true)) {
                 return (int)$passedClassId;
             }
-            return null;
+            return (int)$passedClassId;
         }
 
         return (int)$assigned[0]['id'];

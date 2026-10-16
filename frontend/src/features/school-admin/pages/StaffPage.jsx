@@ -2513,7 +2513,7 @@ export default function StaffPage() {
           footer={
             <div className="flex gap-3 justify-end w-full no-print-section">
               <Button variant="secondary" onClick={() => setIsSalarySlipOpen(false)}>Close</Button>
-              <Button onClick={handleDownloadSalarySlip} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold flex items-center gap-1.5 shadow-2xs">
+              <Button onClick={handleDownloadSalarySlip} className="bg-primary hover:bg-primary/95 text-white font-bold flex items-center gap-1.5 shadow-2xs">
                 <Download className="h-4 w-4" /> Download PDF
               </Button>
               <Button onClick={handlePrintSalarySlip} className="bg-primary hover:bg-primary/95 text-white font-bold flex items-center gap-1.5 shadow-2xs">
@@ -2575,6 +2575,100 @@ export default function StaffPage() {
                   </div>
                 </div>
 
+                {/* Attendance Summary & Absent Dates (Transparency) */}
+                {selectedSlipPayment.attendance_breakdown && (
+                  <div className="bg-zinc-50 border border-zinc-200 p-4 rounded-lg text-xs space-y-2.5">
+                    <div className="flex items-center justify-between border-b border-zinc-200 pb-2">
+                      <span className="font-bold text-zinc-900 uppercase tracking-wider text-[11px]">
+                        Attendance Summary ({selectedSlipPayment.payment_month})
+                      </span>
+                      <span className={`px-2.5 py-0.5 rounded text-[10px] font-bold border ${
+                        selectedSlipPayment.attendance_breakdown.absent_count > 0 
+                          ? 'bg-zinc-100 text-zinc-800 border-zinc-200' 
+                          : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                      }`}>
+                        {selectedSlipPayment.attendance_breakdown.absent_count > 0 
+                          ? `${selectedSlipPayment.attendance_breakdown.absent_count} Unpaid / Absent Days` 
+                          : 'Full Attendance'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-zinc-700">
+                      <div>
+                        <span className="text-zinc-500 block text-[10px]">Total Days:</span>
+                        <span className="font-bold text-zinc-900">{selectedSlipPayment.attendance_breakdown.total_days} Days</span>
+                      </div>
+                      <div>
+                        <span className="text-zinc-500 block text-[10px]">Present Days:</span>
+                        <span className="font-bold text-zinc-900">{selectedSlipPayment.attendance_breakdown.present_count} Days</span>
+                      </div>
+                      <div>
+                        <span className="text-zinc-500 block text-[10px]">Sundays & Holidays:</span>
+                        <span className="font-bold text-zinc-900">{selectedSlipPayment.attendance_breakdown.sunday_count + selectedSlipPayment.attendance_breakdown.holiday_count} Days</span>
+                      </div>
+                      <div>
+                        <span className="text-zinc-500 block text-[10px]">Total Paid Days:</span>
+                        <span className="font-bold text-emerald-700">{selectedSlipPayment.attendance_breakdown.paid_days} Days</span>
+                      </div>
+                      <div>
+                        <span className="text-zinc-500 block text-[10px]">Paid Leaves (Allowed):</span>
+                        <span className="font-bold text-zinc-900">{selectedSlipPayment.attendance_breakdown.paid_leave_count || 0} Day(s)</span>
+                      </div>
+                      <div>
+                        <span className="text-zinc-500 block text-[10px]">Unpaid Leaves (Excess):</span>
+                        <span className="font-bold text-zinc-900">{selectedSlipPayment.attendance_breakdown.unpaid_leave_count || 0} Day(s)</span>
+                      </div>
+                      <div>
+                        <span className="text-zinc-500 block text-[10px]">Absent Days:</span>
+                        <span className="font-bold text-zinc-900">
+                          {selectedSlipPayment.attendance_breakdown.pure_absent_count ?? selectedSlipPayment.attendance_breakdown.absent_count} Days
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Date details callout box (Page neutral theme) */}
+                    {(selectedSlipPayment.attendance_breakdown.absent_count > 0 || selectedSlipPayment.attendance_breakdown.paid_leave_count > 0) && (
+                      <div className="bg-white border border-zinc-200 rounded-lg p-3 text-zinc-800 mt-2 space-y-2">
+                        {/* Pure Absent Dates */}
+                        {(selectedSlipPayment.attendance_breakdown.pure_absent_count > 0 || (selectedSlipPayment.attendance_breakdown.absent_count > 0 && !selectedSlipPayment.attendance_breakdown.unpaid_leave_count)) && (
+                          <div>
+                            <span className="font-semibold block text-[11px] text-zinc-900">
+                              Absent Dates ({selectedSlipPayment.attendance_breakdown.pure_absent_count ?? selectedSlipPayment.attendance_breakdown.absent_count} Days):
+                            </span>
+                            <p className="mt-0.5 text-xs font-mono font-medium text-zinc-700 leading-relaxed">
+                              {selectedSlipPayment.attendance_breakdown.pure_absent_dates_display || selectedSlipPayment.attendance_breakdown.absent_dates_display}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Unpaid / Excess Leave Dates */}
+                        {selectedSlipPayment.attendance_breakdown.unpaid_leave_count > 0 && (
+                          <div>
+                            <span className="font-semibold block text-[11px] text-zinc-900">
+                              Unpaid / Excess Leave Dates ({selectedSlipPayment.attendance_breakdown.unpaid_leave_count} Days - Exceeding Allowed Quota):
+                            </span>
+                            <p className="mt-0.5 text-xs font-mono font-medium text-zinc-700 leading-relaxed">
+                              {selectedSlipPayment.attendance_breakdown.unpaid_leave_dates_display}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Paid Leave Dates (Allowed Quota - 100% Paid) */}
+                        {selectedSlipPayment.attendance_breakdown.paid_leave_count > 0 && (
+                          <div className="bg-zinc-50 border border-zinc-200/80 rounded p-2">
+                            <span className="font-semibold block text-[11px] text-zinc-900">
+                              Paid Leave Dates ({selectedSlipPayment.attendance_breakdown.paid_leave_count} Day - Within School Allowed Quota):
+                            </span>
+                            <p className="mt-0.5 text-xs font-mono font-medium text-emerald-800 leading-relaxed">
+                              {selectedSlipPayment.attendance_breakdown.paid_leave_dates_display} (100% Paid • Added to Total Paid Days)
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Salary calculation / summary */}
                 <div className="border border-zinc-200 rounded-lg overflow-hidden">
                   <table className="w-full text-xs text-left border-collapse">
@@ -2585,23 +2679,24 @@ export default function StaffPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {selectedSlipPayment.proration_details ? (
+                      {selectedSlipPayment.attendance_breakdown && selectedSlipPayment.attendance_breakdown.absent_count > 0 ? (
                         <>
                           <tr className="border-b border-zinc-100 text-zinc-800 font-medium">
-                            <td className="p-3">Monthly Salary</td>
-                            <td className="p-3 text-right font-semibold">₹{parseFloat(selectedSlipPayment.proration_details.monthly_salary).toLocaleString('en-IN')}</td>
+                            <td className="p-3">Basic Monthly Salary (Full Month)</td>
+                            <td className="p-3 text-right font-semibold">₹{parseFloat(selectedSlipPayment.attendance_breakdown.base_salary || teacherDetails?.salary || 0).toLocaleString('en-IN')}</td>
                           </tr>
-                          <tr className="border-b border-zinc-100 text-zinc-800 font-medium">
-                            <td className="p-3">Joining Date</td>
-                            <td className="p-3 text-right font-semibold">{formatDate(selectedSlipPayment.proration_details.joining_date)}</td>
-                          </tr>
-                          <tr className="border-b border-zinc-100 text-zinc-800 font-medium">
-                            <td className="p-3">Prorated Days</td>
-                            <td className="p-3 text-right font-semibold">{selectedSlipPayment.proration_details.prorated_days} / {selectedSlipPayment.proration_details.total_days}</td>
-                          </tr>
-                          <tr className="border-b border-zinc-100 text-zinc-800 font-medium bg-amber-50/50">
-                            <td className="p-3 font-bold text-amber-800">Prorated Salary (Payable Amount)</td>
-                            <td className="p-3 text-right font-bold text-amber-800">₹{parseFloat(selectedSlipPayment.amount_paid).toLocaleString('en-IN')}</td>
+                          <tr className="border-b border-zinc-100 text-zinc-800 font-medium bg-zinc-50/50">
+                            <td className="p-3 text-zinc-800 font-medium">
+                              {selectedSlipPayment.attendance_breakdown.unpaid_leave_count > 0 && selectedSlipPayment.attendance_breakdown.pure_absent_count > 0
+                                ? `Attendance & Unpaid Leave Deduction (${selectedSlipPayment.attendance_breakdown.pure_absent_count} Absent + ${selectedSlipPayment.attendance_breakdown.unpaid_leave_count} Unpaid Leave = ${selectedSlipPayment.attendance_breakdown.absent_count} Days)`
+                                : selectedSlipPayment.attendance_breakdown.unpaid_leave_count > 0
+                                ? `Unpaid Leave Deduction (${selectedSlipPayment.attendance_breakdown.unpaid_leave_count} Excess Leave Day(s))`
+                                : `Attendance Deduction (${selectedSlipPayment.attendance_breakdown.absent_count} Absent Days)`
+                              }
+                            </td>
+                            <td className="p-3 text-right font-bold text-zinc-900">
+                              - ₹{parseFloat(Math.max(0, (selectedSlipPayment.attendance_breakdown.base_salary || teacherDetails?.salary || 0) - selectedSlipPayment.amount_paid)).toLocaleString('en-IN')}
+                            </td>
                           </tr>
                         </>
                       ) : (

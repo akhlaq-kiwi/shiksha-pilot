@@ -212,9 +212,11 @@ class StudentController extends BaseController
     {
         $user = $this->authenticate($request);
         $role = strtoupper($user['role'] ?? '');
-        if ($role === 'TEACHER') {
+        if ($role === 'TEACHER' || $role === 'PRINCIPAL' || $role === 'SCHOOL_ADMIN' || !empty($user['is_principal'])) {
             $teacherService = $this->container->get(\App\Domain\Teacher\Services\TeacherService::class);
-            $data = $teacherService->getExamsList($user);
+            $queryParams = $request->getQueryParams();
+            $classId = isset($queryParams['class_id']) ? (int)$queryParams['class_id'] : null;
+            $data = $teacherService->getExamsList($user, $classId);
             return $this->success($response, $data);
         }
         $this->requireRole($user, self::ALLOWED_ROLES);
@@ -227,9 +229,11 @@ class StudentController extends BaseController
         $user = $this->authenticate($request);
         $role = strtoupper($user['role'] ?? '');
         $examId = (int)$args['id'];
-        if ($role === 'TEACHER') {
+        if ($role === 'TEACHER' || $role === 'PRINCIPAL' || $role === 'SCHOOL_ADMIN' || !empty($user['is_principal'])) {
             $teacherService = $this->container->get(\App\Domain\Teacher\Services\TeacherService::class);
-            $data = $teacherService->getExamDetails($user, $examId);
+            $queryParams = $request->getQueryParams();
+            $classId = isset($queryParams['class_id']) ? (int)$queryParams['class_id'] : null;
+            $data = $teacherService->getExamDetails($user, $examId, $classId);
             return $this->success($response, $data);
         }
         $this->requireRole($user, self::ALLOWED_ROLES);

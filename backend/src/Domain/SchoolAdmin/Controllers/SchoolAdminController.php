@@ -1088,6 +1088,16 @@ class SchoolAdminController extends BaseController
             }
         }
 
+        // Principal announcements management route authorization
+        if (str_contains($uri, '/api/school/announcements')) {
+            if ($userRole === 'SCHOOL_ADMIN' || $userRole === 'PRINCIPAL' || $this->service->isPrincipal($user)) {
+                if ($this->service->checkSubscriptionExpired($user)) {
+                    throw new \App\Shared\Exceptions\ForbiddenException('Subscription Expired. Access Denied.');
+                }
+                return;
+            }
+        }
+
         if ($userRole === 'TEACHER' || $userRole === 'PRINCIPAL') {
             $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
@@ -2132,7 +2142,7 @@ class SchoolAdminController extends BaseController
     public function getAnnouncements(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'PRINCIPAL']);
         $data = $this->service->getAnnouncements($user);
         return $this->success($response, $data);
     }
@@ -2140,16 +2150,41 @@ class SchoolAdminController extends BaseController
     public function createAnnouncement(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'PRINCIPAL']);
         $body = RequestParser::body($request);
         $data = $this->service->createAnnouncement($user, $body);
         return $this->success($response, $data, 'Announcement published successfully');
     }
 
+    public function uploadAnnouncementAudio(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'PRINCIPAL']);
+
+        $uploadedFiles = $request->getUploadedFiles();
+        if (empty($uploadedFiles)) {
+            return $this->error($response, 'No audio file uploaded', 400);
+        }
+
+        $fileKey = array_key_first($uploadedFiles);
+        $uploadedFile = $uploadedFiles[$fileKey];
+
+        if ($uploadedFile->getError() !== UPLOAD_ERR_OK) {
+            return $this->error($response, 'Audio upload failed with error code: ' . $uploadedFile->getError(), 400);
+        }
+
+        if ($uploadedFile->getSize() > 25 * 1024 * 1024) {
+            return $this->error($response, 'Audio file exceeds the maximum 25MB limit', 400);
+        }
+
+        $res = $this->service->handleFileUpload($uploadedFile, \App\Shared\Storage\StorageService::CATEGORY_DOCUMENTS);
+        return $this->success($response, ['audio_url' => $res], 'Audio uploaded successfully');
+    }
+
     public function updateAnnouncement(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'PRINCIPAL']);
         $id = (int)$args['id'];
         $body = RequestParser::body($request);
         $data = $this->service->updateAnnouncement($user, $id, $body);
@@ -2159,7 +2194,7 @@ class SchoolAdminController extends BaseController
     public function deleteAnnouncement(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'PRINCIPAL']);
         $id = (int)$args['id'];
         $data = $this->service->deleteAnnouncement($user, $id);
         return $this->success($response, $data, 'Announcement deleted successfully');

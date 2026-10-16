@@ -124,7 +124,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       isAvailable: true,
     ),
     LauncherFeature(
-      name: 'Mark Attendance',
+      name: 'Scanner',
       icon: Icons.qr_code_scanner_rounded,
       color: Colors.indigo,
       allowedRoles: ['TEACHER', 'PRINCIPAL'],
@@ -874,7 +874,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
         ).then((_) => _fetchUnreadNotificationsCount());
-      } else if (feature.name == 'Mark Attendance' || feature.name == 'Teacher Attendance') {
+      } else if (feature.name == 'Scanner' || feature.name == 'Mark Attendance' || feature.name == 'Teacher Attendance') {
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -1256,13 +1256,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                // Circular Feature Icon Button
+                                // Rounded Square Feature Icon Button
                                 AspectRatio(
                                   aspectRatio: 1.0,
                                   child: Container(
                                     decoration: BoxDecoration(
                                       color: feature.color.withOpacity(0.08),
-                                      shape: BoxShape.circle,
+                                      borderRadius: BorderRadius.circular(16),
                                       border: Border.all(
                                         color: feature.color.withOpacity(0.25),
                                         width: 1.5,

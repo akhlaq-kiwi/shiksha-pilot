@@ -106,7 +106,7 @@ class _ExamListScreenState extends State<ExamListScreen> {
   Color _getStatusColor(String status) {
     switch (status.toUpperCase()) {
       case 'UPCOMING':
-        return Colors.indigo.shade600;
+        return const Color(0xFF0F766E);
       case 'CURRENT':
         return Colors.green.shade600;
       case 'COMPLETED':
@@ -118,7 +118,7 @@ class _ExamListScreenState extends State<ExamListScreen> {
   Color _getStatusBgColor(String status) {
     switch (status.toUpperCase()) {
       case 'UPCOMING':
-        return Colors.indigo.shade50;
+        return const Color(0xFFF0FDFA);
       case 'CURRENT':
         return Colors.green.shade50;
       case 'COMPLETED':
@@ -194,7 +194,7 @@ class _ExamListScreenState extends State<ExamListScreen> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.indigo.shade100, width: 1.2),
+            border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.04),
@@ -221,12 +221,12 @@ class _ExamListScreenState extends State<ExamListScreen> {
                     Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: Colors.indigo.shade50,
+                        color: const Color(0xFFF0FDFA),
                         borderRadius: BorderRadius.circular(14),
                       ),
-                      child: Icon(
+                      child: const Icon(
                         Icons.class_rounded,
-                        color: Colors.indigo.shade800,
+                        color: Color(0xFF0F766E),
                         size: 28,
                       ),
                     ),
@@ -255,9 +255,9 @@ class _ExamListScreenState extends State<ExamListScreen> {
                         ],
                       ),
                     ),
-                    Icon(
+                    const Icon(
                       Icons.chevron_right_rounded,
-                      color: Colors.indigo.shade600,
+                      color: Color(0xFF0F766E),
                       size: 26,
                     ),
                   ],
@@ -282,22 +282,31 @@ class _ExamListScreenState extends State<ExamListScreen> {
         : '';
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: const Color(0xFFFBF8F2),
       appBar: AppBar(
-        title: Text(
-          (widget.userRole == 'TEACHER' || widget.userRole == 'PRINCIPAL') && _assignedClasses.length > 1 && _selectedClass == null
-              ? 'Select Class'
-              : 'Examinations',
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-            color: Colors.white,
+        backgroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: false,
+        titleSpacing: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF1E293B), size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Padding(
+          padding: const EdgeInsets.only(top: 4.0),
+          child: Text(
+            (widget.userRole == 'TEACHER' || widget.userRole == 'PRINCIPAL') && _assignedClasses.length > 1 && _selectedClass == null
+                ? 'SELECT CLASS'
+                : 'EXAMINATIONS',
+            style: const TextStyle(
+              color: Color(0xFF0F172A),
+              fontWeight: FontWeight.w900,
+              fontSize: 16,
+              letterSpacing: 0.6,
+            ),
           ),
         ),
-        centerTitle: true,
-        elevation: 0,
-        backgroundColor: Colors.indigo.shade800,
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(color: Color(0xFF1E293B)),
       ),
       body: RefreshIndicator(
         onRefresh: _loadExams,
@@ -323,8 +332,11 @@ class _ExamListScreenState extends State<ExamListScreen> {
                               ElevatedButton(
                                 onPressed: _loadExams,
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.indigo.shade700,
+                                  backgroundColor: const Color(0xFF0F766E),
                                   foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
                                 ),
                                 child: const Text('Try Again'),
                               ),
@@ -339,21 +351,26 @@ class _ExamListScreenState extends State<ExamListScreen> {
                           if ((widget.userRole == 'TEACHER' || widget.userRole == 'PRINCIPAL') && _assignedClasses.length > 1 && _selectedClass != null)
                             Container(
                               width: double.infinity,
-                              color: Colors.indigo.shade50,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFF0FDFA),
+                                border: Border(
+                                  bottom: BorderSide(color: Color(0xFFCCFBF1), width: 1),
+                                ),
+                              ),
                               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   Row(
                                     children: [
-                                      Icon(Icons.school_rounded, size: 18, color: Colors.indigo.shade800),
+                                      const Icon(Icons.school_rounded, size: 18, color: Color(0xFF0F766E)),
                                       const SizedBox(width: 8),
                                       Text(
                                         'Class: $selectedClassName',
-                                        style: TextStyle(
+                                        style: const TextStyle(
                                           fontWeight: FontWeight.bold,
                                           fontSize: 14,
-                                          color: Colors.indigo.shade900,
+                                          color: Color(0xFF0F766E),
                                         ),
                                       ),
                                     ],
@@ -370,12 +387,12 @@ class _ExamListScreenState extends State<ExamListScreen> {
                                       minimumSize: Size.zero,
                                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                     ),
-                                    child: Text(
+                                    child: const Text(
                                       'Change Class',
                                       style: TextStyle(
                                         fontWeight: FontWeight.w800,
                                         fontSize: 13,
-                                        color: Colors.indigo.shade700,
+                                        color: Color(0xFF0F766E),
                                       ),
                                     ),
                                   ),
@@ -418,7 +435,7 @@ class _ExamListScreenState extends State<ExamListScreen> {
                                             decoration: BoxDecoration(
                                               color: Colors.white,
                                               borderRadius: BorderRadius.circular(16),
-                                              border: Border.all(color: Colors.indigo.shade100, width: 1.2),
+                                              border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
                                               boxShadow: [
                                                 BoxShadow(
                                                   color: Colors.black.withOpacity(0.04),
@@ -455,12 +472,12 @@ class _ExamListScreenState extends State<ExamListScreen> {
                                                       Container(
                                                         padding: const EdgeInsets.all(14),
                                                         decoration: BoxDecoration(
-                                                          color: Colors.indigo.shade50,
+                                                          color: const Color(0xFFF0FDFA),
                                                           borderRadius: BorderRadius.circular(14),
                                                         ),
-                                                        child: Icon(
+                                                        child: const Icon(
                                                           Icons.assignment_rounded,
-                                                          color: Colors.indigo.shade800,
+                                                          color: Color(0xFF0F766E),
                                                           size: 28,
                                                         ),
                                                       ),
@@ -492,9 +509,9 @@ class _ExamListScreenState extends State<ExamListScreen> {
                                                           ],
                                                         ),
                                                       ),
-                                                      Icon(
+                                                      const Icon(
                                                         Icons.chevron_right_rounded,
-                                                        color: Colors.indigo.shade600,
+                                                        color: Color(0xFF0F766E),
                                                         size: 24,
                                                       ),
                                                     ],
@@ -683,7 +700,7 @@ class TermSubTestsScreen extends StatelessWidget {
   Color _getStatusColor(String status) {
     switch (status.toUpperCase()) {
       case 'UPCOMING':
-        return Colors.indigo.shade600;
+        return const Color(0xFF0F766E);
       case 'CURRENT':
         return Colors.green.shade600;
       case 'COMPLETED':
@@ -695,7 +712,7 @@ class TermSubTestsScreen extends StatelessWidget {
   Color _getStatusBgColor(String status) {
     switch (status.toUpperCase()) {
       case 'UPCOMING':
-        return Colors.indigo.shade50;
+        return const Color(0xFFF0FDFA);
       case 'CURRENT':
         return Colors.green.shade50;
       case 'COMPLETED':
@@ -707,20 +724,29 @@ class TermSubTestsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: const Color(0xFFFBF8F2),
       appBar: AppBar(
-        title: Text(
-          termName,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-            color: Colors.white,
+        backgroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: false,
+        titleSpacing: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF1E293B), size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Padding(
+          padding: const EdgeInsets.only(top: 4.0),
+          child: Text(
+            termName.toUpperCase(),
+            style: const TextStyle(
+              color: Color(0xFF0F172A),
+              fontWeight: FontWeight.w900,
+              fontSize: 16,
+              letterSpacing: 0.6,
+            ),
           ),
         ),
-        centerTitle: true,
-        elevation: 0,
-        backgroundColor: Colors.indigo.shade800,
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(color: Color(0xFF1E293B)),
       ),
       body: subTests.isEmpty
           ? Center(
@@ -731,14 +757,14 @@ class TermSubTestsScreen extends StatelessWidget {
                   children: [
                     Container(
                       padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.indigo.shade50,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFF0FDFA),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(
+                      child: const Icon(
                         Icons.assignment_late_outlined,
                         size: 64,
-                        color: Colors.indigo.shade400,
+                        color: Color(0xFF0F766E),
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -834,10 +860,10 @@ class TermSubTestsScreen extends StatelessWidget {
                                         const SizedBox(height: 4),
                                         Text(
                                           'Max Marks: ${maxMarks.toString().replaceAll('.00', '')}',
-                                          style: TextStyle(
+                                          style: const TextStyle(
                                             fontSize: 13,
                                             fontWeight: FontWeight.w600,
-                                            color: Colors.indigo.shade700,
+                                            color: Color(0xFF0F766E),
                                           ),
                                         ),
                                       ],

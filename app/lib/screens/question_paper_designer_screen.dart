@@ -237,11 +237,21 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
   @override
   void initState() {
     super.initState();
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
     _bootstrapData();
   }
 
   @override
   void dispose() {
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
     _paperTitleController.dispose();
     _examNameController.dispose();
     _durationController.dispose();
@@ -302,7 +312,7 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
   Future<http.Response?> _getWithFallback(String path, String token, String primaryBaseUrl) async {
     final List<String> baseUrls = [
       primaryBaseUrl,
-      if (!primaryBaseUrl.contains('10.237.103.71')) 'http://10.237.103.71:8000',
+      if (!primaryBaseUrl.contains('10.155.82.71')) 'http://10.155.82.71:8000',
       if (!primaryBaseUrl.contains('127.0.0.1')) 'http://127.0.0.1:8000',
     ];
 
@@ -1809,7 +1819,15 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
   // --- Main Build UI ---
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        SystemChrome.setPreferredOrientations([
+          DeviceOrientation.portraitUp,
+          DeviceOrientation.portraitDown,
+        ]);
+      },
+      child: Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         backgroundColor: Colors.white,
@@ -1859,6 +1877,7 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
                 ),
               ),
             ),
+      ),
     );
   }
 

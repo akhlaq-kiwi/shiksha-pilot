@@ -13,9 +13,14 @@ class ExamService {
         if (studentId != null) 'X-Student-Id': studentId.toString(),
       };
 
+  bool _isStaff(String role) {
+    final r = role.toUpperCase();
+    return r == 'TEACHER' || r == 'PRINCIPAL' || r == 'SCHOOL_ADMIN' || r == 'ADMIN' || r == 'STAFF';
+  }
+
   Future<List<dynamic>> getExamsList(String userRole, int? studentId, {int? classId}) async {
     final query = (classId != null && classId > 0) ? '?class_id=$classId' : '';
-    final path = userRole == 'TEACHER' ? '/api/teacher/exams-new$query' : '/api/student/exams-new';
+    final path = _isStaff(userRole) ? '/api/teacher/exams-new$query' : '/api/student/exams-new';
     final uri = Uri.parse('$baseUrl$path');
     final response = await http.get(uri, headers: _headers(studentId));
 
@@ -39,7 +44,7 @@ class ExamService {
 
   Future<Map<String, dynamic>> getExamDetails(int examId, String userRole, int? studentId, {int? classId}) async {
     final query = (classId != null && classId > 0) ? '?class_id=$classId' : '';
-    final path = userRole == 'TEACHER' 
+    final path = _isStaff(userRole) 
         ? '/api/teacher/exams-new/$examId/details$query' 
         : '/api/student/exams-new/$examId/details';
     final uri = Uri.parse('$baseUrl$path');

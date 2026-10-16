@@ -223,21 +223,36 @@ class _SalaryCardScreenState extends State<SalaryCardScreen> {
     final totalPages = _hasUnpaidPrev ? 2 : 1;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFFBF8F2),
       appBar: AppBar(
-        title: const Text(
-          'Salary Card',
-          style: TextStyle(fontWeight: FontWeight.w900, color: Colors.black87),
-        ),
         backgroundColor: Colors.white,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black87),
+        centerTitle: false,
+        titleSpacing: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF1E293B), size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Padding(
+          padding: EdgeInsets.only(top: 4.0),
+          child: Text(
+            'Salary Card',
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 16,
+              color: Color(0xFF0F172A),
+              letterSpacing: 0.5,
+            ),
+          ),
+        ),
         actions: [
           if (!_isLoading)
             IconButton(
-              icon: const Icon(Icons.refresh),
+              icon: const Icon(Icons.refresh_rounded, color: Color(0xFF1E293B), size: 20),
+              tooltip: 'Refresh',
               onPressed: _fetchSalariesData,
-            )
+            ),
+          const SizedBox(width: 4),
         ],
       ),
       body: _isLoading
@@ -334,107 +349,142 @@ class _SalaryCardScreenState extends State<SalaryCardScreen> {
 
   Widget _buildYearSalaryCard(Map<String, dynamic> yearData, String yearLabel) {
     final yearName = yearData['academic_year_name'] ?? '—';
-    final baseSalary = (yearData['salary'] ?? 0.0).toDouble();
     final List<dynamic> payments = yearData['payments'] ?? [];
 
     return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Card(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        elevation: 2,
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
         child: Padding(
-          padding: const EdgeInsets.all(20.0),
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 18.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 'Academic Year: $yearName',
                 style: const TextStyle(
-                  fontSize: 16,
+                  fontSize: 15,
                   fontWeight: FontWeight.w900,
-                  color: Colors.black87,
+                  color: Color(0xFF0F172A),
+                  letterSpacing: 0.2,
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
+              const Divider(color: Color(0xFFE2E8F0), thickness: 1.2, height: 1),
               Expanded(
                 child: ListView.separated(
                   physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(vertical: 4),
                   itemCount: payments.length,
-                  separatorBuilder: (ctx, idx) => Divider(color: Colors.grey.shade100, height: 1),
+                  separatorBuilder: (ctx, idx) => const Divider(color: Color(0xFFE2E8F0), thickness: 1, height: 1),
                   itemBuilder: (ctx, idx) {
                     final item = payments[idx];
                     final isPaid = item['status'] == 'Paid';
                     final disbursedDate = item['disbursed_date'];
                     final paymentId = item['id'] ?? 0;
+                    final monthUpper = (item['month'] ?? '').toString().toUpperCase();
 
                     return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item['month'] ?? '',
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
+                          // Left: Month name (CAPITALIZED) & optional disbursed date if paid
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  monthUpper,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF0F172A),
+                                    letterSpacing: 0.6,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                isPaid
-                                    ? 'Disbursed: ${_formatDate(disbursedDate)}'
-                                    : 'Waiting for disbursement',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade600,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
+                                if (isPaid && disbursedDate != null && disbursedDate.toString().isNotEmpty) ...[
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    'Disbursed: ${_formatDate(disbursedDate)}',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: Color(0xFF64748B),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
                           ),
+
+                          // Right: Status badge & optional Slip download button
                           Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                                 decoration: BoxDecoration(
-                                  color: isPaid ? Colors.green.shade50 : Colors.amber.shade50,
-                                  borderRadius: BorderRadius.circular(6),
+                                  color: isPaid ? const Color(0xFFECFDF5) : const Color(0xFFFFFBEB),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: isPaid ? const Color(0xFFA7F3D0) : const Color(0xFFFDE68A),
+                                  ),
                                 ),
                                 child: Text(
                                   isPaid ? 'PAID' : 'PENDING',
                                   style: TextStyle(
                                     fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: isPaid ? Colors.green.shade700 : Colors.amber.shade800,
+                                    fontWeight: FontWeight.w800,
+                                    color: isPaid ? const Color(0xFF047857) : const Color(0xFFB45309),
+                                    letterSpacing: 0.4,
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 10),
-                              isPaid
-                                  ? OutlinedButton(
-                                      onPressed: paymentId > 0
-                                          ? () => _downloadSalarySlip(paymentId, item['month'])
-                                          : null,
-                                      style: OutlinedButton.styleFrom(
-                                        foregroundColor: Colors.indigo,
-                                        side: const BorderSide(color: Colors.indigo),
-                                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                                      ),
-                                      child: const Text('Slip'),
-                                    )
-                                  : OutlinedButton(
-                                      onPressed: null,
-                                      style: OutlinedButton.styleFrom(
-                                        foregroundColor: Colors.grey.shade400,
-                                        side: BorderSide(color: Colors.grey.shade300),
-                                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                                      ),
-                                      child: const Text('Waiting'),
+                              if (isPaid) ...[
+                                const SizedBox(width: 8),
+                                InkWell(
+                                  borderRadius: BorderRadius.circular(8),
+                                  onTap: paymentId > 0
+                                      ? () => _downloadSalarySlip(paymentId, item['month'])
+                                      : null,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: const Color(0xFFCBD5E1)),
                                     ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.download_rounded, size: 14, color: Color(0xFF0F766E)),
+                                        SizedBox(width: 4),
+                                        Text(
+                                          'Slip',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                            color: Color(0xFF0F766E),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ],
