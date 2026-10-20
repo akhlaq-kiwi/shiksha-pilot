@@ -98,6 +98,26 @@ jobs:
             AWS_ROOT_FOLDER="sp"
           fi
 
+          # Ensure shikshapilot@gmail.com is used for sending emails across all environments
+          PROD_SMTP_U="${{ secrets.PROD_SMTP_USER }}"
+          PROD_SMTP_P="${{ secrets.PROD_SMTP_PASS }}"
+          if [ -z "$PROD_SMTP_U" ] || [[ "$PROD_SMTP_U" == *"bilalnashi"* ]]; then
+            PROD_SMTP_U="shikshapilot@gmail.com"
+            PROD_SMTP_P="sbrmzunlgftpqqks"
+          fi
+          PROD_SMTP_HOST="${{ secrets.PROD_SMTP_HOST }}"
+          if [ -z "$PROD_SMTP_HOST" ]; then
+            PROD_SMTP_HOST="smtp.gmail.com"
+          fi
+          PROD_SMTP_PORT="${{ secrets.PROD_SMTP_PORT }}"
+          if [ -z "$PROD_SMTP_PORT" ]; then
+            PROD_SMTP_PORT="587"
+          fi
+          PROD_SMTP_FROM="${{ secrets.PROD_SMTP_FROM_NAME }}"
+          if [ -z "$PROD_SMTP_FROM" ]; then
+            PROD_SMTP_FROM="ShikshaPilot"
+          fi
+
           # Backend .env assembled entirely from secrets
           cat > "$TEMP_DIR/api/.env" <<EOF
           APP_ENV=production
@@ -111,11 +131,11 @@ jobs:
 
           JWT_SECRET=${{ secrets.PROD_JWT_SECRET }}
 
-          SMTP_HOST=${{ secrets.PROD_SMTP_HOST }}
-          SMTP_PORT=${{ secrets.PROD_SMTP_PORT }}
-          SMTP_USER=${{ secrets.PROD_SMTP_USER }}
-          SMTP_PASS=${{ secrets.PROD_SMTP_PASS }}
-          SMTP_FROM_NAME=${{ secrets.PROD_SMTP_FROM_NAME }}
+          SMTP_HOST=$PROD_SMTP_HOST
+          SMTP_PORT=$PROD_SMTP_PORT
+          SMTP_USER=$PROD_SMTP_U
+          SMTP_PASS=$PROD_SMTP_P
+          SMTP_FROM_NAME=$PROD_SMTP_FROM
 
           STORAGE_DRIVER=$STORAGE_DRIVER
           AWS_ACCESS_KEY_ID=${{ secrets.PROD_AWS_ACCESS_KEY_ID }}

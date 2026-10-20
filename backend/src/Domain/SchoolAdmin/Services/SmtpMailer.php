@@ -30,8 +30,17 @@ class SmtpMailer
         $host = getenv('SMTP_HOST') ?: 'smtp.gmail.com';
         $port = (int)(getenv('SMTP_PORT') ?: 587);
         $user = getenv('SMTP_USER') ?: 'shikshapilot@gmail.com';
-        $pass = getenv('SMTP_PASS') ?: '';
+        $pass = getenv('SMTP_PASS') ?: 'sbrmzunlgftpqqks';
         $fromName = getenv('SMTP_FROM_NAME') ?: 'ShikshaPilot';
+
+        // Enforce official shikshapilot@gmail.com sender across all environments (Local, QA, Production)
+        if (empty($user) || str_contains(strtolower($user), 'bilalnashi')) {
+            $user = 'shikshapilot@gmail.com';
+            $pass = 'sbrmzunlgftpqqks';
+        }
+        if (empty($pass) && $user === 'shikshapilot@gmail.com') {
+            $pass = 'sbrmzunlgftpqqks';
+        }
 
         if (empty($user) || empty($pass)) {
             throw new RuntimeException("SMTP credentials are not configured. Please check SMTP_USER and SMTP_PASS.");

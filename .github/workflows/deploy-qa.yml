@@ -86,6 +86,26 @@ jobs:
             AWS_ROOT_FOLDER="sp-qa"
           fi
 
+          # Ensure shikshapilot@gmail.com is used for sending emails across all environments
+          QA_SMTP_U="${{ secrets.QA_SMTP_USER }}"
+          QA_SMTP_P="${{ secrets.QA_SMTP_PASS }}"
+          if [ -z "$QA_SMTP_U" ] || [[ "$QA_SMTP_U" == *"bilalnashi"* ]]; then
+            QA_SMTP_U="shikshapilot@gmail.com"
+            QA_SMTP_P="sbrmzunlgftpqqks"
+          fi
+          QA_SMTP_HOST="${{ secrets.QA_SMTP_HOST }}"
+          if [ -z "$QA_SMTP_HOST" ]; then
+            QA_SMTP_HOST="smtp.gmail.com"
+          fi
+          QA_SMTP_PORT="${{ secrets.QA_SMTP_PORT }}"
+          if [ -z "$QA_SMTP_PORT" ]; then
+            QA_SMTP_PORT="587"
+          fi
+          QA_SMTP_FROM="${{ secrets.QA_SMTP_FROM_NAME }}"
+          if [ -z "$QA_SMTP_FROM" ]; then
+            QA_SMTP_FROM="ShikshaPilot"
+          fi
+
           # Backend .env assembled entirely from secrets
           cat > "$TEMP_DIR/api/.env" <<EOF
           APP_ENV=qa
@@ -99,11 +119,11 @@ jobs:
 
           JWT_SECRET=${{ secrets.QA_JWT_SECRET }}
 
-          SMTP_HOST=${{ secrets.QA_SMTP_HOST }}
-          SMTP_PORT=${{ secrets.QA_SMTP_PORT }}
-          SMTP_USER=${{ secrets.QA_SMTP_USER }}
-          SMTP_PASS=${{ secrets.QA_SMTP_PASS }}
-          SMTP_FROM_NAME=${{ secrets.QA_SMTP_FROM_NAME }}
+          SMTP_HOST=$QA_SMTP_HOST
+          SMTP_PORT=$QA_SMTP_PORT
+          SMTP_USER=$QA_SMTP_U
+          SMTP_PASS=$QA_SMTP_P
+          SMTP_FROM_NAME=$QA_SMTP_FROM
 
           STORAGE_DRIVER=$STORAGE_DRIVER
           AWS_ACCESS_KEY_ID=${{ secrets.QA_AWS_ACCESS_KEY_ID }}
