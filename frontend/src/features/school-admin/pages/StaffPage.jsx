@@ -1880,18 +1880,18 @@ export default function StaffPage() {
                             Identity Card
                           </DropdownItem>
                           {isSchoolAdmin && (
-                            <>
-                              <DropdownItem onClick={() => {
-                                openPrincipalModal(t, isPrincipal ? 'unassign' : 'assign');
-                              }}>
-                                {isPrincipal ? 'Unassign Principal' : 'Principal'}
-                              </DropdownItem>
-                              <DropdownItem onClick={() => {
-                                openFeeCollectorModal(t, isFeeCollector ? 'unassign' : 'assign');
-                              }}>
-                                {isFeeCollector ? 'Unassign Fee Collector' : 'Fee Collector'}
-                              </DropdownItem>
-                            </>
+                            <DropdownItem onClick={() => {
+                              openPrincipalModal(t, isPrincipal ? 'unassign' : 'assign');
+                            }}>
+                              {isPrincipal ? 'Unassign Principal' : 'Principal'}
+                            </DropdownItem>
+                          )}
+                          {isSchoolAdmin && (
+                            <DropdownItem onClick={() => {
+                              openFeeCollectorModal(t, isFeeCollector ? 'unassign' : 'assign');
+                            }}>
+                              {isFeeCollector ? 'Unassign Fee Collector' : 'Fee Collector'}
+                            </DropdownItem>
                           )}
                           <DropdownItem onClick={() => {
                             setCredentialsTarget(t);
@@ -2963,11 +2963,15 @@ export default function StaffPage() {
             <div className="space-y-4">
               <p className="text-sm text-text-secondary leading-relaxed">
                 {principalAction === 'unassign' ? (
-                  <>Are you sure you want to unassign the Principal role from <strong className="text-text-primary font-semibold">{principalTeacherTarget?.name}</strong>? To complete this action, email verification is required.</>
+                  <>Are you sure you want to unassign the Principal role from <strong className="text-text-primary font-semibold">{principalTeacherTarget?.name}</strong>?</>
                 ) : (
-                  <>Are you sure you want to assign the Principal role to <strong className="text-text-primary font-semibold">{principalTeacherTarget?.name}</strong>? To complete this action, email verification is required.</>
+                  <>Are you sure you want to assign the Principal role to <strong className="text-text-primary font-semibold">{principalTeacherTarget?.name}</strong>?</>
                 )}
               </p>
+
+              <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-900 dark:text-amber-200">
+                To proceed, click <strong>Send OTP</strong> below. A 4-digit verification code will be sent to your registered school admin email address.
+              </div>
               
               <div className="flex items-center justify-end space-x-3 pt-2">
                 <Button 
@@ -2980,18 +2984,27 @@ export default function StaffPage() {
                 <Button 
                   onClick={handleSendPrincipalOtp} 
                   disabled={principalLoading}
-                  className="bg-amber-600 hover:bg-amber-700 text-white"
+                  className="bg-amber-600 hover:bg-amber-700 text-white font-medium"
                 >
-                  {principalLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                  Send OTP
+                  {principalLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      Sending OTP...
+                    </>
+                  ) : (
+                    'Send OTP'
+                  )}
                 </Button>
               </div>
             </div>
           ) : (
             <div className="space-y-4">
-              <p className="text-xs text-text-secondary">
-                An OTP has been sent to your registered email address {principalMaskedEmail ? <strong className="text-text-primary">{principalMaskedEmail}</strong> : ''}. Please enter the 4-digit OTP below to verify.
-              </p>
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-xs rounded-xl flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 flex-shrink-0 text-emerald-600 dark:text-emerald-400" />
+                <span>
+                  OTP code sent to {principalMaskedEmail ? <strong className="font-semibold">{principalMaskedEmail}</strong> : 'your registered email'}. Please check your inbox or spam folder.
+                </span>
+              </div>
 
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-text-muted uppercase tracking-wider">
@@ -3000,7 +3013,7 @@ export default function StaffPage() {
                 <Input 
                   type="text"
                   maxLength={6}
-                  placeholder="Enter OTP"
+                  placeholder="Enter 4-digit OTP"
                   value={principalOtpCode}
                   onChange={(e) => setPrincipalOtpCode(e.target.value)}
                   className="text-center text-lg tracking-widest font-mono font-bold"
@@ -3013,8 +3026,9 @@ export default function StaffPage() {
                   type="button"
                   onClick={handleSendPrincipalOtp}
                   disabled={principalLoading}
-                  className="text-xs text-primary hover:underline font-medium disabled:opacity-50"
+                  className="text-xs text-primary hover:underline font-medium disabled:opacity-50 flex items-center gap-1"
                 >
+                  {principalLoading ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
                   Resend OTP
                 </button>
                 
@@ -3029,7 +3043,7 @@ export default function StaffPage() {
                   <Button 
                     onClick={handleVerifyAndAssignPrincipal} 
                     disabled={principalLoading || !principalOtpCode.trim()}
-                    className="bg-amber-600 hover:bg-amber-700 text-white"
+                    className="bg-amber-600 hover:bg-amber-700 text-white font-medium"
                   >
                     {principalLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                     {principalAction === 'unassign' ? 'Verify & Unassign' : 'Verify & Assign'}
@@ -3069,11 +3083,15 @@ export default function StaffPage() {
             <div className="space-y-4">
               <p className="text-sm text-text-secondary leading-relaxed">
                 {feeCollectorAction === 'unassign' ? (
-                  <>Are you sure you want to unassign the Fee Collector role from <strong className="text-text-primary font-semibold">{feeCollectorTeacherTarget?.name}</strong>? To complete this action, email verification is required.</>
+                  <>Are you sure you want to unassign the Fee Collector role from <strong className="text-text-primary font-semibold">{feeCollectorTeacherTarget?.name}</strong>?</>
                 ) : (
-                  <>Are you sure you want to assign the Fee Collector role to <strong className="text-text-primary font-semibold">{feeCollectorTeacherTarget?.name}</strong>? To complete this action, email verification is required.</>
+                  <>Are you sure you want to assign the Fee Collector role to <strong className="text-text-primary font-semibold">{feeCollectorTeacherTarget?.name}</strong>?</>
                 )}
               </p>
+
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs text-emerald-900 dark:text-emerald-200">
+                To proceed, click <strong>Send OTP</strong> below. A 4-digit verification code will be sent to your registered school admin email address.
+              </div>
               
               <div className="flex items-center justify-end space-x-3 pt-2">
                 <Button 
@@ -3086,18 +3104,27 @@ export default function StaffPage() {
                 <Button 
                   onClick={handleSendFeeCollectorOtp} 
                   disabled={feeCollectorLoading}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
                 >
-                  {feeCollectorLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                  Send OTP
+                  {feeCollectorLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      Sending OTP...
+                    </>
+                  ) : (
+                    'Send OTP'
+                  )}
                 </Button>
               </div>
             </div>
           ) : (
             <div className="space-y-4">
-              <p className="text-xs text-text-secondary">
-                An OTP has been sent to your registered email address {feeCollectorMaskedEmail ? <strong className="text-text-primary">{feeCollectorMaskedEmail}</strong> : ''}. Please enter the 4-digit OTP below to verify.
-              </p>
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-xs rounded-xl flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 flex-shrink-0 text-emerald-600 dark:text-emerald-400" />
+                <span>
+                  OTP code sent to {feeCollectorMaskedEmail ? <strong className="font-semibold">{feeCollectorMaskedEmail}</strong> : 'your registered email'}. Please check your inbox or spam folder.
+                </span>
+              </div>
 
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-text-muted uppercase tracking-wider">
@@ -3106,7 +3133,7 @@ export default function StaffPage() {
                 <Input 
                   type="text"
                   maxLength={6}
-                  placeholder="Enter OTP"
+                  placeholder="Enter 4-digit OTP"
                   value={feeCollectorOtpCode}
                   onChange={(e) => setFeeCollectorOtpCode(e.target.value)}
                   className="text-center text-lg tracking-widest font-mono font-bold"
@@ -3119,8 +3146,9 @@ export default function StaffPage() {
                   type="button"
                   onClick={handleSendFeeCollectorOtp}
                   disabled={feeCollectorLoading}
-                  className="text-xs text-primary hover:underline font-medium disabled:opacity-50"
+                  className="text-xs text-primary hover:underline font-medium disabled:opacity-50 flex items-center gap-1"
                 >
+                  {feeCollectorLoading ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
                   Resend OTP
                 </button>
                 
@@ -3135,7 +3163,7 @@ export default function StaffPage() {
                   <Button 
                     onClick={handleVerifyAndAssignFeeCollector} 
                     disabled={feeCollectorLoading || !feeCollectorOtpCode.trim()}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
                   >
                     {feeCollectorLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                     {feeCollectorAction === 'unassign' ? 'Verify & Unassign' : 'Verify & Assign'}

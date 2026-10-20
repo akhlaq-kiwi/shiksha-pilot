@@ -98,8 +98,7 @@ class SmtpMailer
                 "Message-ID: <{$msgId}>",
                 "Subject: =?UTF-8?B?" . base64_encode($subject) . "?=",
                 "MIME-Version: 1.0",
-                "Content-Type: multipart/mixed; boundary=\"{$boundary}\"",
-                "Connection: close"
+                "Content-Type: multipart/mixed; boundary=\"{$boundary}\""
             ];
 
             $emailContent = implode("\r\n", $headers) . "\r\n\r\n";

@@ -20302,6 +20302,12 @@ Only approve the settlement after reviewing all financial records.
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         ");
+        try {
+            $pdo->exec("ALTER TABLE principal_assign_otps ADD COLUMN user_id INT NOT NULL DEFAULT 0");
+        } catch (\Throwable $e) {}
+        try {
+            $pdo->exec("ALTER TABLE principal_assign_otps ADD COLUMN attempts INT DEFAULT 0");
+        } catch (\Throwable $e) {}
 
         // Rate limiting check: 30 seconds
         $stmtRate = $pdo->prepare("
@@ -20347,8 +20353,8 @@ Only approve the settlement after reviewing all financial records.
         
         $isUnassign = (strtolower(trim($action)) === 'unassign');
         $subject = $isUnassign 
-            ? "Security Verification: Unassign Principal Role - ShikshaPilot"
-            : "Security Verification: Assign Principal Role - ShikshaPilot";
+            ? "Your OTP is {$otpCode} - Unassign Principal Role - ShikshaPilot"
+            : "Your OTP is {$otpCode} - Assign Principal Role - ShikshaPilot";
         $actionVerb = $isUnassign ? "unassign the Principal role from" : "assign the Principal role to";
 
         $bodyHtml = "
@@ -20578,6 +20584,12 @@ Only approve the settlement after reviewing all financial records.
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         ");
+        try {
+            $pdo->exec("ALTER TABLE fee_collector_assign_otps ADD COLUMN user_id INT NOT NULL DEFAULT 0");
+        } catch (\Throwable $e) {}
+        try {
+            $pdo->exec("ALTER TABLE fee_collector_assign_otps ADD COLUMN attempts INT DEFAULT 0");
+        } catch (\Throwable $e) {}
 
         // Rate limiting check: 30 seconds
         $stmtRate = $pdo->prepare("
@@ -20623,8 +20635,8 @@ Only approve the settlement after reviewing all financial records.
         
         $isUnassign = (strtolower(trim($action)) === 'unassign');
         $subject = $isUnassign 
-            ? "Security Verification: Unassign Fee Collector Role - ShikshaPilot"
-            : "Security Verification: Assign Fee Collector Role - ShikshaPilot";
+            ? "Your OTP is {$otpCode} - Unassign Fee Collector Role - ShikshaPilot"
+            : "Your OTP is {$otpCode} - Assign Fee Collector Role - ShikshaPilot";
         $actionVerb = $isUnassign ? "unassign the Fee Collector role from" : "assign the Fee Collector role to";
 
         $bodyHtml = "

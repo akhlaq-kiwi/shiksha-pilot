@@ -8,6 +8,7 @@ export function DropdownMenu({ trigger, children, align = 'right' }) {
   const [isOpen, setIsOpen] = useState(false);
   const [coords, setCoords] = useState({ top: 0, left: 0, right: 0 });
   const containerRef = useRef(null);
+  const portalRef = useRef(null);
 
   const toggle = (e) => {
     e.stopPropagation();
@@ -27,8 +28,7 @@ export function DropdownMenu({ trigger, children, align = 'right' }) {
   useEffect(() => {
     const handleOutsideClick = (event) => {
       if (containerRef.current && !containerRef.current.contains(event.target)) {
-        const portalMenu = document.getElementById('dropdown-portal-menu');
-        if (portalMenu && portalMenu.contains(event.target)) {
+        if (portalRef.current && portalRef.current.contains(event.target)) {
           return;
         }
         setIsOpen(false);
@@ -61,6 +61,25 @@ export function DropdownMenu({ trigger, children, align = 'right' }) {
     };
   }, [isOpen]);
 
+  const renderChildren = (childList) => {
+    return React.Children.map(childList, (child) => {
+      if (!React.isValidElement(child)) return child;
+      if (child.type === React.Fragment) {
+        return renderChildren(child.props.children);
+      }
+      return React.cloneElement(child, {
+        onClick: (e) => {
+          e.stopPropagation();
+          setIsOpen(false);
+          if (child.props.disabled) return;
+          if (child.props.onClick) {
+            child.props.onClick(e);
+          }
+        },
+      });
+    });
+  };
+
   return (
     <div className="relative inline-block text-left font-sans" ref={containerRef}>
       {React.isValidElement(trigger) && trigger.type === 'button' ? (
@@ -86,7 +105,9 @@ export function DropdownMenu({ trigger, children, align = 'right' }) {
 
       {isOpen && createPortal(
         <div
+          ref={portalRef}
           id="dropdown-portal-menu"
+          onClick={() => setIsOpen(false)}
           style={{
             position: 'fixed',
             ...(coords.opensUpward
@@ -102,21 +123,7 @@ export function DropdownMenu({ trigger, children, align = 'right' }) {
             )
           )}
         >
-          {React.Children.map(children, (child) => {
-            if (React.isValidElement(child)) {
-              return React.cloneElement(child, {
-                onClick: (e) => {
-                  e.stopPropagation();
-                  if (child.props.disabled) return;
-                  if (child.props.onClick) {
-                    child.props.onClick(e);
-                  }
-                  setIsOpen(false);
-                },
-              });
-            }
-            return child;
-          })}
+          {renderChildren(children)}
         </div>,
         document.body
       )}
