@@ -143,7 +143,7 @@ export default function ModernReportCardTemplate({ data, config = {} }) {
         </div>
         <div className="flex flex-col items-center">
           <span className="text-[11px] font-bold text-zinc-400 uppercase block">Date of Birth</span>
-          <strong className="text-zinc-900 text-sm font-mono font-bold">{student.dob}</strong>
+          <strong className="text-zinc-900 text-sm font-sans font-bold">{student.dob}</strong>
         </div>
       </div>
 

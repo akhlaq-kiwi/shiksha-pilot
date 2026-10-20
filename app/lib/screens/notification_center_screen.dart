@@ -80,7 +80,9 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
     try {
       final role = (widget.userRole ?? '').toUpperCase();
       final isStudentOrParent = role == 'STUDENT' || role == 'PARENT' || widget.studentId != null;
-      final endpoint = isStudentOrParent ? '/api/student/notifications' : '/api/school/notifications';
+      final endpoint = isStudentOrParent 
+          ? '/api/student/notifications' 
+          : (role == 'TEACHER' || role == 'PRINCIPAL' ? '/api/teacher/notifications' : '/api/school/notifications');
       final uri = Uri.parse('${widget.baseUrl}$endpoint?limit=$_limit&offset=0');
       final response = await http.get(
         uri,
@@ -99,6 +101,17 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
         } else if (decoded['data'] is Map && decoded['data']['notifications'] != null) {
           fetched = decoded['data']['notifications'];
         }
+        // Exclude announcements: they have their own Notice feature with dedicated unread badge
+        fetched = fetched.where((n) {
+          final linkStr = (n['link'] ?? '').toString().toLowerCase();
+          final catStr = (n['category'] ?? '').toString().toUpperCase();
+          final evtStr = (n['event_key'] ?? '').toString().toUpperCase();
+          if (linkStr == '/notice' || linkStr.contains('notice') || catStr == 'ANNOUNCEMENT' || evtStr == 'ANNOUNCEMENT_PUBLISHED') {
+            return false;
+          }
+          return true;
+        }).toList();
+
         setState(() {
           _notifications = fetched;
           _isLoading = false;
@@ -130,7 +143,9 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
     try {
       final role = (widget.userRole ?? '').toUpperCase();
       final isStudentOrParent = role == 'STUDENT' || role == 'PARENT' || widget.studentId != null;
-      final endpoint = isStudentOrParent ? '/api/student/notifications' : '/api/school/notifications';
+      final endpoint = isStudentOrParent 
+          ? '/api/student/notifications' 
+          : (role == 'TEACHER' || role == 'PRINCIPAL' ? '/api/teacher/notifications' : '/api/school/notifications');
       final uri = Uri.parse('${widget.baseUrl}$endpoint?limit=$_limit&offset=$_offset');
       final response = await http.get(
         uri,
@@ -149,6 +164,17 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
         } else if (decoded['data'] is Map && decoded['data']['notifications'] != null) {
           fetched = decoded['data']['notifications'];
         }
+        // Exclude announcements
+        fetched = fetched.where((n) {
+          final linkStr = (n['link'] ?? '').toString().toLowerCase();
+          final catStr = (n['category'] ?? '').toString().toUpperCase();
+          final evtStr = (n['event_key'] ?? '').toString().toUpperCase();
+          if (linkStr == '/notice' || linkStr.contains('notice') || catStr == 'ANNOUNCEMENT' || evtStr == 'ANNOUNCEMENT_PUBLISHED') {
+            return false;
+          }
+          return true;
+        }).toList();
+
         setState(() {
           _notifications.addAll(fetched);
           _offset += fetched.length;
@@ -403,10 +429,15 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
 
                               // Fire background API call to update notification state to read
                               try {
-                                final isSchoolStaff = widget.studentId == null;
-                                final path = isSchoolStaff 
-                                    ? '/api/school/notifications/${notif['id']}/read'
-                                    : '/api/student/notifications/${notif['id']}/read';
+                                final roleUpper = (widget.userRole ?? '').toUpperCase();
+                                final String path;
+                                if (roleUpper == 'TEACHER' || roleUpper == 'PRINCIPAL') {
+                                  path = '/api/teacher/notifications/${notif['id']}/read';
+                                } else if (roleUpper == 'SCHOOL_ADMIN' || roleUpper == 'SUPER_ADMIN') {
+                                  path = '/api/school/notifications/${notif['id']}/read';
+                                } else {
+                                  path = '/api/student/notifications/${notif['id']}/read';
+                                }
                                 final uri = Uri.parse('${widget.baseUrl}$path');
                                 final headers = {
                                   'Content-Type': 'application/json',

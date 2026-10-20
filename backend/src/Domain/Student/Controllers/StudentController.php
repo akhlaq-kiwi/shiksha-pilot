@@ -199,6 +199,22 @@ class StudentController extends BaseController
         return $this->success($response, $data);
     }
 
+    public function getUnreadNoticesCount(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['STUDENT', 'PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL']);
+        $data = $this->service->getUnreadNoticesCount($user);
+        return $this->success($response, $data);
+    }
+
+    public function markAllNoticesRead(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['STUDENT', 'PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL']);
+        $data = $this->service->markAllNoticesRead($user);
+        return $this->success($response, $data, 'All notices marked as read');
+    }
+
     public function markNoticeRead(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);

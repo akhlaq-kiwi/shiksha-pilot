@@ -20,6 +20,7 @@ class FeeService {
       http.get(Uri.parse('$baseUrl/api/school/fee-payments'), headers: _headers),
       http.get(Uri.parse('$baseUrl/api/school/class-fee-configurations'), headers: _headers),
       http.get(Uri.parse('$baseUrl/api/school/additional-fees/payments'), headers: _headers),
+      http.get(Uri.parse('$baseUrl/api/school/stats'), headers: _headers),
     ]);
 
     final studentsRes = results[0];
@@ -27,6 +28,7 @@ class FeeService {
     final feePaymentsRes = results[2];
     final feeConfigsRes = results[3];
     final additionalPaymentsRes = results[4];
+    final statsRes = results[5];
 
     if (studentsRes.statusCode != 200) {
       final err = json.decode(studentsRes.body);
@@ -38,6 +40,7 @@ class FeeService {
     final feePaymentsData = feePaymentsRes.statusCode == 200 ? (json.decode(feePaymentsRes.body)['data'] ?? []) : [];
     final feeConfigsData = feeConfigsRes.statusCode == 200 ? (json.decode(feeConfigsRes.body)['data'] ?? []) : [];
     final additionalPaymentsData = additionalPaymentsRes.statusCode == 200 ? (json.decode(additionalPaymentsRes.body)['data'] ?? []) : [];
+    final statsData = statsRes.statusCode == 200 ? (json.decode(statsRes.body)['data'] ?? {}) : <String, dynamic>{};
 
     return {
       'students': studentsData,
@@ -45,6 +48,7 @@ class FeeService {
       'fee_payments': feePaymentsData,
       'class_fee_configs': feeConfigsData,
       'additional_payments': additionalPaymentsData,
+      'stats': statsData,
     };
   }
 

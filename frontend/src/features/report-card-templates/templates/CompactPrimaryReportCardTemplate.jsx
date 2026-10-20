@@ -136,11 +136,11 @@ export default function CompactPrimaryReportCardTemplate({ data, config = {} }) 
         </div>
         <div>
           <span className="text-[10px] text-amber-800 uppercase font-bold block">Roll / SR. No</span>
-          <strong className="text-zinc-900 text-xs font-mono">{student.roll_no} | {student.admission_no}</strong>
+          <strong className="text-zinc-900 text-xs font-mono font-bold">{student.roll_no} | {student.admission_no}</strong>
         </div>
         <div>
           <span className="text-[10px] text-amber-800 uppercase font-bold block">Date of Birth</span>
-          <strong className="text-zinc-900 text-xs font-mono">{student.dob}</strong>
+          <strong className="text-zinc-900 text-xs font-sans font-bold">{student.dob}</strong>
         </div>
       </div>
 

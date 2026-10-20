@@ -4,7 +4,7 @@ import {
   Plus, ArrowLeft, Calendar, Clock, BookOpen, UserCheck, 
   Settings, Award, Printer, Trash, FileText, CheckCircle, 
   XCircle, Save, AlertCircle, Edit3, Trash2, LayoutDashboard, ChevronRight, ChevronDown, Download, X,
-  Users, Check, RotateCcw, Phone, Loader2, MoreVertical, Eye
+  Users, Check, RotateCcw, Phone, Loader2, MoreVertical, Eye, Palette, Sparkles
 } from 'lucide-react';
 import { Button } from '../../../common/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
@@ -18,10 +18,14 @@ import { schoolAdminService } from '../../../common/services/schoolAdminService'
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 import { DropdownMenu, DropdownItem } from '../../../common/ui/DropdownMenu';
 import html2pdf from 'html2pdf.js';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 import ReportCardRenderer from '../../report-card-templates/ReportCardRenderer';
 import { compileReportCardData, compileFinalSessionReportCardData } from '../../../common/services/reportCardEngine';
 import { ContactSuperAdminDialog } from '../index';
 import { getClassIndex, getShortClassName } from '../../../common/constants/predefinedClasses';
+import { REPORT_CARD_THEMES, resolveReportCardTheme, STATIC_FINAL_REPORT_PREVIEW_DATA } from '../../report-card-templates/reportCardThemes';
+import { inlineContainerImages } from '../../../common/utils/inlineImages';
 
 const formatGridHeaderDate = (dateStr) => {
   if (!dateStr) return '';
@@ -665,6 +669,7 @@ export default function ExamsPage() {
   const [savingMarkStudentId, setSavingMarkStudentId] = useState(null);
   const markInputRefs = useRef({});
   const autoAdvanceTimerRef = useRef(null);
+  const lastAutoFocusedKeyRef = useRef(null);
 
   // Local Report Cards State
   const [reportCards, setReportCards] = useState([]);
@@ -699,6 +704,199 @@ export default function ExamsPage() {
   const [tempRemark, setTempRemark] = useState('');
   const [remarkError, setRemarkError] = useState('');
   const [remarkLoading, setRemarkLoading] = useState(false);
+
+  // Report Card Template Color Theme States
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [previewThemeKey, setPreviewThemeKey] = useState(null);
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+  const [isSavingTheme, setIsSavingTheme] = useState(false);
+  const [previewZoom, setPreviewZoom] = useState(0.85);
+
+  const [downloadingTemplate, setDownloadingTemplate] = useState(false);
+
+  const currentThemeKey = schoolProfile?.report_card_color_theme
+    || schoolProfile?.report_card_template?.layout_config?.color_theme
+    || (typeof window !== 'undefined' && schoolProfile?.id ? localStorage.getItem(`report_card_theme_${schoolProfile.id}`) : null)
+    || 'ocean_teal';
+
+  const handleSelectTemplate = async (themeKey) => {
+    const themeObj = REPORT_CARD_THEMES[themeKey] || REPORT_CARD_THEMES.ocean_teal;
+    setIsSavingTheme(true);
+    try {
+      if (typeof window !== 'undefined' && schoolProfile?.id) {
+        localStorage.setItem(`report_card_theme_${schoolProfile.id}`, themeKey);
+      }
+      const updated = await schoolService.updateSchoolProfile({
+        report_card_color_theme: themeKey,
+        report_card_template_id: themeObj.templateId
+      });
+      setSchoolProfile(prev => ({
+        ...(prev || {}),
+        ...(updated || {}),
+        report_card_color_theme: themeKey,
+        report_card_template: {
+          ...(prev?.report_card_template || {}),
+          ...(updated?.report_card_template || {}),
+          id: themeObj.templateId,
+          code: themeObj.templateCode,
+          name: themeObj.name,
+          layout_config: {
+            ...(prev?.report_card_template?.layout_config || {}),
+            ...(updated?.report_card_template?.layout_config || {}),
+            color_theme: themeKey
+          }
+        }
+      }));
+      setSuccess(`Report card template set to "${themeObj.displayName}" successfully!`);
+      setTimeout(() => setSuccess(''), 4000);
+      loadExaminations();
+    } catch (err) {
+      console.error('Failed to update report card template theme:', err);
+      setSchoolProfile(prev => ({
+        ...(prev || {}),
+        report_card_color_theme: themeKey,
+        report_card_template: {
+          ...(prev?.report_card_template || {}),
+          id: themeObj.templateId,
+          code: themeObj.templateCode,
+          name: themeObj.name,
+          layout_config: {
+            ...(prev?.report_card_template?.layout_config || {}),
+            color_theme: themeKey
+          }
+        }
+      }));
+      setSuccess(`Report card template set to "${themeObj.displayName}".`);
+      setTimeout(() => setSuccess(''), 4000);
+      loadExaminations();
+    } finally {
+      setIsSavingTheme(false);
+      setIsPreviewModalOpen(false);
+      setIsTemplateModalOpen(false);
+    }
+  };
+
+  const handleDownloadTemplatePdf = async (themeKey) => {
+    const key = themeKey || previewThemeKey || currentThemeKey || 'classic';
+    const themeObj = REPORT_CARD_THEMES[key] || REPORT_CARD_THEMES.classic;
+    setDownloadingTemplate(true);
+
+    try {
+      if (!isPreviewModalOpen || previewThemeKey !== key) {
+        setPreviewThemeKey(key);
+        setIsPreviewModalOpen(true);
+        await new Promise(r => setTimeout(r, 350));
+      }
+
+      if (document.fonts && document.fonts.ready) {
+        await document.fonts.ready;
+      }
+
+      const canvasElement = document.getElementById('preview-report-card-render-canvas');
+      if (!canvasElement) {
+        throw new Error('Preview canvas element not found');
+      }
+
+      const cleanName = (themeObj.displayName || 'Template').replace(/[^a-zA-Z0-9]/g, '_');
+      const filename = `Report_Card_Template_${cleanName}.pdf`;
+
+      // Inline images to avoid CORS canvas taint in html2canvas
+      let restoreImages = null;
+      try {
+        restoreImages = await inlineContainerImages(canvasElement);
+      } catch (_) {}
+
+      // Capture high-resolution raster canvas
+      const canvas = await html2canvas(canvasElement, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: themeObj.styles?.cardBg || '#ffffff',
+        scrollY: 0,
+        scrollX: 0,
+        onclone: (clonedDoc) => {
+          const targetClone = clonedDoc.getElementById('preview-report-card-render-canvas');
+          if (targetClone) {
+            targetClone.style.margin = '0';
+            targetClone.style.boxShadow = 'none';
+          }
+          const images = clonedDoc.querySelectorAll('img');
+          images.forEach(img => {
+            img.style.display = 'inline-block';
+            img.style.verticalAlign = 'middle';
+          });
+          const style = clonedDoc.createElement('style');
+          style.innerHTML = `
+            * {
+              -webkit-font-smoothing: antialiased;
+              text-rendering: geometricPrecision;
+            }
+            img, svg {
+              display: inline-block !important;
+              vertical-align: middle !important;
+            }
+            .exam-banner-box {
+              display: inline-block !important;
+              padding: 8px 24px !important;
+              line-height: 1.25 !important;
+              text-align: center !important;
+              height: auto !important;
+              min-height: unset !important;
+            }
+            .exam-banner-box span {
+              display: inline-block !important;
+              line-height: 1.25 !important;
+            }
+            td, th {
+              vertical-align: middle !important;
+            }
+          `;
+          clonedDoc.head.appendChild(style);
+        }
+      });
+
+      if (restoreImages) {
+        try { restoreImages(); } catch (_) {}
+      }
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.98);
+
+      // Create PDF - strictly 1 page A4 portrait
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+        compress: true
+      });
+
+      const pdfPageWidth = 210;
+      const pdfPageHeight = 297;
+      const margin = 3; // 3mm clean printable margin
+      const maxPrintWidth = pdfPageWidth - margin * 2; // 204mm
+      const maxPrintHeight = pdfPageHeight - margin * 2; // 291mm
+
+      const canvasRatio = canvas.width / canvas.height;
+      let finalImgWidth = maxPrintWidth;
+      let finalImgHeight = finalImgWidth / canvasRatio;
+
+      if (finalImgHeight > maxPrintHeight) {
+        finalImgHeight = maxPrintHeight;
+        finalImgWidth = finalImgHeight * canvasRatio;
+      }
+
+      // Center exactly on the single page
+      const posX = (pdfPageWidth - finalImgWidth) / 2;
+      const posY = (pdfPageHeight - finalImgHeight) / 2;
+
+      pdf.addImage(imgData, 'JPEG', posX, posY, finalImgWidth, finalImgHeight, undefined, 'FAST');
+      pdf.save(filename);
+    } catch (err) {
+      console.error('Failed to download template PDF:', err);
+      await printNativeReportCardsContainer('preview-report-card-render-canvas', `Report_Card_Template_${themeObj.displayName}`);
+    } finally {
+      setDownloadingTemplate(false);
+    }
+  };
 
   const getWordCount = (text) => {
     if (!text) return 0;
@@ -879,6 +1077,10 @@ export default function ExamsPage() {
       setHolidays(holidaysList || []);
       setGradeScales(gradesList || []);
       if (profile) {
+        const savedTheme = typeof window !== 'undefined' && profile.id ? localStorage.getItem(`report_card_theme_${profile.id}`) : null;
+        if (savedTheme && !profile.report_card_color_theme) {
+          profile.report_card_color_theme = savedTheme;
+        }
         setSchoolProfile(profile);
         setReportCardRemark(profile.report_card_remark ?? '');
       }
@@ -887,6 +1089,10 @@ export default function ExamsPage() {
       try {
         const profile = await schoolService.getSchoolProfile();
         if (profile) {
+          const savedTheme = typeof window !== 'undefined' && profile.id ? localStorage.getItem(`report_card_theme_${profile.id}`) : null;
+          if (savedTheme && !profile.report_card_color_theme) {
+            profile.report_card_color_theme = savedTheme;
+          }
           setSchoolProfile(profile);
           setReportCardRemark(profile.report_card_remark ?? '');
         }
@@ -1008,8 +1214,14 @@ export default function ExamsPage() {
   }, [activeView]);
 
   const hasReportCardTemplate = Boolean(schoolProfile?.report_card_template_id || schoolProfile?.report_card_template);
-  const isCBSEClassic = (schoolProfile?.report_card_template?.code === 'cbse_classic');
-  const isModernReport = (schoolProfile?.report_card_template?.code === 'modern');
+  const tplCode = String(schoolProfile?.report_card_template?.code || '').toLowerCase();
+  const isCBSEClassic = Boolean(
+    tplCode === 'cbse_classic' ||
+    tplCode.startsWith('cbse_') ||
+    Boolean(schoolProfile?.report_card_color_theme) ||
+    Boolean(schoolProfile?.report_card_template_id)
+  );
+  const isModernReport = (tplCode === 'modern');
   const isStandardTemplate = isCBSEClassic || isModernReport;
 
   // Quick Action counts
@@ -1903,6 +2115,7 @@ export default function ExamsPage() {
       setShowPendingAlert(false);
       setPendingValidationSource('');
 
+      lastAutoFocusedKeyRef.current = null;
       const firstSubId = String(papers[0]?.subject_id ?? papers[0]?.id ?? '');
       setSelectedSubjectId(firstSubId);
       if (firstSubId) {
@@ -1930,6 +2143,7 @@ export default function ExamsPage() {
 
   const handleSubjectChange = async (e) => {
     const subId = (typeof e === 'object' && e?.target) ? e.target.value : String(e || '');
+    lastAutoFocusedKeyRef.current = null;
     setSelectedSubjectId(subId);
     if (subId) {
       setLoading(true);
@@ -1939,6 +2153,50 @@ export default function ExamsPage() {
       setMarksSheet(null);
     }
   };
+
+  // Auto-focus the first pending "Marks Obtained" input from top to bottom when a subject is selected
+  useEffect(() => {
+    if (activeView !== 'marks' || loading || !marksSheet || !Array.isArray(marksSheet.students) || marksSheet.students.length === 0) {
+      return;
+    }
+
+    const currentKey = `${selectedExam?.id}_${selectedClassId}_${selectedSubjectId}`;
+    if (lastAutoFocusedKeyRef.current === currentKey) {
+      return;
+    }
+
+    lastAutoFocusedKeyRef.current = currentKey;
+
+    const students = marksSheet.students;
+
+    // Scan top to bottom for the first non-absent student whose marks are not entered
+    const firstUnentered = students.find(s => {
+      if (s.is_absent === 1) return false;
+      const val = s.marks_obtained;
+      return val === null || val === undefined || String(val).trim() === '';
+    });
+
+    // If all fields already have marks entered, do not focus any input
+    if (!firstUnentered) return;
+
+    let cancelled = false;
+    const tryFocus = (attempt = 0) => {
+      if (cancelled) return;
+      const el = markInputRefs.current[firstUnentered.student_id];
+      if (el) {
+        el.focus({ preventScroll: false });
+      } else if (attempt < 8) {
+        setTimeout(() => tryFocus(attempt + 1), 50);
+      }
+    };
+
+    const timer = setTimeout(() => tryFocus(), 60);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [activeView, loading, selectedExam?.id, selectedClassId, selectedSubjectId, marksSheet]);
 
   const handleMarkCellChange = async (studentId, field, value) => {
     if (!marksSheet) return;
@@ -2004,14 +2262,15 @@ export default function ExamsPage() {
     setSavingMarkStudentId(studentId);
 
     // Calculate if the current subject marks are complete locally
-    const isCurrentSubjectComplete = updatedStudents.every(s => 
+    const isCurrentSubjectComplete = updatedStudents.length > 0 && updatedStudents.every(s => 
       (s.marks_obtained !== null && s.marks_obtained !== undefined && s.marks_obtained !== '') || 
       s.is_absent === 1
     );
 
     // Update the local timetable papers status instantly!
     const updatedPapers = timetablePapers.map(p => {
-      if (parseInt(p.subject_id) === parseInt(selectedSubjectId)) {
+      const paperSubId = p?.subject_id ?? p?.id;
+      if (parseInt(paperSubId) === parseInt(selectedSubjectId)) {
         return { ...p, marks_completed: isCurrentSubjectComplete };
       }
       return p;
@@ -2852,11 +3111,10 @@ export default function ExamsPage() {
       <div className="p-5 rounded-2xl border border-border bg-zinc-50/50 dark:bg-zinc-900/50 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 no-print">
         <div>
           <h2 className="text-xl md:text-2xl font-bold text-text-primary tracking-tight font-display uppercase">Examinations</h2>
-          <p className="text-text-secondary text-xs mt-1 font-medium">Configure exams, manage timetables, enter marks, and generate student report cards.</p>
         </div>
-        {effectiveActiveView === 'dashboard' && hasReportCardTemplate && (
+        {hasReportCardTemplate && (
           <div className="flex flex-wrap gap-2 items-center">
-            {!isReadOnly && !isStandardTemplate && (
+            {effectiveActiveView === 'dashboard' && !isReadOnly && !isStandardTemplate && (
               <Button 
                 className="flex items-center gap-2 font-bold bg-primary text-white text-xs h-10 px-4" 
                 onClick={() => {
@@ -2867,15 +3125,28 @@ export default function ExamsPage() {
                 <Plus className="h-4 w-4" /> Add Terminal Examination
               </Button>
             )}
-            <Button 
-              className="flex items-center gap-2 font-bold text-xs h-10 px-4" 
-              onClick={() => setIsSelectClassForFinalReportOpen(true)}
-            >
-              <Award className="h-4 w-4" /> Final Academic Report Card
-            </Button>
-            <Button className="flex items-center gap-2 font-bold text-xs h-10 px-4" onClick={() => { setActiveView('grade_scale'); setGradeError(''); setGradeSuccess(''); }}>
-              Grade Configuration Scale
-            </Button>
+            {effectiveActiveView === 'dashboard' && (
+              <Button 
+                className="flex items-center gap-2 font-bold text-xs h-10 px-4" 
+                onClick={() => setIsSelectClassForFinalReportOpen(true)}
+              >
+                <Award className="h-4 w-4" /> Final Academic Report Card
+              </Button>
+            )}
+            {effectiveActiveView === 'dashboard' && (
+              <Button 
+                className="flex items-center gap-2 font-bold text-xs h-10 px-4" 
+                onClick={() => setIsTemplateModalOpen(true)}
+                title="Select report card template & color theme"
+              >
+                <Palette className="h-4 w-4" /> Report Card Templates
+              </Button>
+            )}
+            {effectiveActiveView === 'dashboard' && (
+              <Button className="flex items-center gap-2 font-bold text-xs h-10 px-4" onClick={() => { setActiveView('grade_scale'); setGradeError(''); setGradeSuccess(''); }}>
+                Grade Configuration Scale
+              </Button>
+            )}
           </div>
         )}
       </div>
@@ -3906,7 +4177,10 @@ export default function ExamsPage() {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => setActiveView('classes')}
+              onClick={() => {
+                lastAutoFocusedKeyRef.current = null;
+                setActiveView('classes');
+              }}
               className="font-bold text-zinc-900 dark:text-zinc-50 border border-zinc-200 dark:border-zinc-800 bg-surface hover:bg-zinc-50 px-4 py-2 rounded-lg text-sm transition-all shadow-2xs cursor-pointer"
             >
               Back
@@ -3931,10 +4205,19 @@ export default function ExamsPage() {
                 <CustomSelect 
                   value={selectedSubjectId} 
                   onChange={handleSubjectChange}
-                  options={timetablePapers.map(p => ({
-                    value: String(p?.subject_id ?? p?.id ?? ''),
-                    label: p?.subject_name || p?.name || 'Subject'
-                  }))}
+                  options={timetablePapers.map(p => {
+                    const isDone = Boolean(
+                      p?.marks_completed === true || 
+                      p?.marks_completed === 1 || 
+                      p?.marks_completed === '1' || 
+                      p?.marks_completed === 'true'
+                    );
+                    const subjectName = p?.subject_name || p?.name || 'Subject';
+                    return {
+                      value: String(p?.subject_id ?? p?.id ?? ''),
+                      label: `${subjectName}${isDone ? ' (Done)' : ''}`
+                    };
+                  })}
                   buttonClassName="h-9 font-semibold"
                 />
               </div>
@@ -3999,6 +4282,7 @@ export default function ExamsPage() {
 
                               return (
                                 <Select
+                                  ref={el => { markInputRefs.current[s.student_id] = el; }}
                                   className="h-8 text-xs font-bold w-full cursor-pointer"
                                   disabled={s.is_absent === 1}
                                   value={s.is_absent === 1 ? '' : (s.marks_obtained || '')}
@@ -4027,14 +4311,29 @@ export default function ExamsPage() {
 
                                 const cleanVal = val.replace(/\D/g, '');
                                 const maxM = parseFloat(marksSheet?.max_marks || 100);
-                                const nextStudent = marksSheet?.students?.[idx + 1];
 
-                                if (nextStudent) {
+                                // Find the next unentered non-absent student top-to-bottom
+                                const allStudents = marksSheet?.students || [];
+                                let nextUnentered = allStudents.slice(idx + 1).find(st => {
+                                  if (st.is_absent === 1) return false;
+                                  const v = st.marks_obtained;
+                                  return v === null || v === undefined || String(v).trim() === '';
+                                });
+
+                                // If none found below, check from top
+                                if (!nextUnentered) {
+                                  nextUnentered = allStudents.slice(0, idx).find(st => {
+                                    if (st.is_absent === 1) return false;
+                                    const v = st.marks_obtained;
+                                    return v === null || v === undefined || String(v).trim() === '';
+                                  });
+                                }
+
+                                if (nextUnentered) {
                                   const focusNext = () => {
-                                    const nextEl = markInputRefs.current[nextStudent.student_id];
+                                    const nextEl = markInputRefs.current[nextUnentered.student_id];
                                     if (nextEl) {
-                                      nextEl.focus();
-                                      if (nextEl.select) nextEl.select();
+                                      nextEl.focus({ preventScroll: false });
                                     }
                                   };
 
@@ -4055,14 +4354,34 @@ export default function ExamsPage() {
                                 }
                               }}
                               onKeyDown={e => {
-                                if (e.key === 'Enter' || e.key === 'ArrowDown') {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  const allStudents = marksSheet?.students || [];
+                                  let nextUnentered = allStudents.slice(idx + 1).find(st => {
+                                    if (st.is_absent === 1) return false;
+                                    const v = st.marks_obtained;
+                                    return v === null || v === undefined || String(v).trim() === '';
+                                  });
+                                  if (!nextUnentered) {
+                                    nextUnentered = allStudents.slice(0, idx).find(st => {
+                                      if (st.is_absent === 1) return false;
+                                      const v = st.marks_obtained;
+                                      return v === null || v === undefined || String(v).trim() === '';
+                                    });
+                                  }
+                                  if (nextUnentered) {
+                                    const nextEl = markInputRefs.current[nextUnentered.student_id];
+                                    if (nextEl) {
+                                      nextEl.focus({ preventScroll: false });
+                                    }
+                                  }
+                                } else if (e.key === 'ArrowDown') {
                                   e.preventDefault();
                                   const nextStudent = marksSheet?.students?.[idx + 1];
                                   if (nextStudent) {
                                     const nextEl = markInputRefs.current[nextStudent.student_id];
                                     if (nextEl) {
-                                      nextEl.focus();
-                                      if (nextEl.select) nextEl.select();
+                                      nextEl.focus({ preventScroll: false });
                                     }
                                   }
                                 } else if (e.key === 'ArrowUp') {
@@ -4071,8 +4390,7 @@ export default function ExamsPage() {
                                   if (prevStudent) {
                                     const prevEl = markInputRefs.current[prevStudent.student_id];
                                     if (prevEl) {
-                                      prevEl.focus();
-                                      if (prevEl.select) prevEl.select();
+                                      prevEl.focus({ preventScroll: false });
                                     }
                                   }
                                 }
@@ -5372,6 +5690,220 @@ export default function ExamsPage() {
               Close
             </Button>
           </div>
+        </div>
+      </Dialog>
+
+      {/* Report Card Templates Modal */}
+      <Dialog
+        isOpen={isTemplateModalOpen}
+        onClose={() => setIsTemplateModalOpen(false)}
+        title="Report Card Templates"
+        description="Choose a report card template for your school. All 6 templates share the official CBSE format with distinct premium, light color themes."
+        maxWidth="max-w-5xl w-full"
+      >
+        <div className="pt-1 pb-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-1">
+            {Object.values(REPORT_CARD_THEMES).map((themeItem) => {
+              const isActive = currentThemeKey === themeItem.key;
+              return (
+                <div
+                  key={themeItem.key}
+                  className={`relative rounded-2xl border transition-all duration-200 p-4 flex flex-col justify-between ${
+                    isActive
+                      ? 'border-primary ring-2 ring-primary/20 bg-primary/5 dark:bg-primary/10 shadow-sm'
+                      : 'border-border bg-surface hover:border-zinc-400 dark:hover:border-zinc-600 hover:shadow-xs'
+                  }`}
+                >
+                  {/* Card Top */}
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-2.5">
+                      <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${themeItem.badgeClass}`}>
+                        {themeItem.tag}
+                      </span>
+                      {isActive ? (
+                        <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 px-2.5 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-800">
+                          <Check className="h-3 w-3" /> Active
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-text-muted font-medium">CBSE Standard</span>
+                      )}
+                    </div>
+
+                    {/* Color Preview Swatch Band */}
+                    <div 
+                      className="w-full rounded-xl p-3 flex items-center justify-between mb-3 border shadow-2xs"
+                      style={{
+                        backgroundColor: themeItem.swatches.lightBg,
+                        borderColor: themeItem.swatches.border,
+                        borderLeft: `5px solid ${themeItem.swatches.borderLeft || themeItem.swatches.primary}`
+                      }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span 
+                          className="h-7 w-7 rounded-lg shadow-xs border border-black/10 dark:border-white/20 flex items-center justify-center text-[11px] font-bold shrink-0"
+                          style={{ 
+                            backgroundColor: themeItem.swatches.primary,
+                            color: themeItem.swatches.textColor || '#ffffff'
+                          }}
+                          title="Primary Theme Color"
+                        >
+                          A
+                        </span>
+                        <span 
+                          className="h-7 w-7 rounded-lg shadow-xs border border-black/10 dark:border-white/20 shrink-0"
+                          style={{ backgroundColor: themeItem.swatches.secondary }}
+                          title="Secondary Tint"
+                        />
+                        <span 
+                          className="h-7 w-7 rounded-lg shadow-xs border border-black/10 dark:border-white/20 shrink-0"
+                          style={{ backgroundColor: themeItem.swatches.accent }}
+                          title="Soft Accent"
+                        />
+                      </div>
+                      <div className="text-right pl-2">
+                        <span 
+                          className="text-[10px] font-bold uppercase tracking-wider block"
+                          style={{ color: themeItem.swatches.labelColor || themeItem.swatches.primary }}
+                        >
+                          Double Border
+                        </span>
+                        <span 
+                          className="text-[11px] font-bold font-mono text-zinc-600 dark:text-zinc-300"
+                        >
+                          {themeItem.swatches.primary}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Template Name & Description */}
+                    <h4 className="text-sm font-bold text-text-primary tracking-tight font-display mb-1 flex items-center gap-1.5">
+                      {themeItem.displayName}
+                    </h4>
+                    <p className="text-xs text-text-secondary leading-relaxed line-clamp-2">
+                      {themeItem.subtitle}
+                    </p>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex flex-col gap-2 mt-4 pt-3 border-t border-border">
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full flex items-center justify-center gap-1.5 text-xs h-8.5 font-medium"
+                        onClick={() => {
+                          setPreviewThemeKey(themeItem.key);
+                          setIsPreviewModalOpen(true);
+                        }}
+                      >
+                        <Eye className="h-3.5 w-3.5" /> Preview
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={downloadingTemplate}
+                        className="w-full flex items-center justify-center gap-1.5 text-xs h-8.5 font-medium border-border hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                        onClick={() => handleDownloadTemplatePdf(themeItem.key)}
+                        title="Download Template PDF"
+                      >
+                        {downloadingTemplate && previewThemeKey === themeItem.key ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Download className="h-3.5 w-3.5 text-primary" />
+                        )}
+                        Download
+                      </Button>
+                    </div>
+
+                    <Button
+                      size="sm"
+                      disabled={isActive || isSavingTheme}
+                      className={`w-full flex items-center justify-center gap-1.5 text-xs h-8.5 font-bold ${
+                        isActive 
+                          ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 cursor-default shadow-none' 
+                          : 'bg-primary text-white hover:bg-primary/90'
+                      }`}
+                      onClick={() => handleSelectTemplate(themeItem.key)}
+                    >
+                      {isActive ? (
+                        <>
+                          <Check className="h-3.5 w-3.5" /> Currently Applied
+                        </>
+                      ) : (
+                        'Use This Template'
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </Dialog>
+
+      {/* Report Card Theme Live Preview Modal */}
+      <Dialog
+        isOpen={isPreviewModalOpen}
+        onClose={() => {
+          setIsPreviewModalOpen(false);
+          setPreviewThemeKey(null);
+        }}
+        title={
+          <div className="flex items-center gap-2 sm:gap-3">
+            <span className="font-bold text-sm sm:text-base font-display uppercase tracking-wider text-text-primary">
+              PREVIEW
+            </span>
+            <Button
+              size="sm"
+              disabled={downloadingTemplate}
+              onClick={() => handleDownloadTemplatePdf(previewThemeKey)}
+              className="flex items-center gap-1.5 text-xs font-bold bg-primary text-white hover:bg-primary/90 h-7 px-3 rounded-lg shadow-xs"
+            >
+              {downloadingTemplate ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Download className="h-3.5 w-3.5" />
+              )}
+              <span>Download Template</span>
+            </Button>
+          </div>
+        }
+        description=""
+        containerClassName="p-1 sm:p-2"
+        maxWidth="max-w-6xl w-full"
+        className="h-[98vh] max-h-[98vh] overflow-hidden"
+        headerClassName="px-4 py-2 sm:px-5 sm:py-2.5"
+        contentClassName="p-2 sm:p-4 bg-zinc-200/90 dark:bg-zinc-900/90 flex justify-center items-start overflow-y-auto overflow-x-auto"
+      >
+        <div 
+          id="preview-report-card-render-canvas"
+          className="shadow-2xl rounded-sm origin-top my-1"
+          style={{ 
+            width: '194mm',
+            backgroundColor: REPORT_CARD_THEMES[previewThemeKey]?.styles?.cardBg || '#ffffff'
+          }}
+        >
+          {previewThemeKey && (
+            <ReportCardRenderer
+              card={STATIC_FINAL_REPORT_PREVIEW_DATA}
+              schoolProfile={{
+                ...(schoolProfile || {}),
+                name: schoolProfile?.name || 'SPLENDID PUBLIC SCHOOL',
+                address: schoolProfile?.address || schoolProfile?.street_address || 'MAIN CAMPUS, CIVIL LINES',
+                report_card_color_theme: previewThemeKey
+              }}
+              currentYear={currentAcademicYear || { name: '2026–2027' }}
+              exam={{
+                name: 'FINAL ACADEMIC REPORT CARD',
+                is_final_session_report: true,
+                type: 'Annual Session Summary'
+              }}
+              customConfig={{
+                ...(schoolProfile?.report_card_template?.layout_config || {}),
+                color_theme: previewThemeKey
+              }}
+            />
+          )}
         </div>
       </Dialog>
 

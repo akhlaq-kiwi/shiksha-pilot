@@ -32,6 +32,14 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
   List<Map<String, dynamic>> _processedStudents = [];
   List<Map<String, dynamic>> _filteredStudents = [];
 
+  // Summary Stat Cards (Synced with School Admin Portal)
+  double _todayCollection = 0.0;
+  double _yesterdayCollection = 0.0;
+  double _feeCollected = 0.0;
+  double _duesPending = 0.0;
+  bool _hasBackendStats = false;
+  bool _showYesterday = false;
+
   final TextEditingController _searchController = TextEditingController();
   String _selectedClassFilter = 'ALL'; // 'ALL' or class name / id
   String _selectedStatusFilter = 'ALL'; // 'ALL', 'PENDING', 'PAID'
@@ -69,6 +77,18 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
       _feePayments = List<dynamic>.from(data['fee_payments'] ?? []);
       _classFeeConfigs = List<dynamic>.from(data['class_fee_configs'] ?? []);
       _additionalPayments = List<dynamic>.from(data['additional_payments'] ?? []);
+
+      // Synchronize 3 Stat Cards from School Admin Portal (/api/school/stats)
+      final stats = data['stats'] is Map ? Map<String, dynamic>.from(data['stats']) : <String, dynamic>{};
+      if (stats.isNotEmpty) {
+        _hasBackendStats = true;
+        _todayCollection = (stats['today_collection'] as num?)?.toDouble() ?? 0.0;
+        _yesterdayCollection = (stats['yesterday_collection'] as num?)?.toDouble() ?? 0.0;
+        _feeCollected = (stats['total_collected'] as num?)?.toDouble() ?? 0.0;
+        _duesPending = (stats['pending_fees'] as num?)?.toDouble() ?? 0.0;
+      } else {
+        _hasBackendStats = false;
+      }
 
       _computeStudentDues();
     } catch (e) {
@@ -186,6 +206,51 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
     }
 
     _processedStudents = processed;
+
+    // Fallback calculation for cards if backend stats endpoint was unreachable
+    if (!_hasBackendStats) {
+      double totalDues = 0.0;
+      for (final s in processed) {
+        totalDues += (s['outstanding_dues'] as num?)?.toDouble() ?? 0.0;
+      }
+      _duesPending = totalDues;
+
+      double totalCollected = 0.0;
+      double todayCollected = 0.0;
+      double yesterdayCollected = 0.0;
+      final todayStr = DateTime.now().toIso8601String().substring(0, 10);
+      final yesterdayStr = DateTime.now().subtract(const Duration(days: 1)).toIso8601String().substring(0, 10);
+
+      for (final p in _feePayments) {
+        final st = (p['status'] ?? '').toString().toUpperCase();
+        if (st == 'PAID' || st == 'PARTIAL') {
+          final amt = double.tryParse(p['amount_paid']?.toString() ?? '0') ?? 0.0;
+          totalCollected += amt;
+          final pDate = (p['payment_date'] ?? p['created_at'] ?? '').toString();
+          if (pDate.startsWith(todayStr)) {
+            todayCollected += amt;
+          } else if (pDate.startsWith(yesterdayStr)) {
+            yesterdayCollected += amt;
+          }
+        }
+      }
+
+      for (final p in _additionalPayments) {
+        final amt = double.tryParse(p['amount_paid']?.toString() ?? '0') ?? 0.0;
+        totalCollected += amt;
+        final pDate = (p['payment_date'] ?? p['created_at'] ?? '').toString();
+        if (pDate.startsWith(todayStr)) {
+          todayCollected += amt;
+        } else if (pDate.startsWith(yesterdayStr)) {
+          yesterdayCollected += amt;
+        }
+      }
+
+      _feeCollected = totalCollected;
+      _todayCollection = todayCollected;
+      _yesterdayCollection = yesterdayCollected;
+    }
+
     _applyFilters();
     setState(() {
       _isLoading = false;
@@ -205,13 +270,14 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
       }).toList();
     }
 
-    // Filter by Class (case-insensitive & unique)
+    // Filter by Class (case-insensitive & matches raw name or short name)
     if (_selectedClassFilter != 'ALL') {
       final selectedLower = _selectedClassFilter.trim().toLowerCase();
       result = result.where((s) {
         final cName = (s['class_name'] ?? '').toString().trim().toLowerCase();
+        final cShort = _getShortClassName(cName).toLowerCase();
         final cId = (s['class_id'] ?? '').toString();
-        return cName == selectedLower || cId == _selectedClassFilter;
+        return cName == selectedLower || cShort == selectedLower || cId == _selectedClassFilter;
       }).toList();
     }
 
@@ -220,12 +286,26 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
       result = result.where((s) => s['calculated_status'] == _selectedStatusFilter).toList();
     }
 
-    // Sorting (Highest Outstanding or Lowest Outstanding)
+    // Sorting (Highest Outstanding or Lowest Outstanding, with class ascending as tie-breaker)
     if (_selectedSort == 'OUTSTANDING_ASC') {
-      result.sort((a, b) => (a['outstanding_dues'] as int).compareTo(b['outstanding_dues'] as int));
+      result.sort((a, b) {
+        final cmp = (a['outstanding_dues'] as int).compareTo(b['outstanding_dues'] as int);
+        if (cmp != 0) return cmp;
+        final idxA = _getClassIndex(a['class_name']?.toString());
+        final idxB = _getClassIndex(b['class_name']?.toString());
+        if (idxA != idxB) return idxA.compareTo(idxB);
+        return (a['name'] ?? '').toString().compareTo((b['name'] ?? '').toString());
+      });
     } else {
       // Default to OUTSTANDING_DESC
-      result.sort((a, b) => (b['outstanding_dues'] as int).compareTo(a['outstanding_dues'] as int));
+      result.sort((a, b) {
+        final cmp = (b['outstanding_dues'] as int).compareTo(a['outstanding_dues'] as int);
+        if (cmp != 0) return cmp;
+        final idxA = _getClassIndex(a['class_name']?.toString());
+        final idxB = _getClassIndex(b['class_name']?.toString());
+        if (idxA != idxB) return idxA.compareTo(idxB);
+        return (a['name'] ?? '').toString().compareTo((b['name'] ?? '').toString());
+      });
     }
 
     setState(() {
@@ -233,22 +313,93 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
     });
   }
 
-  // List of distinct, unique class names (case-insensitive deduplication)
+  // Predefined class hierarchy index (matching School Admin portal predefinedClasses.js)
+  static int _getClassIndex(String? className) {
+    if (className == null || className.trim().isEmpty) return 999;
+    final clean = className.trim();
+    final lower = clean.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+
+    if (lower.contains('prenursery') || lower == 'pnc' || lower == 'playgroup' || lower == 'pg') {
+      return 0;
+    }
+    if (lower.contains('nursery') || lower == 'nc') {
+      return 1;
+    }
+    if (lower.contains('lowerkindergarten') || lower.contains('lowerkg') || lower.contains('lkg') || lower == 'lkg') {
+      return 2;
+    }
+    if (lower.contains('upperkindergarten') || lower.contains('upperkg') || lower.contains('ukg') || lower == 'ukg') {
+      return 3;
+    }
+    if (lower == 'kg' || lower == 'kindergarten') {
+      return 4;
+    }
+
+    final match = RegExp(r'\d+').firstMatch(clean);
+    if (match != null) {
+      final num = int.tryParse(match.group(0)!) ?? 0;
+      return 4 + num;
+    }
+    return 999;
+  }
+
+  // Predefined short class name mapping (matching School Admin portal predefinedClasses.js)
+  static String _getShortClassName(String? className) {
+    if (className == null || className.trim().isEmpty) return '';
+    final clean = className.trim();
+    final lower = clean.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+
+    if (lower.contains('lowerkindergarten') || lower.contains('lowerkg') || lower.contains('lkg') || lower == 'lkg') {
+      return 'LKG';
+    }
+    if (lower.contains('upperkindergarten') || lower.contains('upperkg') || lower.contains('ukg') || lower == 'ukg') {
+      return 'UKG';
+    }
+    if (lower == 'playgroup' || lower == 'pg') {
+      return 'Playgroup';
+    }
+    if (lower.contains('prenursery') || lower == 'pnc') {
+      return 'PNC';
+    }
+    if (lower.contains('nursery') || lower == 'nc') {
+      return 'NC';
+    }
+    if (lower == 'kg' || lower == 'kindergarten') {
+      return 'KG';
+    }
+    return clean;
+  }
+
+  // List of distinct, unique class names in ascending order matching School Admin portal
   List<String> _getAvailableClassNames() {
     final Map<String, String> canonical = {};
     for (final c in _classes) {
-      final name = (c['name'] ?? '').toString().trim();
-      if (name.isNotEmpty) {
-        canonical[name.toLowerCase()] = name;
+      final rawName = (c['name'] ?? '').toString().trim();
+      if (rawName.isNotEmpty) {
+        final shortName = _getShortClassName(rawName);
+        final section = (c['section'] ?? '').toString().trim();
+        final label = section.isNotEmpty ? '$shortName ($section)' : shortName;
+        canonical[label.toLowerCase()] = label;
       }
     }
     for (final s in _processedStudents) {
       final cn = (s['class_name'] ?? '').toString().trim();
-      if (cn.isNotEmpty && cn != 'N/A' && !canonical.containsKey(cn.toLowerCase())) {
-        canonical[cn.toLowerCase()] = cn;
+      if (cn.isNotEmpty && cn != 'N/A') {
+        final shortName = _getShortClassName(cn);
+        if (!canonical.containsKey(shortName.toLowerCase())) {
+          canonical[shortName.toLowerCase()] = shortName;
+        }
       }
     }
-    final sorted = canonical.values.toList()..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    final sorted = canonical.values.toList();
+    sorted.sort((a, b) {
+      final idxA = _getClassIndex(a);
+      final idxB = _getClassIndex(b);
+      if (idxA != idxB) {
+        return idxA.compareTo(idxB);
+      }
+      return a.toLowerCase().compareTo(b.toLowerCase());
+    });
     return sorted;
   }
 
@@ -311,8 +462,6 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
                   children: [
                     // Filter and Search Header
                     _buildFilterSection(availableClasses),
-                    // Summary Banner
-                    _buildSummaryBanner(),
                     // Students List
                     Expanded(
                       child: _filteredStudents.isEmpty
@@ -428,19 +577,150 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
     );
   }
 
+  String _formatIndianCurrency(num value) {
+    final intVal = value.round();
+    final isNegative = intVal < 0;
+    final absVal = intVal.abs();
+    final str = absVal.toString();
+    if (str.length <= 3) {
+      return '${isNegative ? '-' : ''}₹$str';
+    }
+    final last3 = str.substring(str.length - 3);
+    var remaining = str.substring(0, str.length - 3);
+    final chunks = <String>[];
+    while (remaining.isNotEmpty) {
+      if (remaining.length > 2) {
+        chunks.insert(0, remaining.substring(remaining.length - 2));
+        remaining = remaining.substring(0, remaining.length - 2);
+      } else {
+        chunks.insert(0, remaining);
+        remaining = '';
+      }
+    }
+    return '${isNegative ? '-' : ''}₹${chunks.join(',')},$last3';
+  }
+
+  Widget _buildStatsCards() {
+    final firstCardTitle = _showYesterday ? "YESTERDAY'S COLLECTION" : "TODAY'S COLLECTION";
+    final firstCardAmount = _showYesterday ? _yesterdayCollection : _todayCollection;
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // 1. Today's / Yesterday's Collection (Double Tap toggles)
+          Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onDoubleTap: () {
+                HapticFeedback.lightImpact();
+                setState(() {
+                  _showYesterday = !_showYesterday;
+                });
+              },
+              child: _buildSingleStatCard(
+                title: firstCardTitle,
+                amount: firstCardAmount,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          // 2. Fee collected
+          Expanded(
+            child: _buildSingleStatCard(
+              title: "FEE COLLECTED",
+              amount: _feeCollected,
+            ),
+          ),
+          const SizedBox(width: 8),
+          // 3. Dues pending
+          Expanded(
+            child: _buildSingleStatCard(
+              title: "DUES PENDING",
+              amount: _duesPending,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSingleStatCard({
+    required String title,
+    required num amount,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 10),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFFBEB), Color(0xFFFEF5D6)],
+        ),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFFCD34D), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 3,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              title,
+              maxLines: 1,
+              softWrap: false,
+              style: const TextStyle(
+                fontSize: 9.5,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFFB45309),
+                letterSpacing: 0.1,
+              ),
+            ),
+          ),
+          const SizedBox(height: 5),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              _formatIndianCurrency(amount),
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF92400E),
+                letterSpacing: -0.2,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildFilterSection(List<String> availableClasses) {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
       child: Column(
         children: [
+          // 3 Stat Cards above Search Bar (Today's Collection, Fee collected, Dues pending)
+          _buildStatsCards(),
+          const SizedBox(height: 10),
           // Search box
           Container(
             height: 44,
             alignment: Alignment.center,
             decoration: BoxDecoration(
               color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(22),
+              borderRadius: BorderRadius.circular(10),
               border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
             child: TextField(
@@ -470,36 +750,36 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
             ),
           ),
           const SizedBox(height: 10),
-          // Filter Dropdowns Row
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                // Class filter
-                _buildFilterChip(
+          // Filter Dropdowns Row (Equal size, inline with searchbox, rectangular curved)
+          Row(
+            children: [
+              // Class filter
+              Expanded(
+                child: _buildFilterChip(
                   label: _selectedClassFilter == 'ALL' ? 'All Classes' : _selectedClassFilter,
-                  isSelected: _selectedClassFilter != 'ALL',
                   onTap: () => _showClassFilterMenu(availableClasses),
                 ),
-                const SizedBox(width: 8),
-                // Status filter
-                _buildFilterChip(
+              ),
+              const SizedBox(width: 8),
+              // Status filter
+              Expanded(
+                child: _buildFilterChip(
                   label: _selectedStatusFilter == 'ALL'
                       ? 'All Statuses'
                       : _selectedStatusFilter == 'PENDING' ? 'Pending' : 'Paid',
-                  isSelected: _selectedStatusFilter != 'ALL',
                   onTap: _showStatusFilterMenu,
                 ),
-                const SizedBox(width: 8),
-                // Sort filter
-                _buildFilterChip(
+              ),
+              const SizedBox(width: 8),
+              // Sort / Filter
+              Expanded(
+                child: _buildFilterChip(
                   label: _selectedSort == 'OUTSTANDING_ASC' ? 'Lowest Dues' : 'Highest Dues',
                   icon: Icons.sort_rounded,
-                  isSelected: true,
                   onTap: _showSortMenu,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ],
       ),
@@ -509,41 +789,48 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
   Widget _buildFilterChip({
     required String label,
     IconData? icon,
-    required bool isSelected,
     required VoidCallback onTap,
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(10),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        height: 38,
+        padding: const EdgeInsets.symmetric(horizontal: 6),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFFEF3C7) : const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(20),
+          color: const Color(0xFFFEF3C7),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected ? const Color(0xFFF59E0B) : const Color(0xFFCBD5E1),
+            color: const Color(0xFFF59E0B),
+            width: 1,
           ),
         ),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (icon != null) ...[
               Icon(icon, size: 14, color: const Color(0xFF78350F)),
-              const SizedBox(width: 4),
+              const SizedBox(width: 3),
             ],
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: isSelected ? const Color(0xFF78350F) : const Color(0xFF334155),
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF78350F),
+                  ),
+                ),
               ),
             ),
-            const SizedBox(width: 4),
-            Icon(
+            const SizedBox(width: 2),
+            const Icon(
               Icons.keyboard_arrow_down_rounded,
               size: 16,
-              color: isSelected ? const Color(0xFF78350F) : const Color(0xFF64748B),
+              color: Color(0xFF78350F),
             ),
           ],
         ),
@@ -793,7 +1080,7 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          className,
+                          _getShortClassName(className).isNotEmpty ? _getShortClassName(className) : className,
                           style: const TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w700,

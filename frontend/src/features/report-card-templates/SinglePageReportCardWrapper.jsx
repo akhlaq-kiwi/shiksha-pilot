@@ -81,7 +81,7 @@ export default function SinglePageReportCardWrapper({ children, subjectsCount = 
   return (
     <div
       ref={containerRef}
-      className="single-page-report-container id-card-report-wrapper relative bg-white shadow-2xl rounded-none overflow-visible"
+      className="single-page-report-container id-card-report-wrapper relative shadow-2xl rounded-none overflow-visible"
       style={{
         width: '194mm',
         height: `${TARGET_MAX_HEIGHT_PX}px`,

@@ -343,7 +343,8 @@ export default function ReportCardTemplatesPage() {
   // Modals state
   const [previewTemplate, setPreviewTemplate] = useState(null);
   const [previewMode, setPreviewMode] = useState('final_session'); // 'final_session' | 'single_exam'
-  const [assignModalTemplate, setAssignModalTemplate] = useState(null);
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState(9);
   const [selectedSchoolId, setSelectedSchoolId] = useState('');
   const [assigning, setAssigning] = useState(false);
 
@@ -371,6 +372,13 @@ export default function ReportCardTemplatesPage() {
     }
   };
 
+  const handleOpenAssignModal = (tpl = null) => {
+    const defaultTplId = tpl?.id || templates.find(t => Number(t.id) === 9 || t.is_system_default)?.id || 9;
+    setSelectedTemplateId(Number(defaultTplId));
+    setSelectedSchoolId('');
+    setIsAssignModalOpen(true);
+  };
+
   const handleOpenAssignedSchoolsModal = async (tpl) => {
     setViewAssignedSchoolsTemplate(tpl);
     setLoadingAssignedSchools(true);
@@ -385,7 +393,7 @@ export default function ReportCardTemplatesPage() {
         if (sTplId) {
           return sTplId === Number(tpl.id);
         }
-        return Boolean(tpl.is_system_default) && (Number(tpl.id) === 1);
+        return Boolean(tpl.is_system_default) && (Number(tpl.id) === 9);
       });
       setAssignedSchoolsList(filtered);
     } finally {
@@ -395,14 +403,16 @@ export default function ReportCardTemplatesPage() {
 
   const handleAssignSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedSchoolId || !assignModalTemplate) return;
+    if (!selectedSchoolId || !selectedTemplateId) return;
     setAssigning(true);
     setMessage('');
     try {
-      await schoolService.assignReportCardTemplateToSchool(selectedSchoolId, assignModalTemplate.id);
-      setMessage(`Template "${assignModalTemplate.name}" assigned successfully!`);
-      setAssignModalTemplate(null);
+      await schoolService.assignReportCardTemplateToSchool(selectedSchoolId, selectedTemplateId);
+      const chosenTpl = templates.find(t => Number(t.id) === Number(selectedTemplateId));
+      setMessage(`Template "${chosenTpl?.name || 'Selected Template'}" assigned successfully!`);
+      setIsAssignModalOpen(false);
       setSelectedSchoolId('');
+      setSelectedTemplateId(9);
       fetchInitialData();
     } catch (err) {
       setError(err.message || 'Failed to assign template.');
@@ -532,6 +542,13 @@ export default function ReportCardTemplatesPage() {
             Super Admin Portal — Create, preview, and assign school-wise custom report card visual layouts.
           </p>
         </div>
+        <Button
+          onClick={() => handleOpenAssignModal()}
+          className="flex items-center gap-2 text-xs font-bold shadow-xs cursor-pointer self-start sm:self-auto"
+        >
+          <Building className="h-4 w-4" />
+          Assign Template to School
+        </Button>
       </div>
 
       {error && (
@@ -612,7 +629,7 @@ export default function ReportCardTemplatesPage() {
                 <Button variant="outline" className="flex-1 h-8 text-xs font-bold flex items-center gap-1.5" onClick={() => setPreviewTemplate(tpl)}>
                   <Eye className="h-3.5 w-3.5" /> Live Preview
                 </Button>
-                <Button className="flex-1 h-8 text-xs font-bold flex items-center gap-1.5" onClick={() => { setAssignModalTemplate(tpl); setSelectedSchoolId(''); }}>
+                <Button className="flex-1 h-8 text-xs font-bold flex items-center gap-1.5" onClick={() => handleOpenAssignModal(tpl)}>
                   <Building className="h-3.5 w-3.5" /> Assign to School
                 </Button>
               </div>
@@ -622,35 +639,56 @@ export default function ReportCardTemplatesPage() {
       </div>
 
       {/* ASSIGN TEMPLATE TO SCHOOL DIALOG MODAL */}
-      <Dialog isOpen={Boolean(assignModalTemplate)} onClose={() => setAssignModalTemplate(null)} title={`Assign "${assignModalTemplate?.name}"`}>
-        {assignModalTemplate && (
-          <form onSubmit={handleAssignSubmit} className="space-y-4 pt-2">
-            <p className="text-xs text-text-secondary leading-relaxed">
-              Select a school to assign <strong>{assignModalTemplate.name}</strong> as its official report card template.
+      <Dialog isOpen={isAssignModalOpen} onClose={() => setIsAssignModalOpen(false)} title="Assign Report Card Template to School">
+        <form onSubmit={handleAssignSubmit} className="space-y-4 pt-2">
+          <p className="text-xs text-text-secondary leading-relaxed">
+            Select a school and choose which report card template layout should be officially assigned. By default, <strong>Classic CBSE (Manage Finance & Dark Black)</strong> is pre-selected.
+          </p>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-text-secondary uppercase">
+              Select School <span className="text-red-500">*</span>
+            </label>
+            <Select value={selectedSchoolId} onChange={e => setSelectedSchoolId(e.target.value)} required className="w-full">
+              <option value="">-- Choose School --</option>
+              {schools.map(s => (
+                <option key={s.id} value={s.id}>
+                  {s.name} ({s.code || `ID: ${s.id}`})
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-text-secondary uppercase">
+              Report Card Template <span className="text-red-500">*</span>
+            </label>
+            <Select
+              value={selectedTemplateId}
+              onChange={e => setSelectedTemplateId(Number(e.target.value))}
+              required
+              className="w-full"
+            >
+              {templates.map(t => (
+                <option key={t.id} value={t.id}>
+                  {t.name} {Number(t.id) === 9 || t.is_system_default ? '★ (System Default)' : ''}
+                </option>
+              ))}
+            </Select>
+            <p className="text-[11px] text-text-muted">
+              By default, <strong>Classic CBSE (Manage Finance & Dark Black)</strong> is selected as the primary system template.
             </p>
+          </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">Select School</label>
-              <Select value={selectedSchoolId} onChange={e => setSelectedSchoolId(e.target.value)} required className="w-full">
-                <option value="">-- Choose School --</option>
-                {schools.map(s => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} ({s.code || `ID: ${s.id}`})
-                  </option>
-                ))}
-              </Select>
-            </div>
-
-            <div className="flex justify-end gap-2 border-t border-border pt-4">
-              <Button type="button" variant="secondary" onClick={() => setAssignModalTemplate(null)} disabled={assigning}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={assigning || !selectedSchoolId}>
-                {assigning ? 'Assigning...' : 'Confirm Assignment'}
-              </Button>
-            </div>
-          </form>
-        )}
+          <div className="flex justify-end gap-2 border-t border-border pt-4">
+            <Button type="button" variant="secondary" onClick={() => setIsAssignModalOpen(false)} disabled={assigning}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={assigning || !selectedSchoolId || !selectedTemplateId}>
+              {assigning ? 'Assigning...' : 'Confirm Assignment'}
+            </Button>
+          </div>
+        </form>
       </Dialog>
 
       {/* VIEW ASSIGNED SCHOOLS LIST DIALOG MODAL */}
@@ -667,8 +705,7 @@ export default function ReportCardTemplatesPage() {
               onClick={() => {
                 const t = viewAssignedSchoolsTemplate;
                 setViewAssignedSchoolsTemplate(null);
-                setAssignModalTemplate(t);
-                setSelectedSchoolId('');
+                handleOpenAssignModal(t);
               }}
               className="text-xs font-bold flex items-center gap-1.5"
             >

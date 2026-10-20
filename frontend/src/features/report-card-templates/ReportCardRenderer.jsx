@@ -5,6 +5,7 @@ import ClassicCBSEReportCardTemplate from './templates/ClassicCBSEReportCardTemp
 import TraditionalReportCardTemplate from './templates/TraditionalReportCardTemplate';
 import CompactPrimaryReportCardTemplate from './templates/CompactPrimaryReportCardTemplate';
 import SinglePageReportCardWrapper from './SinglePageReportCardWrapper';
+import { resolveReportCardTheme } from './reportCardThemes';
 
 /**
  * Report Card Renderer (Layer 2 Presentation Dispatcher)
@@ -26,9 +27,22 @@ export default function ReportCardRenderer({
   // Step 1: Layer 1 calculation & data standardization
   const reportData = compileReportCardData(card, schoolProfile, currentYear, exam, activeScales);
 
-  // Step 2: Determine active template code
-  const activeTemplateCode = forcedTemplateCode || schoolProfile?.report_card_template?.code || card?.school?.report_card_template?.code || 'modern';
-  const layoutConfig = customConfig || schoolProfile?.report_card_template?.layout_config || card?.school?.report_card_template?.layout_config || {};
+  const activeTemplateCode = forcedTemplateCode || schoolProfile?.report_card_template?.code || card?.school?.report_card_template?.code || 'cbse_ocean_teal';
+  
+  // Resolve theme preference from customConfig, schoolProfile, layoutConfig or localStorage
+  const schoolId = schoolProfile?.id || card?.school?.id || card?.school_id || '';
+  const localTheme = typeof window !== 'undefined' && schoolId ? localStorage.getItem(`report_card_theme_${schoolId}`) : null;
+  const activeColorTheme = customConfig?.color_theme 
+    || schoolProfile?.report_card_color_theme 
+    || schoolProfile?.report_card_template?.layout_config?.color_theme 
+    || localTheme 
+    || null;
+
+  const baseConfig = customConfig || schoolProfile?.report_card_template?.layout_config || card?.school?.report_card_template?.layout_config || {};
+  const layoutConfig = {
+    ...baseConfig,
+    ...(activeColorTheme ? { color_theme: activeColorTheme } : {})
+  };
 
   // Step 3: Dispatch to appropriate visual template
   const renderTemplate = () => {
@@ -37,7 +51,19 @@ export default function ReportCardRenderer({
         return <ModernReportCardTemplate data={reportData} config={layoutConfig} />;
 
       case 'cbse_classic':
-        return <ClassicCBSEReportCardTemplate data={reportData} config={layoutConfig} />;
+      case 'cbse_royal_blue':
+      case 'cbse_emerald_green':
+      case 'cbse_warm_amber':
+      case 'cbse_burgundy_plum':
+      case 'cbse_ocean_teal':
+        return (
+          <ClassicCBSEReportCardTemplate
+            data={reportData}
+            config={layoutConfig}
+            colorTheme={activeColorTheme}
+            templateCode={activeTemplateCode}
+          />
+        );
 
       case 'primary_compact':
         return <CompactPrimaryReportCardTemplate data={reportData} config={layoutConfig} />;
@@ -54,4 +80,3 @@ export default function ReportCardRenderer({
     </SinglePageReportCardWrapper>
   );
 }
-

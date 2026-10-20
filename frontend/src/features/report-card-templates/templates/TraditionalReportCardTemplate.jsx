@@ -110,8 +110,12 @@ export default function TraditionalReportCardTemplate({ data, config = {} }) {
             <p className="text-xs text-zinc-700 font-semibold mt-0.5 uppercase tracking-wide">
               {school.address}
             </p>
-            <div className="mt-2 text-sm font-bold uppercase tracking-widest text-zinc-900 border-t border-b border-zinc-900 inline-block px-6 py-1">
-              {exam.is_final_session_report ? 'FINAL ACADEMIC REPORT CARD' : 'PROGRESS REPORT CARD'}
+            <div 
+              className="exam-banner-box mt-2 text-sm font-bold uppercase tracking-widest text-zinc-900 border-t border-b border-zinc-900 inline-block py-2 px-6 text-center leading-normal"
+            >
+              <span>
+                {exam.is_final_session_report ? 'FINAL ACADEMIC REPORT CARD' : 'PROGRESS REPORT CARD'}
+              </span>
             </div>
             <p className="text-xs font-sans font-bold text-zinc-600 mt-1">
               {exam.name} — Academic Session: {academic_year.name}
@@ -134,22 +138,22 @@ export default function TraditionalReportCardTemplate({ data, config = {} }) {
             </div>
             <div>
               <span className="text-[11px] font-bold text-zinc-500 uppercase block">Father's Name</span>
-              <span className="text-zinc-800">{student.father_name}</span>
+              <strong className="text-zinc-900 text-sm font-bold uppercase">{student.father_name || '—'}</strong>
             </div>
             <div>
               <span className="text-[11px] font-bold text-zinc-500 uppercase block">Mother's Name</span>
-              <span className="text-zinc-800">{student.mother_name}</span>
+              <strong className="text-zinc-900 text-sm font-bold uppercase">{student.mother_name || '—'}</strong>
             </div>
             <div>
-              <span className="text-[11px] font-bold text-zinc-500 uppercase block">Admission / SR No</span>
-              <span className="text-zinc-800 font-mono">{student.admission_no}</span>
+              <span className="text-[11px] font-bold text-zinc-500 uppercase block">{student.dob ? 'Date of Birth / SR' : 'Admission / SR No'}</span>
+              <strong className="text-zinc-900 text-sm font-sans font-bold">{student.dob ? `${student.dob} | ${student.admission_no}` : (student.admission_no || '—')}</strong>
             </div>
           </div>
 
           {/* Traditional Marks Table Container - Expands dynamically for small subject counts */}
           <div className="font-sans flex-1 flex flex-col justify-between">
             {exam.is_final_session_report ? (
-              <table className="w-full h-full border border-zinc-900 border-collapse text-zinc-900" style={{ fontSize: fontSizePx }}>
+              <table className="w-full h-full border border-zinc-900 border-collapse text-zinc-900 [&_td]:align-middle [&_th]:align-middle" style={{ fontSize: fontSizePx }}>
                 <thead>
                   <tr className="bg-zinc-950 text-white font-bold uppercase text-[9.5px] tracking-wide">
                     <th rowSpan={2} style={{ padding: headerPadding }} className="text-left border-r border-zinc-800">Subject</th>
@@ -208,7 +212,7 @@ export default function TraditionalReportCardTemplate({ data, config = {} }) {
                 </tbody>
               </table>
             ) : (
-              <table className="w-full h-full border border-zinc-900 border-collapse text-zinc-900" style={{ fontSize: fontSizePx }}>
+              <table className="w-full h-full border border-zinc-900 border-collapse text-zinc-900 [&_td]:align-middle [&_th]:align-middle" style={{ fontSize: fontSizePx }}>
                 <thead>
                   <tr className="bg-zinc-950 text-white font-bold uppercase text-[11px] tracking-wide">
                     <th style={{ padding: headerPadding }} className="text-left border-r border-zinc-800">Subject</th>

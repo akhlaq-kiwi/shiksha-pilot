@@ -1039,6 +1039,7 @@ class SchoolAdminController extends BaseController
             str_contains($uri, '/api/school/collection-history') ||
             str_contains($uri, '/api/school/fee-structures') ||
             str_contains($uri, '/api/school/staff-payments') ||
+            str_contains($uri, '/api/school/stats') ||
             (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && (str_contains($uri, '/api/school/students') || str_contains($uri, '/api/school/classes') || str_contains($uri, '/api/school/staff')))) {
             if ($userRole === 'SCHOOL_ADMIN' || $this->service->isFeeCollector($user)) {
                 if ($this->service->checkSubscriptionExpired($user)) {

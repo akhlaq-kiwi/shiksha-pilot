@@ -36,7 +36,22 @@ class _SalaryCardScreenState extends State<SalaryCardScreen> {
   @override
   void initState() {
     super.initState();
+    _markSalaryNotificationsRead();
     _fetchSalariesData();
+  }
+
+  Future<void> _markSalaryNotificationsRead() async {
+    try {
+      final uri = Uri.parse('${widget.baseUrl}/api/teacher/notifications/0/read');
+      await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${widget.token}',
+        },
+        body: json.encode({'module': 'salary'}),
+      );
+    } catch (_) {}
   }
 
   @override

@@ -313,14 +313,19 @@ final class FcmClient
     private function httpPost(string $url, string $payload, array $headers): array
     {
         $ch = curl_init($url);
-        curl_setopt_array($ch, [
+        $options = [
             CURLOPT_POST           => true,
             CURLOPT_POSTFIELDS     => $payload,
             CURLOPT_HTTPHEADER     => $headers,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => self::HTTP_TIMEOUT,
             CURLOPT_CONNECTTIMEOUT => 3,
-        ]);
+        ];
+        if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+            $options[CURLOPT_SSL_VERIFYPEER] = false;
+            $options[CURLOPT_SSL_VERIFYHOST] = 0;
+        }
+        curl_setopt_array($ch, $options);
         $body   = curl_exec($ch);
         $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);

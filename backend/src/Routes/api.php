@@ -376,6 +376,8 @@ return function (App $app) {
 
     // Mobile Notices Domain
     $app->get('/api/student/announcements', [StudentController::class, 'getActiveNotices']);
+    $app->get('/api/student/announcements/unread-count', [StudentController::class, 'getUnreadNoticesCount']);
+    $app->post('/api/student/announcements/read-all', [StudentController::class, 'markAllNoticesRead']);
     $app->post('/api/student/announcements/{id}/read', [StudentController::class, 'markNoticeRead']);
 
     // Push Notifications — device registration is role-agnostic, so these are

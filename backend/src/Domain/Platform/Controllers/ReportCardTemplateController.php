@@ -24,7 +24,7 @@ class ReportCardTemplateController extends BaseController
     private function ensureBuiltinReportCardTemplates(): void
     {
         try {
-            $stmt = $this->db->query("SELECT COUNT(*) FROM report_card_templates WHERE is_system_default = 1");
+            $stmt = $this->db->query("SELECT COUNT(*) FROM report_card_templates");
             $count = $stmt ? (int)$stmt->fetchColumn() : 0;
             if ($stmt) $stmt->closeCursor();
 
@@ -56,9 +56,9 @@ class ReportCardTemplateController extends BaseController
 
         $stmt = $this->db->query("
             SELECT t.*, 
-                   (SELECT COUNT(*) FROM schools s WHERE s.report_card_template_id = t.id OR (t.is_system_default = 1 AND s.report_card_template_id IS NULL AND t.id = 1)) as assigned_schools_count
+                   (SELECT COUNT(*) FROM schools s WHERE s.report_card_template_id = t.id OR (t.is_system_default = 1 AND s.report_card_template_id IS NULL AND t.id = 9)) as assigned_schools_count
             FROM report_card_templates t
-            ORDER BY t.is_system_default DESC, t.name ASC
+            ORDER BY (t.id = 9) DESC, t.is_system_default DESC, t.id ASC
         ");
         $templates = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -93,7 +93,7 @@ class ReportCardTemplateController extends BaseController
 
         $isDefault = (bool)$tpl['is_system_default'];
 
-        if ($isDefault && (int)$tpl['id'] === 1) {
+        if ($isDefault && (int)$tpl['id'] === 9) {
             $stmt = $this->db->prepare("
                 SELECT s.id, s.name, s.code, s.city, s.state, s.phone, s.contact_no, s.email, s.status, s.created_at, s.report_card_template_id
                 FROM schools s
@@ -254,7 +254,9 @@ class ReportCardTemplateController extends BaseController
         $schoolId = (int)($args['id'] ?? 0);
 
         $data = RequestParser::body($request);
-        $templateId = isset($data['template_id']) ? (int)$data['template_id'] : null;
+        $templateId = (isset($data['template_id']) && $data['template_id'] !== '' && $data['template_id'] !== null)
+            ? (int)$data['template_id']
+            : 9;
 
         if ($templateId !== null) {
             $chk = $this->db->prepare("SELECT id FROM report_card_templates WHERE id = ?");

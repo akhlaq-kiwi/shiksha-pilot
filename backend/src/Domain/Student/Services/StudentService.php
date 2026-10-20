@@ -432,7 +432,7 @@ class StudentService extends BaseService
         if (!$tplCode && isset($school['template_code'])) {
             $tplCode = $school['template_code'];
         }
-        $tplCode = strtolower((string)($tplCode ?: 'traditional'));
+        $tplCode = strtolower((string)($tplCode ?: 'cbse_ocean_teal'));
         $schoolRemarkSetting = trim((string)($school['report_card_remark'] ?? ''));
 
         $resolveTeacherRemark = function($pct) use ($gradeScales, $schoolRemarkSetting) {
@@ -1349,7 +1349,11 @@ class StudentService extends BaseService
 
         $query = "
             SELECT * FROM dashboard_notifications
-            WHERE school_id = :school_id AND (user_id = :user_id OR (user_role = :role AND user_id IS NULL))
+            WHERE school_id = :school_id 
+              AND (user_id = :user_id OR (user_role = :role AND user_id IS NULL))
+              AND (link != '/notice' OR link IS NULL)
+              AND (event_key != 'ANNOUNCEMENT_PUBLISHED' OR event_key IS NULL)
+              AND (category != 'ANNOUNCEMENT' OR category IS NULL)
         ";
         if ($studentId !== null && $studentId > 0) {
             $query .= " AND (student_id = :student_id OR student_id IS NULL)";
@@ -1442,6 +1446,11 @@ class StudentService extends BaseService
             return [];
         }
 
+        // Fetch School name
+        $stmtSchool = $pdo->prepare("SELECT name FROM schools WHERE id = :sid LIMIT 1");
+        $stmtSchool->execute([':sid' => $schoolId]);
+        $schoolName = trim($stmtSchool->fetchColumn() ?: '');
+
         $creators = array_unique(array_filter(array_column($announcements, 'created_by')));
         $authorMap = [];
         if (!empty($creators)) {
@@ -1452,9 +1461,15 @@ class StudentService extends BaseService
             $stmtUsers->execute($paramsMap);
             while ($row = $stmtUsers->fetch(PDO::FETCH_ASSOC)) {
                 if (!empty($row['name'])) {
-                    $roleLabel = ($row['role'] === 'PRINCIPAL' || $row['role'] === 'SCHOOL_ADMIN') ? 'Principal' : 'Teacher';
-                    $authorMap[$row['phone']] = $row['name'] . ' (' . $roleLabel . ')';
-                    $authorMap[(string)$row['id']] = $row['name'] . ' (' . $roleLabel . ')';
+                    if ($row['role'] === 'SCHOOL_ADMIN' || $row['role'] === 'SUPER_ADMIN') {
+                        $roleLabel = !empty($schoolName) ? $schoolName : 'School Administration';
+                        $authorMap[$row['phone']] = $roleLabel;
+                        $authorMap[(string)$row['id']] = $roleLabel;
+                    } else {
+                        $roleLabel = ($row['role'] === 'PRINCIPAL') ? 'Principal' : 'Teacher';
+                        $authorMap[$row['phone']] = $row['name'] . ' (' . $roleLabel . ')';
+                        $authorMap[(string)$row['id']] = $row['name'] . ' (' . $roleLabel . ')';
+                    }
                 }
             }
 
@@ -1474,18 +1489,140 @@ class StudentService extends BaseService
             }
         }
 
+        $userName = trim($user['name'] ?? '');
+        $userPhone = trim($user['phone'] ?? '');
+
         foreach ($announcements as &$a) {
-            $cb = $a['created_by'] ?? '';
-            $a['author_name'] = $authorMap[$cb] ?? (!empty($cb) && !is_numeric($cb) ? $cb : 'Principal');
+            $cb = trim((string)($a['created_by'] ?? ''));
+
+            // Check if current user is the creator
+            $isCreator = false;
+            if (!empty($userId) && $cb === (string)$userId) $isCreator = true;
+            if (!empty($userPhone) && $cb === $userPhone) $isCreator = true;
+            if (!empty($userName) && stripos($cb, $userName) !== false) $isCreator = true;
+            if ($isCreator) {
+                $a['is_read'] = 1;
+            }
+
+            // Determine author name display (School name if created by school admin)
+            if (!empty($schoolName) && (strcasecmp($cb, $schoolName) === 0 || stripos($cb, 'Admin') !== false || stripos($cb, 'Super Admin') !== false)) {
+                $a['author_name'] = $schoolName;
+            } else {
+                $a['author_name'] = $authorMap[$cb] ?? (!empty($cb) && !is_numeric($cb) ? $cb : ($schoolName ?: 'Principal'));
+            }
         }
         unset($a);
 
         return $announcements;
     }
 
+    public function getUnreadNoticesCount(array $user): array
+    {
+        $schoolId = (int)($user['school_id'] ?? 0);
+        $userId = (int)($user['id'] ?? 0);
+        $role = strtoupper($user['role'] ?? '');
+        $pdo = $this->repo->getPdo();
+
+        $allowedAud = [];
+        if ($role === 'SCHOOL_ADMIN' || $role === 'PRINCIPAL' || !empty($user['is_principal'])) {
+            $allowedAud = ['Teachers', 'Students', 'Both'];
+        } elseif ($role === 'TEACHER') {
+            $allowedAud = ['Teachers', 'Both'];
+        } elseif ($role === 'PARENT' || $role === 'STUDENT') {
+            $allowedAud = ['Students', 'Both'];
+        } else {
+            return ['unread_count' => 0];
+        }
+
+        $userName = trim($user['name'] ?? '');
+        $userPhone = trim($user['phone'] ?? '');
+
+        $inQuery = implode(',', array_fill(0, count($allowedAud), '?'));
+        $sql = "
+            SELECT a.id, a.created_by
+            FROM announcements a
+            LEFT JOIN announcement_reads ar ON a.id = ar.announcement_id AND ar.user_id = ?
+            WHERE a.school_id = ? 
+              AND a.audience IN ({$inQuery}) 
+              AND a.status = 'Published'
+              AND ar.id IS NULL
+        ";
+        $params = array_merge([$userId, $schoolId], $allowedAud);
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        $unreadCount = 0;
+        foreach ($rows as $row) {
+            $cb = trim((string)($row['created_by'] ?? ''));
+            $isCreator = false;
+            if (!empty($userId) && $cb === (string)$userId) $isCreator = true;
+            if (!empty($userPhone) && $cb === $userPhone) $isCreator = true;
+            if (!empty($userName) && stripos($cb, $userName) !== false) $isCreator = true;
+            if (!$isCreator) {
+                $unreadCount++;
+            }
+        }
+
+        return ['unread_count' => $unreadCount];
+    }
+
+    public function markAllNoticesRead(array $user): array
+    {
+        $schoolId = (int)($user['school_id'] ?? 0);
+        $userId = (int)($user['id'] ?? 0);
+        $role = strtoupper($user['role'] ?? '');
+        $pdo = $this->repo->getPdo();
+
+        if (empty($userId)) {
+            return ['success' => false, 'message' => 'Invalid user'];
+        }
+
+        $allowedAud = [];
+        if ($role === 'SCHOOL_ADMIN' || $role === 'PRINCIPAL' || !empty($user['is_principal'])) {
+            $allowedAud = ['Teachers', 'Students', 'Both'];
+        } elseif ($role === 'TEACHER') {
+            $allowedAud = ['Teachers', 'Both'];
+        } elseif ($role === 'PARENT' || $role === 'STUDENT') {
+            $allowedAud = ['Students', 'Both'];
+        } else {
+            return ['success' => true, 'marked_count' => 0];
+        }
+
+        $inQuery = implode(',', array_fill(0, count($allowedAud), '?'));
+        $sql = "
+            SELECT a.id 
+            FROM announcements a
+            LEFT JOIN announcement_reads ar ON a.id = ar.announcement_id AND ar.user_id = ?
+            WHERE a.school_id = ? 
+              AND a.audience IN ({$inQuery}) 
+              AND a.status = 'Published'
+              AND ar.id IS NULL
+        ";
+        $params = array_merge([$userId, $schoolId], $allowedAud);
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $annIds = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+
+        if (!empty($annIds)) {
+            $insertStmt = $pdo->prepare("
+                INSERT IGNORE INTO announcement_reads (announcement_id, user_id)
+                VALUES (?, ?)
+            ");
+            foreach ($annIds as $annId) {
+                $insertStmt->execute([(int)$annId, $userId]);
+            }
+        }
+
+        return ['success' => true, 'marked_count' => count($annIds)];
+    }
+
     public function markNoticeRead(array $user, int $announcementId): array
     {
-        $userId = (int)$user['id'];
+        $userId = (int)($user['id'] ?? 0);
+        if (empty($userId)) {
+            return ['success' => false];
+        }
         $pdo = $this->repo->getPdo();
 
         $stmt = $pdo->prepare("
@@ -2294,7 +2431,7 @@ class StudentService extends BaseService
         $schoolId = (int)($user['school_id'] ?? 0);
         $userId = (int)($user['id'] ?? 0);
         $role = strtoupper($user['role'] ?? 'STUDENT');
-        $pdo = $this->studentRepo->getPdo();
+        $pdo = $this->repo->getPdo();
 
         if ($id > 0) {
             $stmt = $pdo->prepare("
@@ -2307,15 +2444,29 @@ class StudentService extends BaseService
                 ':school_id' => $schoolId,
             ]);
         } else {
+            $module = strtolower($body['module'] ?? '');
             $eventKey = $body['event_key'] ?? '';
             $link = $body['link'] ?? '';
             $title = $body['title'] ?? '';
 
-            if (!empty($eventKey) || !empty($link) || !empty($title)) {
-                $query = "UPDATE dashboard_notifications SET is_read = 1 WHERE school_id = :sid AND is_read = 0 AND (user_id = :uid OR (user_role = :role AND user_id IS NULL))";
-                $params = [':sid' => $schoolId, ':uid' => $userId, ':role' => $role];
+            if (!empty($module) || !empty($eventKey) || !empty($link) || !empty($title)) {
+                $query = "UPDATE dashboard_notifications SET is_read = 1 WHERE school_id = :sid AND is_read = 0";
+                $params = [':sid' => $schoolId, ':uid' => $userId];
 
-                if (!empty($eventKey)) {
+                if ($role === 'STUDENT' || $role === 'PARENT') {
+                    $query .= " AND (user_id = :uid OR (user_id IS NULL AND (user_role = 'STUDENT' OR user_role = 'PARENT')))";
+                } else {
+                    $query .= " AND (user_id = :uid OR (user_role = :role AND user_id IS NULL))";
+                    $params[':role'] = $role;
+                }
+
+                if ($module === 'timetable') {
+                    $query .= " AND (event_key LIKE '%TIMETABLE%' OR event_key = 'SUBSTITUTE_ASSIGNED' OR link LIKE '%timetable%' OR title LIKE '%Timetable%' OR title LIKE '%Time Table%' OR category = 'TIMETABLE')";
+                } elseif ($module === 'salary') {
+                    $query .= " AND (event_key = 'SALARY_DISBURSED' OR link LIKE '%salary%' OR title LIKE '%Salary%' OR category = 'Finance' OR category = 'SALARY')";
+                } elseif ($module === 'exams' || $module === 'exam') {
+                    $query .= " AND (event_key LIKE '%EXAM%' OR category = 'EXAM' OR link LIKE '%exam%' OR title LIKE '%exam%' OR title LIKE '%examination%' OR title LIKE '%admit card%' OR title LIKE '%report card%' OR title LIKE '%scheme%' OR title LIKE '%datesheet%')";
+                } elseif (!empty($eventKey)) {
                     $query .= " AND event_key = :ekey";
                     $params[':ekey'] = $eventKey;
                 } elseif (!empty($link)) {

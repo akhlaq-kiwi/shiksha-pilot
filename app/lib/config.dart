@@ -27,6 +27,10 @@ bool get kServerOverrideAllowed => kDebugMode;
 
 /// Base URL for API calls, given an already-loaded [SharedPreferences].
 String resolveBaseUrlFrom(SharedPreferences prefs) {
+  // If explicitly specified at compile time via --dart-define=BASE_URL=...
+  if (const bool.hasEnvironment('BASE_URL')) {
+    return kEnvBaseUrl;
+  }
   final saved = prefs.getString(kBaseUrlPrefKey);
   if (saved != null && saved.isNotEmpty && saved != kProductionBaseUrl && saved != kQaBaseUrl) {
     if (saved.contains('10.') && !saved.contains('10.155.82.71')) {

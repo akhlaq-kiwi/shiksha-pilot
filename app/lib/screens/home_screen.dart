@@ -97,6 +97,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   String _searchQuery = '';
   int _unreadNotificationCount = 0;
   bool _isFetchingNotifications = false;
+  int _unreadNoticeCount = 0;
+  bool _isFetchingNotices = false;
+  int _unreadTimetableCount = 0;
+  int _unreadSalaryCount = 0;
+  int _unreadExamsCount = 0;
   
   final TextEditingController _searchController = TextEditingController();
 
@@ -244,6 +249,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _fetchChildrenList();
     _notifTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
       _fetchUnreadNotificationsCount();
+      _fetchUnreadNoticesCount();
     });
   }
 
@@ -339,6 +345,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _syncProfileDetails(token);
     }
     _fetchUnreadNotificationsCount();
+    _fetchUnreadNoticesCount();
   }
 
   Future<void> _syncProfileDetails(String token) async {
@@ -493,10 +500,80 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ? (decodedBody['notifications'] ?? decodedBody['data'] ?? [])
             : (decodedBody['data'] ?? []);
 
-        int count = data.where((n) => n['is_read'] == 0 || n['is_read'] == false || n['is_read'] == '0').length;
+        bool isUnread(dynamic n) =>
+            n['is_read'] == 0 || n['is_read'] == false || n['is_read'] == '0';
+
+        bool isNoticeNotif(dynamic n) {
+          final linkStr = (n['link'] ?? '').toString().toLowerCase();
+          final catStr = (n['category'] ?? '').toString().toUpperCase();
+          final evtStr = (n['event_key'] ?? '').toString().toUpperCase();
+          final titleStr = (n['title'] ?? '').toString().toLowerCase();
+          return linkStr == '/notice' ||
+              linkStr.contains('notice') ||
+              catStr == 'ANNOUNCEMENT' ||
+              catStr == 'NOTICE' ||
+              evtStr == 'ANNOUNCEMENT_PUBLISHED' ||
+              titleStr.contains('notice');
+        }
+
+        bool isTimetableNotif(dynamic n) {
+          final linkStr = (n['link'] ?? '').toString().toLowerCase();
+          final catStr = (n['category'] ?? '').toString().toUpperCase();
+          final evtStr = (n['event_key'] ?? '').toString().toUpperCase();
+          final titleStr = (n['title'] ?? '').toString().toLowerCase();
+          return linkStr.contains('timetable') ||
+              catStr == 'TIMETABLE' ||
+              evtStr.contains('TIMETABLE') ||
+              evtStr == 'SUBSTITUTE_ASSIGNED' ||
+              titleStr.contains('timetable') ||
+              titleStr.contains('time table');
+        }
+
+        bool isSalaryNotif(dynamic n) {
+          final linkStr = (n['link'] ?? '').toString().toLowerCase();
+          final catStr = (n['category'] ?? '').toString().toUpperCase();
+          final evtStr = (n['event_key'] ?? '').toString().toUpperCase();
+          final titleStr = (n['title'] ?? '').toString().toLowerCase();
+          return linkStr.contains('salary') ||
+              catStr == 'SALARY' ||
+              catStr == 'FINANCE' ||
+              evtStr == 'SALARY_DISBURSED' ||
+              evtStr.contains('SALARY') ||
+              titleStr.contains('salary');
+        }
+
+        bool isExamsNotif(dynamic n) {
+          final linkStr = (n['link'] ?? '').toString().toLowerCase();
+          final catStr = (n['category'] ?? '').toString().toUpperCase();
+          final evtStr = (n['event_key'] ?? '').toString().toUpperCase();
+          final titleStr = (n['title'] ?? '').toString().toLowerCase();
+          return linkStr.contains('exam') ||
+              catStr == 'EXAM' ||
+              evtStr.contains('EXAM') ||
+              titleStr.contains('exam') ||
+              titleStr.contains('examination') ||
+              titleStr.contains('admit card') ||
+              titleStr.contains('report card') ||
+              titleStr.contains('scheme') ||
+              titleStr.contains('datesheet');
+        }
+
+        int count = data.where((n) {
+          if (!isUnread(n)) return false;
+          if (isNoticeNotif(n)) return false;
+          return true;
+        }).length;
+
+        int timetableCount = data.where((n) => isUnread(n) && isTimetableNotif(n)).length;
+        int salaryCount = data.where((n) => isUnread(n) && isSalaryNotif(n)).length;
+        int examsCount = data.where((n) => isUnread(n) && isExamsNotif(n)).length;
+
         if (mounted) {
           setState(() {
             _unreadNotificationCount = count;
+            _unreadTimetableCount = timetableCount;
+            _unreadSalaryCount = salaryCount;
+            _unreadExamsCount = examsCount;
           });
         }
 
@@ -506,6 +583,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
           final unreadNotifs = data.where((n) {
             final isUnread = n['is_read'] == 0 || n['is_read'] == false || n['is_read'] == '0';
+            final linkStr = (n['link'] ?? '').toString().toLowerCase();
+            final catStr = (n['category'] ?? '').toString().toUpperCase();
+            final evtStr = (n['event_key'] ?? '').toString().toUpperCase();
+            if (linkStr == '/notice' || linkStr.contains('notice') || catStr == 'ANNOUNCEMENT' || evtStr == 'ANNOUNCEMENT_PUBLISHED') {
+              return false;
+            }
             final int nId = n['id'] is int ? n['id'] : int.parse(n['id'].toString());
             return isUnread && nId > lastNotifiedId;
           }).toList();
@@ -530,6 +613,45 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       // Ignore
     } finally {
       _isFetchingNotifications = false;
+    }
+  }
+
+  Future<void> _fetchUnreadNoticesCount() async {
+    if (_isFetchingNotices) return;
+    _isFetchingNotices = true;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token') ?? widget.leaveService.token;
+      if (token.isEmpty) return;
+      final baseUrl = (_workingBaseUrl.isNotEmpty && !_workingBaseUrl.contains('127.0.0.1'))
+          ? _workingBaseUrl
+          : widget.leaveService.baseUrl;
+
+      final roleUpper = widget.userRole.toUpperCase();
+      final bool isStudentOrParent = (roleUpper == 'PARENT' || roleUpper == 'STUDENT');
+
+      final uri = Uri.parse('$baseUrl/api/student/announcements/unread-count');
+      final headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+        if (isStudentOrParent && _activeStudentId != null) 'X-Student-Id': _activeStudentId.toString(),
+      };
+
+      final response = await http.get(uri, headers: headers);
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+        final data = decoded['data'] ?? decoded;
+        final count = (data['unread_count'] as num?)?.toInt() ?? 0;
+        if (mounted) {
+          setState(() {
+            _unreadNoticeCount = count;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching unread notices count: $e');
+    } finally {
+      _isFetchingNotices = false;
     }
   }
 
@@ -569,6 +691,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   ),
                 ).then((_) => _loadSessionInfo());
               } else if (titleLower.contains('timetable') || msgLower.contains('timetable')) {
+                setState(() {
+                  _unreadTimetableCount = 0;
+                });
+                _markFeatureNotificationsRead('timetable');
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -580,7 +706,69 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       isPrincipal: _isPrincipal,
                     ),
                   ),
+                ).then((_) async {
+                  if (mounted) {
+                    setState(() {
+                      _unreadTimetableCount = 0;
+                    });
+                  }
+                  await _markFeatureNotificationsRead('timetable');
+                  await _fetchUnreadNotificationsCount();
+                });
+              } else if (titleLower.contains('salary') || msgLower.contains('salary')) {
+                setState(() {
+                  _unreadSalaryCount = 0;
+                });
+                _markFeatureNotificationsRead('salary');
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => SalaryCardScreen(
+                      baseUrl: widget.leaveService.baseUrl,
+                      token: widget.leaveService.token,
+                    ),
+                  ),
+                ).then((_) async {
+                  if (mounted) {
+                    setState(() {
+                      _unreadSalaryCount = 0;
+                    });
+                  }
+                  await _markFeatureNotificationsRead('salary');
+                  await _fetchUnreadNotificationsCount();
+                });
+              } else if (titleLower.contains('exam') || msgLower.contains('exam') ||
+                  titleLower.contains('examination') || msgLower.contains('examination') ||
+                  titleLower.contains('admit card') || msgLower.contains('admit card') ||
+                  titleLower.contains('report card') || msgLower.contains('report card') ||
+                  titleLower.contains('scheme') || msgLower.contains('scheme') ||
+                  titleLower.contains('datesheet') || msgLower.contains('datesheet')) {
+                setState(() {
+                  _unreadExamsCount = 0;
+                });
+                _markFeatureNotificationsRead('exams');
+                final examService = ExamService(
+                  baseUrl: widget.leaveService.baseUrl,
+                  token: widget.leaveService.token,
                 );
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ExamListScreen(
+                      examService: examService,
+                      userRole: widget.userRole,
+                      selectedStudentId: _activeStudentId,
+                    ),
+                  ),
+                ).then((_) async {
+                  if (mounted) {
+                    setState(() {
+                      _unreadExamsCount = 0;
+                    });
+                  }
+                  await _markFeatureNotificationsRead('exams');
+                  await _fetchUnreadNotificationsCount();
+                });
               } else if (titleLower.contains('homework') || msgLower.contains('homework') || titleLower.contains('assignment') || msgLower.contains('assignment')) {
                 Navigator.push(
                   context,
@@ -744,6 +932,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // Close bottom sheet
     Navigator.pop(context);
     _fetchUnreadNotificationsCount();
+    _fetchUnreadNoticesCount();
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -822,6 +1011,41 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  Future<void> _markFeatureNotificationsRead(String module) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token') ?? widget.leaveService.token;
+      if (token.isEmpty) return;
+      final baseUrl = prefs.getString('base_url') ?? widget.leaveService.baseUrl;
+
+      final roleUpper = widget.userRole.toUpperCase();
+      final bool isSchoolStaff = (roleUpper == 'TEACHER' ||
+          roleUpper == 'PRINCIPAL' ||
+          roleUpper == 'SCHOOL_ADMIN' ||
+          roleUpper == 'SUPER_ADMIN');
+      final String path = isSchoolStaff
+          ? ((roleUpper == 'SCHOOL_ADMIN' || roleUpper == 'SUPER_ADMIN')
+              ? '/api/school/notifications/0/read'
+              : '/api/teacher/notifications/0/read')
+          : '/api/student/notifications/0/read';
+
+      final uri = Uri.parse('$baseUrl$path');
+      final headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+        if (!isSchoolStaff && _activeStudentId != null) 'X-Student-Id': _activeStudentId.toString(),
+      };
+
+      await http.post(
+        uri,
+        headers: headers,
+        body: json.encode({'module': module}),
+      );
+    } catch (e) {
+      debugPrint('Error marking $module notifications as read: $e');
+    }
+  }
+
   void _onFeatureTap(LauncherFeature feature) async {
     if (feature.isAvailable) {
       if (feature.name == 'Leaves') {
@@ -885,18 +1109,34 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
         );
       } else if (feature.name == 'Salary' || feature.name == 'Staff Salary' || feature.name == 'Salaries') {
+        setState(() {
+          _unreadSalaryCount = 0;
+        });
+        _markFeatureNotificationsRead('salary');
         final prefs = await SharedPreferences.getInstance();
         final token = prefs.getString('auth_token') ?? widget.leaveService.token;
+        final baseUrl = prefs.getString('base_url') ?? widget.leaveService.baseUrl;
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => SalaryCardScreen(
-              baseUrl: widget.leaveService.baseUrl,
+              baseUrl: baseUrl,
               token: token,
             ),
           ),
-        );
+        ).then((_) async {
+          if (mounted) {
+            setState(() {
+              _unreadSalaryCount = 0;
+            });
+          }
+          await _markFeatureNotificationsRead('salary');
+          await _fetchUnreadNotificationsCount();
+        });
       } else if (feature.name == 'Notice' || feature.name == 'Notice Board' || feature.name == 'Notices') {
+        setState(() {
+          _unreadNoticeCount = 0;
+        });
         final prefs = await SharedPreferences.getInstance();
         final token = prefs.getString('auth_token') ?? '';
         Navigator.push(
@@ -909,7 +1149,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               studentId: _activeStudentId,
             ),
           ),
-        );
+        ).then((_) {
+          _fetchUnreadNoticesCount();
+          _fetchUnreadNotificationsCount();
+        });
       } else if (feature.name == 'Notifications' || feature.name == 'Messages') {
         final prefs = await SharedPreferences.getInstance();
         final token = prefs.getString('auth_token') ?? '';
@@ -935,23 +1178,44 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
         );
-      } else if (feature.name == 'Timetable') {
+      } else if (feature.name == 'Timetable' || feature.name == 'Time Table') {
+        setState(() {
+          _unreadTimetableCount = 0;
+        });
+        _markFeatureNotificationsRead('timetable');
+        final prefs = await SharedPreferences.getInstance();
+        final baseUrl = prefs.getString('base_url') ?? widget.leaveService.baseUrl;
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => TimetableScreen(
-              baseUrl: widget.leaveService.baseUrl,
+              baseUrl: baseUrl,
               token: widget.leaveService.token,
               userRole: widget.userRole,
               selectedStudentId: _activeStudentId,
               isPrincipal: _isPrincipal,
             ),
           ),
-        );
-      } else if (feature.name == 'Exams') {
+        ).then((_) async {
+          if (mounted) {
+            setState(() {
+              _unreadTimetableCount = 0;
+            });
+          }
+          await _markFeatureNotificationsRead('timetable');
+          await _fetchUnreadNotificationsCount();
+        });
+      } else if (feature.name == 'Exams' || feature.name == 'Exam' || feature.name == 'Examinations') {
+        setState(() {
+          _unreadExamsCount = 0;
+        });
+        _markFeatureNotificationsRead('exams');
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('auth_token') ?? widget.leaveService.token;
+        final baseUrl = prefs.getString('base_url') ?? widget.leaveService.baseUrl;
         final examService = ExamService(
-          baseUrl: widget.leaveService.baseUrl,
-          token: widget.leaveService.token,
+          baseUrl: baseUrl,
+          token: token,
         );
         Navigator.push(
           context,
@@ -962,7 +1226,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               selectedStudentId: _activeStudentId,
             ),
           ),
-        );
+        ).then((_) async {
+          if (mounted) {
+            setState(() {
+              _unreadExamsCount = 0;
+            });
+          }
+          await _markFeatureNotificationsRead('exams');
+          await _fetchUnreadNotificationsCount();
+        });
       } else if (feature.name == 'Achievements') {
         final prefs = await SharedPreferences.getInstance();
         final token = prefs.getString('auth_token') ?? widget.leaveService.token;
@@ -1251,30 +1523,84 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       delegate: SliverChildBuilderDelegate(
                         (BuildContext context, int index) {
                           final feature = filteredFeatures[index];
+                          final bool isNotice = feature.name == 'Notice' || feature.name == 'Notice Board' || feature.name == 'Notices';
+                          final bool isNotification = feature.name == 'Notifications' || feature.name == 'Messages';
+                          final bool isTimetable = feature.name == 'Timetable' || feature.name == 'Time Table';
+                          final bool isSalary = feature.name == 'Salary' || feature.name == 'Staff Salary' || feature.name == 'Salaries';
+                          final bool isExams = feature.name == 'Exams' || feature.name == 'Exam' || feature.name == 'Examinations';
+                          final int badgeCount = isNotice 
+                              ? _unreadNoticeCount 
+                              : (isNotification 
+                                  ? _unreadNotificationCount 
+                                  : (isTimetable 
+                                      ? _unreadTimetableCount 
+                                      : (isSalary 
+                                          ? _unreadSalaryCount 
+                                          : (isExams ? _unreadExamsCount : 0))));
+
                           return GestureDetector(
                             onTap: () => _onFeatureTap(feature),
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                // Rounded Square Feature Icon Button
+                                // Rounded Square Feature Icon Button with Badge
                                 AspectRatio(
                                   aspectRatio: 1.0,
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: feature.color.withOpacity(0.08),
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(
-                                        color: feature.color.withOpacity(0.25),
-                                        width: 1.5,
+                                  child: Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      Container(
+                                        width: double.infinity,
+                                        height: double.infinity,
+                                        decoration: BoxDecoration(
+                                          color: feature.color.withOpacity(0.08),
+                                          borderRadius: BorderRadius.circular(16),
+                                          border: Border.all(
+                                            color: feature.color.withOpacity(0.25),
+                                            width: 1.5,
+                                          ),
+                                        ),
+                                        child: Center(
+                                          child: Icon(
+                                            feature.icon,
+                                            size: 28,
+                                            color: feature.color,
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                    child: Center(
-                                      child: Icon(
-                                        feature.icon,
-                                        size: 28,
-                                        color: feature.color,
-                                      ),
-                                    ),
+                                      if (badgeCount > 0)
+                                        Positioned(
+                                          top: -4,
+                                          right: -4,
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                            constraints: const BoxConstraints(minWidth: 19, minHeight: 19),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFEF4444),
+                                              borderRadius: BorderRadius.circular(10),
+                                              border: Border.all(color: Colors.white, width: 2),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: const Color(0xFFEF4444).withValues(alpha: 0.35),
+                                                  blurRadius: 4,
+                                                  offset: const Offset(0, 2),
+                                                ),
+                                              ],
+                                            ),
+                                            child: Center(
+                                              child: Text(
+                                                badgeCount > 99 ? '99+' : badgeCount.toString(),
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w900,
+                                                  height: 1.0,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                    ],
                                   ),
                                 ),
                                 const SizedBox(height: 8),

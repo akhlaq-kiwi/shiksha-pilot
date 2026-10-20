@@ -1283,7 +1283,7 @@ class TeacherService extends BaseService
 
         // 2. Fetch staff payment details
         $stmt = $pdo->prepare("
-            SELECT sp.*, st.id AS staff_id, st.name AS staff_name, st.employee_id, st.role, st.salary AS base_salary, st.joining_date,
+            SELECT sp.*, st.id AS staff_id, st.name AS staff_name, st.employee_id, st.role, st.department, st.salary AS base_salary, st.joining_date,
                    sch.name AS school_name, sch.logo_path,
                    ay.start_date AS ay_start_date, ay.end_date AS ay_end_date, ay.name AS ay_name
             FROM staff_payments sp
@@ -1338,28 +1338,31 @@ class TeacherService extends BaseService
             "Logo Path: " . ($payment['logo_path'] ?? ''),
             "---",
             "Employee Name: " . $payment['staff_name'],
-            "Employee ID: " . ($payment['employee_id'] ?? '—'),
-            "Designation: " . ($payment['role'] ?? 'Teacher'),
+            "Employee ID: " . ($payment['employee_id'] ?: '—'),
+            "Designation: " . ($payment['role'] ?: 'Teacher'),
+            "Department: " . ($payment['department'] ?: 'General'),
+            "Academic Year: " . ($payment['ay_name'] ?: ($details['year'] . '-' . ($details['year'] + 1))),
             "Month: " . $payment['payment_month'] . ' ' . $details['year'],
+            "Payment Month: " . $payment['payment_month'],
             "Payment Date: " . $paymentDateFormatted,
             "Transaction ID: TXN-SL-" . str_pad((string)$payment['id'], 5, '0', STR_PAD_LEFT),
             "Status: PAID",
             "---",
-            "Base Salary: INR " . number_format($details['base_salary'], 2),
+            "Base Salary: " . number_format($details['base_salary'], 2),
             "Total Days: " . $details['total_days'] . " Days",
             "Paid Days: " . $details['paid_days'] . " Days",
             "Present Days: " . $details['present_count'] . " Days",
-            "Paid Leaves: " . $details['paid_leave_count'] . " Days",
-            "Unpaid Leaves: " . $details['unpaid_leave_count'] . " Days",
+            "Paid Leaves: " . $details['paid_leave_count'] . " Day(s)",
+            "Unpaid Leaves: " . $details['unpaid_leave_count'] . " Day(s)",
             "Sundays & Holidays: " . ($details['sunday_count'] + $details['holiday_count']) . " Days",
             "Absent Days: " . $details['pure_absent_count'] . " Days",
             "Absent Dates: " . ($details['pure_absent_dates_display'] ?: 'None'),
             "Unpaid Leave Dates: " . ($details['unpaid_leave_dates_display'] ?: 'None'),
             "Paid Leave Dates: " . ($details['paid_leave_dates_display'] ?: 'None'),
             "All Unpaid Dates: " . $details['absent_dates_display'],
-            "Attendance Deduction: INR " . number_format($details['attendance_deduction'], 2),
-            "Late Penalty Deduction: INR " . number_format($details['late_penalty_deduction'], 2),
-            "Amount Disbursed: INR " . number_format((float)$payment['amount_paid'], 2),
+            "Attendance Deduction: " . number_format($details['attendance_deduction'], 2),
+            "Late Penalty Deduction: " . number_format($details['late_penalty_deduction'], 2),
+            "Amount Disbursed: " . number_format((float)$payment['amount_paid'], 2),
             "Disbursed Date: " . $paymentDateFormatted,
             "---",
             "This is a computer-generated salary slip. No signature is required."
@@ -2390,7 +2393,11 @@ class TeacherService extends BaseService
 
         $stmt = $pdo->prepare("
             SELECT * FROM dashboard_notifications
-            WHERE school_id = :school_id AND (user_id = :user_id OR (user_role = :role AND user_id IS NULL))
+            WHERE school_id = :school_id 
+              AND (user_id = :user_id OR (user_role = :role AND user_id IS NULL))
+              AND (link != '/notice' OR link IS NULL)
+              AND (event_key != 'ANNOUNCEMENT_PUBLISHED' OR event_key IS NULL)
+              AND (category != 'ANNOUNCEMENT' OR category IS NULL)
             ORDER BY id DESC
             LIMIT :limit OFFSET :offset
         ");
@@ -2423,15 +2430,29 @@ class TeacherService extends BaseService
                 ':role' => $role
             ]);
         } else {
+            $module = strtolower($body['module'] ?? '');
             $eventKey = $body['event_key'] ?? '';
             $link = $body['link'] ?? '';
             $title = $body['title'] ?? '';
 
-            if (!empty($eventKey) || !empty($link) || !empty($title)) {
-                $query = "UPDATE dashboard_notifications SET is_read = 1 WHERE school_id = :sid AND is_read = 0 AND (user_id = :uid OR (user_role = :role AND user_id IS NULL))";
-                $params = [':sid' => $schoolId, ':uid' => $userId, ':role' => $role];
+            if (!empty($module) || !empty($eventKey) || !empty($link) || !empty($title)) {
+                $query = "UPDATE dashboard_notifications SET is_read = 1 WHERE school_id = :sid AND is_read = 0";
+                $params = [':sid' => $schoolId, ':uid' => $userId];
 
-                if (!empty($eventKey)) {
+                if ($role === 'PRINCIPAL') {
+                    $query .= " AND (user_id = :uid OR (user_id IS NULL AND (user_role = 'TEACHER' OR user_role = 'PRINCIPAL')))";
+                } else {
+                    $query .= " AND (user_id = :uid OR (user_id IS NULL AND user_role = :role))";
+                    $params[':role'] = $role;
+                }
+
+                if ($module === 'timetable') {
+                    $query .= " AND (event_key LIKE '%TIMETABLE%' OR event_key = 'SUBSTITUTE_ASSIGNED' OR link LIKE '%timetable%' OR title LIKE '%Timetable%' OR title LIKE '%Time Table%' OR category = 'TIMETABLE')";
+                } elseif ($module === 'salary') {
+                    $query .= " AND (event_key = 'SALARY_DISBURSED' OR link LIKE '%salary%' OR title LIKE '%Salary%' OR category = 'Finance' OR category = 'SALARY')";
+                } elseif ($module === 'exams' || $module === 'exam') {
+                    $query .= " AND (event_key LIKE '%EXAM%' OR category = 'EXAM' OR link LIKE '%exam%' OR title LIKE '%exam%' OR title LIKE '%examination%' OR title LIKE '%admit card%' OR title LIKE '%report card%' OR title LIKE '%scheme%' OR title LIKE '%datesheet%')";
+                } elseif (!empty($eventKey)) {
                     $query .= " AND event_key = :ekey";
                     $params[':ekey'] = $eventKey;
                 } elseif (!empty($link)) {

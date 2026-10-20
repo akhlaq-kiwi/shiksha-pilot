@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:school_hub/services/exam_service.dart';
 import 'package:school_hub/screens/exam_detail_screen.dart';
+import 'package:school_hub/services/http_service.dart' as http;
 
 class ExamListScreen extends StatefulWidget {
   final ExamService examService;
@@ -28,7 +30,36 @@ class _ExamListScreenState extends State<ExamListScreen> {
   @override
   void initState() {
     super.initState();
+    _markExamsNotificationsRead();
     _loadExams();
+  }
+
+  Future<void> _markExamsNotificationsRead() async {
+    try {
+      final roleUpper = widget.userRole.toUpperCase();
+      final bool isSchoolStaff = (roleUpper == 'TEACHER' ||
+          roleUpper == 'PRINCIPAL' ||
+          roleUpper == 'SCHOOL_ADMIN' ||
+          roleUpper == 'SUPER_ADMIN');
+      final String path = isSchoolStaff
+          ? ((roleUpper == 'SCHOOL_ADMIN' || roleUpper == 'SUPER_ADMIN')
+              ? '/api/school/notifications/0/read'
+              : '/api/teacher/notifications/0/read')
+          : '/api/student/notifications/0/read';
+
+      final uri = Uri.parse('${widget.examService.baseUrl}$path');
+      final headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ${widget.examService.token}',
+        if (!isSchoolStaff && widget.selectedStudentId != null) 'X-Student-Id': widget.selectedStudentId.toString(),
+      };
+
+      await http.post(
+        uri,
+        headers: headers,
+        body: json.encode({'module': 'exams'}),
+      );
+    } catch (_) {}
   }
 
   Future<void> _loadExams() async {

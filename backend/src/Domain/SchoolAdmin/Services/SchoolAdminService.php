@@ -266,10 +266,13 @@ class SchoolAdminService extends BaseService
                         $newTplCode = strtolower((string)($stmtTplCode->fetchColumn() ?: ''));
 
                         if ($newTplCode) {
-                            $pdo->prepare("DELETE FROM seating_plans WHERE exam_id IN (SELECT id FROM examinations WHERE school_id = ? AND academic_year_id = ? AND (template_code != ? OR template_code IS NULL))")->execute([$schoolId, $academicYearId, $newTplCode]);
-                            $pdo->prepare("DELETE FROM examination_marks WHERE paper_id IN (SELECT ep.id FROM examination_papers ep JOIN examinations e ON ep.exam_id = e.id WHERE e.school_id = ? AND e.academic_year_id = ? AND (e.template_code != ? OR e.template_code IS NULL))")->execute([$schoolId, $academicYearId, $newTplCode]);
-                            $pdo->prepare("DELETE FROM examination_papers WHERE exam_id IN (SELECT id FROM examinations WHERE school_id = ? AND academic_year_id = ? AND (template_code != ? OR template_code IS NULL))")->execute([$schoolId, $academicYearId, $newTplCode]);
-                            $pdo->prepare("DELETE FROM examinations WHERE school_id = ? AND academic_year_id = ? AND (template_code != ? OR template_code IS NULL)")->execute([$schoolId, $academicYearId, $newTplCode]);
+                            $isCbseFamily = str_starts_with($newTplCode, 'cbse_');
+                            if (!$isCbseFamily) {
+                                $pdo->prepare("DELETE FROM seating_plans WHERE exam_id IN (SELECT id FROM examinations WHERE school_id = ? AND academic_year_id = ? AND (template_code != ? OR template_code IS NULL))")->execute([$schoolId, $academicYearId, $newTplCode]);
+                                $pdo->prepare("DELETE FROM examination_marks WHERE paper_id IN (SELECT ep.id FROM examination_papers ep JOIN examinations e ON ep.exam_id = e.id WHERE e.school_id = ? AND e.academic_year_id = ? AND (e.template_code != ? OR e.template_code IS NULL))")->execute([$schoolId, $academicYearId, $newTplCode]);
+                                $pdo->prepare("DELETE FROM examination_papers WHERE exam_id IN (SELECT id FROM examinations WHERE school_id = ? AND academic_year_id = ? AND (template_code != ? OR template_code IS NULL))")->execute([$schoolId, $academicYearId, $newTplCode]);
+                                $pdo->prepare("DELETE FROM examinations WHERE school_id = ? AND academic_year_id = ? AND (template_code != ? OR template_code IS NULL)")->execute([$schoolId, $academicYearId, $newTplCode]);
+                            }
                         }
                     } catch (\Throwable $t) {}
                 }
@@ -286,7 +289,7 @@ class SchoolAdminService extends BaseService
         }
 
         if (!$templateId) {
-            $templateId = 1;
+            $templateId = 9;
         }
 
         // Fetch template object
@@ -527,6 +530,11 @@ class SchoolAdminService extends BaseService
         $salaryDisbursementChart = [];
         $academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
 
+        $todayStr = date('Y-m-d');
+        $yesterdayStr = date('Y-m-d', strtotime('-1 day'));
+        $todayCollection = 0.0;
+        $yesterdayCollection = 0.0;
+
         if ($activeYear) {
             // 1. Fee collection chart
             $feeMap = [];
@@ -549,6 +557,12 @@ class SchoolAdminService extends BaseService
 
                 $dateStr = !empty($row['payment_date']) ? $row['payment_date'] : ($row['created_at'] ?? '');
                 if (!empty($dateStr)) {
+                    $d = substr($dateStr, 0, 10);
+                    if ($d === $todayStr) {
+                        $todayCollection += $amt;
+                    } elseif ($d === $yesterdayStr) {
+                        $yesterdayCollection += $amt;
+                    }
                     $mName = date('F', strtotime($dateStr));
                     if (isset($feeMap[$mName])) {
                         $feeMap[$mName]['amount'] += $amt;
@@ -559,7 +573,7 @@ class SchoolAdminService extends BaseService
 
             // Query 2: Additional fee payments for this academic year (grouped by deposit payment_date)
             $stmtAddFeeChart = $pdo->prepare("
-                SELECT afph.payment_date, afph.created_at, afph.amount_paid AS amount
+                SELECT afph.payment_date, afph.created_at, afph.amount_paid AS amount, afp.payment_date AS afp_payment_date, afp.created_at AS afp_created_at
                 FROM additional_fee_payment_history afph
                 JOIN additional_fee_payments afp ON afph.payment_id = afp.id
                 JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
@@ -580,8 +594,14 @@ class SchoolAdminService extends BaseService
                 $amt = (float)($row['amount'] ?? 0);
                 if ($amt <= 0) continue;
 
-                $dateStr = !empty($row['payment_date']) ? $row['payment_date'] : ($row['created_at'] ?? '');
+                $dateStr = !empty($row['payment_date']) ? $row['payment_date'] : (!empty($row['afp_payment_date']) ? $row['afp_payment_date'] : (!empty($row['created_at']) ? $row['created_at'] : ($row['afp_created_at'] ?? '')));
                 if (!empty($dateStr)) {
+                    $d = substr($dateStr, 0, 10);
+                    if ($d === $todayStr) {
+                        $todayCollection += $amt;
+                    } elseif ($d === $yesterdayStr) {
+                        $yesterdayCollection += $amt;
+                    }
                     $mName = date('F', strtotime($dateStr));
                     if (isset($feeMap[$mName])) {
                         $feeMap[$mName]['amount'] += $amt;
@@ -658,6 +678,8 @@ class SchoolAdminService extends BaseService
             'classes_count'  => $this->classRepo->countBySchool($schoolId),
             'pending_fees'   => $pendingFeesTotal,
             'total_collected' => $this->feeRepo->getTotalCollectedBySchool($schoolId, $ayid),
+            'today_collection' => round($todayCollection, 2),
+            'yesterday_collection' => round($yesterdayCollection, 2),
             'fee_collection_chart' => $feeCollectionChart,
             'salary_disbursement_chart' => $salaryDisbursementChart,
             'subscription_plan' => $planName,
@@ -8191,6 +8213,9 @@ class SchoolAdminService extends BaseService
         $tpl = $this->getWorkingAcademicYearReportCardTemplate($pdo, $schoolId);
         if ($tpl) {
             $school['report_card_template_id'] = $tpl['id'];
+            if (!empty($school['report_card_color_theme'])) {
+                $tpl['layout_config']['color_theme'] = $school['report_card_color_theme'];
+            }
             $school['report_card_template'] = $tpl;
         }
 
@@ -8245,6 +8270,8 @@ class SchoolAdminService extends BaseService
         $pdo = $this->classRepo->getPdo();
         $currentProfile = $this->getSchoolProfile($user);
 
+        $colorTheme = $data['report_card_color_theme'] ?? $data['color_theme'] ?? ($currentProfile['report_card_color_theme'] ?? 'classic');
+
         $stmt = $pdo->prepare("
             UPDATE schools SET
                 name = :name,
@@ -8263,30 +8290,38 @@ class SchoolAdminService extends BaseService
                 term_start = :term_start,
                 term_end = :term_end,
                 classes_offered = :classes_offered,
-                report_card_remark = :report_card_remark
+                report_card_remark = :report_card_remark,
+                report_card_color_theme = :report_card_color_theme
             WHERE id = :id
         ");
 
         $stmt->execute([
-            ':name'                  => $data['name'] ?? $currentProfile['name'],
-            ':contact_phone'         => array_key_exists('contact_phone', $data) ? $data['contact_phone'] : $currentProfile['contact_phone'],
-            ':contact_email'         => array_key_exists('contact_email', $data) ? $data['contact_email'] : $currentProfile['contact_email'],
-            ':registration_no'       => array_key_exists('registration_no', $data) ? $data['registration_no'] : $currentProfile['registration_no'],
-            ':affiliation_board'     => array_key_exists('affiliation_board', $data) ? $data['affiliation_board'] : $currentProfile['affiliation_board'],
-            ':school_type'           => array_key_exists('school_type', $data) ? $data['school_type'] : $currentProfile['school_type'],
-            ':founded_year'          => array_key_exists('founded_year', $data) ? $data['founded_year'] : $currentProfile['founded_year'],
-            ':medium_of_instruction' => array_key_exists('medium_of_instruction', $data) ? $data['medium_of_instruction'] : $currentProfile['medium_of_instruction'],
-            ':street_address'        => array_key_exists('street_address', $data) ? $data['street_address'] : $currentProfile['street_address'],
-            ':city'                  => array_key_exists('city', $data) ? $data['city'] : $currentProfile['city'],
-            ':state'                 => array_key_exists('state', $data) ? $data['state'] : $currentProfile['state'],
-            ':pin_code'              => array_key_exists('pin_code', $data) ? $data['pin_code'] : $currentProfile['pin_code'],
-            ':current_term'          => array_key_exists('current_term', $data) ? $data['current_term'] : $currentProfile['current_term'],
-            ':term_start'            => array_key_exists('term_start', $data) ? $data['term_start'] : $currentProfile['term_start'],
-            ':term_end'              => array_key_exists('term_end', $data) ? $data['term_end'] : $currentProfile['term_end'],
-            ':classes_offered'       => array_key_exists('classes_offered', $data) ? $data['classes_offered'] : $currentProfile['classes_offered'],
-            ':report_card_remark'    => array_key_exists('report_card_remark', $data) ? $data['report_card_remark'] : $currentProfile['report_card_remark'],
-            ':id'                    => $schoolId,
+            ':name'                    => $data['name'] ?? $currentProfile['name'],
+            ':contact_phone'           => array_key_exists('contact_phone', $data) ? $data['contact_phone'] : $currentProfile['contact_phone'],
+            ':contact_email'           => array_key_exists('contact_email', $data) ? $data['contact_email'] : $currentProfile['contact_email'],
+            ':registration_no'         => array_key_exists('registration_no', $data) ? $data['registration_no'] : $currentProfile['registration_no'],
+            ':affiliation_board'       => array_key_exists('affiliation_board', $data) ? $data['affiliation_board'] : $currentProfile['affiliation_board'],
+            ':school_type'             => array_key_exists('school_type', $data) ? $data['school_type'] : $currentProfile['school_type'],
+            ':founded_year'            => array_key_exists('founded_year', $data) ? $data['founded_year'] : $currentProfile['founded_year'],
+            ':medium_of_instruction'   => array_key_exists('medium_of_instruction', $data) ? $data['medium_of_instruction'] : $currentProfile['medium_of_instruction'],
+            ':street_address'          => array_key_exists('street_address', $data) ? $data['street_address'] : $currentProfile['street_address'],
+            ':city'                    => array_key_exists('city', $data) ? $data['city'] : $currentProfile['city'],
+            ':state'                   => array_key_exists('state', $data) ? $data['state'] : $currentProfile['state'],
+            ':pin_code'                => array_key_exists('pin_code', $data) ? $data['pin_code'] : $currentProfile['pin_code'],
+            ':current_term'            => array_key_exists('current_term', $data) ? $data['current_term'] : $currentProfile['current_term'],
+            ':term_start'              => array_key_exists('term_start', $data) ? $data['term_start'] : $currentProfile['term_start'],
+            ':term_end'                => array_key_exists('term_end', $data) ? $data['term_end'] : $currentProfile['term_end'],
+            ':classes_offered'         => array_key_exists('classes_offered', $data) ? $data['classes_offered'] : $currentProfile['classes_offered'],
+            ':report_card_remark'      => array_key_exists('report_card_remark', $data) ? $data['report_card_remark'] : $currentProfile['report_card_remark'],
+            ':report_card_color_theme' => $colorTheme,
+            ':id'                      => $schoolId,
         ]);
+
+        if (!empty($data['report_card_template_id'])) {
+            $tid = (int)$data['report_card_template_id'];
+            $pdo->prepare("UPDATE schools SET report_card_template_id = :tid WHERE id = :id")->execute([':tid' => $tid, ':id' => $schoolId]);
+            $pdo->prepare("UPDATE academic_years SET report_card_template_id = :tid WHERE school_id = :sid AND (status = 'ACTIVE' OR is_current = 1)")->execute([':tid' => $tid, ':sid' => $schoolId]);
+        }
 
         return $this->getSchoolProfile($user);
     }
@@ -9786,15 +9821,23 @@ class SchoolAdminService extends BaseService
 
             $stmtNotif = $pdo->prepare("
                 INSERT INTO dashboard_notifications 
-                    (school_id, user_id, user_role, title, message, event_key, category, is_read, created_at)
+                    (school_id, user_id, user_role, title, message, event_key, category, link, is_read, created_at)
                 VALUES 
-                    (:sid, :uid, 'TEACHER', 'Salary Disbursed', :msg, 'SALARY_DISBURSED', 'Finance', 0, NOW())
+                    (:sid, :uid, 'TEACHER', 'Salary Disbursed', :msg, 'SALARY_DISBURSED', 'Finance', '/teacher/salary', 0, NOW())
             ");
             $stmtNotif->execute([
                 ':sid' => $schoolId,
                 ':uid' => $teacherUserId ?: null,
                 ':msg' => "Your salary for the month of {$month} has been disbursed."
             ]);
+
+            if ($teacherUserId) {
+                try {
+                    \App\Shared\Notifications\PushDispatcher::pushOnly(
+                        $pdo, $schoolId, 'TEACHER', (int)$teacherUserId, 'SALARY_DISBURSED', 'Salary Disbursed', "Your salary for the month of {$month} has been disbursed.", '/teacher/salary'
+                    );
+                } catch (\Throwable $e) {}
+            }
         }
 
         return ['success' => true, 'id' => (int)$pdo->lastInsertId()];
@@ -9982,6 +10025,32 @@ class SchoolAdminService extends BaseService
             ':month' => 'Previous Year - ' . $monthsString,
             ':payment_date' => $paymentDate
         ]);
+
+        if (!empty($staff['phone'])) {
+            $stmtUserPhone = $pdo->prepare("SELECT id FROM users WHERE phone = :phone LIMIT 1");
+            $stmtUserPhone->execute([':phone' => $staff['phone']]);
+            $teacherUserId = $stmtUserPhone->fetchColumn();
+
+            $stmtNotif = $pdo->prepare("
+                INSERT INTO dashboard_notifications 
+                    (school_id, user_id, user_role, title, message, event_key, category, link, is_read, created_at)
+                VALUES 
+                    (:sid, :uid, 'TEACHER', 'Salary Disbursed', :msg, 'SALARY_DISBURSED', 'Finance', '/teacher/salary', 0, NOW())
+            ");
+            $stmtNotif->execute([
+                ':sid' => $schoolId,
+                ':uid' => $teacherUserId ?: null,
+                ':msg' => "Your previous year salary for " . $monthsString . " has been disbursed."
+            ]);
+
+            if ($teacherUserId) {
+                try {
+                    \App\Shared\Notifications\PushDispatcher::pushOnly(
+                        $pdo, $schoolId, 'TEACHER', (int)$teacherUserId, 'SALARY_DISBURSED', 'Salary Disbursed', "Your previous year salary for " . $monthsString . " has been disbursed.", '/teacher/salary'
+                    );
+                } catch (\Throwable $e) {}
+            }
+        }
 
         return ['success' => true, 'id' => (int)$pdo->lastInsertId()];
     }
@@ -14069,6 +14138,7 @@ Only approve the settlement after reviewing all financial records.
 
         $activeTpl = $this->getWorkingAcademicYearReportCardTemplate($pdo, $schoolId);
         $activeTplCode = strtolower((string)($activeTpl['code'] ?? 'modern'));
+        $isCbseFamily = ($activeTplCode === 'cbse_classic' || str_starts_with($activeTplCode, 'cbse_'));
 
         if ($academicYearId > 0) {
             $this->autoSeedDefaultSessionExams($pdo, $schoolId, $academicYearId);
@@ -14080,12 +14150,18 @@ Only approve the settlement after reviewing all financial records.
             FROM examinations e 
             WHERE e.school_id = :sid 
               AND e.academic_year_id = :ayid
-              AND (e.template_code = :tpl_code OR (e.template_code IS NULL AND :is_modern = 1))
+              AND (
+                e.template_code = :tpl_code 
+                OR (:is_cbse = 1 AND (e.template_code LIKE 'cbse_%' OR e.template_code = 'cbse_classic' OR e.template_code IS NULL))
+                OR (e.template_code IS NULL AND :is_modern = 1)
+              )
             ORDER BY 
               CASE 
                 WHEN e.parent_id IS NULL THEN 0 ELSE 1 
               END ASC,
               CASE 
+                WHEN LOWER(e.name) LIKE '%first%' THEN 1 
+                WHEN LOWER(e.name) LIKE '%second%' THEN 2 
                 WHEN LOWER(e.name) LIKE '%quarterly%' THEN 1 
                 WHEN LOWER(e.name) LIKE '%half%' THEN 2 
                 WHEN LOWER(e.name) LIKE '%annual%' THEN 3 
@@ -14096,6 +14172,7 @@ Only approve the settlement after reviewing all financial records.
             ':sid' => $schoolId, 
             ':ayid' => $academicYearId,
             ':tpl_code' => $activeTplCode,
+            ':is_cbse' => $isCbseFamily ? 1 : 0,
             ':is_modern' => $activeTplCode === 'modern' ? 1 : 0
         ]);
         $allExams = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
@@ -14163,7 +14240,8 @@ Only approve the settlement after reviewing all financial records.
         } catch (\Throwable $t) {
         }
 
-        if ($tplCode === 'cbse_classic') {
+        $isCbseFamily = ($tplCode === 'cbse_classic' || str_starts_with($tplCode, 'cbse_'));
+        if ($isCbseFamily) {
             $defaultTerminals = [
                 'FIRST TERM EXAMINATION' => 'First terminal evaluation.',
                 'SECOND TERM EXAMINATION' => 'Second terminal evaluation.'
@@ -14173,7 +14251,7 @@ Only approve the settlement after reviewing all financial records.
                 // Check if terminal exists
                 $stmtCheckTerm = $pdo->prepare("
                     SELECT id FROM examinations 
-                    WHERE school_id = :sid AND academic_year_id = :ayid AND parent_id IS NULL AND (template_code = 'cbse_classic' OR template_code IS NULL) AND LOWER(name) LIKE LOWER(:name)
+                    WHERE school_id = :sid AND academic_year_id = :ayid AND parent_id IS NULL AND (template_code = 'cbse_classic' OR template_code LIKE 'cbse_%' OR template_code IS NULL) AND LOWER(name) LIKE LOWER(:name)
                     LIMIT 1
                 ");
                 $stmtCheckTerm->execute([
@@ -15781,8 +15859,25 @@ Only approve the settlement after reviewing all financial records.
             PushDispatcher::pushOnly($pdo, $schoolId, $userRole, $userId, $eventKey, $title, $message, $link);
         }
 
-        // Also insert role-wide broadcast notifications & FCM topic push if classId is 0 (all classes) or for scheme publication to teachers
-        if ($classId <= 0 || $type === 'SCHEME' || $type === 'UNPUBLISH_SCHEME') {
+        // Also insert role-wide broadcast notifications & FCM topic push if classId is 0 (all classes) or for scheme/admit card/result publication to teachers
+        if ($classId <= 0 || in_array($type, ['SCHEME', 'UNPUBLISH_SCHEME', 'ADMIT_CARD', 'UNPUBLISH_ADMIT_CARD', 'RESULT', 'SCHEDULED'])) {
+            $stmtCheckTeacher = $pdo->prepare("
+                SELECT COUNT(*) FROM dashboard_notifications
+                WHERE school_id = :sid AND user_role = 'TEACHER' AND user_id IS NULL AND title = :title AND message = :msg
+                  AND created_at >= NOW() - INTERVAL 1 MINUTE
+            ");
+            $stmtCheckTeacher->execute([':sid' => $schoolId, ':title' => $title, ':msg' => $message]);
+            if ((int)$stmtCheckTeacher->fetchColumn() === 0) {
+                $stmtInsert->execute([
+                    ':school_id' => $schoolId,
+                    ':role'      => 'TEACHER',
+                    ':user_id'   => null,
+                    ':title'     => $title,
+                    ':message'   => $message,
+                    ':link'      => $link,
+                    ':event_key' => $eventKey
+                ]);
+            }
             PushDispatcher::pushOnly($pdo, $schoolId, 'TEACHER', null, $eventKey, $title, $message, $link);
         }
     }
@@ -15946,10 +16041,10 @@ Only approve the settlement after reviewing all financial records.
         $exam['class_name'] = $classInfo['name'] ?? '';
         $exam['class_section'] = $classInfo['section'] ?? '';
 
-        // Check if working academic year or exam has cbse_classic template
+        // Check if working academic year or exam has cbse_classic or cbse_* template
         $activeTpl = $this->getWorkingAcademicYearReportCardTemplate($pdo, $schoolId);
         $tplCode = strtolower((string)($exam['template_code'] ?? $activeTpl['code'] ?? ''));
-        if ($tplCode === 'cbse_classic' && empty($exam['parent_id'])) {
+        if (($tplCode === 'cbse_classic' || str_starts_with($tplCode, 'cbse_')) && empty($exam['parent_id'])) {
             return $this->getCBSEClassicReportCards($pdo, $schoolId, $exam, $classId, $studentId, $user);
         }
 
@@ -16335,10 +16430,10 @@ Only approve the settlement after reviewing all financial records.
 
         $activeExamIds = array_unique(array_merge($configuredExamIds, $withMarksExamIds));
 
-        // Fetch top-level Terminal Exams strictly for cbse_classic in this academic year
+        // Fetch top-level Terminal Exams strictly for cbse family in this academic year
         $stmtTerminals = $pdo->prepare("
             SELECT e.* FROM examinations e
-            WHERE e.school_id = :sid AND e.academic_year_id = :ayid AND e.parent_id IS NULL AND e.template_code = 'cbse_classic'
+            WHERE e.school_id = :sid AND e.academic_year_id = :ayid AND e.parent_id IS NULL AND (e.template_code = 'cbse_classic' OR e.template_code LIKE 'cbse_%')
             ORDER BY e.id ASC
         ");
         $stmtTerminals->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
@@ -18327,6 +18422,9 @@ Only approve the settlement after reviewing all financial records.
             $stmt = $pdo->prepare("
                 SELECT * FROM dashboard_notifications
                 WHERE school_id = :sid AND user_role = 'SCHOOL_ADMIN'
+                  AND (link != '/notice' OR link IS NULL)
+                  AND (event_key != 'ANNOUNCEMENT_PUBLISHED' OR event_key IS NULL)
+                  AND (category != 'ANNOUNCEMENT' OR category IS NULL)
                 ORDER BY id DESC
                 LIMIT :limit OFFSET :offset
             ");
@@ -18339,6 +18437,9 @@ Only approve the settlement after reviewing all financial records.
             $stmtUnread = $pdo->prepare("
                 SELECT COUNT(*) FROM dashboard_notifications
                 WHERE school_id = :sid AND user_role = 'SCHOOL_ADMIN' AND is_read = 0
+                  AND (link != '/notice' OR link IS NULL)
+                  AND (event_key != 'ANNOUNCEMENT_PUBLISHED' OR event_key IS NULL)
+                  AND (category != 'ANNOUNCEMENT' OR category IS NULL)
             ");
             $stmtUnread->execute([':sid' => $schoolId]);
             $unreadCount = (int)$stmtUnread->fetchColumn();
@@ -18347,6 +18448,9 @@ Only approve the settlement after reviewing all financial records.
             $stmt = $pdo->prepare("
                 SELECT * FROM dashboard_notifications
                 WHERE school_id = :sid AND user_role = :role AND (user_id = :uid OR user_id IS NULL)
+                  AND (link != '/notice' OR link IS NULL)
+                  AND (event_key != 'ANNOUNCEMENT_PUBLISHED' OR event_key IS NULL)
+                  AND (category != 'ANNOUNCEMENT' OR category IS NULL)
                 ORDER BY id DESC
                 LIMIT :limit OFFSET :offset
             ");
@@ -18361,6 +18465,9 @@ Only approve the settlement after reviewing all financial records.
             $stmtUnread = $pdo->prepare("
                 SELECT COUNT(*) FROM dashboard_notifications
                 WHERE school_id = :sid AND user_role = :role AND (user_id = :uid OR user_id IS NULL) AND is_read = 0
+                  AND (link != '/notice' OR link IS NULL)
+                  AND (event_key != 'ANNOUNCEMENT_PUBLISHED' OR event_key IS NULL)
+                  AND (category != 'ANNOUNCEMENT' OR category IS NULL)
             ");
             $stmtUnread->execute([':sid' => $schoolId, ':role' => $role, ':uid' => $userId]);
             $unreadCount = (int)$stmtUnread->fetchColumn();
@@ -18387,11 +18494,12 @@ Only approve the settlement after reviewing all financial records.
             ");
             $stmt->execute([':id' => $id, ':sid' => $schoolId]);
         } else {
+            $module = strtolower($body['module'] ?? '');
             $eventKey = $body['event_key'] ?? '';
             $link = $body['link'] ?? '';
             $title = $body['title'] ?? '';
 
-            if (!empty($eventKey) || !empty($link) || !empty($title)) {
+            if (!empty($module) || !empty($eventKey) || !empty($link) || !empty($title)) {
                 $query = "UPDATE dashboard_notifications SET is_read = 1 WHERE school_id = :sid AND is_read = 0";
                 $params = [':sid' => $schoolId];
 
@@ -18401,7 +18509,13 @@ Only approve the settlement after reviewing all financial records.
                     $params[':uid'] = $userId;
                 }
 
-                if (!empty($eventKey)) {
+                if ($module === 'timetable') {
+                    $query .= " AND (event_key LIKE '%TIMETABLE%' OR event_key = 'SUBSTITUTE_ASSIGNED' OR link LIKE '%timetable%' OR title LIKE '%Timetable%' OR title LIKE '%Time Table%' OR category = 'TIMETABLE')";
+                } elseif ($module === 'salary') {
+                    $query .= " AND (event_key = 'SALARY_DISBURSED' OR link LIKE '%salary%' OR title LIKE '%Salary%' OR category = 'Finance' OR category = 'SALARY')";
+                } elseif ($module === 'exams' || $module === 'exam') {
+                    $query .= " AND (event_key LIKE '%EXAM%' OR category = 'EXAM' OR link LIKE '%exam%' OR title LIKE '%exam%' OR title LIKE '%examination%' OR title LIKE '%admit card%' OR title LIKE '%report card%' OR title LIKE '%scheme%' OR title LIKE '%datesheet%')";
+                } elseif (!empty($eventKey)) {
                     $query .= " AND event_key = :ekey";
                     $params[':ekey'] = $eventKey;
                 } elseif (!empty($link)) {
@@ -19377,9 +19491,17 @@ Only approve the settlement after reviewing all financial records.
             }
         }
 
+        $stmtSchool = $pdo->prepare("SELECT name FROM schools WHERE id = :sid LIMIT 1");
+        $stmtSchool->execute([':sid' => $schoolId]);
+        $schoolName = trim($stmtSchool->fetchColumn() ?: '');
+
         foreach ($announcements as &$a) {
-            $cb = $a['created_by'] ?? '';
-            $a['author_name'] = $authorMap[$cb] ?? (!empty($cb) && !is_numeric($cb) ? $cb : 'Principal');
+            $cb = trim((string)($a['created_by'] ?? ''));
+            if (!empty($schoolName) && (strcasecmp($cb, $schoolName) === 0 || stripos($cb, 'Admin') !== false || stripos($cb, 'Super Admin') !== false)) {
+                $a['author_name'] = $schoolName;
+            } else {
+                $a['author_name'] = $authorMap[$cb] ?? (!empty($cb) && !is_numeric($cb) ? $cb : ($schoolName ?: 'Principal'));
+            }
         }
         unset($a);
 
@@ -19436,27 +19558,40 @@ Only approve the settlement after reviewing all financial records.
 
         $publishedAt = ($status === 'Published') ? date('Y-m-d H:i:s') : null;
 
+        // Fetch school name
+        $stmtSchool = $pdo->prepare("SELECT name FROM schools WHERE id = :sid LIMIT 1");
+        $stmtSchool->execute([':sid' => $schoolId]);
+        $schoolRow = $stmtSchool->fetch(PDO::FETCH_ASSOC);
+        $schoolName = trim($schoolRow['name'] ?? '');
+
+        $roleUpper = strtoupper($user['role'] ?? '');
+        $isSchoolAdmin = ($roleUpper === 'SCHOOL_ADMIN' || $roleUpper === 'SUPER_ADMIN');
+
         $actorName = null;
-        if (!empty($user['id'])) {
-            $stmtUser = $pdo->prepare("SELECT name, role FROM users WHERE id = :id LIMIT 1");
-            $stmtUser->execute([':id' => $user['id']]);
-            $uRow = $stmtUser->fetch(PDO::FETCH_ASSOC);
-            if (!empty($uRow['name'])) {
-                $roleLabel = ($uRow['role'] === 'PRINCIPAL' || $uRow['role'] === 'SCHOOL_ADMIN') ? 'Principal' : 'Teacher';
-                $actorName = $uRow['name'] . ' (' . $roleLabel . ')';
+        if ($isSchoolAdmin && !empty($schoolName)) {
+            $actorName = $schoolName;
+        } else {
+            if (!empty($user['id'])) {
+                $stmtUser = $pdo->prepare("SELECT name, role FROM users WHERE id = :id LIMIT 1");
+                $stmtUser->execute([':id' => $user['id']]);
+                $uRow = $stmtUser->fetch(PDO::FETCH_ASSOC);
+                if (!empty($uRow['name'])) {
+                    $roleLabel = ($uRow['role'] === 'PRINCIPAL') ? 'Principal' : 'Teacher';
+                    $actorName = $uRow['name'] . ' (' . $roleLabel . ')';
+                }
             }
-        }
-        if (empty($actorName) && !empty($user['phone'])) {
-            $stmtStaff = $pdo->prepare("SELECT name, role, is_principal FROM staff WHERE phone = :phone AND school_id = :sid ORDER BY id DESC LIMIT 1");
-            $stmtStaff->execute([':phone' => $user['phone'], ':sid' => $schoolId]);
-            $sRow = $stmtStaff->fetch(PDO::FETCH_ASSOC);
-            if (!empty($sRow['name'])) {
-                $roleLabel = (!empty($sRow['is_principal']) || strtoupper($sRow['role'] ?? '') === 'PRINCIPAL') ? 'Principal' : 'Teacher';
-                $actorName = $sRow['name'] . ' (' . $roleLabel . ')';
+            if (empty($actorName) && !empty($user['phone'])) {
+                $stmtStaff = $pdo->prepare("SELECT name, role, is_principal FROM staff WHERE phone = :phone AND school_id = :sid ORDER BY id DESC LIMIT 1");
+                $stmtStaff->execute([':phone' => $user['phone'], ':sid' => $schoolId]);
+                $sRow = $stmtStaff->fetch(PDO::FETCH_ASSOC);
+                if (!empty($sRow['name'])) {
+                    $roleLabel = (!empty($sRow['is_principal']) || strtoupper($sRow['role'] ?? '') === 'PRINCIPAL') ? 'Principal' : 'Teacher';
+                    $actorName = $sRow['name'] . ' (' . $roleLabel . ')';
+                }
             }
-        }
-        if (empty($actorName)) {
-            $actorName = $user['name'] ?? $user['phone'] ?? $user['email'] ?? 'Principal';
+            if (empty($actorName)) {
+                $actorName = $user['name'] ?? $user['phone'] ?? $user['email'] ?? 'Principal';
+            }
         }
 
         // Insert
@@ -19476,6 +19611,12 @@ Only approve the settlement after reviewing all financial records.
             ':by' => $actorName
         ]);
         $announcementId = (int)$pdo->lastInsertId();
+
+        // Mark read for creator user
+        if (!empty($user['id'])) {
+            $stmtCreatorRead = $pdo->prepare("INSERT IGNORE INTO announcement_reads (announcement_id, user_id) VALUES (:ann, :uid)");
+            $stmtCreatorRead->execute([':ann' => $announcementId, ':uid' => (int)$user['id']]);
+        }
 
         // Broadcast notifications if published
         if ($status === 'Published') {
@@ -19589,11 +19730,11 @@ Only approve the settlement after reviewing all financial records.
     {
         $rolesToNotify = [];
         if ($audience === 'Teachers') {
-            $rolesToNotify = ['TEACHER'];
+            $rolesToNotify = ['TEACHER', 'PRINCIPAL'];
         } elseif ($audience === 'Students') {
             $rolesToNotify = ['PARENT', 'STUDENT'];
         } else {
-            $rolesToNotify = ['TEACHER', 'PARENT', 'STUDENT'];
+            $rolesToNotify = ['TEACHER', 'PRINCIPAL', 'PARENT', 'STUDENT'];
         }
 
         $plainText = trim(preg_replace('/\s+/', ' ', strip_tags($description)));
@@ -19601,17 +19742,15 @@ Only approve the settlement after reviewing all financial records.
             $plainText = mb_substr($plainText, 0, 117) . '...';
         }
 
-        $stmtNotif = $pdo->prepare("
-            INSERT INTO dashboard_notifications (school_id, user_role, title, message, link, is_read)
-            VALUES (:sch, :role, :title, :msg, '/notice', 0)
-        ");
+        // Announcement notifications are not shown in dashboard_notifications listing
+        // because the Notice feature icon now displays a dedicated unread badge count.
+        // We only send FCM push notifications, tapping which routes directly to the Notice feature.
         foreach ($rolesToNotify as $role) {
-            $stmtNotif->execute([
-                ':sch' => $schoolId,
-                ':role' => $role,
-                ':title' => $subject,
-                ':msg' => $plainText
-            ]);
+            try {
+                \App\Shared\Notifications\PushDispatcher::pushOnly($pdo, $schoolId, $role, null, 'ANNOUNCEMENT_PUBLISHED', $subject, $plainText, '/notice');
+            } catch (\Throwable $e) {
+                // Ignore push dispatch failure
+            }
         }
     }
 
@@ -20172,9 +20311,12 @@ Only approve the settlement after reviewing all financial records.
         ");
         $stmtRate->execute([':sid' => $schoolId, ':uid' => $userId, ':tid' => $teacherId]);
         $lastOtpTime = $stmtRate->fetchColumn();
-        if ($lastOtpTime && (time() - strtotime((string)$lastOtpTime)) < 30) {
-            $wait = 30 - (time() - strtotime((string)$lastOtpTime));
-            throw new ValidationException(['rate_limit' => "Please wait {$wait} seconds before requesting a new OTP."]);
+        if ($lastOtpTime) {
+            $diff = time() - strtotime((string)$lastOtpTime);
+            if ($diff >= 0 && $diff < 30) {
+                $wait = 30 - $diff;
+                throw new ValidationException(['rate_limit' => "Please wait {$wait} seconds before requesting a new OTP."]);
+            }
         }
 
         // Generate 4-digit OTP
@@ -20239,6 +20381,7 @@ Only approve the settlement after reviewing all financial records.
             SmtpMailer::send($toEmail, $subject, $bodyHtml, '', '');
         } catch (\Throwable $e) {
             $this->log('Failed to send Principal assign OTP email', ['error' => $e->getMessage(), 'email' => $toEmail, 'otp' => $otpCode]);
+            throw new ValidationException(['email' => 'Failed to send OTP email: ' . $e->getMessage()]);
         }
 
         // Mask email address
@@ -20444,9 +20587,12 @@ Only approve the settlement after reviewing all financial records.
         ");
         $stmtRate->execute([':sid' => $schoolId, ':uid' => $userId, ':tid' => $teacherId]);
         $lastOtpTime = $stmtRate->fetchColumn();
-        if ($lastOtpTime && (time() - strtotime((string)$lastOtpTime)) < 30) {
-            $wait = 30 - (time() - strtotime((string)$lastOtpTime));
-            throw new ValidationException(['rate_limit' => "Please wait {$wait} seconds before requesting a new OTP."]);
+        if ($lastOtpTime) {
+            $diff = time() - strtotime((string)$lastOtpTime);
+            if ($diff >= 0 && $diff < 30) {
+                $wait = 30 - $diff;
+                throw new ValidationException(['rate_limit' => "Please wait {$wait} seconds before requesting a new OTP."]);
+            }
         }
 
         // Generate 4-digit OTP
@@ -20511,6 +20657,7 @@ Only approve the settlement after reviewing all financial records.
             SmtpMailer::send($toEmail, $subject, $bodyHtml, '', '');
         } catch (\Throwable $e) {
             $this->log('Failed to send Fee Collector assign OTP email', ['error' => $e->getMessage(), 'email' => $toEmail, 'otp' => $otpCode]);
+            throw new ValidationException(['email' => 'Failed to send OTP email: ' . $e->getMessage()]);
         }
 
         // Mask email address
@@ -20593,7 +20740,7 @@ Only approve the settlement after reviewing all financial records.
         $stmtUpdateStaff = $pdo->prepare("
             UPDATE staff 
             SET is_fee_collector = :flag 
-            WHERE (id = :tid OR (phone = :phone AND phone IS NOT NULL AND phone != '' AND school_id = :sid)) 
+            WHERE (id = :tid OR (phone = :phone AND phone IS NOT NULL AND phone != '')) 
               AND school_id = :sid
         ");
         $stmtUpdateStaff->execute([':flag' => $newFlag, ':tid' => $teacherId, ':phone' => $teacherPhone, ':sid' => $schoolId]);

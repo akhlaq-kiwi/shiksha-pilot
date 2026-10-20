@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:school_hub/main.dart';
+import 'package:school_hub/services/push_notification_service.dart';
+import 'package:school_hub/services/local_notification_scheduler.dart';
 
 class UserProfileScreen extends StatefulWidget {
   final String userName;
@@ -60,7 +62,76 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     }
   }
 
+  Future<void> _confirmAndLogout() async {
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.logout_rounded, color: Colors.red.shade600, size: 24),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Log Out',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          content: const Text(
+            'Are you sure you want to log out of your account?',
+            style: TextStyle(fontSize: 14, color: Colors.black87),
+          ),
+          actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  color: Colors.grey.shade700,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFF44336),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                elevation: 0,
+              ),
+              child: const Text(
+                'Log Out',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldLogout == true) {
+      await _handleLogout();
+    }
+  }
+
   Future<void> _handleLogout() async {
+    try {
+      await PushNotificationService.unregisterDevice();
+      await LocalNotificationScheduler.cancelAll();
+    } catch (_) {}
+
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
 
@@ -355,7 +426,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               width: double.infinity,
               height: 50,
               child: ElevatedButton.icon(
-                onPressed: _handleLogout,
+                onPressed: _confirmAndLogout,
                 icon: const Icon(Icons.logout_rounded, color: Colors.white),
                 label: const Text(
                   'Log Out',

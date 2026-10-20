@@ -19,6 +19,7 @@ import '../screens/homework_list_screen.dart';
 import '../screens/achievements_screen.dart';
 import '../screens/attendance_screen.dart';
 import '../screens/principal_tar_screen.dart';
+import '../screens/notice_screen.dart';
 import '../services/attendance_service.dart';
 import '../services/leave_service.dart';
 import '../services/exam_service.dart';
@@ -279,7 +280,14 @@ class NotificationHelper {
     }
 
     Widget targetScreen;
-    if (userRole.toUpperCase() == 'TEACHER' && (link.contains('salary') || title.contains('salary') || message.contains('salary') || eventKey == 'SALARY_DISBURSED')) {
+    if (link == '/notice' || link.contains('notice') || link.contains('announcement') || eventKey == 'ANNOUNCEMENT_PUBLISHED' || eventKey == NotificationEvent.announcementPublished) {
+      targetScreen = NoticeScreen(
+        baseUrl: baseUrl,
+        token: token,
+        userRole: userRole,
+        studentId: notifStudentId ?? studentId,
+      );
+    } else if (userRole.toUpperCase() == 'TEACHER' && (link.contains('salary') || title.contains('salary') || message.contains('salary') || eventKey == 'SALARY_DISBURSED')) {
       targetScreen = SalaryCardScreen(
         baseUrl: baseUrl,
         token: token,
@@ -468,6 +476,13 @@ class NotificationHelper {
         );
 
       case NotificationEvent.announcementPublished:
+        return NoticeScreen(
+          baseUrl: baseUrl,
+          token: token,
+          userRole: userRole,
+          studentId: studentId,
+        );
+
       case NotificationEvent.attendanceNotMarkedReminder:
       case NotificationEvent.feeFollowupDueToday:
       case NotificationEvent.feeFollowupOverdue:

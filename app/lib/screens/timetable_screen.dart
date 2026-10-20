@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:school_hub/services/http_service.dart' as http;
 import '../services/timetable_service.dart';
 import 'principal_timetable_manage_screen.dart';
 
@@ -45,6 +47,7 @@ class _TimetableScreenState extends State<TimetableScreen> {
   @override
   void initState() {
     super.initState();
+    _markTimetableNotificationsRead();
     _isPrincipal = widget.isPrincipal ??
         (widget.userRole.toUpperCase() == 'PRINCIPAL');
     _checkPrincipal();
@@ -55,6 +58,34 @@ class _TimetableScreenState extends State<TimetableScreen> {
       _selectedDate = _selectedDate.add(const Duration(days: 1));
     }
     _loadSchedule();
+  }
+
+  Future<void> _markTimetableNotificationsRead() async {
+    try {
+      final roleUpper = widget.userRole.toUpperCase();
+      final bool isSchoolStaff = (roleUpper == 'TEACHER' ||
+          roleUpper == 'PRINCIPAL' ||
+          roleUpper == 'SCHOOL_ADMIN' ||
+          roleUpper == 'SUPER_ADMIN');
+      final String path = isSchoolStaff
+          ? ((roleUpper == 'SCHOOL_ADMIN' || roleUpper == 'SUPER_ADMIN')
+              ? '/api/school/notifications/0/read'
+              : '/api/teacher/notifications/0/read')
+          : '/api/student/notifications/0/read';
+
+      final uri = Uri.parse('${widget.baseUrl}$path');
+      final headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ${widget.token}',
+        if (!isSchoolStaff && widget.selectedStudentId != null) 'X-Student-Id': widget.selectedStudentId.toString(),
+      };
+
+      await http.post(
+        uri,
+        headers: headers,
+        body: json.encode({'module': 'timetable'}),
+      );
+    } catch (_) {}
   }
 
   Future<void> _checkPrincipal() async {

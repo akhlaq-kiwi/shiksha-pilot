@@ -90,9 +90,12 @@ class SmtpMailer
             // Prepare Email Content with Attachments
             $boundary = md5(uniqid((string)time(), true));
 
+            $msgId = bin2hex(random_bytes(12)) . '@shikshapilot.com';
             $headers = [
                 "From: {$fromName} <{$user}>",
                 "To: {$to}",
+                "Date: " . date('r'),
+                "Message-ID: <{$msgId}>",
                 "Subject: =?UTF-8?B?" . base64_encode($subject) . "?=",
                 "MIME-Version: 1.0",
                 "Content-Type: multipart/mixed; boundary=\"{$boundary}\"",

@@ -206,6 +206,7 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
         final decoded = json.decode(response.body);
         final List<dynamic> data = decoded['data'] ?? [];
         data.sort(_compareNoticesChronologically);
+        final bool hasUnread = data.any((n) => (n['is_read'] ?? 0) == 0 || n['is_read'] == false || n['is_read'] == '0');
         if (mounted) {
           setState(() {
             _allNotices = data;
@@ -213,6 +214,9 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
             _isLoading = false;
           });
           _scrollToBottom();
+        }
+        if (hasUnread) {
+          _markAllAsRead();
         }
       } else {
         if (mounted) {
@@ -229,6 +233,22 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
           _isLoading = false;
         });
       }
+    }
+  }
+
+  Future<void> _markAllAsRead() async {
+    try {
+      final uri = Uri.parse('${widget.baseUrl}/api/student/announcements/read-all');
+      final headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ${widget.token}',
+        if (widget.userRole.toUpperCase() == 'PARENT' && widget.studentId != null)
+          'X-Student-Id': widget.studentId.toString(),
+      };
+
+      await http.post(uri, headers: headers);
+    } catch (_) {
+      // Ignore background marking failure
     }
   }
 
@@ -1491,218 +1511,250 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
     final bool isAudio = audioUrl != null && audioUrl.isNotEmpty;
     final bool isPlayingThis = _currentlyPlayingNoticeId == noticeId && _playerState == PlayerState.playing;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: _kCardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _kBorderSlate),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () {
+        if (!isRead) {
+          _markAsRead(noticeId);
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: _kCardBg,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isRead ? _kBorderSlate : const Color(0xFFEF4444).withValues(alpha: 0.4),
+            width: isRead ? 1.0 : 1.5,
           ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Top Tag Row: Audience Badge (Principal only), Author Name, Time
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // Audience Tag - ONLY for Principal
-                if (_isPrincipal) ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: _kTealLight,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: _kTealBorder),
-                    ),
-                    child: Text(
-                      audience == 'Both'
-                          ? 'All'
-                          : audience == 'Teachers'
-                              ? 'Teachers'
-                              : 'Students',
-                      style: const TextStyle(
-                        color: _kTealPrimary,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  if (status == 'Draft') ...[
-                    const SizedBox(width: 6),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top Tag Row: Audience Badge (Principal only), Author Name, Time
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // NEW Tag for unread notice
+                  if (!isRead) ...[
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFEF3C7),
+                        color: const Color(0xFFEF4444),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: const Text(
-                        'DRAFT',
+                        'NEW',
                         style: TextStyle(
-                          color: Color(0xFF92400E),
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(width: 8),
-                ],
-
-                // Author / Sender Name
-                if (authorName.isNotEmpty) ...[
-                  Expanded(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.person_rounded, size: 14, color: _kMutedSlate),
-                        const SizedBox(width: 4),
-                        Flexible(
-                          child: Text(
-                            authorName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: _kMutedSlate,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ] else
-                  const Spacer(),
-
-                Icon(Icons.access_time_rounded, size: 12, color: _kSubtleSlate),
-                const SizedBox(width: 4),
-                Text(
-                  _formatTimeOnly(dateStr),
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: _kSubtleSlate,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-
-            // Subject Title (Hidden for pure voice announcements without custom title)
-            if (!isAudio || (subject.isNotEmpty && !subject.toLowerCase().startsWith('voice announcement') && subject.toLowerCase() != 'voice note')) ...[
-              const SizedBox(height: 10),
-              Text(
-                subject,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: isRead ? FontWeight.w700 : FontWeight.w900,
-                  color: _kDarkSlate,
-                  height: 1.25,
-                ),
-              ),
-            ],
-
-            // Inline Audio Player (if Voice Announcement)
-            if (isAudio) ...[
-              const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: _kBorderSlate),
-                ),
-                child: Row(
-                  children: [
-                    InkWell(
-                      borderRadius: BorderRadius.circular(20),
-                      onTap: () {
-                        if (!isRead) {
-                          _markAsRead(noticeId);
-                        }
-                        _toggleAudioPlay(noticeId, audioUrl);
-                      },
-                      child: CircleAvatar(
-                        radius: 17,
-                        backgroundColor: _kTealPrimary,
-                        child: Icon(
-                          isPlayingThis ? Icons.pause_rounded : Icons.play_arrow_rounded,
                           color: Colors.white,
-                          size: 20,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.5,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.mic_rounded, color: _kTealPrimary, size: 13),
-                              const SizedBox(width: 4),
-                              Text(
-                                'Voice Note${audioDuration != null ? ' • ${_formatDuration(audioDuration)}' : ''}',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: _kTealPrimary,
-                                ),
-                              ),
-                              if (isPlayingThis) ...[
-                                const Spacer(),
-                                Text(
-                                  _formatDuration(_audioPosition.inSeconds),
-                                  style: const TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                    color: _kMutedSlate,
-                                  ),
-                                ),
-                              ],
-                            ],
+                    const SizedBox(width: 8),
+                  ],
+
+                  // Audience Tag - ONLY for Principal
+                  if (_isPrincipal) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: _kTealLight,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: _kTealBorder),
+                      ),
+                      child: Text(
+                        audience == 'Both'
+                            ? 'All'
+                            : audience == 'Teachers'
+                                ? 'Teachers'
+                                : 'Students',
+                        style: const TextStyle(
+                          color: _kTealPrimary,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    if (status == 'Draft') ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF3C7),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text(
+                          'DRAFT',
+                          style: TextStyle(
+                            color: Color(0xFF92400E),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
                           ),
-                          if (isPlayingThis && _audioDuration.inSeconds > 0) ...[
-                            const SizedBox(height: 3),
-                            LinearProgressIndicator(
-                              value: (_audioPosition.inMilliseconds / _audioDuration.inMilliseconds)
-                                  .clamp(0.0, 1.0),
-                              backgroundColor: _kBorderSlate,
-                              valueColor: const AlwaysStoppedAnimation<Color>(_kTealPrimary),
-                              minHeight: 3,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(width: 8),
+                  ],
+
+                  // Author / Sender Name
+                  if (authorName.isNotEmpty) ...[
+                    Expanded(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.person_rounded, size: 14, color: _kMutedSlate),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              authorName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: _kMutedSlate,
+                              ),
                             ),
-                          ],
+                          ),
                         ],
                       ),
                     ),
-                  ],
-                ),
-              ),
-            ],
+                  ] else
+                    const Spacer(),
 
-            // Text preview if exists (for non-audio or detailed notes)
-            if (description.isNotEmpty && _stripHtml(description).isNotEmpty && _stripHtml(description) != 'Voice Announcement' && _stripHtml(description) != 'Voice Note') ...[
-              const SizedBox(height: 8),
-              Text(
-                _stripHtml(description),
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: _kMutedSlate,
-                  height: 1.35,
-                ),
+                  Icon(Icons.access_time_rounded, size: 12, color: _kSubtleSlate),
+                  const SizedBox(width: 4),
+                  Text(
+                    _formatTimeOnly(dateStr),
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: _kSubtleSlate,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
+
+              // Subject Title (Hidden for pure voice announcements without custom title)
+              if (!isAudio || (subject.isNotEmpty && !subject.toLowerCase().startsWith('voice announcement') && subject.toLowerCase() != 'voice note')) ...[
+                const SizedBox(height: 10),
+                Text(
+                  subject,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: isRead ? FontWeight.w700 : FontWeight.w900,
+                    color: _kDarkSlate,
+                    height: 1.25,
+                  ),
+                ),
+              ],
+
+              // Inline Audio Player (if Voice Announcement)
+              if (isAudio) ...[
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: _kBorderSlate),
+                  ),
+                  child: Row(
+                    children: [
+                      InkWell(
+                        borderRadius: BorderRadius.circular(20),
+                        onTap: () {
+                          if (!isRead) {
+                            _markAsRead(noticeId);
+                          }
+                          _toggleAudioPlay(noticeId, audioUrl);
+                        },
+                        child: CircleAvatar(
+                          radius: 17,
+                          backgroundColor: _kTealPrimary,
+                          child: Icon(
+                            isPlayingThis ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.mic_rounded, color: _kTealPrimary, size: 13),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Voice Note${audioDuration != null ? ' • ${_formatDuration(audioDuration)}' : ''}',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: _kTealPrimary,
+                                  ),
+                                ),
+                                if (isPlayingThis) ...[
+                                  const Spacer(),
+                                  Text(
+                                    _formatDuration(_audioPosition.inSeconds),
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: _kMutedSlate,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            if (isPlayingThis && _audioDuration.inSeconds > 0) ...[
+                              const SizedBox(height: 3),
+                              LinearProgressIndicator(
+                                value: (_audioPosition.inMilliseconds / _audioDuration.inMilliseconds)
+                                    .clamp(0.0, 1.0),
+                                backgroundColor: _kBorderSlate,
+                                valueColor: const AlwaysStoppedAnimation<Color>(_kTealPrimary),
+                                minHeight: 3,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              // Text preview if exists (for non-audio or detailed notes)
+              if (description.isNotEmpty && _stripHtml(description).isNotEmpty && _stripHtml(description) != 'Voice Announcement' && _stripHtml(description) != 'Voice Note') ...[
+                const SizedBox(height: 8),
+                Text(
+                  _stripHtml(description),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: _kMutedSlate,
+                    height: 1.35,
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

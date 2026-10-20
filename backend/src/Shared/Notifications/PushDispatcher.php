@@ -170,8 +170,16 @@ final class PushDispatcher
             $priority     = NotificationCatalog::priorityFor($eventKey);
 
             if ($userId === null) {
-                // Role-wide broadcast: one topic request instead of one per device.
+                // Role-wide broadcast: send to FCM topic
                 $dispatcher->fcm->sendToTopic(self::topicFor($schoolId, $role), $notification, $data, $priority);
+
+                // Also fan out to any active tokens registered for this role
+                $stmt = $pdo->prepare("SELECT token FROM device_tokens WHERE school_id = :sid AND UPPER(user_role) = :role AND is_active = 1 LIMIT 200");
+                $stmt->execute([':sid' => $schoolId, ':role' => strtoupper($role)]);
+                $tokens = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+                if (!empty($tokens)) {
+                    $dispatcher->fanOut($tokens, $eventKey, $title, $message, $link);
+                }
                 return;
             }
 

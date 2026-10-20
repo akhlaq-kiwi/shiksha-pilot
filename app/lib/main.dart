@@ -63,6 +63,12 @@ void callbackDispatcher() {
 
               final unreadNotifs = data.where((n) {
                 final isUnread = n['is_read'] == 0 || n['is_read'] == false || n['is_read'] == '0';
+                final linkStr = (n['link'] ?? '').toString().toLowerCase();
+                final catStr = (n['category'] ?? '').toString().toUpperCase();
+                final evtStr = (n['event_key'] ?? '').toString().toUpperCase();
+                if (linkStr == '/notice' || linkStr.contains('notice') || catStr == 'ANNOUNCEMENT' || evtStr == 'ANNOUNCEMENT_PUBLISHED') {
+                  return false;
+                }
                 final int nId = n['id'] is int ? n['id'] : int.parse(n['id'].toString());
                 return isUnread && nId > lastNotifiedId;
               }).toList();

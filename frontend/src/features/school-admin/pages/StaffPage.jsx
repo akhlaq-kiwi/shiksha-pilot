@@ -406,7 +406,6 @@ export default function StaffPage() {
 
   const handleSendPrincipalOtp = async () => {
     if (!principalTeacherTarget) return;
-    setPrincipalStep('otp');
     setPrincipalLoading(true);
     setPrincipalError('');
     try {
@@ -414,6 +413,7 @@ export default function StaffPage() {
       if (res?.email_masked) {
         setPrincipalMaskedEmail(res.email_masked);
       }
+      setPrincipalStep('otp');
     } catch (err) {
       console.error(err);
       setPrincipalError(err.message || 'Failed to send OTP to registered email address.');
@@ -467,7 +467,6 @@ export default function StaffPage() {
 
   const handleSendFeeCollectorOtp = async () => {
     if (!feeCollectorTeacherTarget) return;
-    setFeeCollectorStep('otp');
     setFeeCollectorLoading(true);
     setFeeCollectorError('');
     try {
@@ -475,6 +474,7 @@ export default function StaffPage() {
       if (res?.email_masked) {
         setFeeCollectorMaskedEmail(res.email_masked);
       }
+      setFeeCollectorStep('otp');
     } catch (err) {
       console.error(err);
       setFeeCollectorError(err.message || 'Failed to send OTP to registered email address.');
