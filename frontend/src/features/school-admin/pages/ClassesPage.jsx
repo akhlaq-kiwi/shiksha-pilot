@@ -13,6 +13,8 @@ import StudentDetailsPage from './StudentDetailsPage';
 import { Dialog } from '../../../common/ui/dialog';
 import CredentialsDialog from '../../../common/components/CredentialsDialog';
 import ClassIdentityCardPreview from '../components/ClassIdentityCardPreview';
+import { useToast } from '../../../common/components/Toast';
+import { exportStudentRecordsPdf } from '../utils/exportStudentRecordsPdf';
 import { 
   PREDEFINED_CLASSES, 
   PREDEFINED_CLASS_NAMES, 
@@ -191,6 +193,9 @@ export default function ClassesPage() {
   const [error, setError] = useState('');
 
   const { currentYear } = useAcademicYear();
+  const toast = useToast();
+  const [exportingClass, setExportingClass] = useState(null);
+  const [exportProgress, setExportProgress] = useState(null);
 
   useEffect(() => {
     schoolService.getSchoolProfile().then(data => {
@@ -643,6 +648,66 @@ export default function ClassesPage() {
       const matchesId = s.class_id && matchingClassIds.includes(s.class_id);
       return matchesName || matchesId;
     });
+  };
+
+  const handleExportRecords = async (classGroup) => {
+    if (exportingClass) return;
+    const shortName = classGroup?.name || '';
+    if (!shortName) return;
+
+    setExportingClass(shortName);
+    toast.info(`Preparing student records PDF for ${shortName}...`, 'Export Records');
+
+    try {
+      // Fetch latest students from existing API to guarantee accurate data
+      const allStudents = await schoolService.getStudents();
+      if (allStudents && Array.isArray(allStudents)) {
+        setStudents(allStudents);
+      }
+
+      const classRows = getRosterClassRows(shortName);
+      const matchingOrigNames = classRows.map(c => c.name.trim().toLowerCase());
+      const matchingClassIds = classRows.map(c => c.id);
+
+      const targetList = (allStudents && Array.isArray(allStudents)) ? allStudents : students;
+      const classStudents = targetList.filter(s => {
+        const sShort = getShortClassName(s.class_name);
+        const matchesName = sShort === shortName || (s.class_name && matchingOrigNames.includes(s.class_name.trim().toLowerCase()));
+        const matchesId = s.class_id && matchingClassIds.includes(s.class_id);
+        return matchesName || matchesId;
+      });
+
+      if (classStudents.length === 0) {
+        toast.warning(`No student records found in ${shortName} to export.`, 'Export Records');
+        return;
+      }
+
+      // Sort students ascending by Roll Number (numerically parsed), then name
+      const sortedStudents = [...classStudents].sort((a, b) => {
+        const rollA = parseInt(a.roll_no || a.roll || '999999', 10);
+        const rollB = parseInt(b.roll_no || b.roll || '999999', 10);
+        if (rollA !== rollB) {
+          return rollA - rollB;
+        }
+        return (a.name || '').localeCompare(b.name || '');
+      });
+
+      const downloadedFilename = await exportStudentRecordsPdf({
+        className: shortName,
+        students: sortedStudents,
+        schoolProfile,
+        currentYear,
+        onProgress: setExportProgress,
+      });
+
+      toast.success(`Successfully exported ${sortedStudents.length} student record(s) to ${downloadedFilename}`, 'Export Complete');
+    } catch (err) {
+      console.error('Failed to export student records PDF:', err);
+      toast.error(err.message || 'Failed to generate student records PDF. Please try again.', 'Export Failed');
+    } finally {
+      setExportingClass(null);
+      setExportProgress(null);
+    }
   };
 
   if (loading) {
@@ -1358,6 +1423,12 @@ export default function ClassesPage() {
                       Identity Cards
                     </DropdownItem>
                     <DropdownItem 
+                      onClick={() => handleExportRecords(gc)}
+                      disabled={exportingClass === gc.name}
+                    >
+                      {exportingClass === gc.name ? 'Exporting Records...' : 'Export Records'}
+                    </DropdownItem>
+                    <DropdownItem 
                       onClick={() => handleDeleteClassClick(gc)}
                       className="text-red-600 dark:text-red-400 font-bold hover:bg-red-50 dark:hover:bg-red-950/40"
                     >
@@ -1859,6 +1930,33 @@ export default function ClassesPage() {
             </div>
           </div>
         </Dialog>
+      )}
+
+      {/* Student Records PDF Export Progress Modal */}
+      {exportProgress && (
+        <div className="fixed inset-0 z-[1000000] bg-black/75 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-zinc-900 border border-border rounded-2xl shadow-2xl p-6 w-full max-w-md text-center space-y-4">
+            <div className="flex items-center justify-center gap-3">
+              <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent" />
+              <h3 className="font-bold text-text-primary text-base tracking-tight font-display">
+                Exporting Student Records
+              </h3>
+            </div>
+            <p className="text-xs text-text-secondary leading-relaxed">
+              Generating record <span className="font-bold text-text-primary">{exportProgress.current}</span> of <span className="font-bold text-text-primary">{exportProgress.total}</span>:
+              <span className="font-bold text-primary block mt-1 text-sm truncate">{exportProgress.studentName}</span>
+            </p>
+            <div className="w-full bg-zinc-200 dark:bg-zinc-800 rounded-full h-2.5 overflow-hidden">
+              <div 
+                className="bg-primary h-full transition-all duration-200 rounded-full" 
+                style={{ width: `${Math.round((exportProgress.current / exportProgress.total) * 100)}%` }} 
+              />
+            </div>
+            <p className="text-[11px] font-semibold text-text-muted">
+              {Math.round((exportProgress.current / exportProgress.total) * 100)}% Completed • Downloading PDF automatically
+            </p>
+          </div>
+        </div>
       )}
 
       {/* Transfer Students Modal moved to roster view block */}

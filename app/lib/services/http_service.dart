@@ -8,9 +8,9 @@ import 'package:school_hub/main.dart';
 
 export 'package:http/http.dart' hide get, post, put, delete;
 
-const String _kWifiBaseUrl = 'http://10.155.82.71:8000';
-const String _kWifiBaseUrlOld = 'http://10.184.196.71:8000';
 const String _kUsbBaseUrl = 'http://127.0.0.1:8000';
+const String _kWifiBaseUrl = 'http://10.22.6.71:8000';
+const String _kWifiBaseUrlOld = 'http://10.155.82.71:8000';
 
 Future<void> _saveWorkingBaseUrl(String base) async {
   try {
@@ -37,10 +37,10 @@ Future<http.Response> _executeWithFallback(
   final List<String> candidateBaseUrls = isProductionOrQa
       ? [origin]
       : [
-          _kWifiBaseUrl,
-          if (savedBase != null && savedBase.isNotEmpty && !savedBase.contains('10.57.197.71') && !savedBase.contains('10.184.196.71')) savedBase,
-          origin,
           _kUsbBaseUrl,
+          _kWifiBaseUrl,
+          if (savedBase != null && savedBase.isNotEmpty && !savedBase.contains('10.57.197.71') && !savedBase.contains('10.184.196.71') && !savedBase.contains('10.155.82.71')) savedBase,
+          origin,
           _kWifiBaseUrlOld,
         ];
 
@@ -60,7 +60,7 @@ Future<http.Response> _executeWithFallback(
       final targetUri = Uri.parse('$base$pathAndQuery');
 
       final timeoutDuration = (base.contains('127.0.0.1') || base.contains('10.') || base.contains('localhost'))
-          ? const Duration(seconds: 4)
+          ? const Duration(seconds: 3)
           : const Duration(seconds: 15);
 
       final response = await requestFn(targetUri).timeout(timeoutDuration);

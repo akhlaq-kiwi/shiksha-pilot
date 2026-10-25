@@ -1032,7 +1032,7 @@ class SchoolAdminController extends BaseController
             return;
         }
 
-        // Fee Collector route authorization (Fees Portal + TSD: Teacher Salary Disbursement)
+        // Fee Collector route authorization (Fees Portal + TSD: Teacher Salary Disbursement + Expenses)
         if (str_contains($uri, '/api/school/fee-payments') || 
             str_contains($uri, '/api/school/class-fee-configurations') || 
             str_contains($uri, '/api/school/additional-fees') || 
@@ -1040,6 +1040,7 @@ class SchoolAdminController extends BaseController
             str_contains($uri, '/api/school/fee-structures') ||
             str_contains($uri, '/api/school/staff-payments') ||
             str_contains($uri, '/api/school/stats') ||
+            str_contains($uri, '/api/school/expenses') ||
             (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && (str_contains($uri, '/api/school/students') || str_contains($uri, '/api/school/classes') || str_contains($uri, '/api/school/staff')))) {
             if ($userRole === 'SCHOOL_ADMIN' || $this->service->isFeeCollector($user)) {
                 if ($this->service->checkSubscriptionExpired($user)) {
@@ -1166,7 +1167,7 @@ class SchoolAdminController extends BaseController
 
             // Document Upload endpoint permission mapping
             if (str_contains($uri, '/api/school/upload')) {
-                if (in_array('Classes', $permissions, true) || in_array('Leave Requests', $permissions, true) || in_array('Teachers', $permissions, true)) {
+                if (in_array('Classes', $permissions, true) || in_array('Leave Requests', $permissions, true) || in_array('Teachers', $permissions, true) || $this->service->isFeeCollector($user)) {
                     return;
                 }
                 throw new \App\Shared\Exceptions\ForbiddenException('Access Denied. Upload permission required.');
@@ -1706,7 +1707,7 @@ class SchoolAdminController extends BaseController
     public function getSchoolExpenses(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'TEACHER']);
 
         $params = $request->getQueryParams();
         $data = $this->service->getSchoolExpenses($user, $params);
@@ -1717,7 +1718,7 @@ class SchoolAdminController extends BaseController
     public function updateSchoolExpense(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'TEACHER']);
 
         $id = (int)$args['id'];
         $body = RequestParser::body($request);
@@ -1729,7 +1730,7 @@ class SchoolAdminController extends BaseController
     public function deleteSchoolExpense(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'TEACHER']);
 
         $id = (int)$args['id'];
         $data = $this->service->deleteSchoolExpense($user, $id);
@@ -1740,7 +1741,7 @@ class SchoolAdminController extends BaseController
     public function createSchoolExpense(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'TEACHER']);
 
         $body = RequestParser::body($request);
         $data = $this->service->createSchoolExpense($user, $body);

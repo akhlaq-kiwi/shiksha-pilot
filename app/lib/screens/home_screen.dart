@@ -37,6 +37,7 @@ import 'package:school_hub/screens/principal_tar_screen.dart';
 import 'package:school_hub/screens/fees_portal_screen.dart';
 import 'package:school_hub/screens/teacher_salary_disbursement_screen.dart';
 import 'package:school_hub/screens/class_teacher_assignment_screen.dart';
+import 'package:school_hub/screens/expense_screen.dart';
 
 class LauncherFeature {
   final String name;
@@ -223,6 +224,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       name: 'TSD',
       icon: Icons.payments_rounded,
       color: const Color(0xFF0D9488),
+      allowedRoles: ['TEACHER', 'FEE_COLLECTOR'],
+      isAvailable: true,
+    ),
+    LauncherFeature(
+      name: 'Expense',
+      icon: Icons.receipt_long_rounded,
+      color: const Color(0xFFE11D48),
       allowedRoles: ['TEACHER', 'FEE_COLLECTOR'],
       isAvailable: true,
     ),
@@ -902,6 +910,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (f.name == 'TSD') {
         return _isFeeCollector == true;
       }
+      if (f.name == 'Expense') {
+        return _isFeeCollector == true;
+      }
       if (f.name == 'Class Teacher') {
         return (_isPrincipal == true || role == 'PRINCIPAL');
       }
@@ -1312,6 +1323,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           context,
           MaterialPageRoute(
             builder: (context) => TeacherSalaryDisbursementScreen(
+              baseUrl: effectiveBase,
+              token: token,
+            ),
+          ),
+        );
+      } else if (feature.name == 'Expense') {
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('auth_token') ?? widget.leaveService.token;
+        String effectiveBase = widget.leaveService.baseUrl;
+        if (effectiveBase.isEmpty || effectiveBase.contains('127.0.0.1')) {
+          final savedBase = prefs.getString('base_url') ?? _workingBaseUrl;
+          if (savedBase.isNotEmpty && !savedBase.contains('127.0.0.1')) {
+            effectiveBase = savedBase;
+          }
+        }
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ExpenseScreen(
               baseUrl: effectiveBase,
               token: token,
             ),
