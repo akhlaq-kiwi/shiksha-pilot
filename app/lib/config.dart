@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Configured Base URL from compile-time --dart-define or local environment default.
-const String kEnvBaseUrl = String.fromEnvironment('BASE_URL', defaultValue: 'https://app.shikshapilot.com');
+const String kEnvBaseUrl = String.fromEnvironment('BASE_URL', defaultValue: 'https://qa.shikshapilot.com');
 
 /// QA Server Base URL.
 const String kQaBaseUrl = 'https://qa.shikshapilot.com';

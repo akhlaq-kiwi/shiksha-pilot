@@ -53,6 +53,7 @@ class _TeacherProfileSalaryScreenState extends State<TeacherProfileSalaryScreen>
   Future<void> _loadTeacherDetails() async {
     setState(() {
       _isLoading = true;
+      _isActionLoading = false;
       _errorMessage = '';
     });
 
@@ -117,6 +118,7 @@ class _TeacherProfileSalaryScreenState extends State<TeacherProfileSalaryScreen>
 
   void _showDisburseDialog(String month, double amount, bool isProrated) {
     _actionError = '';
+    _isActionLoading = false;
     showDialog(
       context: context,
       barrierDismissible: !_isActionLoading,
@@ -236,10 +238,19 @@ class _TeacherProfileSalaryScreenState extends State<TeacherProfileSalaryScreen>
                             _loadTeacherDetails();
                           }
                         } catch (err) {
-                          setDialogState(() {
-                            _actionError = err.toString().replaceAll('Exception:', '').trim();
+                          if (dialogCtx.mounted) {
+                            setDialogState(() {
+                              _actionError = err.toString().replaceAll('Exception:', '').trim();
+                            });
+                          }
+                        } finally {
+                          if (dialogCtx.mounted) {
+                            setDialogState(() {
+                              _isActionLoading = false;
+                            });
+                          } else {
                             _isActionLoading = false;
-                          });
+                          }
                         }
                       },
                 child: _isActionLoading
@@ -259,6 +270,7 @@ class _TeacherProfileSalaryScreenState extends State<TeacherProfileSalaryScreen>
 
   void _showPrevYearDisburseDialog(List<String> months, double totalAmount) {
     _actionError = '';
+    _isActionLoading = false;
     final prevAY = _teacher?['previous_year_pending']?['academic_year_name'] ?? 'Previous Year';
     showDialog(
       context: context,
@@ -366,10 +378,19 @@ class _TeacherProfileSalaryScreenState extends State<TeacherProfileSalaryScreen>
                             _loadTeacherDetails();
                           }
                         } catch (err) {
-                          setDialogState(() {
-                            _actionError = err.toString().replaceAll('Exception:', '').trim();
+                          if (dialogCtx.mounted) {
+                            setDialogState(() {
+                              _actionError = err.toString().replaceAll('Exception:', '').trim();
+                            });
+                          }
+                        } finally {
+                          if (dialogCtx.mounted) {
+                            setDialogState(() {
+                              _isActionLoading = false;
+                            });
+                          } else {
                             _isActionLoading = false;
-                          });
+                          }
                         }
                       },
                 child: _isActionLoading
@@ -413,7 +434,13 @@ class _TeacherProfileSalaryScreenState extends State<TeacherProfileSalaryScreen>
   Widget build(BuildContext context) {
     final t = _teacher;
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        Navigator.pop(context, true);
+      },
+      child: Scaffold(
       backgroundColor: const Color(0xFFFAF9F6), // Warm light background like screenshot
       appBar: AppBar(
         backgroundColor: Colors.white,
@@ -495,6 +522,7 @@ class _TeacherProfileSalaryScreenState extends State<TeacherProfileSalaryScreen>
                         ),
                       ),
                     ),
+      ),
     );
   }
 

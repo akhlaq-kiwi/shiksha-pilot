@@ -10087,6 +10087,8 @@ class SchoolAdminService extends BaseService
         // Verify and delete payout
         $stmtDel = $pdo->prepare("DELETE FROM staff_payments WHERE id = :id AND school_id = :sid");
         $stmtDel->execute([':id' => $id, ':sid' => $schoolId]);
+
+        return ['success' => true];
     }
 
     private function ensureFinancialReportSchema(\PDO $pdo): void

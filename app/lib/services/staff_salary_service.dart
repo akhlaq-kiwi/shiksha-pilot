@@ -79,16 +79,25 @@ class StaffSalaryService {
       }),
     );
 
-    final decoded = json.decode(response.body);
+    Map<String, dynamic> decoded = {};
+    try {
+      decoded = json.decode(response.body);
+    } catch (_) {}
+
     if (response.statusCode == 200 || response.statusCode == 201) {
       return decoded;
     } else {
       String msg = 'Failed to disburse salary.';
-      if (decoded['message'] != null && decoded['message'].toString().isNotEmpty) {
-        msg = decoded['message'].toString();
+      if (decoded['data'] is Map && (decoded['data'] as Map)['errors'] is Map) {
+        final errs = (decoded['data'] as Map)['errors'] as Map;
+        if (errs.isNotEmpty) {
+          msg = errs.values.first.toString();
+        }
+      } else if (decoded['message'] != null && decoded['message'].toString().trim().isNotEmpty) {
+        msg = decoded['message'].toString().trim();
       } else if (decoded['errors'] != null) {
         final errs = decoded['errors'];
-        if (errs is Map) {
+        if (errs is Map && errs.isNotEmpty) {
           msg = errs.values.first.toString();
         } else {
           msg = errs.toString();
@@ -113,12 +122,24 @@ class StaffSalaryService {
       }),
     );
 
-    final decoded = json.decode(response.body);
+    Map<String, dynamic> decoded = {};
+    try {
+      decoded = json.decode(response.body);
+    } catch (_) {}
+
     if (response.statusCode == 200 || response.statusCode == 201) {
       return decoded;
     } else {
-      final msg = decoded['message'] ?? 'Failed to disburse previous year salary.';
-      throw Exception(msg.toString());
+      String msg = 'Failed to disburse previous year salary.';
+      if (decoded['data'] is Map && (decoded['data'] as Map)['errors'] is Map) {
+        final errs = (decoded['data'] as Map)['errors'] as Map;
+        if (errs.isNotEmpty) {
+          msg = errs.values.first.toString();
+        }
+      } else if (decoded['message'] != null && decoded['message'].toString().trim().isNotEmpty) {
+        msg = decoded['message'].toString().trim();
+      }
+      throw Exception(msg);
     }
   }
 
@@ -127,12 +148,24 @@ class StaffSalaryService {
     final uri = Uri.parse('$baseUrl/api/school/staff-payments/$paymentId');
     final response = await http.delete(uri, headers: _headers);
 
-    final decoded = json.decode(response.body);
+    Map<String, dynamic> decoded = {};
+    try {
+      decoded = json.decode(response.body);
+    } catch (_) {}
+
     if (response.statusCode == 200) {
       return decoded;
     } else {
-      final msg = decoded['message'] ?? 'Failed to revert salary payment.';
-      throw Exception(msg.toString());
+      String msg = 'Failed to revert salary payment.';
+      if (decoded['data'] is Map && (decoded['data'] as Map)['errors'] is Map) {
+        final errs = (decoded['data'] as Map)['errors'] as Map;
+        if (errs.isNotEmpty) {
+          msg = errs.values.first.toString();
+        }
+      } else if (decoded['message'] != null && decoded['message'].toString().trim().isNotEmpty) {
+        msg = decoded['message'].toString().trim();
+      }
+      throw Exception(msg);
     }
   }
 }
