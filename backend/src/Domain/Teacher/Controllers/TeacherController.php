@@ -59,7 +59,7 @@ class TeacherController extends BaseController
         $rawOnlyAssigned = strtolower(trim((string)($params['only_assigned'] ?? '')));
         $onlyAssigned = in_array($rawOnlyAssigned, ['1', 'true', 'yes'], true);
 
-        $data = $this->service->getMyClasses((int) $user['id'], (int) $user['school_id'], $onlyAssigned);
+        $data = $this->service->getMyClasses((int) $user['id'], (int) $user['school_id'], $onlyAssigned, $user);
 
         return $this->success($response, $data);
     }

@@ -201,6 +201,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             ? '${firstClass['name']}-$section'
             : firstClass['name'];
         await _fetchTeacherStudentsAndHistory();
+      } else {
+        setState(() {
+          _selectedClassId = null;
+          _selectedClassName = '';
+          _students = [];
+          _isLoadingAttendanceForDate = false;
+        });
       }
     } catch (e) {
       if (e is SocketException || e.toString().contains('SocketException') || e.toString().contains('Failed host lookup')) {

@@ -65,7 +65,7 @@ class StudentRepository extends BaseRepository
                      ELSE 
                        TRIM(CONCAT(s.first_name, ' ', COALESCE(s.middle_name, ''), ' ', s.last_name))
                    END AS name,
-                   c.name AS class_name, c.section, ay.name AS academic_year_name
+                   c.name AS class_name, c.section, ay.name AS academic_year_name, ay.status AS academic_year_status
             FROM students s
             LEFT JOIN classes c ON s.class_id = c.id
             LEFT JOIN academic_years ay ON s.academic_year_id = ay.id

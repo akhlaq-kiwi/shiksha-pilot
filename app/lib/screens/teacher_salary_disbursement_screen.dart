@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:school_hub/services/staff_salary_service.dart';
 import 'package:school_hub/screens/teacher_salary_profile_screen.dart';
+
 
 class TeacherSalaryDisbursementScreen extends StatefulWidget {
   final String baseUrl;
@@ -29,6 +31,7 @@ class _TeacherSalaryDisbursementScreenState extends State<TeacherSalaryDisbursem
   late String _selectedMonth;
   String _academicYearName = '2026–2027';
   String? _academicYearStartDate;
+  bool _isArchivedYear = false;
 
   List<Map<String, dynamic>> _teachersList = [];
   final TextEditingController _searchController = TextEditingController();
@@ -128,17 +131,40 @@ class _TeacherSalaryDisbursementScreenState extends State<TeacherSalaryDisbursem
     });
 
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedAyName = prefs.getString('selected_academic_year_name');
+      final savedAyId = prefs.get('selected_academic_year_id');
+
       final years = await _salaryService.getAcademicYears();
-      final current = years.firstWhere(
-        (y) => y['is_current'] == 1 || y['is_current'] == true || y['is_current'] == '1',
-        orElse: () => years.isNotEmpty ? years.first : {},
-      );
-      if (current.isNotEmpty) {
-        _academicYearName = current['name']?.toString() ?? _academicYearName;
-        _academicYearStartDate = current['start_date']?.toString();
+      Map<String, dynamic> selectedYear = {};
+      if (savedAyId != null) {
+        selectedYear = years.firstWhere(
+          (y) => y['id']?.toString() == savedAyId.toString(),
+          orElse: () => {},
+        );
+      }
+      if (selectedYear.isEmpty && savedAyName != null && savedAyName.isNotEmpty) {
+        selectedYear = years.firstWhere(
+          (y) => y['name']?.toString() == savedAyName,
+          orElse: () => {},
+        );
+      }
+      if (selectedYear.isEmpty) {
+        selectedYear = years.firstWhere(
+          (y) => y['is_current'] == 1 || y['is_current'] == true || y['is_current'] == '1',
+          orElse: () => years.isNotEmpty ? years.first : {},
+        );
+      }
+      if (selectedYear.isNotEmpty) {
+        _academicYearName = selectedYear['name']?.toString() ?? _academicYearName;
+        _academicYearStartDate = selectedYear['start_date']?.toString();
+        final isCurrentYear = (selectedYear['is_current'] == 1 || selectedYear['is_current'] == true || selectedYear['is_current'] == '1');
+        final isStatusArchived = (selectedYear['status']?.toString().toLowerCase() == 'archived');
+        _isArchivedYear = !isCurrentYear || isStatusArchived;
       }
 
       await _fetchMonthPayments(_selectedMonth);
+
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -195,6 +221,7 @@ class _TeacherSalaryDisbursementScreenState extends State<TeacherSalaryDisbursem
           initialTeacherName: teacherName,
           academicYearName: _academicYearName,
           academicYearStartDate: _academicYearStartDate,
+          isArchivedYear: _isArchivedYear,
         ),
       ),
     );
@@ -245,19 +272,37 @@ class _TeacherSalaryDisbursementScreenState extends State<TeacherSalaryDisbursem
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF1E293B), size: 18),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: Text(
-            'TEACHER SALARY DISBURSEMENT',
-            style: TextStyle(
-              color: Color(0xFF0F172A),
-              fontWeight: FontWeight.bold,
-              fontSize: 16.5,
-              letterSpacing: 0.2,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'TEACHER SALARY DISBURSEMENT',
+                style: TextStyle(
+                  color: Color(0xFF0F172A),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15.5,
+                  letterSpacing: 0.2,
+                ),
+              ),
             ),
-          ),
+            if (_academicYearName.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                'Academic Year: $_academicYearName',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+            ],
+          ],
         ),
+
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: Color(0xFF475569)),
@@ -797,22 +842,63 @@ class _TeacherSalaryDisbursementScreenState extends State<TeacherSalaryDisbursem
                   ],
                 ),
 
-              // Disburse Button on Right (Clickable, navigates to Teacher Detail page)
+              // Disburse Button on Right vs Salary Migrated
               if (!isPaid)
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFD97706),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  ),
-                  onPressed: () => _navigateToTeacherProfile(staffId, name),
-                  child: const Text(
-                    'Disburse',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                  ),
-                )
+                (_isArchivedYear && (teacher['is_migrated'] == true || teacher['is_migrated'] == 1 || teacher['is_migrated'] == '1'))
+                    ? InkWell(
+                        onTap: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                "Salary for $name has migrated to the active academic year. Switch to active year to disburse salary.",
+                              ),
+                              backgroundColor: const Color(0xFF475569),
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              duration: const Duration(seconds: 3),
+                            ),
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFCBD5E1), width: 1),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.lock_outline_rounded, size: 13, color: Color(0xFF64748B)),
+                              SizedBox(width: 4),
+                              Text(
+                                'Salary Migrated',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF64748B),
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFD97706),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        ),
+                        onPressed: () => _navigateToTeacherProfile(staffId, name),
+                        child: const Text(
+                          'Disburse',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                        ),
+                      )
               else
                 OutlinedButton(
                   style: OutlinedButton.styleFrom(

@@ -111,15 +111,20 @@ class StaffSalaryService {
   Future<Map<String, dynamic>> disbursePreviousYearStaffSalary({
     required int staffId,
     required List<String> months,
+    int? academicYearId,
   }) async {
     final uri = Uri.parse('$baseUrl/api/school/staff-payments/disburse-previous-year');
+    final Map<String, dynamic> payload = {
+      'staff_id': staffId,
+      'months': months,
+    };
+    if (academicYearId != null && academicYearId > 0) {
+      payload['academic_year_id'] = academicYearId;
+    }
     final response = await http.post(
       uri,
       headers: _headers,
-      body: json.encode({
-        'staff_id': staffId,
-        'months': months,
-      }),
+      body: json.encode(payload),
     );
 
     Map<String, dynamic> decoded = {};

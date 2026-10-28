@@ -82,20 +82,39 @@ Future<http.Response> _executeWithFallback(
   throw lastError ?? const SocketException('Connection failed on all available network interfaces.');
 }
 
+Future<Map<String, String>> _prepareHeaders(Map<String, String>? headers) async {
+  final merged = Map<String, String>.from(headers ?? {});
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final dynamic ayId = prefs.get('selected_academic_year_id');
+    if (ayId != null) {
+      final strId = ayId.toString().trim();
+      if (strId.isNotEmpty && !merged.containsKey('X-Academic-Year-Id')) {
+        merged['X-Academic-Year-Id'] = strId;
+      }
+    }
+  } catch (_) {}
+  return merged;
+}
+
 Future<http.Response> get(Uri url, {Map<String, String>? headers}) async {
-  return _executeWithFallback(url, (targetUri) => http.get(targetUri, headers: headers));
+  final effectiveHeaders = await _prepareHeaders(headers);
+  return _executeWithFallback(url, (targetUri) => http.get(targetUri, headers: effectiveHeaders));
 }
 
 Future<http.Response> post(Uri url, {Map<String, String>? headers, Object? body, Object? encoding}) async {
-  return _executeWithFallback(url, (targetUri) => http.post(targetUri, headers: headers, body: body, encoding: encoding as Encoding?));
+  final effectiveHeaders = await _prepareHeaders(headers);
+  return _executeWithFallback(url, (targetUri) => http.post(targetUri, headers: effectiveHeaders, body: body, encoding: encoding as Encoding?));
 }
 
 Future<http.Response> put(Uri url, {Map<String, String>? headers, Object? body, Object? encoding}) async {
-  return _executeWithFallback(url, (targetUri) => http.put(targetUri, headers: headers, body: body, encoding: encoding as Encoding?));
+  final effectiveHeaders = await _prepareHeaders(headers);
+  return _executeWithFallback(url, (targetUri) => http.put(targetUri, headers: effectiveHeaders, body: body, encoding: encoding as Encoding?));
 }
 
 Future<http.Response> delete(Uri url, {Map<String, String>? headers, Object? body, Object? encoding}) async {
-  return _executeWithFallback(url, (targetUri) => http.delete(targetUri, headers: headers, body: body, encoding: encoding as Encoding?));
+  final effectiveHeaders = await _prepareHeaders(headers);
+  return _executeWithFallback(url, (targetUri) => http.delete(targetUri, headers: effectiveHeaders, body: body, encoding: encoding as Encoding?));
 }
 
 void checkUnauthorized(http.Response response) {

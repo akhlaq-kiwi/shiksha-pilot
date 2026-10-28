@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import '../services/http_service.dart' as http;
 import '../services/leave_service.dart';
 import '../services/auth_service.dart';
 import '../services/account_service.dart';
@@ -39,9 +39,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   List<dynamic> _children = [];
   int? _activeStudentId;
 
+  bool _isFeeCollector = false;
   List<dynamic> _academicYears = [];
   int? _selectedAcademicYearId;
   String _selectedAcademicYearName = '';
+  String _selectedAcademicYearStatus = 'ACTIVE';
 
   DeletionRequest? _deletionRequest;
   String _appVersion = '';
@@ -96,12 +98,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
 
     final role = widget.userRole.toUpperCase();
+    _isFeeCollector = prefs.getBool('is_fee_collector') == true;
+    _selectedAcademicYearStatus = prefs.getString('selected_academic_year_status') ?? 'ACTIVE';
+
     if (role == 'PARENT' || role == 'STUDENT') {
       await _fetchChildrenList();
     }
-    if (role == 'SCHOOL_ADMIN' || role == 'SUPER_ADMIN' || role == 'PRINCIPAL') {
+    if (_canSwitchAcademicYear) {
       await _fetchAcademicYears();
     }
+  }
+
+  bool get _canSwitchAcademicYear {
+    final role = widget.userRole.toUpperCase();
+    return _isFeeCollector || role == 'SCHOOL_ADMIN' || role == 'SUPER_ADMIN' || role == 'PRINCIPAL';
   }
 
   Future<void> _fetchAcademicYears() async {
@@ -121,35 +131,51 @@ class _SettingsScreenState extends State<SettingsScreen> {
         final data = json.decode(response.body);
         List<dynamic> years = [];
         if (data is Map && data['academic_years'] != null) {
-          years = data['academic_years'];
+          years = List<dynamic>.from(data['academic_years']);
         } else if (data is Map && data['data'] != null) {
-          years = data['data'];
+          years = List<dynamic>.from(data['data']);
         } else if (data is List) {
-          years = data;
+          years = List<dynamic>.from(data);
         }
 
-        final prefs = await SharedPreferences.getInstance();
+        // Sort: Active first, then Archived by name DESC, then Draft
+        years.sort((a, b) {
+          final aStatus = (a['status'] ?? '').toString().toUpperCase();
+          final bStatus = (b['status'] ?? '').toString().toUpperCase();
+          if (aStatus == 'ACTIVE' || a['is_current'] == 1) return -1;
+          if (bStatus == 'ACTIVE' || b['is_current'] == 1) return 1;
+          final aName = (a['name'] ?? '').toString();
+          final bName = (b['name'] ?? '').toString();
+          return bName.compareTo(aName);
+        });
+
         int? savedAyId = prefs.getInt('selected_academic_year_id');
         String savedAyName = prefs.getString('selected_academic_year_name') ?? '';
+        String savedAyStatus = prefs.getString('selected_academic_year_status') ?? '';
 
-        if (savedAyId == null && years.isNotEmpty) {
-          final currentYr = years.firstWhere(
-            (y) => y['is_current'] == 1 || y['is_current'] == true || y['status'] == 'ACTIVE',
-            orElse: () => years.first,
-          );
-          savedAyId = (currentYr['id'] is int) ? currentYr['id'] : int.tryParse(currentYr['id'].toString());
-          savedAyName = currentYr['name'] ?? '';
-          if (savedAyId != null) {
-            await prefs.setInt('selected_academic_year_id', savedAyId);
-            await prefs.setString('selected_academic_year_name', savedAyName);
-          }
-        } else if (savedAyId != null && savedAyName.isEmpty && years.isNotEmpty) {
-          final matched = years.firstWhere(
+        dynamic matched;
+        if (savedAyId != null) {
+          matched = years.firstWhere(
             (y) => (y['id'] is int ? y['id'] : int.tryParse(y['id'].toString())) == savedAyId,
             orElse: () => null,
           );
-          if (matched != null) {
-            savedAyName = matched['name']?.toString() ?? '';
+        }
+
+        if (matched == null && years.isNotEmpty) {
+          matched = years.firstWhere(
+            (y) => y['is_current'] == 1 || y['is_current'] == true || (y['status'] ?? '').toString().toUpperCase() == 'ACTIVE',
+            orElse: () => years.first,
+          );
+          savedAyId = (matched['id'] is int) ? matched['id'] : int.tryParse(matched['id'].toString());
+        }
+
+        if (matched != null) {
+          savedAyName = matched['name']?.toString() ?? '';
+          savedAyStatus = (matched['status'] ?? (matched['is_current'] == 1 ? 'ACTIVE' : '')).toString();
+          if (savedAyId != null) {
+            await prefs.setInt('selected_academic_year_id', savedAyId);
+            await prefs.setString('selected_academic_year_name', savedAyName);
+            await prefs.setString('selected_academic_year_status', savedAyStatus);
           }
         }
 
@@ -158,6 +184,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _academicYears = years;
             _selectedAcademicYearId = savedAyId;
             _selectedAcademicYearName = savedAyName;
+            _selectedAcademicYearStatus = savedAyStatus.isNotEmpty ? savedAyStatus : 'ACTIVE';
           });
         }
       }
@@ -166,26 +193,309 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  Future<void> _handleSwitchAcademicYear(int yearId, String yearName) async {
+  Future<void> _handleSwitchAcademicYear(int yearId, String yearName, String yearStatus) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('selected_academic_year_id', yearId);
     await prefs.setString('selected_academic_year_name', yearName);
+    await prefs.setString('selected_academic_year_status', yearStatus);
 
     if (mounted) {
       setState(() {
         _selectedAcademicYearId = yearId;
         _selectedAcademicYearName = yearName;
+        _selectedAcademicYearStatus = yearStatus;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Switched Academic Year to $yearName'),
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Switched Academic Year to $yearName ($yearStatus)',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
           behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
-          backgroundColor: Colors.indigo.shade800,
+          duration: const Duration(seconds: 3),
+          backgroundColor: const Color(0xFF1E293B),
         ),
       );
     }
+  }
+
+  void _showSwitchAcademicYearSheet() {
+    if (_academicYears.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Loading academic sessions, please try again in a moment...'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      _fetchAcademicYears();
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.calendar_month_rounded,
+                        color: Color(0xFFD97706),
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text(
+                            'Switch Academic Year',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Select session to view student dues & deposit fees',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.45,
+                  ),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: _academicYears.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    itemBuilder: (context, index) {
+                      final yr = _academicYears[index];
+                      final yrId = yr['id'] is int ? yr['id'] as int : int.tryParse(yr['id'].toString()) ?? 0;
+                      final yrName = (yr['name'] ?? '').toString();
+                      final yrStatus = (yr['status'] ?? (yr['is_current'] == 1 ? 'ACTIVE' : '')).toString();
+                      final isSelected = yrId == _selectedAcademicYearId;
+                      final isCurrentActive = yrStatus.toUpperCase() == 'ACTIVE' || yr['is_current'] == 1;
+
+                      return InkWell(
+                        onTap: () => _onSelectAcademicYear(yr, ctx),
+                        borderRadius: BorderRadius.circular(14),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: isSelected ? const Color(0xFFFEF3C7).withOpacity(0.4) : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: isSelected ? const Color(0xFFF59E0B) : const Color(0xFFE2E8F0),
+                              width: isSelected ? 1.5 : 1.0,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 38,
+                                height: 38,
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? const Color(0xFFD97706)
+                                      : (isCurrentActive ? const Color(0xFF10B981).withOpacity(0.12) : const Color(0xFFE2E8F0)),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Icon(
+                                  Icons.event_note_rounded,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : (isCurrentActive ? const Color(0xFF059669) : const Color(0xFF64748B)),
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Text(
+                                          yrName,
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w700,
+                                            color: const Color(0xFF0F172A),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        _buildAyStatusBadge(yrStatus),
+                                      ],
+                                    ),
+                                    if (yr['start_date'] != null && yr['end_date'] != null) ...[
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '${yr['start_date']}  to  ${yr['end_date']}',
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: Color(0xFF64748B),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              if (isSelected)
+                                const Icon(
+                                  Icons.check_circle_rounded,
+                                  color: Color(0xFFD97706),
+                                  size: 22,
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _onSelectAcademicYear(dynamic targetYear, BuildContext bottomSheetContext) async {
+    final int nextId = targetYear['id'] is int ? targetYear['id'] as int : int.tryParse(targetYear['id'].toString()) ?? 0;
+    final String nextName = (targetYear['name'] ?? '').toString();
+    final String nextStatus = (targetYear['status'] ?? (targetYear['is_current'] == 1 ? 'ACTIVE' : '')).toString();
+
+    if (nextId == _selectedAcademicYearId) {
+      Navigator.pop(bottomSheetContext);
+      return;
+    }
+
+    final bool isLeavingActive = (_selectedAcademicYearStatus.toUpperCase() == 'ACTIVE') &&
+        (nextStatus.toUpperCase() != 'ACTIVE' && targetYear['is_current'] != 1);
+
+    if (isLeavingActive) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogCtx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(
+            'Switch from active year to $nextName?',
+            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+          ),
+          content: Text(
+            'All dashboards, fees, and student records will show $nextName data until you switch back.\n\n'
+            'Fees deposited for inactive or alumni students will be credited to the active academic year.',
+            style: const TextStyle(fontSize: 13, height: 1.4, color: Color(0xFF334155)),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx, false),
+              child: const Text('Cancel', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600)),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(dialogCtx, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFD97706),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text('Switch Year', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true) return;
+    }
+
+    if (!mounted) return;
+    Navigator.pop(bottomSheetContext);
+    await _handleSwitchAcademicYear(nextId, nextName, nextStatus);
+  }
+
+  Widget _buildAyStatusBadge(String status) {
+    final sUpper = status.toUpperCase();
+    final bool isActive = sUpper == 'ACTIVE';
+    final bool isDraft = sUpper == 'DRAFT';
+    final Color bgColor = isActive
+        ? const Color(0xFFDCFCE7)
+        : (isDraft ? const Color(0xFFFEF3C7) : const Color(0xFFF1F5F9));
+    final Color textColor = isActive
+        ? const Color(0xFF15803D)
+        : (isDraft ? const Color(0xFFB45309) : const Color(0xFF64748B));
+    final Color borderColor = isActive
+        ? const Color(0xFF86EFAC)
+        : (isDraft ? const Color(0xFFFDE68A) : const Color(0xFFCBD5E1));
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: borderColor, width: 0.8),
+      ),
+      child: Text(
+        isActive ? 'Active' : (isDraft ? 'Draft' : 'Archived'),
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          color: textColor,
+          letterSpacing: 0.2,
+        ),
+      ),
+    );
   }
 
   Future<void> _fetchChildrenList() async {
@@ -571,6 +881,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       title: 'Switch Account',
                       subtitle: 'Change active student profile',
                       onTap: _showSwitchStudentDialog,
+                    ),
+                  ],
+                  if (_canSwitchAcademicYear) ...[
+                    const Divider(height: 1, indent: 56),
+                    _buildSettingsTile(
+                      icon: Icons.calendar_month_rounded,
+                      title: 'Switch Academic Year',
+                      subtitle: _selectedAcademicYearName.isNotEmpty
+                          ? '$_selectedAcademicYearName (${_selectedAcademicYearStatus.toUpperCase()})'
+                          : 'Select Academic Session',
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildAyStatusBadge(_selectedAcademicYearStatus),
+                          const SizedBox(width: 6),
+                          const Icon(Icons.chevron_right_rounded, color: Colors.grey),
+                        ],
+                      ),
+                      onTap: _showSwitchAcademicYearSheet,
                     ),
                   ],
                   const Divider(height: 1, indent: 56),

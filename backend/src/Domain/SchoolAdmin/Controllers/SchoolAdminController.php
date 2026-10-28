@@ -1041,6 +1041,7 @@ class SchoolAdminController extends BaseController
             str_contains($uri, '/api/school/staff-payments') ||
             str_contains($uri, '/api/school/stats') ||
             str_contains($uri, '/api/school/expenses') ||
+            str_contains($uri, '/api/school/academic-years') ||
             (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && (str_contains($uri, '/api/school/students') || str_contains($uri, '/api/school/classes') || str_contains($uri, '/api/school/staff')))) {
             if ($userRole === 'SCHOOL_ADMIN' || $this->service->isFeeCollector($user)) {
                 if ($this->service->checkSubscriptionExpired($user)) {
@@ -1132,6 +1133,7 @@ class SchoolAdminController extends BaseController
                     '/api/school/grade-configurations',
                     '/api/school/period-configurations',
                     '/api/school/timetable-settings',
+                    '/api/school/academic-years',
                 ];
                 foreach ($sharedGetPaths as $path) {
                     if (str_contains($uri, $path)) {

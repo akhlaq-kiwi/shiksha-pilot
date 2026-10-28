@@ -100,4 +100,40 @@ class FeeService {
       throw Exception(msg.toString());
     }
   }
+
+  /// Fetch collection history transactions with filters & pagination
+  Future<Map<String, dynamic>> getCollectionHistory({
+    String? period,
+    String? depositBy,
+    String? search,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    final queryParams = <String, String>{
+      'page': page.toString(),
+      'limit': limit.toString(),
+    };
+    if (period != null && period.isNotEmpty && period != 'ALL TIME') {
+      queryParams['period'] = period;
+      queryParams['month'] = period;
+    }
+    if (depositBy != null && depositBy.isNotEmpty && depositBy != 'All Users') {
+      queryParams['deposit_by'] = depositBy;
+    }
+    if (search != null && search.trim().isNotEmpty) {
+      queryParams['search'] = search.trim();
+    }
+
+    final baseUri = Uri.parse('$baseUrl/api/school/collection-history');
+    final uri = baseUri.replace(queryParameters: queryParams);
+    final res = await http.get(uri, headers: _headers);
+    if (res.statusCode == 200) {
+      final decoded = json.decode(res.body);
+      return decoded['data'] ?? decoded;
+    } else {
+      final decoded = json.decode(res.body);
+      throw Exception(decoded['message'] ?? 'Failed to load collection history');
+    }
+  }
 }
+

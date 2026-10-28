@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'dart:convert';
 import 'dart:math';
 import 'package:school_hub/services/fee_service.dart';
+import 'package:school_hub/screens/fees_collection_history_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class FeesPortalScreen extends StatefulWidget {
   final String baseUrl;
@@ -45,6 +47,9 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
   String _selectedStatusFilter = 'ALL'; // 'ALL', 'PENDING', 'PAID'
   String _selectedSort = 'OUTSTANDING_DESC'; // 'OUTSTANDING_DESC', 'OUTSTANDING_ASC', 'NAME_ASC', 'ROLL_ASC'
 
+  String _workingAyName = '';
+  String _workingAyStatus = 'ACTIVE';
+
   static const List<String> _academicMonths = [
     'April', 'May', 'June', 'July', 'August', 'September',
     'October', 'November', 'December', 'January', 'February', 'March'
@@ -71,6 +76,12 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
     });
 
     try {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        _workingAyName = prefs.getString('selected_academic_year_name') ?? '';
+        _workingAyStatus = prefs.getString('selected_academic_year_status') ?? 'ACTIVE';
+      } catch (_) {}
+
       final data = await _feeService.fetchPortalData();
       _rawStudents = List<dynamic>.from(data['students'] ?? []);
       _classes = List<dynamic>.from(data['classes'] ?? []);
@@ -172,7 +183,19 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
       final studentAyId = int.tryParse(s['academic_year_id']?.toString() ?? '') ?? 0;
       final studentClassId = int.tryParse(s['class_id']?.toString() ?? '') ?? 0;
       final configKey = '${studentAyId}_$studentClassId';
-      final monthlyFees = configMap[configKey] ?? {};
+      Map<String, dynamic> monthlyFees = configMap[configKey] ?? {};
+      if (monthlyFees.isEmpty) {
+        final ayFallbackKey = configMap.keys.firstWhere(
+          (k) => k.startsWith('${studentAyId}_'),
+          orElse: () => '',
+        );
+        if (ayFallbackKey.isNotEmpty) {
+          monthlyFees = configMap[ayFallbackKey] ?? {};
+        } else if (configMap.isNotEmpty) {
+          monthlyFees = configMap.values.first;
+        }
+      }
+
 
       double outstandingDues = 0.0;
       for (final m in _academicMonths) {
@@ -460,6 +483,8 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
               ? _buildErrorView()
               : Column(
                   children: [
+                    if (_workingAyStatus.toUpperCase() != 'ACTIVE' && _workingAyName.isNotEmpty)
+                      _buildWorkingAcademicYearBanner(),
                     // Filter and Search Header
                     _buildFilterSection(availableClasses),
                     // Students List
@@ -577,6 +602,78 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
     );
   }
 
+  Widget _buildWorkingAcademicYearBanner() {
+    final isArchived = _workingAyStatus.toUpperCase() == 'ARCHIVED';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: const BoxDecoration(
+        color: Color(0xFFFEF3C7),
+        border: Border(
+          bottom: BorderSide(color: Color(0xFFFDE68A), width: 1),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(5),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF59E0B),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: const Icon(Icons.history_rounded, color: Colors.white, size: 14),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'Session: $_workingAyName',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF92400E),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFDE68A),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        isArchived ? 'ARCHIVED' : _workingAyStatus.toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF78350F),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 1),
+                const Text(
+                  'Inactive & alumni students enabled · Deposits credited to active year',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFFB45309),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   String _formatIndianCurrency(num value) {
     final intVal = value.round();
     final isNegative = intVal < 0;
@@ -625,11 +722,29 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
             ),
           ),
           const SizedBox(width: 8),
-          // 2. Fee collected
+          // 2. Fee collected (Clickable -> Opens FeesCollectionHistoryScreen)
           Expanded(
-            child: _buildSingleStatCard(
-              title: "FEE COLLECTED",
-              amount: _feeCollected,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => FeesCollectionHistoryScreen(
+                        baseUrl: widget.baseUrl,
+                        token: widget.token,
+                      ),
+                    ),
+                  );
+                },
+                child: _buildSingleStatCard(
+                  title: "FEE COLLECTED",
+                  amount: _feeCollected,
+                  isClickable: true,
+                ),
+              ),
             ),
           ),
           const SizedBox(width: 8),
@@ -648,6 +763,7 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
   Widget _buildSingleStatCard({
     required String title,
     required num amount,
+    bool isClickable = false,
   }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 10),
@@ -658,7 +774,10 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
           colors: [Color(0xFFFFFBEB), Color(0xFFFEF5D6)],
         ),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFFCD34D), width: 1),
+        border: Border.all(
+          color: isClickable ? const Color(0xFFF59E0B) : const Color(0xFFFCD34D),
+          width: isClickable ? 1.2 : 1,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.02),
@@ -671,20 +790,34 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              title,
-              maxLines: 1,
-              softWrap: false,
-              style: const TextStyle(
-                fontSize: 9.5,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFFB45309),
-                letterSpacing: 0.1,
+          Row(
+            children: [
+              Expanded(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    softWrap: false,
+                    style: const TextStyle(
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFB45309),
+                      letterSpacing: 0.1,
+                    ),
+                  ),
+                ),
               ),
-            ),
+              if (isClickable) ...[
+                const SizedBox(width: 2),
+                const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 8.5,
+                  color: Color(0xFFB45309),
+                ),
+              ],
+            ],
           ),
           const SizedBox(height: 5),
           FittedBox(
@@ -1097,6 +1230,34 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
                           color: Color(0xFF64748B),
                         ),
                       ),
+                      () {
+                        final rawStatus = (student['raw']?['status'] ?? '').toString();
+                        final isInactive = rawStatus.toLowerCase() == 'inactive';
+                        final isAlumni = rawStatus.toLowerCase() == 'alumni';
+                        if (!isInactive && !isAlumni) return const SizedBox.shrink();
+                        return Padding(
+                          padding: const EdgeInsets.only(left: 6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: isAlumni ? const Color(0xFFF3E8FF) : const Color(0xFFFEE2E2),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: isAlumni ? const Color(0xFFDDD6FE) : const Color(0xFFFECACA),
+                                width: 0.8,
+                              ),
+                            ),
+                            child: Text(
+                              isAlumni ? 'Alumni' : 'Inactive',
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w700,
+                                color: isAlumni ? const Color(0xFF7E22CE) : const Color(0xFFDC2626),
+                              ),
+                            ),
+                          ),
+                        );
+                      }(),
                     ],
                   ),
                   const SizedBox(height: 6),
@@ -1136,36 +1297,87 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
                 ],
               ),
             ),
-            // Action Button: OPEN LEDGER >
-            ElevatedButton(
-              onPressed: () => _openStudentLedger(student),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFEF3C7),
-                foregroundColor: const Color(0xFF92400E),
-                elevation: 0,
-                shape: RoundedRectangleBorder(
+            // Action Button: OPEN LEDGER > (for Active AY, or Inactive/Alumni in Archived AY) vs Fees Migrated
+            () {
+              final isArchivedAY = _workingAyStatus.trim().toUpperCase() == 'ARCHIVED' ||
+                  (student['raw']?['academic_year_status']?.toString().toUpperCase() == 'ARCHIVED');
+              final rawStatus = (student['raw']?['status'] ?? '').toString().trim().toLowerCase();
+              final isInactiveOrAlumni = rawStatus == 'inactive' || rawStatus == 'alumni';
+              final bool feesMigrated = isArchivedAY && !isInactiveOrAlumni;
+
+              if (feesMigrated) {
+                return InkWell(
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          "Fees for ${student['name']} have migrated to the active academic year. Switch to active year to collect fees.",
+                        ),
+                        backgroundColor: const Color(0xFF475569),
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        duration: const Duration(seconds: 3),
+                      ),
+                    );
+                  },
                   borderRadius: BorderRadius.circular(20),
-                  side: const BorderSide(color: Color(0xFFFCD34D), width: 1),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                visualDensity: VisualDensity.compact,
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: const [
-                  Text(
-                    'OPEN LEDGER',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.5,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFFCBD5E1), width: 1),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(Icons.lock_outline_rounded, size: 13, color: Color(0xFF64748B)),
+                        SizedBox(width: 4),
+                        Text(
+                          'Fees Migrated',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF64748B),
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  SizedBox(width: 3),
-                  Icon(Icons.chevron_right_rounded, size: 16),
-                ],
-              ),
-            ),
+                );
+              }
+
+              return ElevatedButton(
+                onPressed: () => _openStudentLedger(student),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFEF3C7),
+                  foregroundColor: const Color(0xFF92400E),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    side: const BorderSide(color: Color(0xFFFCD34D), width: 1),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  visualDensity: VisualDensity.compact,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Text(
+                      'OPEN LEDGER',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    SizedBox(width: 3),
+                    Icon(Icons.chevron_right_rounded, size: 16),
+                  ],
+                ),
+              );
+            }(),
           ],
         ),
       ),
@@ -1176,6 +1388,24 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
   // STUDENT LEDGER MODAL / SHEET
   // ---------------------------------------------------------------------------
   void _openStudentLedger(Map<String, dynamic> studentSummary) {
+    final isArchivedAY = _workingAyStatus.trim().toUpperCase() == 'ARCHIVED' ||
+        (studentSummary['raw']?['academic_year_status']?.toString().toUpperCase() == 'ARCHIVED');
+    final rawStatus = (studentSummary['raw']?['status'] ?? '').toString().trim().toLowerCase();
+    final isInactiveOrAlumni = rawStatus == 'inactive' || rawStatus == 'alumni';
+    if (isArchivedAY && !isInactiveOrAlumni) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            "Fees for ${studentSummary['name']} have migrated to the active academic year. Switch to active year to collect fees.",
+          ),
+          backgroundColor: const Color(0xFF475569),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+      return;
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1843,9 +2073,14 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
                               ),
                       icon: const Icon(Icons.payment_rounded, size: 18),
                       label: Text(
-                        totalTuitionDues > 0 ? 'Deposit Tuition Fees (₹${totalTuitionDues.round()})' : 'Tuition Fees Fully Paid',
+                        totalTuitionDues > 0
+                            ? 'Deposit Tuition Fees (₹${totalTuitionDues.round()})'
+                            : (monthRows.every((m) => (m['fee'] as num) == 0)
+                                ? 'Tuition Fee Not Configured'
+                                : 'Tuition Fees Fully Paid'),
                         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
                       ),
+
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFD97706),
                         foregroundColor: Colors.white,
@@ -1977,11 +2212,27 @@ class _DepositDialogState extends State<_DepositDialog> {
 
   Map<String, dynamic> _monthlyFeeConfig = {};
 
+  String _workingAyName = '';
+  String _workingAyStatus = 'ACTIVE';
+
   @override
   void initState() {
     super.initState();
+    _loadWorkingAy();
     _initMonthlyConfig();
     _autoSelectEarliestUnpaid();
+  }
+
+  Future<void> _loadWorkingAy() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (mounted) {
+        setState(() {
+          _workingAyName = prefs.getString('selected_academic_year_name') ?? '';
+          _workingAyStatus = prefs.getString('selected_academic_year_status') ?? 'ACTIVE';
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -2300,9 +2551,45 @@ class _DepositDialogState extends State<_DepositDialog> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Deposit Fees',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Deposit Fees',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+                      ),
+                      if (_workingAyName.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            Text(
+                              'Session: $_workingAyName',
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF64748B)),
+                            ),
+                            const SizedBox(width: 5),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: _workingAyStatus.toUpperCase() == 'ACTIVE'
+                                    ? const Color(0xFFDCFCE7)
+                                    : const Color(0xFFFEF3C7),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                _workingAyStatus.toUpperCase(),
+                                style: TextStyle(
+                                  fontSize: 8.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: _workingAyStatus.toUpperCase() == 'ACTIVE'
+                                      ? const Color(0xFF16A34A)
+                                      : const Color(0xFFB45309),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
                   ),
                   IconButton(
                     icon: const Icon(Icons.close_rounded, size: 22, color: Color(0xFF64748B)),
@@ -2464,6 +2751,8 @@ class _DepositDialogState extends State<_DepositDialog> {
                         final remAfter = (remaining.round() - numAmt).clamp(0, 999999);
                         final isOver = numAmt > remaining.round();
 
+                        final isInteractive = !isPaid && !(partialMonth != null && m != partialMonth);
+
                         return Container(
                           decoration: BoxDecoration(
                             color: isPaid ? const Color(0xFFF8FAFC) : Colors.white,
@@ -2480,72 +2769,78 @@ class _DepositDialogState extends State<_DepositDialog> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                child: Row(
-                                  children: [
-                                    Checkbox(
-                                      value: isPaid || isChecked,
-                                      activeColor: isPaid ? const Color(0xFF94A3B8) : const Color(0xFF2563EB),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                                      onChanged: isPaid || (partialMonth != null && m != partialMonth)
-                                          ? null
-                                          : (_) => _handleMonthToggle(m),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Expanded(
-                                      child: Row(
-                                        children: [
-                                          Text(
-                                            m.toUpperCase(),
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w800,
-                                              color: isPaid ? const Color(0xFF94A3B8) : const Color(0xFF0F172A),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            '(₹${totalFee.round()})',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w600,
-                                              color: isPaid ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                                            ),
-                                          ),
-                                        ],
+                              InkWell(
+                                onTap: isInteractive ? () => _handleMonthToggle(m) : null,
+                                borderRadius: BorderRadius.circular(12),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                  child: Row(
+                                    children: [
+                                      IgnorePointer(
+                                        child: Checkbox(
+                                          value: isPaid || isChecked,
+                                          activeColor: isPaid ? const Color(0xFF94A3B8) : const Color(0xFF2563EB),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                                          onChanged: isInteractive
+                                              ? (_) => _handleMonthToggle(m)
+                                              : null,
+                                        ),
                                       ),
-                                    ),
-                                    if (isPaid)
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFDCFCE7),
-                                          borderRadius: BorderRadius.circular(8),
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: Row(
+                                          children: [
+                                            Text(
+                                              m.toUpperCase(),
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w800,
+                                                color: isPaid ? const Color(0xFF94A3B8) : const Color(0xFF0F172A),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              '(₹${totalFee.round()})',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                                color: isPaid ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                        child: const Text(
-                                          'PAID',
-                                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF16A34A)),
-                                        ),
-                                      )
-                                    else if (isPartial)
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFFEF3C7),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: const Text(
-                                          'Partially Paid',
-                                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFFB45309)),
-                                        ),
-                                      )
-                                    else
-                                      const Text(
-                                        'Pending',
-                                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF64748B)),
                                       ),
-                                  ],
+                                      if (isPaid)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFDCFCE7),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: const Text(
+                                            'PAID',
+                                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF16A34A)),
+                                          ),
+                                        )
+                                      else if (isPartial)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFFEF3C7),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: const Text(
+                                            'Partially Paid',
+                                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFFB45309)),
+                                          ),
+                                        )
+                                      else
+                                        const Text(
+                                          'Pending',
+                                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF64748B)),
+                                        ),
+                                    ],
+                                  ),
                                 ),
                               ),
 
@@ -3219,16 +3514,21 @@ class _AdditionalDepositModalState extends State<_AdditionalDepositModal> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                child: Row(
-                                  children: [
-                                    Checkbox(
-                                      value: isChecked,
-                                      activeColor: const Color(0xFF2563EB),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                                      onChanged: isDisabled ? null : (_) => _handleToggle(feeId),
-                                    ),
+                              InkWell(
+                                onTap: isDisabled ? null : () => _handleToggle(feeId),
+                                borderRadius: BorderRadius.circular(12),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                  child: Row(
+                                    children: [
+                                      IgnorePointer(
+                                        child: Checkbox(
+                                          value: isChecked,
+                                          activeColor: const Color(0xFF2563EB),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                                          onChanged: isDisabled ? null : (_) => _handleToggle(feeId),
+                                        ),
+                                      ),
                                     const SizedBox(width: 4),
                                     Expanded(
                                       child: Column(
@@ -3268,6 +3568,7 @@ class _AdditionalDepositModalState extends State<_AdditionalDepositModal> {
                                   ],
                                 ),
                               ),
+                            ),
 
                               // EXPANDED PARTIAL AMOUNT BOX
                               if (shouldExpand) ...[

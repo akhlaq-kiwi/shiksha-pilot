@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:school_hub/services/staff_salary_service.dart';
 
 class TeacherProfileSalaryScreen extends StatefulWidget {
@@ -8,6 +9,7 @@ class TeacherProfileSalaryScreen extends StatefulWidget {
   final String? initialTeacherName;
   final String? academicYearName;
   final String? academicYearStartDate;
+  final bool? isArchivedYear;
 
   const TeacherProfileSalaryScreen({
     super.key,
@@ -17,6 +19,7 @@ class TeacherProfileSalaryScreen extends StatefulWidget {
     this.initialTeacherName,
     this.academicYearName,
     this.academicYearStartDate,
+    this.isArchivedYear,
   });
 
   @override
@@ -30,6 +33,7 @@ class _TeacherProfileSalaryScreenState extends State<TeacherProfileSalaryScreen>
   Map<String, dynamic>? _teacher;
   String _academicYearName = '2026–2027';
   String? _academicYearStartDate;
+  bool _isArchivedYear = false;
 
   bool _isActionLoading = false;
   String _actionError = '';
@@ -47,6 +51,9 @@ class _TeacherProfileSalaryScreenState extends State<TeacherProfileSalaryScreen>
       _academicYearName = widget.academicYearName!;
     }
     _academicYearStartDate = widget.academicYearStartDate;
+    if (widget.isArchivedYear != null) {
+      _isArchivedYear = widget.isArchivedYear!;
+    }
     _loadTeacherDetails();
   }
 
@@ -58,19 +65,50 @@ class _TeacherProfileSalaryScreenState extends State<TeacherProfileSalaryScreen>
     });
 
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedAyName = prefs.getString('selected_academic_year_name');
+      final savedAyId = prefs.get('selected_academic_year_id');
+
       if (_academicYearStartDate == null || _academicYearStartDate!.isEmpty) {
         final years = await _salaryService.getAcademicYears();
-        final current = years.firstWhere(
-          (y) => y['is_current'] == 1 || y['is_current'] == true || y['is_current'] == '1',
-          orElse: () => years.isNotEmpty ? years.first : {},
-        );
-        if (current.isNotEmpty) {
-          _academicYearName = current['name']?.toString() ?? _academicYearName;
-          _academicYearStartDate = current['start_date']?.toString();
+        Map<String, dynamic> selectedYear = {};
+        if (savedAyId != null) {
+          selectedYear = years.firstWhere(
+            (y) => y['id']?.toString() == savedAyId.toString(),
+            orElse: () => {},
+          );
+        }
+        if (selectedYear.isEmpty && savedAyName != null && savedAyName.isNotEmpty) {
+          selectedYear = years.firstWhere(
+            (y) => y['name']?.toString() == savedAyName,
+            orElse: () => {},
+          );
+        }
+        if (selectedYear.isEmpty) {
+          selectedYear = years.firstWhere(
+            (y) => y['is_current'] == 1 || y['is_current'] == true || y['is_current'] == '1',
+            orElse: () => years.isNotEmpty ? years.first : {},
+          );
+        }
+        if (selectedYear.isNotEmpty) {
+          _academicYearName = selectedYear['name']?.toString() ?? _academicYearName;
+          _academicYearStartDate = selectedYear['start_date']?.toString();
         }
       }
 
       final data = await _salaryService.getStaffDetails(widget.staffId);
+      if (data['academic_year_name'] != null && data['academic_year_name'].toString().isNotEmpty) {
+        _academicYearName = data['academic_year_name'].toString();
+      }
+      if (data['academic_year_start_date'] != null && data['academic_year_start_date'].toString().isNotEmpty) {
+        _academicYearStartDate = data['academic_year_start_date'].toString();
+      }
+      if (data['academic_year_status']?.toString().toLowerCase() == 'archived' ||
+          data['is_current_academic_year'] == 0 ||
+          data['is_current_academic_year'] == false) {
+        _isArchivedYear = true;
+      }
+
       if (mounted) {
         setState(() {
           _teacher = data;
@@ -117,6 +155,17 @@ class _TeacherProfileSalaryScreenState extends State<TeacherProfileSalaryScreen>
   }
 
   void _showDisburseDialog(String month, double amount, bool isProrated) {
+    final isMigrated = _teacher?['is_migrated'] == true || _teacher?['is_migrated'] == 1 || _teacher?['is_migrated'] == '1';
+    if (_isArchivedYear && isMigrated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Salary for migrated teachers cannot be disbursed in an archived academic year. Switch to active year.'),
+          backgroundColor: Color(0xFF475569),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
     _actionError = '';
     _isActionLoading = false;
     showDialog(
@@ -326,7 +375,7 @@ class _TeacherProfileSalaryScreenState extends State<TeacherProfileSalaryScreen>
                       const SizedBox(height: 8),
                       _buildDialogRow('Academic Year:', prevAY, isBold: true),
                       const SizedBox(height: 8),
-                      _buildDialogRow('Pending Months:', months.join(', '), isBold: true),
+                      _buildDialogRow(months.length == 1 ? 'Pending Month:' : 'Pending Months:', months.join(', '), isBold: true),
                       const SizedBox(height: 8),
                       _buildDialogRow(
                         'Total Payable:',
@@ -360,9 +409,14 @@ class _TeacherProfileSalaryScreenState extends State<TeacherProfileSalaryScreen>
                           _actionError = '';
                         });
                         try {
+                          final prevPending = _teacher?['previous_year_pending'];
+                          final prevAyId = prevPending != null && prevPending['academic_year_id'] != null
+                              ? int.tryParse(prevPending['academic_year_id'].toString())
+                              : null;
                           await _salaryService.disbursePreviousYearStaffSalary(
                             staffId: widget.staffId,
                             months: months,
+                            academicYearId: prevAyId,
                           );
                           if (dialogCtx.mounted) {
                             Navigator.pop(dialogCtx);
@@ -508,10 +562,10 @@ class _TeacherProfileSalaryScreenState extends State<TeacherProfileSalaryScreen>
 
                             const SizedBox(height: 16),
 
-                            // 2. Salary Card Section (Academic Year)
+                            // 2. Active Year Salary Card Section (Top)
                             _buildSalaryCardSection(t),
 
-                            // 4. Previous Year Salary Card Section (if pending)
+                            // 3. Previous Year Salary Card Section (if pending, below/niche)
                             if (t['previous_year_pending'] != null) ...[
                               const SizedBox(height: 16),
                               _buildPreviousYearSalaryCardSection(t),
@@ -651,6 +705,7 @@ class _TeacherProfileSalaryScreenState extends State<TeacherProfileSalaryScreen>
     final salaryPayments = (t['salary_payments'] as List?) ?? [];
     final defaultSalary = double.tryParse((t['salary'] ?? 0).toString()) ?? 0.0;
     final staffId = widget.staffId;
+    final bool isMigrated = t['is_migrated'] == true || t['is_migrated'] == 1 || t['is_migrated'] == '1';
 
     return Container(
       decoration: BoxDecoration(
@@ -677,7 +732,7 @@ class _TeacherProfileSalaryScreenState extends State<TeacherProfileSalaryScreen>
                   ),
                 ),
                 Text(
-                  'Academic Year: $_academicYearName',
+                  'Academic Year: ${_teacher?['academic_year_name'] ?? _academicYearName}',
                   style: const TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
@@ -765,11 +820,13 @@ class _TeacherProfileSalaryScreenState extends State<TeacherProfileSalaryScreen>
                                       Text(
                                         isPaid
                                             ? (isProrated ? 'PAID (PRORATED)' : 'PAID')
-                                            : (isProrated ? 'PENDING (PRORATED)' : 'PENDING'),
+                                            : ((_isArchivedYear && isMigrated) ? 'SALARY MIGRATED' : (isProrated ? 'PENDING (PRORATED)' : 'PENDING')),
                                         style: TextStyle(
                                           fontSize: 10,
                                           fontWeight: FontWeight.bold,
-                                          color: isPaid ? const Color(0xFF16A34A) : const Color(0xFFD97706),
+                                          color: isPaid
+                                              ? const Color(0xFF16A34A)
+                                              : ((_isArchivedYear && isMigrated) ? const Color(0xFF64748B) : const Color(0xFFD97706)),
                                           letterSpacing: 0.4,
                                         ),
                                       ),
@@ -788,7 +845,7 @@ class _TeacherProfileSalaryScreenState extends State<TeacherProfileSalaryScreen>
                               ),
                             ),
 
-                            // Right Action Button (Disburse or Paid badge)
+                            // Right Action Button (Disburse or Paid badge or Salary Migrated)
                             if (isPaid)
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -806,6 +863,30 @@ class _TeacherProfileSalaryScreenState extends State<TeacherProfileSalaryScreen>
                                       'Paid',
                                       style: TextStyle(
                                         color: Color(0xFF16A34A),
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            else if (_isArchivedYear && isMigrated)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: const Color(0xFFCBD5E1)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: const [
+                                    Icon(Icons.lock_outline_rounded, color: Color(0xFF64748B), size: 14),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'Salary Migrated',
+                                      style: TextStyle(
+                                        color: Color(0xFF64748B),
                                         fontWeight: FontWeight.bold,
                                         fontSize: 12,
                                       ),
@@ -844,9 +925,14 @@ class _TeacherProfileSalaryScreenState extends State<TeacherProfileSalaryScreen>
     if (prevPending == null) return const SizedBox.shrink();
 
     final prevAYName = prevPending['academic_year_name']?.toString() ?? 'Previous Year';
+    final List<dynamic> validMonthsRaw = prevPending['valid_months'] ?? [];
+    final List<String> validMonths = validMonthsRaw.map((e) => e.toString()).toList();
     final List<dynamic> pendingMonthsRaw = prevPending['pending_months'] ?? [];
     final List<String> pendingMonths = pendingMonthsRaw.map((e) => e.toString()).toList();
+    if (validMonths.isEmpty && pendingMonths.isEmpty) return const SizedBox.shrink();
+
     final defaultSalary = double.tryParse((prevPending['salary'] ?? 0).toString()) ?? 0.0;
+    final List<String> monthsToDisplay = validMonths.isNotEmpty ? validMonths : pendingMonths;
 
     double totalPrevPayable = 0.0;
     for (final m in pendingMonths) {
@@ -856,6 +942,8 @@ class _TeacherProfileSalaryScreenState extends State<TeacherProfileSalaryScreen>
         totalPrevPayable += defaultSalary;
       }
     }
+
+    final isAllPaid = pendingMonths.isEmpty;
 
     return Container(
       decoration: BoxDecoration(
@@ -913,41 +1001,126 @@ class _TeacherProfileSalaryScreenState extends State<TeacherProfileSalaryScreen>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${pendingMonths.length} Pending Month${pendingMonths.length > 1 ? 's' : ''}',
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          pendingMonths.join(', '),
-                          style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-                        ),
-                      ],
+                    Text(
+                      isAllPaid
+                          ? 'All Months Settled'
+                          : '${pendingMonths.length} Pending Month${pendingMonths.length > 1 ? 's' : ''}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: isAllPaid ? const Color(0xFF16A34A) : const Color(0xFF1E293B),
+                      ),
                     ),
                     Text(
-                      '₹${totalPrevPayable.round().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFFD97706)),
+                      isAllPaid
+                          ? 'Fully Disbursed'
+                          : 'Total: ₹${totalPrevPayable.round().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: isAllPaid ? const Color(0xFF16A34A) : const Color(0xFFD97706),
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD97706),
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      padding: const EdgeInsets.symmetric(vertical: 11),
+                // Month cards (showing Paid or Disburse button)
+                ...monthsToDisplay.map((m) {
+                  final isPending = pendingMonths.contains(m);
+                  final isPaid = !isPending;
+                  final monthSalary = (prevPending['monthly_salaries'] != null && prevPending['monthly_salaries'][m] != null)
+                      ? (double.tryParse(prevPending['monthly_salaries'][m].toString()) ?? defaultSalary)
+                      : defaultSalary;
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: isPaid ? const Color(0xFFF8FAFC) : Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: isPaid ? const Color(0xFFE2E8F0) : const Color(0xFFFED7AA),
+                      ),
                     ),
-                    onPressed: () => _showPrevYearDisburseDialog(pendingMonths, totalPrevPayable),
-                    child: const Text('Disburse All Previous Year Dues', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ),
-                ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                m,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                isPaid ? 'PAID' : 'PENDING',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: isPaid ? const Color(0xFF16A34A) : const Color(0xFFD97706),
+                                  letterSpacing: 0.4,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                '₹${monthSalary.round().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (match) => '${match[1]},')}',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (isPaid)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDCFCE7),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFFBBF7D0)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: const [
+                                Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 14),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Paid',
+                                  style: TextStyle(
+                                    color: Color(0xFF16A34A),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFD97706),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                            ),
+                            onPressed: () => _showPrevYearDisburseDialog([m], monthSalary),
+                            child: const Text(
+                              'Disburse',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                }),
               ],
             ),
           ),

@@ -191,30 +191,38 @@ class TeacherService extends BaseService
         return $finalSchedule;
     }
 
-    public function getMyClasses(int $teacherId, int $schoolId, bool $onlyAssigned = false): array
+    public function getMyClasses(int $teacherId, int $schoolId, bool $onlyAssigned = false, array $user = []): array
     {
+        $pdo = $this->teacherRepo->getPdo();
+        $userPayload = !empty($user) ? $user : ['id' => $teacherId, 'school_id' => $schoolId];
+
         if ($onlyAssigned) {
-            $pdo = $this->teacherRepo->getPdo();
-            $assigned = $this->getTeacherAssignedClasses($pdo, ['id' => $teacherId, 'school_id' => $schoolId]);
+            $assigned = $this->getTeacherAssignedClasses($pdo, $userPayload);
             if (!empty($assigned)) {
                 return $assigned;
             }
-            // Fallback for Principal or teachers without explicit assignment: return active classes in school
-            $stmt = $pdo->prepare("
-                SELECT c.id, c.name, c.section, c.academic_year_id 
-                FROM classes c 
-                JOIN academic_years ay ON c.academic_year_id = ay.id 
-                WHERE c.school_id = :sid 
-                  AND (ay.is_current = 1 OR ay.status = 'ACTIVE')
-                ORDER BY c.name ASC, c.section ASC
-            ");
-            $stmt->execute([':sid' => $schoolId]);
-            return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+            $role = strtoupper((string)($userPayload['role'] ?? ''));
+            // Only Principal, School Admin, or Admin can fall back to all active classes if not explicitly assigned
+            if (in_array($role, ['PRINCIPAL', 'SCHOOL_ADMIN', 'ADMIN'], true) || $this->isPrincipal($pdo, $userPayload)) {
+                $stmt = $pdo->prepare("
+                    SELECT c.id, c.name, c.section, c.academic_year_id 
+                    FROM classes c 
+                    JOIN academic_years ay ON c.academic_year_id = ay.id 
+                    WHERE c.school_id = :sid 
+                      AND (ay.is_current = 1 OR ay.status = 'ACTIVE')
+                    ORDER BY c.name ASC, c.section ASC
+                ");
+                $stmt->execute([':sid' => $schoolId]);
+                return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            }
+
+            // Regular teacher with no assigned class: return empty list!
+            return [];
         }
 
         $res = $this->teacherRepo->getClasses($teacherId, $schoolId);
         if (empty($res)) {
-            $pdo = $this->teacherRepo->getPdo();
             $stmt = $pdo->prepare("
                 SELECT c.*, ay.name AS academic_year_name 
                 FROM classes c 
@@ -229,15 +237,71 @@ class TeacherService extends BaseService
         return $res;
     }
 
+    private function isPrincipal(\PDO $pdo, array $user): bool
+    {
+        $role = strtoupper((string)($user['role'] ?? ''));
+        if ($role === 'PRINCIPAL' || $role === 'SCHOOL_ADMIN' || $role === 'ADMIN') {
+            return true;
+        }
+        if (!empty($user['is_principal'])) {
+            return true;
+        }
+        $schoolId = (int)($user['school_id'] ?? 0);
+        $userId = (int)($user['id'] ?? 0);
+        if ($schoolId <= 0 || $userId <= 0) {
+            return false;
+        }
+        $phone = trim((string)($user['phone'] ?? ''));
+        if ($phone === '') {
+            $stmt = $pdo->prepare("SELECT phone FROM users WHERE id = :id LIMIT 1");
+            $stmt->execute([':id' => $userId]);
+            $phone = (string)$stmt->fetchColumn();
+        }
+        if ($phone === '') {
+            return false;
+        }
+        $stmtStaff = $pdo->prepare("
+            SELECT is_principal, role 
+            FROM staff 
+            WHERE school_id = :sid AND phone = :phone AND status = 'ACTIVE' 
+            ORDER BY id DESC 
+            LIMIT 1
+        ");
+        $stmtStaff->execute([':sid' => $schoolId, ':phone' => $phone]);
+        $staff = $stmtStaff->fetch(\PDO::FETCH_ASSOC);
+        if ($staff) {
+            if (!empty($staff['is_principal']) || strtoupper((string)$staff['role']) === 'PRINCIPAL') {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private function validateClassTeacherAssignment(\PDO $pdo, array $user, int $classId): void
     {
         $schoolId = (int)$user['school_id'];
         
-        $stmtUser = $pdo->prepare("SELECT phone, role FROM users WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtUser = $pdo->prepare("SELECT id, phone, email, role FROM users WHERE id = :id AND school_id = :sid LIMIT 1");
         $stmtUser->execute([':id' => $user['id'], ':sid' => $schoolId]);
-        $userObj = $stmtUser->fetch();
-        if (!$userObj || (!in_array($userObj['role'], ['TEACHER', 'PRINCIPAL', 'SCHOOL_ADMIN', 'ADMIN']))) {
+        $userObj = $stmtUser->fetch(\PDO::FETCH_ASSOC);
+        if (!$userObj || (!in_array($userObj['role'], ['TEACHER', 'PRINCIPAL', 'SCHOOL_ADMIN', 'ADMIN'], true))) {
             throw new \App\Shared\Exceptions\ForbiddenException("Access denied.");
+        }
+
+        $mergedUser = array_merge($user, $userObj);
+        $role = strtoupper((string)($mergedUser['role'] ?? 'TEACHER'));
+
+        // Principal, School Admin, and Admin can access and mark attendance for any class
+        if (in_array($role, ['PRINCIPAL', 'SCHOOL_ADMIN', 'ADMIN'], true) || $this->isPrincipal($pdo, $mergedUser)) {
+            return;
+        }
+
+        // Regular teacher: must be assigned to this class
+        $assigned = $this->getTeacherAssignedClasses($pdo, $mergedUser);
+        $assignedClassIds = array_map(function($c) { return (int)$c['id']; }, $assigned);
+
+        if (!in_array($classId, $assignedClassIds, true)) {
+            throw new \App\Shared\Exceptions\ForbiddenException("You are not assigned as the class teacher for this class.");
         }
     }
 
@@ -263,12 +327,14 @@ class TeacherService extends BaseService
             ];
         }
 
-        // 2. Resolve all classes assigned to this class teacher
+        // 2. Resolve all classes assigned to this class teacher in the active academic year
         $stmtClass = $pdo->prepare("
             SELECT c.id, c.name, c.section, c.academic_year_id
             FROM class_teacher_assignments cta
             JOIN classes c ON cta.class_id = c.id
+            JOIN academic_years ay ON c.academic_year_id = ay.id
             WHERE cta.teacher_id = :tid AND cta.school_id = :sid
+              AND (ay.status = 'ACTIVE' OR ay.is_current = 1)
             ORDER BY c.name ASC, c.section ASC
         ");
         $stmtClass->execute([':tid' => $staffId, ':sid' => $schoolId]);
@@ -1018,13 +1084,21 @@ class TeacherService extends BaseService
                   AND staff_id IN ({$inStaffIds}) 
                   AND (
                       (academic_year_id = :prev_ayid AND payment_month NOT LIKE 'Previous Year - %')
-                      " . ($nextAyId > 0 ? "OR (academic_year_id = :next_ayid AND payment_month LIKE 'Previous Year - %')" : "") . "
+                      OR (
+                          academic_year_id IN (
+                              SELECT id FROM academic_years 
+                              WHERE school_id = :sid_ay AND start_date > :prev_start_date
+                          )
+                          AND payment_month LIKE 'Previous Year - %'
+                      )
                   )
             ");
-            $paramsOldPaid = [':sid' => $schoolId, ':prev_ayid' => $prevYearId];
-            if ($nextAyId > 0) {
-                $paramsOldPaid[':next_ayid'] = $nextAyId;
-            }
+            $paramsOldPaid = [
+                ':sid' => $schoolId,
+                ':prev_ayid' => $prevYearId,
+                ':sid_ay' => $schoolId,
+                ':prev_start_date' => $prevYear['start_date']
+            ];
             $stmtOldPaid->execute($paramsOldPaid);
             $oldPaidRecords = $stmtOldPaid->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
@@ -1643,71 +1717,17 @@ class TeacherService extends BaseService
         ");
         $stmtAssign->execute([':sid' => $schoolId]);
         $activeClasses = $stmtAssign->fetchAll(PDO::FETCH_ASSOC) ?: [];
-        if (!empty($activeClasses)) {
-            return $activeClasses;
-        }
-
-        // 2. Auto-heal: If teacher has assignments in older academic year classes, resolve corresponding class in active academic year
-        if ($activeAyId > 0) {
-            $stmtOlder = $pdo->prepare("
-                SELECT DISTINCT cta.teacher_id, c.name, c.section
-                FROM class_teacher_assignments cta
-                JOIN classes c ON cta.class_id = c.id
-                WHERE cta.school_id = :sid AND cta.teacher_id IN ({$inClause})
-            ");
-            $stmtOlder->execute([':sid' => $schoolId]);
-            $olderAssignments = $stmtOlder->fetchAll(PDO::FETCH_ASSOC) ?: [];
-
-            if (!empty($olderAssignments)) {
-                $stmtFindActive = $pdo->prepare("
-                    SELECT id, name, section, academic_year_id
-                    FROM classes
-                    WHERE school_id = :sid AND academic_year_id = :ayid
-                      AND LOWER(name) = LOWER(:name)
-                      AND (section = :sec OR (section IS NULL AND :sec_null = 1))
-                    LIMIT 1
-                ");
-                $stmtInsCta = $pdo->prepare("
-                    INSERT INTO class_teacher_assignments (school_id, class_id, teacher_id)
-                    VALUES (:sid, :cid, :tid)
-                    ON DUPLICATE KEY UPDATE teacher_id = VALUES(teacher_id)
-                ");
-
-                $resolvedClasses = [];
-                foreach ($olderAssignments as $oa) {
-                    $cName = trim((string)$oa['name']);
-                    $cSec = $oa['section'];
-                    $stmtFindActive->execute([
-                        ':sid' => $schoolId,
-                        ':ayid' => $activeAyId,
-                        ':name' => $cName,
-                        ':sec' => $cSec,
-                        ':sec_null' => ($cSec === null || $cSec === '') ? 1 : 0
-                    ]);
-                    $activeClassRow = $stmtFindActive->fetch(PDO::FETCH_ASSOC);
-                    if ($activeClassRow) {
-                        $cid = (int)$activeClassRow['id'];
-                        $tid = (int)$oa['teacher_id'];
-                        try {
-                            $stmtInsCta->execute([':sid' => $schoolId, ':cid' => $cid, ':tid' => $tid]);
-                        } catch (\Throwable $t) {}
-
-                        $resolvedClasses[$cid] = $activeClassRow;
-                    }
-                }
-                if (!empty($resolvedClasses)) {
-                    return array_values($resolvedClasses);
-                }
-            }
-        }
-
-        return [];
+        return $activeClasses;
     }
 
     private function getTeacherClassId(PDO $pdo, array $user, ?int $requestAyId = null, ?int $passedClassId = null): ?int
     {
         $assigned = $this->getTeacherAssignedClasses($pdo, $user);
-        if (empty($assigned)) {
+        $role = strtoupper((string)($user['role'] ?? ''));
+        $isPrincipalOrAdmin = in_array($role, ['PRINCIPAL', 'SCHOOL_ADMIN', 'ADMIN'], true) || $this->isPrincipal($pdo, $user);
+
+        // Only principal or school admin can fall back to all school classes if not assigned
+        if (empty($assigned) && $isPrincipalOrAdmin) {
             $stmt = $pdo->prepare("
                 SELECT c.id, c.name, c.section, c.academic_year_id 
                 FROM classes c 
@@ -1721,16 +1741,16 @@ class TeacherService extends BaseService
         }
 
         if (empty($assigned)) {
-            return ($passedClassId !== null && $passedClassId > 0) ? (int)$passedClassId : null;
+            return ($passedClassId !== null && $passedClassId > 0 && $isPrincipalOrAdmin) ? (int)$passedClassId : null;
         }
 
         $assignedIds = array_map(function($c) { return (int)$c['id']; }, $assigned);
 
         if ($passedClassId !== null && $passedClassId > 0) {
-            if (in_array((int)$passedClassId, $assignedIds, true)) {
+            if (in_array((int)$passedClassId, $assignedIds, true) || $isPrincipalOrAdmin) {
                 return (int)$passedClassId;
             }
-            return (int)$passedClassId;
+            return null;
         }
 
         return (int)$assigned[0]['id'];
@@ -2009,7 +2029,9 @@ class TeacherService extends BaseService
                     SELECT c.id, c.name, c.section
                     FROM class_teacher_assignments cta
                     JOIN classes c ON cta.class_id = c.id
+                    JOIN academic_years ay ON c.academic_year_id = ay.id
                     WHERE cta.teacher_id = :tid AND cta.school_id = :sid
+                      AND (ay.status = 'ACTIVE' OR ay.is_current = 1)
                     ORDER BY c.name ASC, c.section ASC
                 ");
                 $stmtClassAssignments->execute([':tid' => $staffId, ':sid' => $schoolId]);

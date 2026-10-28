@@ -31,14 +31,14 @@ String resolveBaseUrlFrom(SharedPreferences prefs) {
   if (const bool.hasEnvironment('BASE_URL')) {
     return kEnvBaseUrl;
   }
-  final saved = prefs.getString(kBaseUrlPrefKey);
-  if (saved != null && saved.isNotEmpty && saved != kProductionBaseUrl && saved != kQaBaseUrl) {
-    if (saved.contains('10.') && !saved.contains('10.22.6.71')) {
-      return kUsbBaseUrl;
-    }
-    return saved;
-  }
   if (kDebugMode) {
+    final saved = prefs.getString(kBaseUrlPrefKey);
+    if (saved != null && saved.isNotEmpty && saved != kProductionBaseUrl && saved != kQaBaseUrl) {
+      if (saved.contains('10.') && !saved.contains('10.22.6.71')) {
+        return kUsbBaseUrl;
+      }
+      return saved;
+    }
     return kUsbBaseUrl;
   }
   return kEnvBaseUrl;

@@ -28,9 +28,6 @@ class _ClassTeacherAssignmentScreenState extends State<ClassTeacherAssignmentScr
   final Map<int, int?> _localAssignments = {};
   int? _savingClassId;
 
-  final TextEditingController _searchController = TextEditingController();
-  String _searchQuery = '';
-
   @override
   void initState() {
     super.initState();
@@ -38,18 +35,12 @@ class _ClassTeacherAssignmentScreenState extends State<ClassTeacherAssignmentScr
       baseUrl: widget.baseUrl,
       token: widget.token,
     );
-    _searchController.addListener(() {
-      setState(() {
-        _searchQuery = _searchController.text.trim().toLowerCase();
-      });
-    });
     _loadData();
   }
 
   @override
   void dispose() {
     _bannerTimer?.cancel();
-    _searchController.dispose();
     super.dispose();
   }
 
@@ -655,23 +646,6 @@ class _ClassTeacherAssignmentScreenState extends State<ClassTeacherAssignmentScr
 
   @override
   Widget build(BuildContext context) {
-    // Filter classes by search query
-    final filteredClasses = _classes.where((c) {
-      if (_searchQuery.isEmpty) return true;
-      final label = _formatClassLabel(c).toLowerCase();
-      final name = (c['name']?.toString() ?? '').toLowerCase();
-      final assignedId = _localAssignments[c['id']];
-      String assignedName = '';
-      if (assignedId != null) {
-        final t = _teachers.firstWhere(
-          (item) => (item['id'] is int ? item['id'] : int.parse(item['id'].toString())) == assignedId,
-          orElse: () => {},
-        );
-        assignedName = (t['name']?.toString() ?? '').toLowerCase();
-      }
-      return label.contains(_searchQuery) || name.contains(_searchQuery) || assignedName.contains(_searchQuery);
-    }).toList();
-
     final totalClasses = _classes.length;
     final assignedCount = _localAssignments.values.where((id) => id != null).length;
 
@@ -776,71 +750,35 @@ class _ClassTeacherAssignmentScreenState extends State<ClassTeacherAssignmentScr
                       ),
                     ],
 
-                    // Search & Summary Card
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: Column(
-                        children: [
-                          // Search Box
-                          Container(
-                            height: 42,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF8FAFC),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: const Color(0xFFE2E8F0)),
-                            ),
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.search_rounded, size: 20, color: Color(0xFF94A3B8)),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: TextField(
-                                    controller: _searchController,
-                                    style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
-                                    decoration: const InputDecoration(
-                                      hintText: 'Search class or assigned teacher...',
-                                      hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                                      border: InputBorder.none,
-                                      isDense: true,
-                                      contentPadding: EdgeInsets.zero,
-                                    ),
-                                  ),
-                                ),
-                                if (_searchQuery.isNotEmpty)
-                                  GestureDetector(
-                                    onTap: () => _searchController.clear(),
-                                    child: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF94A3B8)),
-                                  ),
-                              ],
-                            ),
+                    // 3 Rectangular Cards with Curved Corners & Identical Color (Requirements 3 & 4)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildSummaryCard(
+                            title: 'TOTAL',
+                            value: '$totalClasses Classes',
                           ),
-
-                          const SizedBox(height: 10),
-
-                          // Summary stats (Center-aligned with equal gap)
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              _buildStatBadge('TOTAL', '$totalClasses Classes', const Color(0xFFF1F5F9), const Color(0xFF475569)),
-                              const SizedBox(width: 8),
-                              _buildStatBadge('ASSIGNED', '$assignedCount', const Color(0xFFF0FDF4), const Color(0xFF16A34A)),
-                              const SizedBox(width: 8),
-                              _buildStatBadge('UNASSIGNED', '${totalClasses - assignedCount}', const Color(0xFFFFFBEB), const Color(0xFFD97706)),
-                            ],
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildSummaryCard(
+                            title: 'ASSIGNED',
+                            value: '$assignedCount',
                           ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildSummaryCard(
+                            title: 'UNASSIGNED',
+                            value: '${totalClasses - assignedCount}',
+                          ),
+                        ),
+                      ],
                     ),
 
                     const SizedBox(height: 16),
 
-                    // Main Table Card matching web admin portal
+                    // Main Table Card
                     Container(
                       decoration: BoxDecoration(
                         color: Colors.white,
@@ -857,43 +795,12 @@ class _ClassTeacherAssignmentScreenState extends State<ClassTeacherAssignmentScr
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Card Header matching screenshot
+                          // Table Column Headers (Top rounded corners match card)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFFAFAFA),
-                              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                              border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: const [
-                                Text(
-                                  'Class Teacher Assignment',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF0F172A),
-                                    letterSpacing: -0.2,
-                                  ),
-                                ),
-                                SizedBox(height: 3),
-                                Text(
-                                  'Assign primary class teachers to active classrooms.',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Color(0xFF64748B),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          // Table Column Headers matching screenshot
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                             decoration: const BoxDecoration(
                               color: Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
                               border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
                             ),
                             child: Row(
@@ -925,16 +832,14 @@ class _ClassTeacherAssignmentScreenState extends State<ClassTeacherAssignmentScr
                             ),
                           ),
 
-                          // Class Rows matching screenshot
-                          if (filteredClasses.isEmpty)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 36),
+                          // Class Rows
+                          if (_classes.isEmpty)
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 36),
                               child: Center(
                                 child: Text(
-                                  _classes.isEmpty
-                                      ? 'No classes found in active academic year.'
-                                      : 'No classes matching "$_searchQuery"',
-                                  style: const TextStyle(
+                                  'No classes found in active academic year.',
+                                  style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,
                                     color: Color(0xFF94A3B8),
@@ -946,14 +851,14 @@ class _ClassTeacherAssignmentScreenState extends State<ClassTeacherAssignmentScr
                             ListView.separated(
                               shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),
-                              itemCount: filteredClasses.length,
+                              itemCount: _classes.length,
                               separatorBuilder: (_, __) => const Divider(
                                 height: 1,
                                 thickness: 1,
                                 color: Color(0xFFF1F5F9),
                               ),
                               itemBuilder: (ctx, index) {
-                                final c = filteredClasses[index];
+                                final c = _classes[index];
                                 final cid = c['id'] is int ? c['id'] as int : int.parse(c['id'].toString());
                                 final classLabel = _formatClassLabel(c);
                                 final assignedId = _localAssignments[cid];
@@ -1064,30 +969,45 @@ class _ClassTeacherAssignmentScreenState extends State<ClassTeacherAssignmentScr
     );
   }
 
-  Widget _buildStatBadge(String label, String value, Color bgColor, Color textColor) {
+  Widget _buildSummaryCard({
+    required String title,
+    required String value,
+  }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
       decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(8),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
       ),
-      child: Row(
+      child: Column(
         mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
-            '$label: ',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              color: textColor.withOpacity(0.8),
+            title,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF64748B),
+              letterSpacing: 0.5,
             ),
           ),
+          const SizedBox(height: 6),
           Text(
             value,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: textColor,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF0F172A),
             ),
           ),
         ],
