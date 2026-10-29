@@ -805,7 +805,10 @@ class _FeesCollectionHistoryScreenState extends State<FeesCollectionHistoryScree
     final num amount = (tx['amount'] is num) ? tx['amount'] : (double.tryParse(tx['amount']?.toString() ?? '0') ?? 0);
 
     final String studentName = _cleanStudentName(tx['student_name']?.toString());
-    final String receiptNo = tx['receipt_no']?.toString().trim() ?? tx['id']?.toString() ?? '—';
+    String receiptNo = tx['receipt_no']?.toString().trim() ?? tx['id']?.toString() ?? '—';
+    if (receiptNo.length == 15 && RegExp(r'^\d{15}$').hasMatch(receiptNo)) {
+      receiptNo = receiptNo.substring(0, 12);
+    }
     final String paymentMethod = tx['payment_method']?.toString().trim() ?? 'Cash';
 
     return Container(
@@ -880,7 +883,7 @@ class _FeesCollectionHistoryScreenState extends State<FeesCollectionHistoryScree
                 _buildDetailRow('Roll No', displayRollNo),
                 _buildDetailRow('Description', description),
                 _buildDetailRow('Date & Time', formattedDateTime),
-                _buildDetailRow('UTR', receiptNo, isMonospace: true),
+                _buildDetailRow('Ref No.', receiptNo, isMonospace: true),
                 _buildDetailRow('Deposit By', displayDepositBy),
                 _buildDetailRow('Payment Type', paymentMethod),
               ],

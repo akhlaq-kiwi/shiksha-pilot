@@ -1877,6 +1877,11 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
                         final isPartial = mStatus == 'PARTIAL';
                         final monthPayments = payments
                             .where((p) => (p['fee_month'] ?? '').toString().trim().toLowerCase() == (mRow['month'] as String).toLowerCase())
+                            .map((p) => {
+                                  if (p is Map) ...Map<String, dynamic>.from(p),
+                                  'remaining': mRow['remaining'],
+                                  'fee': mRow['fee'],
+                                })
                             .toList();
 
                         return Padding(
@@ -2094,7 +2099,16 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
                                             _showReceiptBottomSheet(
                                               studentInfo: studentInfo,
                                               title: title,
-                                              payments: [af['raw'] ?? af],
+                                              payments: [
+                                                {
+                                                  if (af['raw'] is Map)
+                                                    ...Map<String, dynamic>.from(af['raw'])
+                                                  else
+                                                    ...Map<String, dynamic>.from(af),
+                                                  'remaining': rem,
+                                                  'fee': total,
+                                                }
+                                              ],
                                               isAdditional: true,
                                             );
                                           },
@@ -2442,6 +2456,56 @@ class _ReceiptShareSheetState extends State<_ReceiptShareSheet> {
     }
   }
 
+  String _formatReceiptDate(dynamic payment) {
+    if (payment is! Map) return '—';
+    final p = Map<String, dynamic>.from(payment);
+    String datePart = '';
+    final rawDate = (p['payment_date'] ?? p['created_at'] ?? '').toString().trim();
+    if (rawDate.isNotEmpty) {
+      final dateOnly = rawDate.split(' ')[0].split('T')[0];
+      final parts = dateOnly.split('-');
+      if (parts.length == 3) {
+        if (parts[0].length == 4) {
+          // YYYY-MM-DD -> DD-MM-YYYY
+          datePart = '${parts[2].padLeft(2, '0')}-${parts[1].padLeft(2, '0')}-${parts[0]}';
+        } else {
+          datePart = dateOnly;
+        }
+      } else {
+        datePart = dateOnly;
+      }
+    } else {
+      datePart = '—';
+    }
+
+    String timePart = '';
+    final rawCreatedAt = (p['created_at'] ?? p['updated_at'] ?? p['payment_date'] ?? '').toString().trim();
+    if (rawCreatedAt.isNotEmpty && (rawCreatedAt.contains(' ') || rawCreatedAt.contains('T'))) {
+      try {
+        final dt = DateTime.parse(rawCreatedAt.replaceFirst(' ', 'T')).toLocal();
+        final hour = dt.hour;
+        final minute = dt.minute.toString().padLeft(2, '0');
+        final period = hour >= 12 ? 'PM' : 'AM';
+        final h12 = hour % 12 == 0 ? 12 : hour % 12;
+        timePart = '$h12:$minute $period';
+      } catch (_) {
+        final timeMatch = RegExp(r'(\d{1,2}):(\d{2})').firstMatch(rawCreatedAt);
+        if (timeMatch != null) {
+          final int h = int.tryParse(timeMatch.group(1)!) ?? 0;
+          final String m = timeMatch.group(2)!;
+          final String period = h >= 12 ? 'PM' : 'AM';
+          final int h12 = h % 12 == 0 ? 12 : h % 12;
+          timePart = '$h12:$m $period';
+        }
+      }
+    }
+
+    if (timePart.isNotEmpty) {
+      return '$datePart ($timePart)';
+    }
+    return datePart;
+  }
+
   @override
   Widget build(BuildContext context) {
     final studentName = (widget.studentInfo['name'] ??
@@ -2573,12 +2637,23 @@ class _ReceiptShareSheetState extends State<_ReceiptShareSheet> {
                   else
                     ...widget.payments.map((p) {
                       final pid = int.tryParse(p['id']?.toString() ?? '0') ?? 0;
-                      final receiptNo = (p['receipt_no'] ?? (pid > 0 ? 'REC-$pid' : '—')).toString();
+                      var receiptNo = (p['receipt_no'] ?? (pid > 0 ? 'REC-$pid' : '—')).toString();
+                      if (receiptNo.length == 15 && RegExp(r'^\d{15}$').hasMatch(receiptNo)) {
+                        receiptNo = receiptNo.substring(0, 12);
+                      }
                       final amount = double.tryParse(p['amount_paid']?.toString() ?? p['amount']?.toString() ?? '0') ?? 0.0;
                       final disc = double.tryParse(p['discount_amount']?.toString() ?? '0') ?? 0.0;
-                      final payDate = (p['payment_date'] ?? p['created_at'] ?? '—').toString().split(' ')[0];
-                      final mode = (p['payment_method'] ?? 'Cash').toString();
-                      final collectedBy = (p['collected_by'] ?? 'School Admin').toString();
+                      final remaining = double.tryParse(p['remaining']?.toString() ?? '0') ?? 0.0;
+                      final rawCollector = (p['collected_by'] ?? 'ADMIN').toString().trim();
+                      final lowerCollector = rawCollector.toLowerCase();
+                      final String collectedBy = (lowerCollector.isEmpty ||
+                              lowerCollector == 'school admin' ||
+                              lowerCollector == 'admin' ||
+                              lowerCollector.endsWith('admin') ||
+                              lowerCollector.contains('school admin') ||
+                              lowerCollector.contains('accounts office'))
+                          ? 'ADMIN'
+                          : rawCollector;
                       final rawStatus = (p['status'] ?? (widget.isAdditional ? 'Paid' : 'PAID')).toString().toUpperCase();
                       final isPart = rawStatus.contains('PART');
                       final isSharing = _loadingPaymentId == pid;
@@ -2611,7 +2686,7 @@ class _ReceiptShareSheetState extends State<_ReceiptShareSheet> {
                                       const Icon(Icons.receipt_rounded, size: 16, color: Color(0xFF475569)),
                                       const SizedBox(width: 6),
                                       Text(
-                                        'Receipt: $receiptNo',
+                                        'Ref No: $receiptNo',
                                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF1E293B)),
                                       ),
                                     ],
@@ -2641,38 +2716,75 @@ class _ReceiptShareSheetState extends State<_ReceiptShareSheet> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    crossAxisAlignment: CrossAxisAlignment.center,
                                     children: [
-                                      const Text(
-                                        'Amount Paid',
-                                        style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            'Amount Paid',
+                                            style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            '₹${amount.round()}',
+                                            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF16A34A)),
+                                          ),
+                                        ],
                                       ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        '₹${amount.round()}',
-                                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF16A34A)),
-                                      ),
-                                      if (disc > 0)
-                                        Text(
-                                          'Discount: ₹${disc.round()}',
-                                          style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600),
+                                      if (isPart && remaining > 0)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFFEF2F2),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: const Color(0xFFFCA5A5)),
+                                          ),
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.end,
+                                            children: [
+                                              const Text(
+                                                'Remaining Due',
+                                                style: TextStyle(fontSize: 10, color: Color(0xFF991B1B), fontWeight: FontWeight.w600),
+                                              ),
+                                              Text(
+                                                '₹${remaining.round()}',
+                                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Color(0xFFDC2626)),
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                     ],
                                   ),
+                                  if (disc > 0)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 4),
+                                      child: Text(
+                                        'Discount: ₹${disc.round()}',
+                                        style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600),
+                                      ),
+                                    ),
                                   const SizedBox(height: 10),
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    crossAxisAlignment: CrossAxisAlignment.center,
                                     children: [
                                       if (collectedBy.isNotEmpty)
-                                        Text(
-                                          'Collected By: $collectedBy',
-                                          style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                                        Flexible(
+                                          child: Text(
+                                            'Collected By: $collectedBy',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                                          ),
                                         )
                                       else
                                         const SizedBox(),
+                                      const SizedBox(width: 8),
                                       Text(
-                                        'Date: $payDate',
+                                        'Date: ${_formatReceiptDate(p)}',
                                         style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
                                       ),
                                     ],
@@ -3799,15 +3911,9 @@ class _AdditionalDepositModalState extends State<_AdditionalDepositModal> {
       int remainingDiscount = totalDiscount;
       final isSingleFee = _selectedIds.length == 1;
 
-      final now = DateTime.now();
-      final random = Random().nextInt(900) + 100;
-      final sharedReceiptNo = 'REC${now.year}'
-          '${now.month.toString().padLeft(2, '0')}'
-          '${now.day.toString().padLeft(2, '0')}'
-          '${now.hour.toString().padLeft(2, '0')}'
-          '${now.minute.toString().padLeft(2, '0')}'
-          '${now.second.toString().padLeft(2, '0')}'
-          '$random';
+      final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      final rnd = Random().nextInt(90) + 10;
+      final sharedReceiptNo = '$nowSec$rnd';
 
       for (int i = 0; i < _selectedIds.length; i++) {
         final id = _selectedIds[i];

@@ -1183,7 +1183,7 @@ class StudentService extends BaseService
             $monthTitle = $title;
         } else {
             $stmt = $pdo->prepare("
-                SELECT fp.*, s.first_name, s.last_name, s.roll_no, s.sr_no, c.name AS class_name, c.section, sch.name AS school_name, sch.logo_path, ay.name AS academic_year_name
+                SELECT fp.*, s.first_name, s.last_name, s.roll_no, s.sr_no, c.name AS class_name, c.section, sch.name AS school_name, sch.logo_path, ay.name AS academic_year_name, s.class_id
                 FROM fee_payments fp
                 JOIN students s ON fp.student_id = s.id
                 LEFT JOIN classes c ON s.class_id = c.id
@@ -1239,18 +1239,52 @@ class StudentService extends BaseService
 
         $feeMonthDisplay = '';
         $totalDiscountAmount = 0.0;
+        $totalRemainingDue = 0.0;
+        $isPartial = false;
+
         if (!$isAdditional) {
-            $stmtGrp = $pdo->prepare("SELECT fee_month, amount_paid, COALESCE(discount_amount, 0) AS discount_amount FROM fee_payments WHERE receipt_no = :receipt_no AND school_id = :sid");
+            $stmtGrp = $pdo->prepare("SELECT id, fee_month, amount_paid, COALESCE(discount_amount, 0) AS discount_amount, status FROM fee_payments WHERE receipt_no = :receipt_no AND school_id = :sid");
             $stmtGrp->execute([':receipt_no' => $receiptNo, ':sid' => $schoolId]);
             $groupPayments = $stmtGrp->fetchAll(PDO::FETCH_ASSOC) ?: [];
-            
-            if (empty($groupPayments)) {
-                $feeMonthDisplay = !empty($payment['fee_month']) ? $payment['fee_month'] : 'April';
-                $totalAmountPaid = (float)($payment['amount_paid'] ?? 0.0);
-                $totalDiscountAmount = (float)($payment['discount_amount'] ?? 0.0);
-                $billingItemLabel = "Month: ";
-            } else {
-                $academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+
+            // Fetch class fee configuration to know the full monthly fee
+            $classFeeConfig = null;
+            $targetClassId = (int)($payment['class_id'] ?? 0);
+            $targetAyId = (int)($payment['academic_year_id'] ?? 0);
+            if ($targetClassId > 0 && $targetAyId > 0) {
+                $stmtCfg = $pdo->prepare("
+                    SELECT monthly_fees FROM class_fee_configurations 
+                    WHERE school_id = :school_id AND class_id = :class_id AND academic_year_id = :academic_year_id
+                    LIMIT 1
+                ");
+                $stmtCfg->execute([
+                    ':school_id' => $schoolId,
+                    ':class_id' => $targetClassId,
+                    ':academic_year_id' => $targetAyId
+                ]);
+                $cfgRow = $stmtCfg->fetch(PDO::FETCH_ASSOC);
+                if ($cfgRow && !empty($cfgRow['monthly_fees'])) {
+                    $classFeeConfig = is_string($cfgRow['monthly_fees']) ? json_decode($cfgRow['monthly_fees'], true) : $cfgRow['monthly_fees'];
+                }
+            }
+            if (!$classFeeConfig && $targetAyId > 0) {
+                $stmtAnyCfg = $pdo->prepare("
+                    SELECT monthly_fees FROM class_fee_configurations 
+                    WHERE school_id = :school_id AND academic_year_id = :academic_year_id 
+                    ORDER BY id ASC LIMIT 1
+                ");
+                $stmtAnyCfg->execute([
+                    ':school_id' => $schoolId,
+                    ':academic_year_id' => $targetAyId
+                ]);
+                $anyRow = $stmtAnyCfg->fetch(PDO::FETCH_ASSOC);
+                if ($anyRow && !empty($anyRow['monthly_fees'])) {
+                    $classFeeConfig = is_string($anyRow['monthly_fees']) ? json_decode($anyRow['monthly_fees'], true) : $anyRow['monthly_fees'];
+                }
+            }
+
+            $academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+            if (!empty($groupPayments)) {
                 usort($groupPayments, function($a, $b) use ($academicMonths) {
                     $idxA = array_search(trim($a['fee_month']), $academicMonths);
                     $idxB = array_search(trim($b['fee_month']), $academicMonths);
@@ -1286,20 +1320,95 @@ class StudentService extends BaseService
                 } else {
                     $feeMonthDisplay = implode(', ', $monthsList);
                 }
-                $totalAmountPaid = array_sum(array_column($groupPayments, 'amount_paid'));
-                $totalDiscountAmount = array_sum(array_column($groupPayments, 'discount_amount'));
-                $billingItemLabel = count($monthsList) > 1 ? "Months: " : "Month: ";
+                $billingItemLabel = count($monthsList) > 1 ? "Billing Months: " : "Billing Month: ";
+            } else {
+                $feeMonthDisplay = !empty($payment['fee_month']) ? $payment['fee_month'] : 'April';
+                $billingItemLabel = "Billing Month: ";
             }
+
+            $itemsForCalc = !empty($groupPayments) ? $groupPayments : [$payment];
+            $totalAmountPaid = 0.0;
+            $totalDiscountAmount = 0.0;
+            $totalPayableAmount = 0.0;
+            $totalRemainingDue = 0.0;
+
+            foreach ($itemsForCalc as $gp) {
+                $m = $gp['fee_month'] ?? 'April';
+                $pPaid = (float)($gp['amount_paid'] ?? 0.0);
+                $pDisc = (float)($gp['discount_amount'] ?? 0.0);
+                $gpId = (int)($gp['id'] ?? 0);
+
+                $totalAmountPaid += $pPaid;
+                $totalDiscountAmount += $pDisc;
+
+                if (strcasecmp($gp['status'] ?? '', 'Partial') === 0) {
+                    $isPartial = true;
+                }
+
+                $mConfigured = isset($classFeeConfig[$m]) ? (float)$classFeeConfig[$m] : ($pPaid + $pDisc);
+
+                // Cumulative prior payments before this receipt
+                $priorPaid = 0.0;
+                if ($gpId > 0) {
+                    $stmtPrior = $pdo->prepare("
+                        SELECT COALESCE(SUM(amount_paid + discount_amount), 0)
+                        FROM fee_payments
+                        WHERE student_id = :student_id 
+                          AND school_id = :school_id 
+                          AND fee_month = :month 
+                          AND (academic_year_id = :ayid OR academic_year_id IS NULL)
+                          AND id < :curr_id
+                    ");
+                    $stmtPrior->execute([
+                        ':student_id' => $payment['student_id'],
+                        ':school_id' => $schoolId,
+                        ':month' => $m,
+                        ':ayid' => $payment['academic_year_id'],
+                        ':curr_id' => $gpId
+                    ]);
+                    $priorPaid = (float)$stmtPrior->fetchColumn();
+                }
+
+                $mPayableBefore = max(0.0, $mConfigured - $priorPaid);
+                $mRemainingAfter = max(0.0, round($mConfigured - ($priorPaid + $pPaid + $pDisc), 2));
+
+                $totalPayableAmount += $mPayableBefore;
+                $totalRemainingDue += $mRemainingAfter;
+            }
+
+            if ($totalRemainingDue > 0.01) {
+                $isPartial = true;
+            }
+
             $amountPaidFormatted = "Rs " . number_format((float)$totalAmountPaid, 0);
         } else {
             $feeMonthDisplay = !empty($payment['fee_name']) ? $payment['fee_name'] : (!empty($payment['fee_month']) ? $payment['fee_month'] : 'Additional Fee');
             $totalAmountPaid = (float)($payment['tx_amount_paid'] ?? $payment['amount_paid'] ?? $payment['amount'] ?? 0.0);
             $totalDiscountAmount = (float)($payment['tx_discount_amount'] ?? $payment['discount_amount'] ?? 0.0);
+            $totalGross = (float)($payment['gross_amount'] ?? $payment['amount'] ?? ($totalAmountPaid + $totalDiscountAmount));
+
+            // Cumulative prior history payments
+            $priorPaid = 0.0;
+            if (!empty($payment['history_id'])) {
+                $stmtPrior = $pdo->prepare("
+                    SELECT COALESCE(SUM(amount_paid + discount_amount), 0)
+                    FROM additional_fee_payment_history
+                    WHERE payment_id = :pid AND id < :hid
+                ");
+                $stmtPrior->execute([':pid' => $payment['id'], ':hid' => $payment['history_id']]);
+                $priorPaid = (float)$stmtPrior->fetchColumn();
+            }
+
+            $totalPayableAmount = max(0.0, $totalGross - $priorPaid);
+            $totalRemainingDue = max(0.0, round($totalGross - ($priorPaid + $totalAmountPaid + $totalDiscountAmount), 2));
+
+            if (strcasecmp($payment['status'] ?? '', 'Partial') === 0 || $totalRemainingDue > 0.01) {
+                $isPartial = true;
+            }
+
             $amountPaidFormatted = "Rs " . number_format((float)$totalAmountPaid, 0);
             $billingItemLabel = "Description: ";
         }
-
-        $totalPayableAmount = $totalAmountPaid + $totalDiscountAmount;
 
         $lines = [
             "FEE PAYMENT RECEIPT",
@@ -1316,14 +1425,21 @@ class StudentService extends BaseService
             $billingItemLabel . $feeMonthDisplay,
         ];
 
-        if ($totalDiscountAmount > 0) {
+        if ($isPartial || $totalDiscountAmount > 0) {
             $lines[] = "Payable Amount: Rs " . number_format($totalPayableAmount, 0);
+        }
+
+        if ($totalDiscountAmount > 0) {
             $lines[] = "Discount: Rs " . number_format($totalDiscountAmount, 0);
+        }
+
+        if ($isPartial && $totalRemainingDue > 0) {
+            $lines[] = "Remaining Due: Rs " . number_format($totalRemainingDue, 0);
         }
 
         $lines[] = "Total Amount: " . $amountPaidFormatted;
         $lines[] = "---";
-        $lines[] = "Status: PAID";
+        $lines[] = $isPartial ? "Status: PARTIALLY PAID" : "Status: PAID";
         $lines[] = "---";
         $lines[] = "This is an automated system generated receipt. Thank you for your payment.";
 

@@ -464,11 +464,15 @@ class SchoolAdminService extends BaseService
 
     private function generateUniqueRefNo(PDO $pdo): string
     {
-        $micro = microtime(true);
-        $sec = (int)$micro;
-        $milli = sprintf('%03d', (int)(($micro - $sec) * 1000));
-        $rnd = sprintf('%02d', rand(10, 99));
-        return $sec . $milli . $rnd;
+        for ($attempt = 0; $attempt < 10; $attempt++) {
+            $ref = sprintf('%010d%02d', time(), random_int(10, 99));
+            $stmt = $pdo->prepare("SELECT 1 FROM fee_payments WHERE receipt_no = ? UNION ALL SELECT 1 FROM additional_fee_payments WHERE receipt_no = ? LIMIT 1");
+            $stmt->execute([$ref, $ref]);
+            if (!$stmt->fetch()) {
+                return $ref;
+            }
+        }
+        return sprintf('%010d%02d', time(), random_int(10, 99));
     }
 
     // -------------------------------------------------------------------------
@@ -935,6 +939,14 @@ class SchoolAdminService extends BaseService
         ");
         $paymentsStmt->execute([':student_id' => $id]);
         $payments = $paymentsStmt->fetchAll(PDO::FETCH_ASSOC);
+        $payments = array_map(function($p) {
+            $cBy = trim($p['collected_by'] ?? '');
+            $cByLower = strtolower($cBy);
+            if (empty($cBy) || $cByLower === 'school admin' || $cByLower === 'admin' || str_ends_with($cByLower, 'admin') || str_contains($cByLower, 'school admin') || str_contains($cByLower, 'accounts office')) {
+                $p['collected_by'] = 'ADMIN';
+            }
+            return $p;
+        }, $payments);
         $feeSummary['payments'] = $payments;
 
         // Query Attendance Summary
@@ -1053,6 +1065,11 @@ class SchoolAdminService extends BaseService
             $ap['amount'] = (float)$ap['amount'];
             $ap['amount_paid'] = isset($ap['amount_paid']) && $ap['amount_paid'] !== null ? (float)$ap['amount_paid'] : ($ap['status'] === 'Paid' ? (float)$ap['amount'] : 0.0);
             $ap['discount_amount'] = (float)($ap['discount_amount'] ?? 0.0);
+            $cBy = trim($ap['collected_by'] ?? '');
+            $cByLower = strtolower($cBy);
+            if (empty($cBy) || $cByLower === 'school admin' || $cByLower === 'admin' || str_ends_with($cByLower, 'admin') || str_contains($cByLower, 'school admin') || str_contains($cByLower, 'accounts office')) {
+                $ap['collected_by'] = 'ADMIN';
+            }
             return $ap;
         }, $additionalPayments);
 
@@ -1175,21 +1192,47 @@ class SchoolAdminService extends BaseService
             $totalAmountPaid = 0.0;
             $totalDiscountAmount = 0.0;
             $totalPayableAmount = 0.0;
+            $totalRemainingDue = 0.0;
+            $isPartial = false;
 
             foreach ($groupedRows as $r) {
                 $pPaid = (float)($r['amount_paid'] ?? 0.0);
                 $pDisc = (float)($r['discount_amount'] ?? 0.0);
                 $pGross = isset($r['gross_amount']) && (float)$r['gross_amount'] > 0 ? (float)$r['gross_amount'] : ($pPaid + $pDisc);
                 
+                // Prior history payments before this transaction
+                $priorPaid = 0.0;
+                if (!empty($r['history_id'])) {
+                    $stmtPrior = $pdo->prepare("
+                        SELECT COALESCE(SUM(amount_paid + discount_amount), 0)
+                        FROM additional_fee_payment_history
+                        WHERE payment_id = :pid AND id < :hid
+                    ");
+                    $stmtPrior->execute([':pid' => $r['id'], ':hid' => $r['history_id']]);
+                    $priorPaid = (float)$stmtPrior->fetchColumn();
+                }
+
+                $mPayableBefore = max(0.0, $pGross - $priorPaid);
+                $mRemainingAfter = max(0.0, round($pGross - ($priorPaid + $pPaid + $pDisc), 2));
+
                 $totalAmountPaid += $pPaid;
                 $totalDiscountAmount += $pDisc;
-                $totalPayableAmount += $pGross;
+                $totalPayableAmount += $mPayableBefore;
+                $totalRemainingDue += $mRemainingAfter;
+
+                if (strcasecmp($r['status'] ?? '', 'Partial') === 0) {
+                    $isPartial = true;
+                }
+            }
+
+            if ($totalRemainingDue > 0.01) {
+                $isPartial = true;
             }
 
             $amountPaidFormatted = "Rs " . number_format((float)$totalAmountPaid, 0);
         } else {
             $stmt = $pdo->prepare("
-                SELECT fp.*, s.first_name, s.last_name, s.roll_no, s.sr_no, c.name AS class_name, c.section, sch.name AS school_name, sch.logo_path, ay.name AS academic_year_name
+                SELECT fp.*, s.first_name, s.last_name, s.roll_no, s.sr_no, c.name AS class_name, c.section, sch.name AS school_name, sch.logo_path, ay.name AS academic_year_name, s.class_id
                 FROM fee_payments fp
                 JOIN students s ON fp.student_id = s.id
                 LEFT JOIN classes c ON s.class_id = c.id
@@ -1206,17 +1249,48 @@ class SchoolAdminService extends BaseService
             $receiptNo = $payment['receipt_no'];
             $monthTitle = $payment['fee_month'];
 
-            $stmtGrp = $pdo->prepare("SELECT fee_month, amount_paid, COALESCE(discount_amount, 0) AS discount_amount FROM fee_payments WHERE receipt_no = :receipt_no AND school_id = :sid");
+            $stmtGrp = $pdo->prepare("SELECT id, fee_month, amount_paid, COALESCE(discount_amount, 0) AS discount_amount, status FROM fee_payments WHERE receipt_no = :receipt_no AND school_id = :sid");
             $stmtGrp->execute([':receipt_no' => $receiptNo, ':sid' => $schoolId]);
             $groupPayments = $stmtGrp->fetchAll(PDO::FETCH_ASSOC) ?: [];
             
-            if (empty($groupPayments)) {
-                $feeMonthDisplay = !empty($payment['fee_month']) ? $payment['fee_month'] : 'April';
-                $totalAmountPaid = (float)($payment['amount_paid'] ?? 0.0);
-                $totalDiscountAmount = (float)($payment['discount_amount'] ?? 0.0);
-                $billingItemLabel = "Billing Month: ";
-            } else {
-                $academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+            // Fetch class fee configuration to know the full monthly fee
+            $classFeeConfig = null;
+            $targetClassId = (int)($payment['class_id'] ?? 0);
+            $targetAyId = (int)($payment['academic_year_id'] ?? 0);
+            if ($targetClassId > 0 && $targetAyId > 0) {
+                $stmtCfg = $pdo->prepare("
+                    SELECT monthly_fees FROM class_fee_configurations 
+                    WHERE school_id = :school_id AND class_id = :class_id AND academic_year_id = :academic_year_id
+                    LIMIT 1
+                ");
+                $stmtCfg->execute([
+                    ':school_id' => $schoolId,
+                    ':class_id' => $targetClassId,
+                    ':academic_year_id' => $targetAyId
+                ]);
+                $cfgRow = $stmtCfg->fetch(PDO::FETCH_ASSOC);
+                if ($cfgRow && !empty($cfgRow['monthly_fees'])) {
+                    $classFeeConfig = is_string($cfgRow['monthly_fees']) ? json_decode($cfgRow['monthly_fees'], true) : $cfgRow['monthly_fees'];
+                }
+            }
+            if (!$classFeeConfig && $targetAyId > 0) {
+                $stmtAnyCfg = $pdo->prepare("
+                    SELECT monthly_fees FROM class_fee_configurations 
+                    WHERE school_id = :school_id AND academic_year_id = :academic_year_id 
+                    ORDER BY id ASC LIMIT 1
+                ");
+                $stmtAnyCfg->execute([
+                    ':school_id' => $schoolId,
+                    ':academic_year_id' => $targetAyId
+                ]);
+                $anyRow = $stmtAnyCfg->fetch(PDO::FETCH_ASSOC);
+                if ($anyRow && !empty($anyRow['monthly_fees'])) {
+                    $classFeeConfig = is_string($anyRow['monthly_fees']) ? json_decode($anyRow['monthly_fees'], true) : $anyRow['monthly_fees'];
+                }
+            }
+
+            $academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+            if (!empty($groupPayments)) {
                 usort($groupPayments, function($a, $b) use ($academicMonths) {
                     $idxA = array_search(trim($a['fee_month']), $academicMonths);
                     $idxB = array_search(trim($b['fee_month']), $academicMonths);
@@ -1252,14 +1326,69 @@ class SchoolAdminService extends BaseService
                 } else {
                     $feeMonthDisplay = implode(', ', $monthsList);
                 }
-                $totalAmountPaid = array_sum(array_column($groupPayments, 'amount_paid'));
-                $totalDiscountAmount = array_sum(array_column($groupPayments, 'discount_amount'));
                 $billingItemLabel = count($monthsList) > 1 ? "Billing Months: " : "Billing Month: ";
+            } else {
+                $feeMonthDisplay = !empty($payment['fee_month']) ? $payment['fee_month'] : 'April';
+                $billingItemLabel = "Billing Month: ";
             }
+
+            $itemsForCalc = !empty($groupPayments) ? $groupPayments : [$payment];
+            $totalAmountPaid = 0.0;
+            $totalDiscountAmount = 0.0;
+            $totalPayableAmount = 0.0;
+            $totalRemainingDue = 0.0;
+            $isPartial = false;
+
+            foreach ($itemsForCalc as $gp) {
+                $m = $gp['fee_month'] ?? 'April';
+                $pPaid = (float)($gp['amount_paid'] ?? 0.0);
+                $pDisc = (float)($gp['discount_amount'] ?? 0.0);
+                $gpId = (int)($gp['id'] ?? 0);
+
+                $totalAmountPaid += $pPaid;
+                $totalDiscountAmount += $pDisc;
+
+                if (strcasecmp($gp['status'] ?? '', 'Partial') === 0) {
+                    $isPartial = true;
+                }
+
+                $mConfigured = isset($classFeeConfig[$m]) ? (float)$classFeeConfig[$m] : ($pPaid + $pDisc);
+
+                // Cumulative prior payments before this receipt
+                $priorPaid = 0.0;
+                if ($gpId > 0) {
+                    $stmtPrior = $pdo->prepare("
+                        SELECT COALESCE(SUM(amount_paid + discount_amount), 0)
+                        FROM fee_payments
+                        WHERE student_id = :student_id 
+                          AND school_id = :school_id 
+                          AND fee_month = :month 
+                          AND (academic_year_id = :ayid OR academic_year_id IS NULL)
+                          AND id < :curr_id
+                    ");
+                    $stmtPrior->execute([
+                        ':student_id' => $payment['student_id'],
+                        ':school_id' => $schoolId,
+                        ':month' => $m,
+                        ':ayid' => $payment['academic_year_id'],
+                        ':curr_id' => $gpId
+                    ]);
+                    $priorPaid = (float)$stmtPrior->fetchColumn();
+                }
+
+                $mPayableBefore = max(0.0, $mConfigured - $priorPaid);
+                $mRemainingAfter = max(0.0, round($mConfigured - ($priorPaid + $pPaid + $pDisc), 2));
+
+                $totalPayableAmount += $mPayableBefore;
+                $totalRemainingDue += $mRemainingAfter;
+            }
+
+            if ($totalRemainingDue > 0.01) {
+                $isPartial = true;
+            }
+
             $amountPaidFormatted = "Rs " . number_format((float)$totalAmountPaid, 0);
         }
-
-        $totalPayableAmount = $totalAmountPaid + ($totalDiscountAmount ?? 0.0);
 
         // Format payment date
         $months = [
@@ -1311,14 +1440,21 @@ class SchoolAdminService extends BaseService
             $billingItemLabel . $feeMonthDisplay,
         ];
 
-        if (!empty($totalDiscountAmount) && $totalDiscountAmount > 0) {
+        if ($isPartial || (!empty($totalDiscountAmount) && $totalDiscountAmount > 0)) {
             $lines[] = "Payable Amount: Rs " . number_format($totalPayableAmount, 0);
+        }
+
+        if (!empty($totalDiscountAmount) && $totalDiscountAmount > 0) {
             $lines[] = "Discount: Rs " . number_format($totalDiscountAmount, 0);
+        }
+
+        if ($isPartial && $totalRemainingDue > 0) {
+            $lines[] = "Remaining Due: Rs " . number_format($totalRemainingDue, 0);
         }
 
         $lines[] = "Total Amount: " . $amountPaidFormatted;
         $lines[] = "---";
-        $lines[] = "Status: PAID";
+        $lines[] = $isPartial ? "Status: PARTIALLY PAID" : "Status: PAID";
         $lines[] = "---";
         $lines[] = "This is an automated system generated receipt. Thank you for your payment.";
 
@@ -7775,13 +7911,22 @@ class SchoolAdminService extends BaseService
         // 6. Insert payments
         $paymentMethod = !empty($data['payment_method']) ? trim($data['payment_method']) : (!empty($data['payment_mode']) ? trim($data['payment_mode']) : 'Cash');
         $userId = (int) ($user['id'] ?? 0);
-        $collectedBy = 'School Admin';
-        if ($userId > 0) {
-            $stmtUser = $pdo->prepare("SELECT name FROM users WHERE id = :id LIMIT 1");
+        $userRole = strtoupper($user['role'] ?? '');
+        $collectedBy = 'ADMIN';
+        if ($userRole === 'SCHOOL_ADMIN' || $userRole === 'ADMIN') {
+            $collectedBy = 'ADMIN';
+        } elseif ($userId > 0) {
+            $stmtUser = $pdo->prepare("SELECT name, role FROM users WHERE id = :id LIMIT 1");
             $stmtUser->execute([':id' => $userId]);
-            $uName = $stmtUser->fetchColumn();
-            if ($uName !== false) {
-                $collectedBy = $uName;
+            $uRow = $stmtUser->fetch(PDO::FETCH_ASSOC);
+            if ($uRow) {
+                $uRole = strtoupper($uRow['role'] ?? '');
+                $uName = trim($uRow['name'] ?? '');
+                if ($uRole === 'SCHOOL_ADMIN' || $uRole === 'ADMIN' || str_ends_with(strtolower($uName), 'admin') || str_contains(strtolower($uName), 'school admin')) {
+                    $collectedBy = 'ADMIN';
+                } else {
+                    $collectedBy = $uName;
+                }
             }
         }
 
@@ -8076,31 +8221,18 @@ class SchoolAdminService extends BaseService
             }
 
 
-            // Format clean 12-digit receipt number for display per transaction group
-            $cleanRef = preg_replace('/\D/', '', $t['raw_receipt_no']);
+            // Use exact unique reference number for tracking across mobile, PDF, and collection history
+            $cleanRef = trim((string)$t['raw_receipt_no']);
             if ($cleanRef === '') {
                 $cleanRef = (string)$t['id'];
             }
-            
-            if (strlen($cleanRef) < 12) {
-                $paddingNeeded = 12 - strlen($cleanRef);
-                $padPattern = '123456789012';
-                $prefix = substr($padPattern, 0, $paddingNeeded);
-                $cleanRef = $prefix . $cleanRef;
-            } else {
-                $cleanRef = substr($cleanRef, 0, 12);
+            $digitsOnly = preg_replace('/\D/', '', $cleanRef);
+            if (strlen($digitsOnly) === 15) {
+                $cleanRef = substr($digitsOnly, 0, 12);
+            } elseif ($digitsOnly !== '') {
+                $cleanRef = $digitsOnly;
             }
-
-            // Correct any 3 consecutive repeating digits dynamically
-            $chars = str_split($cleanRef);
-            for ($i = 2; $i < count($chars); $i++) {
-                if ($chars[$i] === $chars[$i-1] && $chars[$i] === $chars[$i-2]) {
-                    $prevVal = (int)$chars[$i-1];
-                    $newVal = ($prevVal + 1) % 10;
-                    $chars[$i] = (string)$newVal;
-                }
-            }
-            $t['receipt_no'] = implode('', $chars);
+            $t['receipt_no'] = $cleanRef;
 
             unset($t['items_list'], $t['raw_receipt_no']);
             $mergedGrouped[] = $t;
@@ -12753,16 +12885,33 @@ Only approve the settlement after reviewing all financial records.
         $paymentDate = date('Y-m-d');
         $paymentMethod = !empty($data['payment_method']) ? trim($data['payment_method']) : (!empty($data['payment_mode']) ? trim($data['payment_mode']) : 'Cash');
         $userId = (int) ($user['id'] ?? 0);
-        $collectedBy = 'School Admin';
-        if ($userId > 0) {
-            $stmtUser = $pdo->prepare("SELECT name FROM users WHERE id = :id LIMIT 1");
+        $userRole = strtoupper($user['role'] ?? '');
+        $collectedBy = 'ADMIN';
+        if ($userRole === 'SCHOOL_ADMIN' || $userRole === 'ADMIN') {
+            $collectedBy = 'ADMIN';
+        } elseif ($userId > 0) {
+            $stmtUser = $pdo->prepare("SELECT name, role FROM users WHERE id = :id LIMIT 1");
             $stmtUser->execute([':id' => $userId]);
-            $uName = $stmtUser->fetchColumn();
-            if ($uName !== false) {
-                $collectedBy = $uName;
+            $uRow = $stmtUser->fetch(PDO::FETCH_ASSOC);
+            if ($uRow) {
+                $uRole = strtoupper($uRow['role'] ?? '');
+                $uName = trim($uRow['name'] ?? '');
+                if ($uRole === 'SCHOOL_ADMIN' || $uRole === 'ADMIN' || str_ends_with(strtolower($uName), 'admin') || str_contains(strtolower($uName), 'school admin')) {
+                    $collectedBy = 'ADMIN';
+                } else {
+                    $collectedBy = $uName;
+                }
             }
         }
-        $receiptNo = !empty($data['receipt_no']) ? trim((string)$data['receipt_no']) : $this->generateUniqueRefNo($pdo);
+        if (!empty($data['receipt_no'])) {
+            $receiptNo = trim((string)$data['receipt_no']);
+            if (str_starts_with(strtoupper($receiptNo), 'REC')) {
+                $digitsOnly = preg_replace('/\D/', '', $receiptNo);
+                $receiptNo = strlen($digitsOnly) >= 12 ? substr($digitsOnly, 0, 12) : $digitsOnly;
+            }
+        } else {
+            $receiptNo = $this->generateUniqueRefNo($pdo);
+        }
 
         $stmtUpdate = $pdo->prepare("
             UPDATE additional_fee_payments 

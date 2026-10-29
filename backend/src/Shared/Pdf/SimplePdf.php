@@ -231,6 +231,9 @@ class SimplePdf
             }
 
             $receiptNo = $fields['Ref No'] ?? '—';
+            if (strlen($receiptNo) === 15 && ctype_digit($receiptNo)) {
+                $receiptNo = substr($receiptNo, 0, 12);
+            }
             $academicYear = $fields['Academic Year'] ?? '2026-2027';
             $paymentDate = $fields['Payment Date'] ?? '—';
             $paymentMode = $fields['Mode of Payment'] ?? '—';
@@ -292,8 +295,46 @@ class SimplePdf
             $hasDiscount = !empty($fields['Discount']);
             $payableText = $fields['Payable Amount'] ?? null;
             $discountText = $fields['Discount'] ?? null;
+            $remainingText = $fields['Remaining Due'] ?? ($fields['Remaining Balance'] ?? null);
+            $statusText = strtoupper($fields['Status'] ?? ($fields['Payment Status'] ?? ''));
+            $isPartial = (!empty($remainingText) && (float)str_replace(['Rs', 'INR', ',', '₹', ' ', '-'], '', $remainingText) > 0) 
+                         || str_contains($statusText, 'PART');
 
-            $amtBoxHeight = ($hasDiscount && $payableText && $discountText) ? 100 : 80;
+            // Build breakdown lines
+            $breakdownLines = [];
+            if ($payableText && ($hasDiscount || $isPartial)) {
+                $pValStr = (str_starts_with($payableText, 'Rs') || str_starts_with($payableText, '₹')) ? $payableText : "Rs " . $payableText;
+                $breakdownLines[] = [
+                    'label' => 'Payable Amount:',
+                    'value' => $pValStr,
+                    'color' => '0.4 0.4 0.4',
+                    'bold'  => false
+                ];
+            }
+            if ($hasDiscount && $discountText) {
+                $dValStr = (str_starts_with($discountText, 'Rs') || str_starts_with($discountText, '₹')) ? "- " . $discountText : "- Rs " . $discountText;
+                $breakdownLines[] = [
+                    'label' => 'Discount:',
+                    'value' => $dValStr,
+                    'color' => '0.10 0.55 0.30', // Emerald green
+                    'bold'  => false
+                ];
+            }
+            if ($isPartial && !empty($remainingText)) {
+                $rValStr = (str_starts_with($remainingText, 'Rs') || str_starts_with($remainingText, '₹')) ? $remainingText : "Rs " . $remainingText;
+                $breakdownLines[] = [
+                    'label' => 'Remaining Due:',
+                    'value' => $rValStr,
+                    'color' => '0.85 0.20 0.15', // Warm coral/red
+                    'bold'  => true
+                ];
+            }
+
+            $hasBreakdown = !empty($breakdownLines);
+            $badgeExtra = $isPartial ? 22 : 0;
+            $amtBoxHeight = $hasBreakdown 
+                ? (20 + (count($breakdownLines) * 14) + 48 + $badgeExtra) 
+                : ($isPartial ? 100 : 80);
             $amtBoxTop = 400 - $extraShift;
             $amtBoxBottom = $amtBoxTop - $amtBoxHeight;
 
@@ -428,30 +469,28 @@ class SimplePdf
                 $currY -= 14;
             }
 
-            if ($hasDiscount && $payableText && $discountText) {
-                // Payable Amount Line
-                $pLineY = $amtBoxTop - 18;
-                $stream .= "0.4 0.4 0.4 rg\n";
-                $stream .= "/F2 8.5 Tf\n";
-                $stream .= "1 0 0 1 " . (187.64 + 15) . " " . $pLineY . " Tm\n";
-                $stream .= "(Payable Amount:) Tj\n";
-                $stream .= "/F1 8.5 Tf\n";
-                $pValStr = (str_starts_with($payableText, 'Rs') || str_starts_with($payableText, '₹')) ? $payableText : "Rs " . $payableText;
-                $stream .= "1 0 0 1 " . (407.64 - 15 - $this->getStringWidth($pValStr, 8.5)) . " " . $pLineY . " Tm\n";
-                $stream .= "(" . $this->escape($pValStr) . ") Tj\n";
+            if ($hasBreakdown) {
+                $currBreakdownY = $amtBoxTop - 18;
+                foreach ($breakdownLines as $bLine) {
+                    $stream .= "{$bLine['color']} rg\n";
+                    $stream .= "/F2 8.5 Tf\n";
+                    $stream .= "1 0 0 1 " . (187.64 + 15) . " " . $currBreakdownY . " Tm\n";
+                    $stream .= "(" . $this->escape($bLine['label']) . ") Tj\n";
 
-                // Discount Line
-                $dLineY = $amtBoxTop - 32;
-                $stream .= "0.10 0.55 0.30 rg\n"; // Emerald Green
-                $stream .= "/F2 8.5 Tf\n";
-                $stream .= "1 0 0 1 " . (187.64 + 15) . " " . $dLineY . " Tm\n";
-                $stream .= "(Discount:) Tj\n";
-                $dValStr = (str_starts_with($discountText, 'Rs') || str_starts_with($discountText, '₹')) ? "- " . $discountText : "- Rs " . $discountText;
-                $stream .= "1 0 0 1 " . (407.64 - 15 - $this->getStringWidth($dValStr, 8.5)) . " " . $dLineY . " Tm\n";
-                $stream .= "(" . $this->escape($dValStr) . ") Tj\n";
+                    if (!empty($bLine['bold'])) {
+                        $stream .= "/F2 8.5 Tf\n";
+                    } else {
+                        $stream .= "/F1 8.5 Tf\n";
+                    }
+                    $valWidth = $this->getStringWidth($bLine['value'], 8.5);
+                    $stream .= "1 0 0 1 " . (407.64 - 15 - $valWidth) . " " . $currBreakdownY . " Tm\n";
+                    $stream .= "(" . $this->escape($bLine['value']) . ") Tj\n";
+
+                    $currBreakdownY -= 14;
+                }
 
                 // Dashed separator line
-                $sepY = $amtBoxTop - 42;
+                $sepY = $currBreakdownY + 4;
                 $stream .= "ET\n";
                 $stream .= "0.85 0.85 0.85 RG\n";
                 $stream .= "0.5 w\n";
@@ -460,19 +499,21 @@ class SimplePdf
                 $stream .= "[] 0 d\n";
                 $stream .= "BT\n";
 
-                $amtLabelY = $amtBoxTop - 58;
-                $amtValY = $amtBoxTop - 80;
+                $amtLabelY = $sepY - 15;
+                $amtValY = $sepY - 35;
             } else {
                 $amtLabelY = 375 - $extraShift;
                 $amtValY = 345 - $extraShift;
             }
 
             // Amount Box Text Label
+            $amtLabelText = $isPartial ? "AMOUNT PAID (PARTIAL)" : "TOTAL AMOUNT PAID";
             $stream .= "0.09 0.17 0.35 rg\n";
             $stream .= "/F2 9.5 Tf\n";
-            $amtLabelX = $amtX + (220 - (strlen("TOTAL AMOUNT PAID") * 5.2)) / 2;
+            $labelWidth = $this->getStringWidth($amtLabelText, 9.5);
+            $amtLabelX = $amtX + (220 - $labelWidth) / 2;
             $stream .= "1 0 0 1 " . number_format($amtLabelX, 2, '.', '') . " " . $amtLabelY . " Tm\n";
-            $stream .= "(TOTAL AMOUNT PAID) Tj\n";
+            $stream .= "(" . $this->escape($amtLabelText) . ") Tj\n";
 
             // Draw Amount Value text formatted as "Rs X,XXX" on one centered line
             $displayText = "Rs " . $amountPaid;
@@ -483,6 +524,32 @@ class SimplePdf
             $stream .= "/F2 18 Tf\n";
             $stream .= "1 0 0 1 " . number_format($amtValX, 2, '.', '') . " " . $amtValY . " Tm\n";
             $stream .= "(" . $this->escape($displayText) . ") Tj\n";
+
+            // If Partial: Draw a dedicated "PARTIALLY PAID" pill badge below the amount
+            if ($isPartial) {
+                $badgeW = 96;
+                $badgeH = 14;
+                $badgeX = $amtX + (220 - $badgeW) / 2;
+                $badgeY = $amtValY - 18;
+
+                $stream .= "ET\n";
+                // Badge background: Soft warm amber fill
+                $stream .= "1.0 0.95 0.88 rg\n";
+                $stream .= "0.92 0.65 0.20 RG\n";
+                $stream .= "0.75 w\n";
+                $stream .= number_format($badgeX, 2, '.', '') . " " . number_format($badgeY, 2, '.', '') . " " . $badgeW . " " . $badgeH . " re\n";
+                $stream .= "B\n";
+
+                // Badge text: Bold amber
+                $stream .= "BT\n";
+                $stream .= "0.75 0.35 0.05 rg\n";
+                $stream .= "/F2 7.5 Tf\n";
+                $badgeText = "PARTIALLY PAID";
+                $bTextW = $this->getStringWidth($badgeText, 7.5);
+                $bTextX = $badgeX + ($badgeW - $bTextW) / 2;
+                $stream .= "1 0 0 1 " . number_format($bTextX, 2, '.', '') . " " . number_format($badgeY + 4, 2, '.', '') . " Tm\n";
+                $stream .= "(" . $this->escape($badgeText) . ") Tj\n";
+            }
             $stream .= "ET\n";
 
             // Footer

@@ -693,15 +693,9 @@ function AdditionalDepositModal({ student, unpaidFees, initialSelectedIds = [], 
       const totalDiscount = getDiscAmount();
       let remainingDiscount = totalDiscount;
 
-      const now = new Date();
-      const timestamp = 'REC' + now.getFullYear().toString() +
-        String(now.getMonth() + 1).padStart(2, '0') +
-        String(now.getDate()).padStart(2, '0') +
-        String(now.getHours()).padStart(2, '0') +
-        String(now.getMinutes()).padStart(2, '0') +
-        String(now.getSeconds()).padStart(2, '0') +
-        String(Math.floor(100 + Math.random() * 900));
-      const sharedReceiptNo = timestamp;
+      const nowSec = Math.floor(Date.now() / 1000);
+      const rnd = Math.floor(10 + Math.random() * 90);
+      const sharedReceiptNo = `${nowSec}${rnd}`;
 
       for (let i = 0; i < selectedIds.length; i++) {
         const id = selectedIds[i];
