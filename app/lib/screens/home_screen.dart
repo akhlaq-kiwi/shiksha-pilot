@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:school_hub/config.dart';
 import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/services.dart';
@@ -1294,11 +1295,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         final prefs = await SharedPreferences.getInstance();
         final token = prefs.getString('auth_token') ?? widget.leaveService.token;
         String effectiveBase = widget.leaveService.baseUrl;
-        if (effectiveBase.isEmpty || effectiveBase.contains('127.0.0.1')) {
-          final savedBase = prefs.getString('base_url') ?? _workingBaseUrl;
-          if (savedBase.isNotEmpty && !savedBase.contains('127.0.0.1')) {
-            effectiveBase = savedBase;
-          }
+        if (effectiveBase.isEmpty || effectiveBase.contains('10.22.6.71') || effectiveBase.contains('10.155.82.71')) {
+          effectiveBase = resolveBaseUrlFrom(prefs);
         }
         Navigator.push(
           context,
@@ -1313,11 +1311,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         final prefs = await SharedPreferences.getInstance();
         final token = prefs.getString('auth_token') ?? widget.leaveService.token;
         String effectiveBase = widget.leaveService.baseUrl;
-        if (effectiveBase.isEmpty || effectiveBase.contains('127.0.0.1')) {
-          final savedBase = prefs.getString('base_url') ?? _workingBaseUrl;
-          if (savedBase.isNotEmpty && !savedBase.contains('127.0.0.1')) {
-            effectiveBase = savedBase;
-          }
+        if (effectiveBase.isEmpty || effectiveBase.contains('10.22.6.71') || effectiveBase.contains('10.155.82.71')) {
+          effectiveBase = resolveBaseUrlFrom(prefs);
         }
         Navigator.push(
           context,
@@ -1332,11 +1327,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         final prefs = await SharedPreferences.getInstance();
         final token = prefs.getString('auth_token') ?? widget.leaveService.token;
         String effectiveBase = widget.leaveService.baseUrl;
-        if (effectiveBase.isEmpty || effectiveBase.contains('127.0.0.1')) {
-          final savedBase = prefs.getString('base_url') ?? _workingBaseUrl;
-          if (savedBase.isNotEmpty && !savedBase.contains('127.0.0.1')) {
-            effectiveBase = savedBase;
-          }
+        if (effectiveBase.isEmpty || effectiveBase.contains('10.22.6.71') || effectiveBase.contains('10.155.82.71')) {
+          effectiveBase = resolveBaseUrlFrom(prefs);
         }
         Navigator.push(
           context,
@@ -1351,11 +1343,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         final prefs = await SharedPreferences.getInstance();
         final token = prefs.getString('auth_token') ?? widget.leaveService.token;
         String effectiveBase = widget.leaveService.baseUrl;
-        if (effectiveBase.isEmpty || effectiveBase.contains('127.0.0.1')) {
-          final savedBase = prefs.getString('base_url') ?? _workingBaseUrl;
-          if (savedBase.isNotEmpty && !savedBase.contains('127.0.0.1')) {
-            effectiveBase = savedBase;
-          }
+        if (effectiveBase.isEmpty || effectiveBase.contains('10.22.6.71') || effectiveBase.contains('10.155.82.71')) {
+          effectiveBase = resolveBaseUrlFrom(prefs);
         }
         Navigator.push(
           context,

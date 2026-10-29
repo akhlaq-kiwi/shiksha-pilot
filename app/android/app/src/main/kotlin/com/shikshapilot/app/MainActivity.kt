@@ -42,8 +42,14 @@ class MainActivity : FlutterActivity() {
                     }
 
                     try {
-                        val baseName = fileName.replace(Regex("[^a-zA-Z0-9_\\-]"), "_").replace(Regex("_+"), "_").trim('_')
-                        val safeFileName = if (baseName.endsWith(".pdf", ignoreCase = true)) baseName else "${if (baseName.isEmpty()) "Question_Paper" else baseName}.pdf"
+                        val safeFileName = if (fileName.endsWith(".pdf", ignoreCase = true)) {
+                            val withoutExt = fileName.substring(0, fileName.length - 4)
+                            val clean = withoutExt.replace(Regex("[^a-zA-Z0-9_\\-]"), "_").replace(Regex("_+"), "_").trim('_')
+                            "${if (clean.isEmpty()) "Fee_Receipt" else clean}.pdf"
+                        } else {
+                            val clean = fileName.replace(Regex("[^a-zA-Z0-9_\\-]"), "_").replace(Regex("_+"), "_").trim('_')
+                            "${if (clean.isEmpty()) "Fee_Receipt" else clean}.pdf"
+                        }
 
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                             val resolver = contentResolver
@@ -59,6 +65,7 @@ class MainActivity : FlutterActivity() {
                                 put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, safeFileName)
                                 put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "application/pdf")
                                 put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                                put(android.provider.MediaStore.MediaColumns.IS_PENDING, 1)
                             }
 
                             val downloadsUri = android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI
@@ -68,6 +75,21 @@ class MainActivity : FlutterActivity() {
                                     os.write(bytes)
                                     os.flush()
                                 }
+                                contentValues.clear()
+                                contentValues.put(android.provider.MediaStore.MediaColumns.IS_PENDING, 0)
+                                resolver.update(uri, contentValues, null, null)
+
+                                try {
+                                    val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                                    val file = File(downloadDir, safeFileName)
+                                    android.media.MediaScannerConnection.scanFile(
+                                        applicationContext,
+                                        arrayOf(file.absolutePath),
+                                        arrayOf("application/pdf"),
+                                        null
+                                    )
+                                } catch (_: Throwable) { }
+
                                 result.success(uri.toString())
                             } else {
                                 result.error("INSERT_ERROR", "Failed to insert PDF", null)

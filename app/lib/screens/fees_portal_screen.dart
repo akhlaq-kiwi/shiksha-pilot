@@ -2689,6 +2689,44 @@ class _ReceiptShareSheetState extends State<_ReceiptShareSheet> {
                                         'Ref No: $receiptNo',
                                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF1E293B)),
                                       ),
+                                      const SizedBox(width: 6),
+                                      InkWell(
+                                        onTap: () async {
+                                          await Clipboard.setData(ClipboardData(text: receiptNo.toString().trim()));
+                                          HapticFeedback.lightImpact();
+                                          if (!context.mounted) return;
+                                          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 16),
+                                                  const SizedBox(width: 8),
+                                                  Text(
+                                                    'Ref No copied: $receiptNo',
+                                                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Colors.white),
+                                                  ),
+                                                ],
+                                              ),
+                                              duration: const Duration(seconds: 2),
+                                              behavior: SnackBarBehavior.floating,
+                                              backgroundColor: const Color(0xFF0F172A),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                              margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                                            ),
+                                          );
+                                        },
+                                        borderRadius: BorderRadius.circular(4),
+                                        child: const Padding(
+                                          padding: EdgeInsets.all(3),
+                                          child: Icon(
+                                            Icons.copy_rounded,
+                                            size: 15,
+                                            color: Color(0xFF64748B),
+                                          ),
+                                        ),
+                                      ),
                                     ],
                                   ),
                                   Container(

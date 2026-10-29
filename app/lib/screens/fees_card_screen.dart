@@ -151,7 +151,7 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(savedPath != null ? 'Fee Receipt saved successfully.' : 'Download failed.'),
+            content: Text(savedPath != null ? 'Fee Receipt saved to Downloads.' : 'Download failed.'),
             action: savedPath != null ? SnackBarAction(
               label: 'OPEN',
               textColor: Colors.amber.shade300,
@@ -230,7 +230,7 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.indigo))
+          ? const Center(child: CircularProgressIndicator(color: const Color(0xFFD97706)))
           : _errorText.isNotEmpty
               ? Center(
                   child: Column(
@@ -240,7 +240,7 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
                       const SizedBox(height: 12),
                       ElevatedButton(
                         onPressed: _fetchFeesData,
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo),
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD97706)),
                         child: const Text('Retry'),
                       ),
                     ],
@@ -284,7 +284,7 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  CircularProgressIndicator(color: Colors.indigo),
+                                  CircularProgressIndicator(color: const Color(0xFFD97706)),
                                   SizedBox(width: 16),
                                   Text(
                                     'Downloading receipt...',
@@ -306,15 +306,15 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.indigo.shade800, Colors.indigo.shade600],
+        gradient: const LinearGradient(
+          colors: [Color(0xFFD97706), Color(0xFFB45309)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.indigo.shade200.withOpacity(0.5),
+            color: const Color(0xFFD97706).withValues(alpha: 0.35),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -326,7 +326,7 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
           const Text(
             'TOTAL OUTSTANDING',
             style: TextStyle(
-              color: Colors.white70,
+              color: Color(0xFFFEF3C7),
               fontSize: 12,
               fontWeight: FontWeight.bold,
               letterSpacing: 1.2,
@@ -361,7 +361,7 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
                     children: [
                       const Text(
                         'Monthly Dues',
-                        style: TextStyle(color: Colors.white60, fontSize: 11, fontWeight: FontWeight.bold),
+                        style: TextStyle(color: Color(0xFFFDE68A), fontSize: 11, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -375,7 +375,7 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
               Container(
                 width: 1,
                 height: 30,
-                color: Colors.white24,
+                color: Colors.white.withValues(alpha: 0.25),
               ),
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
@@ -393,7 +393,7 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
                     children: [
                       const Text(
                         'Additional Dues',
-                        style: TextStyle(color: Colors.white60, fontSize: 11, fontWeight: FontWeight.bold),
+                        style: TextStyle(color: Color(0xFFFDE68A), fontSize: 11, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -422,7 +422,7 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
           width: isSelected ? 20 : 8,
           height: 8,
           decoration: BoxDecoration(
-            color: isSelected ? Colors.indigo : Colors.grey.shade300,
+            color: isSelected ? const Color(0xFFD97706) : const Color(0xFFE2E8F0),
             borderRadius: BorderRadius.circular(4),
           ),
         );
@@ -430,7 +430,7 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
     );
   }
 
-  void _showPartiallyPaidDialog(Map<String, dynamic> item, String title) {
+  void _showPartiallyPaidDialog(Map<String, dynamic> item, String title, {bool isAdditional = false}) {
     final amount = (item['amount'] ?? 0).round();
     final paidAmount = (item['paid_amount'] ?? 0).round();
     final discountAmount = (item['discount_amount'] ?? 0).round();
@@ -465,6 +465,19 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
           ],
         ),
         actions: [
+          if (paidAmount > 0 && item['id'] != null && item['id'] != 0)
+            TextButton.icon(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                _downloadReceipt(
+                  item['id'],
+                  isAdditional,
+                  isAdditional ? (item['description'] ?? 'Fee') : (item['month'] ?? 'Fee'),
+                );
+              },
+              icon: const Icon(Icons.receipt_long_rounded, size: 16, color: Color(0xFFB45309)),
+              label: const Text('Download Receipt', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFB45309))),
+            ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
             child: const Text('Close', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.indigo)),
@@ -543,85 +556,185 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
                                 item['month'] ?? '',
                                 style: const TextStyle(
                                   fontSize: 15,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF0F172A),
                                 ),
                               ),
                               const SizedBox(height: 4),
-                              Text(
-                                isPaid
-                                    ? 'Paid: ${_formatDate(item['payment_date'])}'
-                                    : isPartiallyPaid
-                                        ? 'Paid: ₹${(item['paid_amount'] ?? 0).round()}   •   Rem: ₹${(item['remaining_amount'] ?? 0).round()}'
-                                        : 'Amount: ₹${(item['amount'] ?? 0).round()}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade600,
-                                  fontWeight: FontWeight.bold,
+                              Text.rich(
+                                TextSpan(
+                                  children: [
+                                    if (isPaid)
+                                      TextSpan(
+                                        text: 'Fee: ₹${(item['amount'] ?? 0).round()}   •   Paid: ₹${(item['paid_amount'] ?? item['amount'] ?? 0).round()}',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey.shade600,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      )
+                                    else if (isPartiallyPaid) ...[
+                                      TextSpan(
+                                        text: 'Fee: ₹${(item['amount'] ?? 0).round()}   •   Paid: ₹${(item['paid_amount'] ?? 0).round()}   •   ',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey.shade600,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      TextSpan(
+                                        text: 'Due: ₹${(item['remaining_amount'] ?? 0).round()}',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: Color(0xFFDC2626),
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ] else ...[
+                                      TextSpan(
+                                        text: 'Fee: ₹${(item['amount'] ?? 0).round()}   •   ',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey.shade600,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      TextSpan(
+                                        text: 'Due: ₹${(item['remaining_amount'] ?? item['amount'] ?? 0).round()}',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: Color(0xFFDC2626),
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
                               ),
                             ],
                           ),
                           Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              if (isPaid)
-                                OutlinedButton(
-                                  onPressed: () => _downloadReceipt(
+                              if (isPaid) ...[
+                                Container(
+                                  height: 24,
+                                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFD1FAE5),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Text(
+                                    'PAID',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.3,
+                                      color: Color(0xFF065F46),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                InkWell(
+                                  onTap: () => _downloadReceipt(
                                     item['id'],
                                     false,
                                     item['month'],
                                   ),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: Colors.indigo,
-                                    side: const BorderSide(color: Colors.indigo),
-                                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                                  ),
-                                  child: const Text('Receipt'),
-                                )
-                              else if (isPartiallyPaid)
-                                InkWell(
-                                  onTap: () => _showPartiallyPaidDialog(item, '${item['month']} Fee Details'),
                                   borderRadius: BorderRadius.circular(6),
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    height: 24,
+                                    width: 28,
+                                    alignment: Alignment.center,
                                     decoration: BoxDecoration(
-                                      color: Colors.amber.shade50,
-                                      border: Border.all(color: Colors.amber.shade300),
+                                      color: const Color(0xFFFFFBEB),
                                       borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: const Color(0xFFFDE68A)),
                                     ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          'PARTIALLY PAID',
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.amber.shade900,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 2),
-                                        Icon(Icons.info_outline, size: 12, color: Colors.amber.shade900),
-                                      ],
-                                    ),
-                                  ),
-                                )
-                              else
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: Colors.red.shade50,
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    'UNPAID',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.red.shade700,
+                                    child: const Icon(
+                                      Icons.receipt_long_rounded,
+                                      size: 14,
+                                      color: Color(0xFFB45309),
                                     ),
                                   ),
                                 ),
+                              ] else if (isPartiallyPaid) ...[
+                                InkWell(
+                                  onTap: () => _showPartiallyPaidDialog(item, '${item['month']} Fee Details', isAdditional: false),
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: Container(
+                                    height: 24,
+                                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFDBEAFE),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          'PARTIAL',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 0.3,
+                                            color: Color(0xFF1E40AF),
+                                          ),
+                                        ),
+                                        SizedBox(width: 2),
+                                        Icon(Icons.info_outline, size: 12, color: Color(0xFF1E40AF)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                if (item['id'] != null && item['id'] != 0) ...[
+                                  const SizedBox(width: 6),
+                                  InkWell(
+                                    onTap: () => _downloadReceipt(
+                                      item['id'],
+                                      false,
+                                      item['month'],
+                                    ),
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: Container(
+                                      height: 24,
+                                      width: 28,
+                                      alignment: Alignment.center,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFFFBEB),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: const Color(0xFFFDE68A)),
+                                      ),
+                                      child: const Icon(
+                                        Icons.receipt_long_rounded,
+                                        size: 14,
+                                        color: Color(0xFFB45309),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ] else ...[
+                                Container(
+                                  height: 24,
+                                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFEF3C7),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Text(
+                                    'UNPAID',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.3,
+                                      color: Color(0xFF92400E),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ],
@@ -721,65 +834,127 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
                                   ),
                                 ),
                                 Row(
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    if (isPaid)
-                                      OutlinedButton(
-                                        onPressed: () => _downloadReceipt(
+                                    if (isPaid) ...[
+                                      Container(
+                                        height: 24,
+                                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                                        alignment: Alignment.center,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFD1FAE5),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: const Text(
+                                          'PAID',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 0.3,
+                                            color: Color(0xFF065F46),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      InkWell(
+                                        onTap: () => _downloadReceipt(
                                           item['id'],
                                           true,
                                           item['description'],
                                         ),
-                                        style: OutlinedButton.styleFrom(
-                                          foregroundColor: Colors.indigo,
-                                          side: const BorderSide(color: Colors.indigo),
-                                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                                        ),
-                                        child: const Text('Receipt'),
-                                      )
-                                    else if (isPartiallyPaid)
-                                      InkWell(
-                                        onTap: () => _showPartiallyPaidDialog(item, '${item['description']} Details'),
                                         borderRadius: BorderRadius.circular(6),
                                         child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          height: 24,
+                                          width: 28,
+                                          alignment: Alignment.center,
                                           decoration: BoxDecoration(
-                                            color: Colors.amber.shade50,
-                                            border: Border.all(color: Colors.amber.shade300),
+                                            color: const Color(0xFFFFFBEB),
                                             borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(color: const Color(0xFFFDE68A)),
                                           ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Text(
-                                                'PARTIALLY PAID',
-                                                style: TextStyle(
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: Colors.amber.shade900,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 2),
-                                              Icon(Icons.info_outline, size: 12, color: Colors.amber.shade900),
-                                            ],
-                                          ),
-                                        ),
-                                      )
-                                    else
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: Colors.amber.shade50,
-                                          borderRadius: BorderRadius.circular(6),
-                                        ),
-                                        child: Text(
-                                          'PENDING',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.amber.shade800,
+                                          child: const Icon(
+                                            Icons.receipt_long_rounded,
+                                            size: 14,
+                                            color: Color(0xFFB45309),
                                           ),
                                         ),
                                       ),
+                                    ] else if (isPartiallyPaid) ...[
+                                      InkWell(
+                                        onTap: () => _showPartiallyPaidDialog(item, '${item['description']} Details', isAdditional: true),
+                                        borderRadius: BorderRadius.circular(6),
+                                        child: Container(
+                                          height: 24,
+                                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                                          alignment: Alignment.center,
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFDBEAFE),
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: const Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                'PARTIAL',
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w800,
+                                                  letterSpacing: 0.3,
+                                                  color: Color(0xFF1E40AF),
+                                                ),
+                                              ),
+                                              SizedBox(width: 2),
+                                              Icon(Icons.info_outline, size: 12, color: Color(0xFF1E40AF)),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      if (item['id'] != null && item['id'] != 0) ...[
+                                        const SizedBox(width: 6),
+                                        InkWell(
+                                          onTap: () => _downloadReceipt(
+                                            item['id'],
+                                            true,
+                                            item['description'],
+                                          ),
+                                          borderRadius: BorderRadius.circular(6),
+                                          child: Container(
+                                            height: 24,
+                                            width: 28,
+                                            alignment: Alignment.center,
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFFFFBEB),
+                                              borderRadius: BorderRadius.circular(6),
+                                              border: Border.all(color: const Color(0xFFFDE68A)),
+                                            ),
+                                            child: const Icon(
+                                              Icons.receipt_long_rounded,
+                                              size: 14,
+                                              color: Color(0xFFB45309),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ] else ...[
+                                      Container(
+                                        height: 24,
+                                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                                        alignment: Alignment.center,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFFEF3C7),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: const Text(
+                                          'PENDING',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 0.3,
+                                            color: Color(0xFF92400E),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ],
                                 ),
                               ],

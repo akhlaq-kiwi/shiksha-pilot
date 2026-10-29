@@ -1,3 +1,8 @@
+---
+name: frontend
+description: UI design system standards, ShadCN UI, Tailwind CSS, and React component guidelines.
+---
+
 # UI Design System Standards
 
 ## Design System Stack

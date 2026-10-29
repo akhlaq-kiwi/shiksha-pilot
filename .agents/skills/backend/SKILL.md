@@ -1,3 +1,8 @@
+---
+name: backend
+description: Backend engineering standards and architecture guidelines for PHP and Slim Framework.
+---
+
 # Backend Engineering Standards & Skills
 
 ## Technology Stack
