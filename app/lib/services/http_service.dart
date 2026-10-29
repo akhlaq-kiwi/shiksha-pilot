@@ -60,8 +60,8 @@ Future<http.Response> _executeWithFallback(
       final targetUri = Uri.parse('$base$pathAndQuery');
 
       final timeoutDuration = (base.contains('127.0.0.1') || base.contains('10.') || base.contains('localhost'))
-          ? const Duration(seconds: 3)
-          : const Duration(seconds: 15);
+          ? const Duration(seconds: 20)
+          : const Duration(seconds: 25);
 
       final response = await requestFn(targetUri).timeout(timeoutDuration);
       _checkUnauthorized(response);

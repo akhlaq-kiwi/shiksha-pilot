@@ -107,6 +107,56 @@ class MainActivity : FlutterActivity() {
                         }
                     }
                 }
+                "sharePdf" -> {
+                    val fileName = call.argument<String>("fileName") ?: "Fee_Receipt.pdf"
+                    val rawBytes = call.argument<Any>("bytes")
+                    val bytes = when (rawBytes) {
+                        is ByteArray -> rawBytes
+                        is List<*> -> {
+                            val byteArray = ByteArray(rawBytes.size)
+                            for (i in rawBytes.indices) {
+                                val item = rawBytes[i]
+                                if (item is Number) {
+                                    byteArray[i] = item.toByte()
+                                }
+                            }
+                            byteArray
+                        }
+                        else -> null
+                    }
+
+                    if (bytes == null) {
+                        result.error("INVALID_ARGUMENTS", "File bytes is null", null)
+                        return@setMethodCallHandler
+                    }
+
+                    try {
+                        val shareDir = File(cacheDir, "shared_receipts")
+                        if (!shareDir.exists()) shareDir.mkdirs()
+                        val file = File(shareDir, fileName)
+                        file.writeBytes(bytes)
+
+                        val uri = androidx.core.content.FileProvider.getUriForFile(
+                            this,
+                            "${applicationContext.packageName}.fileprovider",
+                            file
+                        )
+
+                        val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                            type = "application/pdf"
+                            putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                            putExtra(android.content.Intent.EXTRA_SUBJECT, "Fee Receipt")
+                            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+
+                        val chooser = android.content.Intent.createChooser(intent, "Share Receipt")
+                        chooser.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        startActivity(chooser)
+                        result.success(true)
+                    } catch (t: Throwable) {
+                        result.error("SHARE_ERROR", t.message ?: t.toString(), null)
+                    }
+                }
                 else -> result.notImplemented()
             }
         }

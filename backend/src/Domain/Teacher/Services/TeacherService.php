@@ -197,28 +197,7 @@ class TeacherService extends BaseService
         $userPayload = !empty($user) ? $user : ['id' => $teacherId, 'school_id' => $schoolId];
 
         if ($onlyAssigned) {
-            $assigned = $this->getTeacherAssignedClasses($pdo, $userPayload);
-            if (!empty($assigned)) {
-                return $assigned;
-            }
-
-            $role = strtoupper((string)($userPayload['role'] ?? ''));
-            // Only Principal, School Admin, or Admin can fall back to all active classes if not explicitly assigned
-            if (in_array($role, ['PRINCIPAL', 'SCHOOL_ADMIN', 'ADMIN'], true) || $this->isPrincipal($pdo, $userPayload)) {
-                $stmt = $pdo->prepare("
-                    SELECT c.id, c.name, c.section, c.academic_year_id 
-                    FROM classes c 
-                    JOIN academic_years ay ON c.academic_year_id = ay.id 
-                    WHERE c.school_id = :sid 
-                      AND (ay.is_current = 1 OR ay.status = 'ACTIVE')
-                    ORDER BY c.name ASC, c.section ASC
-                ");
-                $stmt->execute([':sid' => $schoolId]);
-                return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-            }
-
-            // Regular teacher with no assigned class: return empty list!
-            return [];
+            return $this->getTeacherAssignedClasses($pdo, $userPayload);
         }
 
         $res = $this->teacherRepo->getClasses($teacherId, $schoolId);
@@ -289,14 +268,8 @@ class TeacherService extends BaseService
         }
 
         $mergedUser = array_merge($user, $userObj);
-        $role = strtoupper((string)($mergedUser['role'] ?? 'TEACHER'));
 
-        // Principal, School Admin, and Admin can access and mark attendance for any class
-        if (in_array($role, ['PRINCIPAL', 'SCHOOL_ADMIN', 'ADMIN'], true) || $this->isPrincipal($pdo, $mergedUser)) {
-            return;
-        }
-
-        // Regular teacher: must be assigned to this class
+        // Must be assigned as the class teacher for this class
         $assigned = $this->getTeacherAssignedClasses($pdo, $mergedUser);
         $assignedClassIds = array_map(function($c) { return (int)$c['id']; }, $assigned);
 

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:school_hub/services/http_service.dart' as http;
 
 class FeeService {
@@ -133,6 +134,22 @@ class FeeService {
     } else {
       final decoded = json.decode(res.body);
       throw Exception(decoded['message'] ?? 'Failed to load collection history');
+    }
+  }
+
+  /// Download fee receipt PDF bytes
+  Future<Uint8List> downloadFeeReceipt(int studentId, int paymentId, {bool isAdditional = false}) async {
+    final uri = Uri.parse('$baseUrl/api/school/students/$studentId/fees/receipt?id=$paymentId&additional=${isAdditional ? 1 : 0}');
+    final res = await http.get(uri, headers: _headers);
+    if (res.statusCode == 200) {
+      return res.bodyBytes;
+    } else {
+      String msg = 'Failed to load receipt (${res.statusCode})';
+      try {
+        final decoded = json.decode(res.body);
+        if (decoded['message'] != null) msg = decoded['message'].toString();
+      } catch (_) {}
+      throw Exception(msg);
     }
   }
 }

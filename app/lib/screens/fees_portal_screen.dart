@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:convert';
 import 'dart:math';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:printing/printing.dart';
 import 'package:school_hub/services/fee_service.dart';
 import 'package:school_hub/screens/fees_collection_history_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -1566,6 +1568,16 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
     final className = (studentInfo['class_name'] ?? widget.studentSummary['class_name'] ?? 'N/A').toString();
     final rollNo = (studentInfo['roll_no'] ?? widget.studentSummary['roll_no'] ?? '—').toString();
     final srNo = (studentInfo['sr_no'] ?? '—').toString();
+    final photoRaw = (studentInfo['photo_path'] ?? widget.studentSummary['photo_path'] ?? studentInfo['photo'] ?? widget.studentSummary['photo'] ?? '').toString().trim();
+    String photoUrl = '';
+    if (photoRaw.isNotEmpty) {
+      if (photoRaw.startsWith('http')) {
+        photoUrl = photoRaw;
+      } else {
+        final cleanPath = photoRaw.startsWith('/') ? photoRaw : '/$photoRaw';
+        photoUrl = '${widget.feeService.baseUrl}$cleanPath';
+      }
+    }
 
     // Payments list
     final List<dynamic> payments = List<dynamic>.from(
@@ -1672,30 +1684,70 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
                 // Student Profile Card
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  padding: const EdgeInsets.fromLTRB(6, 6, 16, 6),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: const Color(0xFFE2E8F0)),
                   ),
-                  child: Column(
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Text(
-                        name,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text('Class: $className', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF475569))),
-                          const SizedBox(width: 20),
-                          Text('Roll No: $rollNo', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
-                          const SizedBox(width: 20),
-                          Text('SR No: $srNo', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
-                        ],
+                      // Left aligned student photo
+                      _buildLedgerStudentAvatar(photoUrl, name),
+                      const SizedBox(width: 14),
+
+                      // Right: Student details
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Student Name
+                            Text(
+                              name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            // Class, Roll No & SR No as plain text
+                            Wrap(
+                              spacing: 14,
+                              runSpacing: 3,
+                              children: [
+                                Text(
+                                  'Class: $className',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF64748B),
+                                  ),
+                                ),
+                                Text(
+                                  'Roll No: $rollNo',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF64748B),
+                                  ),
+                                ),
+                                Text(
+                                  'SR No: $srNo',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF64748B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -1823,6 +1875,9 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
                         final mStatus = mRow['status'] as String;
                         final isPaid = mStatus == 'PAID';
                         final isPartial = mStatus == 'PARTIAL';
+                        final monthPayments = payments
+                            .where((p) => (p['fee_month'] ?? '').toString().trim().toLowerCase() == (mRow['month'] as String).toLowerCase())
+                            .toList();
 
                         return Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -1857,28 +1912,65 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
                                   ],
                                 ),
                               ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: isPaid
-                                      ? const Color(0xFFD1FAE5)
-                                      : isPartial
-                                          ? const Color(0xFFDBEAFE)
-                                          : const Color(0xFFFEF3C7),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  mStatus,
-                                  style: TextStyle(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w800,
-                                    color: isPaid
-                                        ? const Color(0xFF065F46)
-                                        : isPartial
-                                            ? const Color(0xFF1E40AF)
-                                            : const Color(0xFF92400E),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 62,
+                                    height: 24,
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      color: isPaid
+                                          ? const Color(0xFFD1FAE5)
+                                          : isPartial
+                                              ? const Color(0xFFDBEAFE)
+                                              : const Color(0xFFFEF3C7),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      mStatus,
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: 0.3,
+                                        color: isPaid
+                                            ? const Color(0xFF065F46)
+                                            : isPartial
+                                                ? const Color(0xFF1E40AF)
+                                                : const Color(0xFF92400E),
+                                      ),
+                                    ),
                                   ),
-                                ),
+                                  if (isPaid || isPartial) ...[
+                                    const SizedBox(width: 6),
+                                    InkWell(
+                                      onTap: () {
+                                        _showReceiptBottomSheet(
+                                          studentInfo: studentInfo,
+                                          title: '${mRow['month']} Tuition Fee',
+                                          payments: monthPayments,
+                                          isAdditional: false,
+                                        );
+                                      },
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Container(
+                                        width: 28,
+                                        height: 24,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFFFFBEB),
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: const Color(0xFFFDE68A)),
+                                        ),
+                                        child: const Icon(
+                                          Icons.receipt_long_rounded,
+                                          size: 14,
+                                          color: Color(0xFFB45309),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                             ],
                           ),
@@ -1965,28 +2057,65 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
                                       style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
                                     ),
                                   ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: isPaid
-                                          ? const Color(0xFFD1FAE5)
-                                          : isPartial
-                                              ? const Color(0xFFFEF3C7)
-                                              : const Color(0xFFF1F5F9),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      status.toUpperCase(),
-                                      style: TextStyle(
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.w800,
-                                        color: isPaid
-                                            ? const Color(0xFF065F46)
-                                            : isPartial
-                                                ? const Color(0xFFB45309)
-                                                : const Color(0xFF475569),
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        width: 62,
+                                        height: 24,
+                                        alignment: Alignment.center,
+                                        decoration: BoxDecoration(
+                                          color: isPaid
+                                              ? const Color(0xFFD1FAE5)
+                                              : isPartial
+                                                  ? const Color(0xFFDBEAFE)
+                                                  : const Color(0xFFFEF3C7),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          isPartial ? 'PARTIAL' : (isPaid ? 'PAID' : 'UNPAID'),
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 9.5,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 0.3,
+                                            color: isPaid
+                                                ? const Color(0xFF065F46)
+                                                : isPartial
+                                                    ? const Color(0xFF1E40AF)
+                                                    : const Color(0xFF92400E),
+                                          ),
+                                        ),
                                       ),
-                                    ),
+                                      if (isPaid || isPartial) ...[
+                                        const SizedBox(width: 6),
+                                        InkWell(
+                                          onTap: () {
+                                            _showReceiptBottomSheet(
+                                              studentInfo: studentInfo,
+                                              title: title,
+                                              payments: [af['raw'] ?? af],
+                                              isAdditional: true,
+                                            );
+                                          },
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: Container(
+                                            width: 28,
+                                            height: 24,
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFFFFBEB),
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border.all(color: const Color(0xFFFDE68A)),
+                                            ),
+                                            child: const Icon(
+                                              Icons.receipt_long_rounded,
+                                              size: 14,
+                                              color: Color(0xFFB45309),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
                                   ),
                                 ],
                               ),
@@ -2163,6 +2292,434 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
           },
         );
       },
+    );
+  }
+
+  void _showReceiptBottomSheet({
+    required Map<String, dynamic> studentInfo,
+    required String title,
+    required List<dynamic> payments,
+    required bool isAdditional,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _ReceiptShareSheet(
+        studentInfo: studentInfo,
+        title: title,
+        payments: payments,
+        isAdditional: isAdditional,
+        feeService: widget.feeService,
+      ),
+    );
+  }
+
+  Widget _buildLedgerStudentAvatar(String photoUrl, String name) {
+    final initial = name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : 'S';
+    return Container(
+      width: 66,
+      height: 66,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: const Color(0xFFF1F5F9),
+        border: Border.all(color: const Color(0xFFCBD5E1), width: 1.5),
+      ),
+      child: ClipOval(
+        child: photoUrl.isNotEmpty
+            ? CachedNetworkImage(
+                imageUrl: photoUrl,
+                width: 66,
+                height: 66,
+                fit: BoxFit.cover,
+                placeholder: (context, url) => Center(
+                  child: Text(
+                    initial,
+                    style: const TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFFD97706),
+                    ),
+                  ),
+                ),
+                errorWidget: (context, url, error) => Center(
+                  child: Text(
+                    initial,
+                    style: const TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFFD97706),
+                    ),
+                  ),
+                ),
+              )
+            : Center(
+                child: Text(
+                  initial,
+                  style: const TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFFD97706),
+                  ),
+                ),
+              ),
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// FEE RECEIPT BOTTOM SHEET & SHARING
+// =============================================================================
+class _ReceiptShareSheet extends StatefulWidget {
+  final Map<String, dynamic> studentInfo;
+  final String title;
+  final List<dynamic> payments;
+  final bool isAdditional;
+  final FeeService feeService;
+
+  const _ReceiptShareSheet({
+    Key? key,
+    required this.studentInfo,
+    required this.title,
+    required this.payments,
+    required this.isAdditional,
+    required this.feeService,
+  }) : super(key: key);
+
+  @override
+  State<_ReceiptShareSheet> createState() => _ReceiptShareSheetState();
+}
+
+class _ReceiptShareSheetState extends State<_ReceiptShareSheet> {
+  int? _loadingPaymentId;
+
+  Future<void> _shareReceipt(int paymentId, String receiptNo, String itemTitle) async {
+    setState(() => _loadingPaymentId = paymentId);
+    try {
+      final studentId = int.tryParse(widget.studentInfo['id']?.toString() ?? '0') ?? 0;
+      final pdfBytes = await widget.feeService.downloadFeeReceipt(
+        studentId,
+        paymentId,
+        isAdditional: widget.isAdditional,
+      );
+      final cleanName = itemTitle.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+      final fileName = '${cleanName}_Receipt_${receiptNo}.pdf';
+
+      bool nativeShared = false;
+      try {
+        const platform = MethodChannel('com.shikshapilot.schoolhub/battery');
+        final res = await platform.invokeMethod('sharePdf', {
+          'fileName': fileName,
+          'bytes': pdfBytes,
+        });
+        if (res == true) {
+          nativeShared = true;
+        }
+      } catch (nativeErr) {
+        debugPrint('Native sharePdf failed: $nativeErr');
+      }
+
+      if (!nativeShared) {
+        await Printing.sharePdf(
+          bytes: pdfBytes,
+          filename: fileName,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to share receipt: ${e.toString().replaceAll('Exception: ', '')}'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _loadingPaymentId = null);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final studentName = (widget.studentInfo['name'] ??
+            '${widget.studentInfo['first_name'] ?? ''} ${widget.studentInfo['last_name'] ?? ''}')
+        .toString()
+        .trim();
+    final className = (widget.studentInfo['class_name'] ?? '—').toString();
+    final rollNo = (widget.studentInfo['roll_no'] ?? '—').toString();
+    final srNo = (widget.studentInfo['sr_no'] ?? '—').toString();
+
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.88,
+      ),
+      decoration: const BoxDecoration(
+        color: Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Drag handle
+          Container(
+            margin: const EdgeInsets.only(top: 10, bottom: 6),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+
+          // Header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.receipt_long_rounded, color: Color(0xFFB45309), size: 20),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Fee Receipt',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                      ),
+                      Text(
+                        widget.title,
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: Color(0xFFE2E8F0)),
+
+          // Body
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Student Info Card
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          studentName.isNotEmpty ? studentName : 'Student',
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                        ),
+                        const SizedBox(height: 4),
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 2,
+                          children: [
+                            Text('Class: $className', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                            Text('Roll No: $rollNo', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                            Text('SR No: $srNo', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  if (widget.payments.isEmpty)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        children: const [
+                          Icon(Icons.receipt_outlined, size: 36, color: Color(0xFF94A3B8)),
+                          SizedBox(height: 8),
+                          Text(
+                            'No receipt record found for this fee.',
+                            style: TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    ...widget.payments.map((p) {
+                      final pid = int.tryParse(p['id']?.toString() ?? '0') ?? 0;
+                      final receiptNo = (p['receipt_no'] ?? (pid > 0 ? 'REC-$pid' : '—')).toString();
+                      final amount = double.tryParse(p['amount_paid']?.toString() ?? p['amount']?.toString() ?? '0') ?? 0.0;
+                      final disc = double.tryParse(p['discount_amount']?.toString() ?? '0') ?? 0.0;
+                      final payDate = (p['payment_date'] ?? p['created_at'] ?? '—').toString().split(' ')[0];
+                      final mode = (p['payment_method'] ?? 'Cash').toString();
+                      final collectedBy = (p['collected_by'] ?? 'School Admin').toString();
+                      final rawStatus = (p['status'] ?? (widget.isAdditional ? 'Paid' : 'PAID')).toString().toUpperCase();
+                      final isPart = rawStatus.contains('PART');
+                      final isSharing = _loadingPaymentId == pid;
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          boxShadow: [
+                            BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2)),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Header of card
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.vertical(top: Radius.circular(13)),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.receipt_rounded, size: 16, color: Color(0xFF475569)),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Receipt: $receiptNo',
+                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF1E293B)),
+                                      ),
+                                    ],
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: isPart ? const Color(0xFFDBEAFE) : const Color(0xFFD1FAE5),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      isPart ? 'PARTIAL' : 'PAID',
+                                      style: TextStyle(
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.w800,
+                                        color: isPart ? const Color(0xFF1E40AF) : const Color(0xFF065F46),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // Details
+                            Padding(
+                              padding: const EdgeInsets.all(14),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Amount Paid',
+                                        style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '₹${amount.round()}',
+                                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF16A34A)),
+                                      ),
+                                      if (disc > 0)
+                                        Text(
+                                          'Discount: ₹${disc.round()}',
+                                          style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600),
+                                        ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      if (collectedBy.isNotEmpty)
+                                        Text(
+                                          'Collected By: $collectedBy',
+                                          style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                                        )
+                                      else
+                                        const SizedBox(),
+                                      Text(
+                                        'Date: $payDate',
+                                        style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                                      ),
+                                    ],
+                                  ),
+
+                                  const Divider(height: 20, color: Color(0xFFF1F5F9)),
+
+                                  // Actions: Full-width Share Receipt button
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton.icon(
+                                      onPressed: (pid <= 0 || isSharing)
+                                          ? null
+                                          : () => _shareReceipt(pid, receiptNo, widget.title),
+                                      icon: isSharing
+                                          ? const SizedBox(
+                                              width: 16,
+                                              height: 16,
+                                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                            )
+                                          : const Icon(Icons.share_rounded, size: 18),
+                                      label: Text(
+                                        isSharing ? 'Preparing Receipt...' : 'Share Receipt',
+                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+                                      ),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF16A34A),
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                        elevation: 0,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
