@@ -499,6 +499,8 @@ class TeacherAttendanceService
         $holidayDates = array_flip($stmtHol->fetchAll(PDO::FETCH_COLUMN));
 
         $todayStr = date('Y-m-d');
+        $settings = $this->getSettings($user);
+        $globalConfiguredTime = $settings['entry_time'] ?? '08:30 AM';
 
         $staffAttMap = [];
         foreach ($allAtt as $att) {
@@ -546,12 +548,38 @@ class TeacherAttendanceService
                     if ($stStatus === 'Present') {
                         $present++;
                         $entryT = $attRow['entry_time'] ?? '—';
+                        $recordOfficialTime = (!empty($attRow['official_entry_time']))
+                            ? $attRow['official_entry_time']
+                            : $globalConfiguredTime;
+                        $diffText = null;
+                        $isLateFlag = (bool)$attRow['is_late'];
+                        $isEarlyFlag = false;
+                        if ($entryT !== '—' && !empty($entryT)) {
+                            $officialMins = $this->parseTimeToMinutes($recordOfficialTime);
+                            $entryMins = $this->parseTimeToMinutes($entryT);
+                            if ($entryMins > $officialMins) {
+                                $diff = $entryMins - $officialMins;
+                                $diffText = $this->formatMinutesText($diff) . ' Late';
+                                $isLateFlag = true;
+                            } elseif ($entryMins < $officialMins) {
+                                $diff = $officialMins - $entryMins;
+                                $diffText = $this->formatMinutesText($diff) . ' Early';
+                                $isEarlyFlag = true;
+                            } else {
+                                $diffText = 'On Time';
+                            }
+                        }
                         $pItem = [
                             'date' => $dtStr,
                             'status' => 'Present',
                             'entry_time' => $entryT,
+                            'official_entry_time' => $recordOfficialTime,
                             'reach_time' => $attRow['reach_time'] ?? null,
-                            'is_late' => (bool)$attRow['is_late'],
+                            'is_late' => $isLateFlag,
+                            'is_early' => $isEarlyFlag,
+                            'late_text' => $isLateFlag ? $diffText : null,
+                            'early_text' => $isEarlyFlag ? $diffText : null,
+                            'diff_text' => $diffText,
                         ];
                         $presentDates[] = $pItem;
 

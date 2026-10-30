@@ -6,6 +6,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:printing/printing.dart';
 import 'package:school_hub/services/fee_service.dart';
 import 'package:school_hub/screens/fees_collection_history_screen.dart';
+import 'package:school_hub/screens/manage_finance_fees_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class FeesPortalScreen extends StatefulWidget {
@@ -468,10 +469,50 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: Color(0xFF475569)),
-            tooltip: 'Refresh',
-            onPressed: _loadPortalData,
+          Padding(
+            padding: const EdgeInsets.only(right: 14.0),
+            child: Center(
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ManageFinanceFeesScreen(
+                          feeService: _feeService,
+                        ),
+                      ),
+                    );
+                    _loadPortalData();
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFD97706), Color(0xFFF59E0B)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFD97706).withValues(alpha: 0.35),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.add_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),

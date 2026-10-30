@@ -138,12 +138,20 @@ class MyApp extends StatelessWidget {
         fontFamily: 'Roboto',
         scaffoldBackgroundColor: AppColors.surfaceCanvas,
         colorScheme: AppColors.lightColorScheme,
+        tabBarTheme: const TabBarThemeData(
+          splashFactory: NoSplash.splashFactory,
+          overlayColor: WidgetStatePropertyAll(Colors.transparent),
+        ),
       ),
       darkTheme: ThemeData(
         useMaterial3: true,
         fontFamily: 'Roboto',
         scaffoldBackgroundColor: AppColors.darkSurfaceCanvas,
         colorScheme: AppColors.darkColorScheme,
+        tabBarTheme: const TabBarThemeData(
+          splashFactory: NoSplash.splashFactory,
+          overlayColor: WidgetStatePropertyAll(Colors.transparent),
+        ),
       ),
       themeMode: ThemeMode.light,
       home: const SplashScreen(),

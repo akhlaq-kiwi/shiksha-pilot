@@ -47,10 +47,10 @@ class _AttachmentGalleryScreenState extends State<AttachmentGalleryScreen> {
     if (_loadedImageBytes.containsKey(index) || _loadingStates[index] == true) return;
 
     final att = Map<String, dynamic>.from(widget.attachments[index]);
-    final rawPath = att['file_path'] ?? '';
-    final name = att['file_name'] ?? 'File';
-    final type = att['file_type'] ?? '';
-    final isPdf = type == 'pdf' || name.toLowerCase().endsWith('.pdf');
+    final rawPath = (att['file_path'] ?? att['path'] ?? '').toString();
+    final name = (att['file_name'] ?? att['category'] ?? 'File').toString();
+    final type = (att['file_type'] ?? '').toString();
+    final isPdf = type == 'pdf' || name.toLowerCase().endsWith('.pdf') || rawPath.toLowerCase().endsWith('.pdf');
     if (isPdf) return;
 
     setState(() {
@@ -82,9 +82,11 @@ class _AttachmentGalleryScreenState extends State<AttachmentGalleryScreen> {
       }
     }
 
-    const headers = {
+    final token = prefs.getString('token') ?? prefs.getString('auth_token') ?? '';
+    final headers = <String, String>{
       'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Mobile)',
       'Accept': 'image/*,*/*',
+      if (token.isNotEmpty) 'Authorization': 'Bearer $token',
     };
 
     String lastErr = 'Failed to load image';
@@ -145,9 +147,11 @@ class _AttachmentGalleryScreenState extends State<AttachmentGalleryScreen> {
         }
       }
 
-      const headers = {
+      final token = prefs.getString('token') ?? prefs.getString('auth_token') ?? '';
+      final headers = <String, String>{
         'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Mobile)',
         'Accept': 'application/pdf,*/*',
+        if (token.isNotEmpty) 'Authorization': 'Bearer $token',
       };
 
       http.Response? response;
@@ -203,7 +207,11 @@ class _AttachmentGalleryScreenState extends State<AttachmentGalleryScreen> {
     }
 
     final currentAtt = Map<String, dynamic>.from(widget.attachments[_currentIndex]);
-    final String currentName = currentAtt['file_name'] ?? 'Attachment';
+    final currentCat = currentAtt['category']?.toString();
+    final currentNameRaw = (currentAtt['file_name'] ?? currentCat ?? 'Attachment').toString();
+    final String currentName = (currentCat != null && currentCat.isNotEmpty && !currentNameRaw.toLowerCase().contains(currentCat.toLowerCase()))
+        ? '$currentCat - $currentNameRaw'
+        : currentNameRaw;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -239,14 +247,14 @@ class _AttachmentGalleryScreenState extends State<AttachmentGalleryScreen> {
         },
         itemBuilder: (context, index) {
           final att = Map<String, dynamic>.from(widget.attachments[index]);
-          final rawPath = att['file_path'] ?? '';
-          final name = att['file_name'] ?? 'File';
-          final type = att['file_type'] ?? '';
+          final rawPath = (att['file_path'] ?? att['path'] ?? '').toString();
+          final name = (att['file_name'] ?? att['category'] ?? 'File').toString();
+          final type = (att['file_type'] ?? '').toString();
 
           final cleanBaseUrl = widget.baseUrl.replaceAll(RegExp(r'/$'), '');
           final cleanRawPath = rawPath.startsWith('/') ? rawPath : '/$rawPath';
           final fullUrl = rawPath.startsWith('http') ? rawPath : '$cleanBaseUrl$cleanRawPath';
-          final isPdf = type == 'pdf' || name.toLowerCase().endsWith('.pdf');
+          final isPdf = type == 'pdf' || name.toLowerCase().endsWith('.pdf') || rawPath.toLowerCase().endsWith('.pdf');
 
           if (isPdf) {
             return Center(

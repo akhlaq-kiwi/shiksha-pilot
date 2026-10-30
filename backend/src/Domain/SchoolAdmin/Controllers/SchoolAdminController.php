@@ -44,7 +44,7 @@ class SchoolAdminController extends BaseController
     public function getStudents(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireStaffAccess($user);
 
         $filters = $request->getQueryParams();
         $data    = $this->service->getStudents($user, $filters);
@@ -55,7 +55,7 @@ class SchoolAdminController extends BaseController
     public function createStudent(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireStaffAccess($user);
 
         $body    = RequestParser::body($request);
         $student = $this->service->createStudent($user, $body);
@@ -66,7 +66,7 @@ class SchoolAdminController extends BaseController
     public function getStudentById(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireStaffAccess($user);
 
         $id = (int) ($args['id'] ?? 0);
         $student = $this->service->getStudentById($user, $id);
@@ -77,7 +77,7 @@ class SchoolAdminController extends BaseController
     public function getFeeReceipt(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireStaffAccess($user);
 
         $studentId = (int)($args['student_id'] ?? 0);
         $params = $request->getQueryParams();
@@ -96,7 +96,7 @@ class SchoolAdminController extends BaseController
     public function updateStudent(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireStaffAccess($user);
 
         $id = (int) ($args['id'] ?? 0);
         $body = RequestParser::body($request);
@@ -108,7 +108,7 @@ class SchoolAdminController extends BaseController
     public function advanceStudent(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireStaffAccess($user);
 
         $id = (int) ($args['id'] ?? 0);
         $body = RequestParser::body($request);
@@ -123,7 +123,7 @@ class SchoolAdminController extends BaseController
     public function checkSrNo(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireStaffAccess($user);
 
         $params = $request->getQueryParams();
         $srNo = $params['sr_no'] ?? '';
@@ -147,7 +147,7 @@ class SchoolAdminController extends BaseController
     public function uploadDocument(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireStaffAccess($user);
 
         $uploadedFiles = $request->getUploadedFiles();
         if (empty($uploadedFiles)) {
@@ -193,10 +193,19 @@ class SchoolAdminController extends BaseController
     // Staff
     // -------------------------------------------------------------------------
 
+    private function requireStaffAccess(array $user): void
+    {
+        $role = (string) ($user['role'] ?? '');
+        if ($role === 'SCHOOL_ADMIN' || $role === 'SUPER_ADMIN' || $role === 'PRINCIPAL' || $this->service->isPrincipal($user) || $this->service->isFeeCollector($user)) {
+            return;
+        }
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+    }
+
     public function getStaff(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireStaffAccess($user);
 
         $params = $request->getQueryParams();
         $data = $this->service->getStaff($user, $params);
@@ -207,7 +216,7 @@ class SchoolAdminController extends BaseController
     public function createStaff(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireStaffAccess($user);
 
         $body   = RequestParser::body($request);
         $member = $this->service->createStaff($user, $body);
@@ -218,7 +227,7 @@ class SchoolAdminController extends BaseController
     public function updateStaff(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireStaffAccess($user);
 
         $id     = (int)$args['id'];
         $body   = RequestParser::body($request);
@@ -230,7 +239,7 @@ class SchoolAdminController extends BaseController
     public function getStaffDetails(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireStaffAccess($user);
 
         $id = (int)$args['id'];
         $params = $request->getQueryParams();
@@ -302,7 +311,7 @@ class SchoolAdminController extends BaseController
     public function getClasses(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireStaffAccess($user);
 
         $params = $request->getQueryParams();
         $data = $this->service->getClasses($user, $params);
@@ -323,7 +332,7 @@ class SchoolAdminController extends BaseController
     public function createClass(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireStaffAccess($user);
 
         $body  = RequestParser::body($request);
         $class = $this->service->createClass($user, $body);
@@ -1036,14 +1045,45 @@ class SchoolAdminController extends BaseController
         if (str_contains($uri, '/api/school/fee-payments') || 
             str_contains($uri, '/api/school/class-fee-configurations') || 
             str_contains($uri, '/api/school/additional-fees') || 
+            str_contains($uri, '/api/school/annual-fees') || 
+            str_contains($uri, '/api/school/transport-fees') || 
             str_contains($uri, '/api/school/collection-history') ||
             str_contains($uri, '/api/school/fee-structures') ||
             str_contains($uri, '/api/school/staff-payments') ||
             str_contains($uri, '/api/school/stats') ||
             str_contains($uri, '/api/school/expenses') ||
             str_contains($uri, '/api/school/academic-years') ||
+            str_contains($uri, '/api/school/financial-reports') ||
             (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && (str_contains($uri, '/api/school/students') || str_contains($uri, '/api/school/classes') || str_contains($uri, '/api/school/staff')))) {
             if ($userRole === 'SCHOOL_ADMIN' || $this->service->isFeeCollector($user)) {
+                if ($this->service->checkSubscriptionExpired($user)) {
+                    throw new \App\Shared\Exceptions\ForbiddenException('Subscription Expired. Access Denied.');
+                }
+                return;
+            }
+        }
+
+        // Classes & Teachers modules, Credentials, Timetable Settings & Upload authorization for Principal & Fee Collector
+        if (str_contains($uri, '/api/school/classes') || 
+            str_contains($uri, '/api/school/students') || 
+            str_contains($uri, '/api/school/staff') || 
+            str_contains($uri, '/api/school/credentials') ||
+            str_contains($uri, '/api/school/timetable-settings') ||
+            str_contains($uri, '/api/school/upload')) {
+            if ($userRole === 'SCHOOL_ADMIN' || $userRole === 'SUPER_ADMIN' || $userRole === 'PRINCIPAL' || $this->service->isPrincipal($user) || $this->service->isFeeCollector($user)) {
+                if ($this->service->checkSubscriptionExpired($user)) {
+                    throw new \App\Shared\Exceptions\ForbiddenException('Subscription Expired. Access Denied.');
+                }
+                return;
+            }
+        }
+
+        // Principal Examinations route authorization
+        if (str_contains($uri, '/api/school/exams-new') || 
+            str_contains($uri, '/api/school/exams') || 
+            str_contains($uri, '/api/school/exam-marks') || 
+            str_contains($uri, '/api/school/grade-configurations')) {
+            if ($userRole === 'SCHOOL_ADMIN' || $userRole === 'SUPER_ADMIN' || $userRole === 'PRINCIPAL' || $this->service->isPrincipal($user)) {
                 if ($this->service->checkSubscriptionExpired($user)) {
                     throw new \App\Shared\Exceptions\ForbiddenException('Subscription Expired. Access Denied.');
                 }
@@ -1199,6 +1239,7 @@ class SchoolAdminController extends BaseController
                 '/api/school/collection-history' => 'Fees Portal',
                 '/api/school/class-fee-configurations' => 'Fees Portal',
                 '/api/school/additional-fees' => 'Fees Portal',
+                '/api/school/annual-fees' => 'Fees Portal',
                 '/api/school/financial-reports' => 'Financial Reports',
                 '/api/school/finance-management' => 'Finance Management',
                 '/api/school/expenses' => 'Finance Management',
@@ -1345,7 +1386,7 @@ class SchoolAdminController extends BaseController
     public function updateClass(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireStaffAccess($user);
 
         $body  = RequestParser::body($request);
         $class = $this->service->updateClass($user, $body);
@@ -1356,7 +1397,7 @@ class SchoolAdminController extends BaseController
     public function deleteClass(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireStaffAccess($user);
 
         $body   = RequestParser::body($request);
         $query  = RequestParser::query($request);
@@ -1370,7 +1411,7 @@ class SchoolAdminController extends BaseController
     public function transferStudents(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireStaffAccess($user);
 
         $body   = RequestParser::body($request);
         $result = $this->service->transferStudents($user, $body);
@@ -1381,7 +1422,7 @@ class SchoolAdminController extends BaseController
     public function deleteSection(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireStaffAccess($user);
 
         $body   = RequestParser::body($request);
         $result = $this->service->deleteSection($user, $body);
@@ -1583,7 +1624,7 @@ class SchoolAdminController extends BaseController
     public function getFinancialPreview(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireStaffAccess($user);
 
         $params = $request->getQueryParams();
         $from = $params['from_date'] ?? '';
@@ -1597,7 +1638,7 @@ class SchoolAdminController extends BaseController
     public function getFinancialReports(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireStaffAccess($user);
 
         $data = $this->service->getFinancialReports($user);
 
@@ -1607,7 +1648,7 @@ class SchoolAdminController extends BaseController
     public function createFinancialReport(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireStaffAccess($user);
 
         $body = RequestParser::body($request);
         $data = $this->service->createFinancialReport($user, $body);
@@ -1618,7 +1659,7 @@ class SchoolAdminController extends BaseController
     public function updateFinancialReportStatus(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireStaffAccess($user);
 
         $id = (int)$args['id'];
         $body = RequestParser::body($request);
@@ -1630,7 +1671,7 @@ class SchoolAdminController extends BaseController
     public function submitSettlementRequest(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireStaffAccess($user);
 
         $id = (int)$args['id'];
         $data = $this->service->submitSettlementRequest($user, $id);
@@ -1641,7 +1682,7 @@ class SchoolAdminController extends BaseController
     public function deleteFinancialReport(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireStaffAccess($user);
 
         $id = (int)$args['id'];
         $this->service->deleteFinancialReport($user, $id);
@@ -1652,7 +1693,7 @@ class SchoolAdminController extends BaseController
     public function exportFinancialReport(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireStaffAccess($user);
 
         $id = (int)$args['id'];
         $filename = "";
@@ -1669,7 +1710,7 @@ class SchoolAdminController extends BaseController
     public function exportFinancialPreviewReport(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireStaffAccess($user);
 
         $params = $request->getQueryParams();
         $from = $params['from_date'] ?? '';
@@ -2122,7 +2163,7 @@ class SchoolAdminController extends BaseController
     public function getCredentials(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireStaffAccess($user);
 
         $role = $args['role'] ?? '';
         $id = (int)($args['id'] ?? 0);
@@ -2135,7 +2176,7 @@ class SchoolAdminController extends BaseController
     public function generateCredentials(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireStaffAccess($user);
 
         $body = RequestParser::body($request);
         $result = $this->service->generateCredentials($user, $body);

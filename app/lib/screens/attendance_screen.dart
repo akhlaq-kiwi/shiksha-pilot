@@ -181,13 +181,35 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     });
 
     try {
-      final classesList = await widget.attendanceService.getTeacherClasses();
+      final rawClasses = await widget.attendanceService.getTeacherClasses();
       List<dynamic> holidaysList = [];
       try {
         holidaysList = await widget.attendanceService.getHolidays();
       } catch (he) {
         debugPrint('Error loading holidays: $he');
       }
+
+      // Filter unsectioned classes if sectioned variants exist for the same class name
+      final Set<String> classesWithSections = {};
+      for (final c in rawClasses) {
+        final name = (c['name'] ?? '').toString().trim().toLowerCase();
+        final sec = (c['section'] ?? '').toString().trim();
+        if (sec.isNotEmpty) {
+          classesWithSections.add(name);
+        }
+      }
+
+      final List<dynamic> classesList = sortClassesAscending(
+        rawClasses.where((c) {
+          final name = (c['name'] ?? '').toString().trim().toLowerCase();
+          final sec = (c['section'] ?? '').toString().trim();
+          if (sec.isEmpty && classesWithSections.contains(name)) {
+            return false;
+          }
+          return true;
+        }).toList(),
+      );
+
       setState(() {
         _classes = classesList;
         _holidays = holidaysList;
@@ -196,10 +218,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       if (classesList.isNotEmpty) {
         _selectedClassId = classesList[0]['id'];
         final firstClass = classesList[0];
-        final section = firstClass['section'];
-        _selectedClassName = (section != null && section.toString().isNotEmpty)
-            ? '${firstClass['name']}-$section'
-            : firstClass['name'];
+        _selectedClassName = formatShortClassName(
+          firstClass['name']?.toString(),
+          section: firstClass['section']?.toString(),
+        );
         await _fetchTeacherStudentsAndHistory();
       } else {
         setState(() {
@@ -1151,42 +1173,92 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                           ],
                         ),
                       )
-                    : Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey.shade200),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<int>(
-                            value: _selectedClassId,
-                            isExpanded: false,
-                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87, fontSize: 14),
-                            items: sortClassesAscending(_classes).map((cls) {
-                              final String rawName = cls['name']?.toString() ?? '';
-                              final String sec = cls['section']?.toString() ?? '';
-                              final String displayName = formatShortClassName(rawName, section: sec);
-                              return DropdownMenuItem<int>(
-                                value: cls['id'] as int,
-                                child: Text(displayName),
-                              );
-                            }).toList(),
-                            onChanged: _isLoadingTeacherData ? null : (val) {
-                              if (val != null) {
-                                setState(() {
-                                  _selectedClassId = val;
-                                  final matched = _classes.firstWhere((c) => c['id'] == val);
-                                  final sec = matched['section'];
-                                  _selectedClassName = (sec != null && sec.toString().isNotEmpty)
-                                      ? '${matched['name']}-$sec'
-                                      : matched['name'];
-                                });
-                                _fetchTeacherStudentsAndHistory();
-                              }
-                            },
-                          ),
-                        ),
+                    : Builder(
+                        builder: (btnContext) {
+                          final sortedClasses = sortClassesAscending(_classes);
+                          return InkWell(
+                            onTap: _isLoadingTeacherData
+                                ? null
+                                : () async {
+                                    final renderBox = btnContext.findRenderObject() as RenderBox?;
+                                    if (renderBox == null) return;
+                                    final offset = renderBox.localToGlobal(Offset.zero);
+                                    final size = renderBox.size;
+                                    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
+                                    if (overlay == null) return;
+
+                                    final position = RelativeRect.fromRect(
+                                      Rect.fromLTWH(offset.dx, offset.dy + size.height + 4, size.width, size.height),
+                                      Offset.zero & overlay.size,
+                                    );
+
+                                    final selected = await showMenu<int>(
+                                      context: context,
+                                      position: position,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                      color: Colors.white,
+                                      elevation: 6,
+                                      constraints: BoxConstraints(
+                                        minWidth: size.width < 180 ? 180 : size.width,
+                                        maxWidth: size.width < 220 ? 220 : size.width,
+                                        maxHeight: 280,
+                                      ),
+                                      items: sortedClasses.map((cls) {
+                                        final id = cls['id'] as int;
+                                        final rawName = cls['name']?.toString() ?? '';
+                                        final sec = cls['section']?.toString() ?? '';
+                                        final displayName = formatShortClassName(rawName, section: sec);
+                                        final isSelected = id == _selectedClassId;
+
+                                        return PopupMenuItem<int>(
+                                          value: id,
+                                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                          child: Text(
+                                            displayName,
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
+                                              color: isSelected ? const Color(0xFFD97706) : const Color(0xFF1E293B),
+                                            ),
+                                          ),
+                                        );
+                                      }).toList(),
+                                    );
+
+                                    if (selected != null) {
+                                      setState(() {
+                                        _selectedClassId = selected;
+                                        final matched = _classes.firstWhere((c) => c['id'] == selected);
+                                        _selectedClassName = formatShortClassName(
+                                          matched['name']?.toString(),
+                                          section: matched['section']?.toString(),
+                                        );
+                                      });
+                                      _fetchTeacherStudentsAndHistory();
+                                    }
+                                  },
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.grey.shade200),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    _selectedClassName,
+                                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87, fontSize: 14),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B), size: 18),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
                       ),
               ),
               const SizedBox(width: 12),

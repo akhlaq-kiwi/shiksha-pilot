@@ -269,6 +269,11 @@ class TeacherService extends BaseService
 
         $mergedUser = array_merge($user, $userObj);
 
+        // Principal / School Admin has oversight over all classes
+        if ($this->isPrincipal($pdo, $mergedUser)) {
+            return;
+        }
+
         // Must be assigned as the class teacher for this class
         $assigned = $this->getTeacherAssignedClasses($pdo, $mergedUser);
         $assignedClassIds = array_map(function($c) { return (int)$c['id']; }, $assigned);
@@ -540,6 +545,7 @@ class TeacherService extends BaseService
             FROM students s
             LEFT JOIN classes c ON s.class_id = c.id
             WHERE s.class_id = :class_id AND s.school_id = :school_id AND s.status = 'ACTIVE'
+              AND (s.academic_year_id = c.academic_year_id OR c.academic_year_id IS NULL OR s.academic_year_id IS NULL)
             ORDER BY CASE WHEN s.roll_no IS NULL OR s.roll_no = '' THEN 1 ELSE 0 END, CAST(s.roll_no AS UNSIGNED) ASC, name
         ");
         $stmt->execute([':class_id' => $classId, ':school_id' => $schoolId]);
@@ -1666,6 +1672,47 @@ class TeacherService extends BaseService
     public function getTeacherAssignedClasses(PDO $pdo, array $user): array
     {
         $schoolId = (int)($user['school_id'] ?? 0);
+        $role = strtoupper((string)($user['role'] ?? ''));
+        $isPrincipalOrAdmin = in_array($role, ['PRINCIPAL', 'SCHOOL_ADMIN', 'ADMIN'], true) || $this->isPrincipal($pdo, $user);
+
+        $filterUnsectioned = function(array $list): array {
+            $hasSections = [];
+            foreach ($list as $c) {
+                $name = strtolower(trim((string)($c['name'] ?? '')));
+                $sec = trim((string)($c['section'] ?? ''));
+                if ($sec !== '') {
+                    $hasSections[$name] = true;
+                }
+            }
+            $res = [];
+            foreach ($list as $c) {
+                $name = strtolower(trim((string)($c['name'] ?? '')));
+                $sec = trim((string)($c['section'] ?? ''));
+                if ($sec === '' && !empty($hasSections[$name])) {
+                    continue; // Skip unsectioned duplicate since sectioned entries exist
+                }
+                $res[] = $c;
+            }
+            return $res;
+        };
+
+        // Principal / School Admin can access all active school classes to manage examinations
+        if ($isPrincipalOrAdmin) {
+            $stmtAll = $pdo->prepare("
+                SELECT DISTINCT c.id, c.name, c.section, c.academic_year_id
+                FROM classes c
+                JOIN academic_years ay ON c.academic_year_id = ay.id
+                WHERE c.school_id = :sid
+                  AND (ay.status = 'ACTIVE' OR ay.is_current = 1)
+                ORDER BY c.name ASC, c.section ASC
+            ");
+            $stmtAll->execute([':sid' => $schoolId]);
+            $allSchoolClasses = $stmtAll->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            if (!empty($allSchoolClasses)) {
+                return $filterUnsectioned($allSchoolClasses);
+            }
+        }
+
         $staffIds = $this->getTeacherStaffIds($pdo, $user);
         if (empty($staffIds)) {
             return [];
@@ -1690,7 +1737,7 @@ class TeacherService extends BaseService
         ");
         $stmtAssign->execute([':sid' => $schoolId]);
         $activeClasses = $stmtAssign->fetchAll(PDO::FETCH_ASSOC) ?: [];
-        return $activeClasses;
+        return $filterUnsectioned($activeClasses);
     }
 
     private function getTeacherClassId(PDO $pdo, array $user, ?int $requestAyId = null, ?int $passedClassId = null): ?int

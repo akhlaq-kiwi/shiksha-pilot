@@ -8,12 +8,14 @@ class ExamListScreen extends StatefulWidget {
   final ExamService examService;
   final String userRole;
   final int? selectedStudentId;
+  final bool isPrincipal;
 
   const ExamListScreen({
     Key? key,
     required this.examService,
     required this.userRole,
     this.selectedStudentId,
+    this.isPrincipal = false,
   }) : super(key: key);
 
   @override
@@ -321,7 +323,16 @@ class _ExamListScreenState extends State<ExamListScreen> {
         titleSpacing: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF1E293B), size: 18),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            if (_selectedClass != null && _assignedClasses.length > 1) {
+              setState(() {
+                _selectedClass = null;
+                _exams = [];
+              });
+            } else {
+              Navigator.pop(context);
+            }
+          },
         ),
         title: Padding(
           padding: const EdgeInsets.only(top: 4.0),
@@ -339,7 +350,18 @@ class _ExamListScreenState extends State<ExamListScreen> {
         ),
         iconTheme: const IconThemeData(color: Color(0xFF1E293B)),
       ),
-      body: RefreshIndicator(
+      body: PopScope(
+        canPop: _selectedClass == null || _assignedClasses.length <= 1,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
+          if (_selectedClass != null && _assignedClasses.length > 1) {
+            setState(() {
+              _selectedClass = null;
+              _exams = [];
+            });
+          }
+        },
+        child: RefreshIndicator(
         onRefresh: _loadExams,
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
@@ -690,8 +712,9 @@ class _ExamListScreenState extends State<ExamListScreen> {
                           ),
                         ],
                       ),
-      ),
-    );
+          ),
+        ),
+      );
   }
 }
 

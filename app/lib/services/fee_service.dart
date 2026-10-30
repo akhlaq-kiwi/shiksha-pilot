@@ -152,5 +152,200 @@ class FeeService {
       throw Exception(msg);
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Additional Fees, Annual Fees & Transport Fees Management APIs
+  // ---------------------------------------------------------------------------
+
+  /// Fetch list of additional fee type definitions
+  Future<List<dynamic>> getAdditionalFeeTypes() async {
+    final uri = Uri.parse('$baseUrl/api/school/additional-fees/types');
+    final res = await http.get(uri, headers: _headers);
+    if (res.statusCode == 200) {
+      final decoded = json.decode(res.body);
+      return (decoded['data'] ?? decoded) as List<dynamic>;
+    } else {
+      final err = json.decode(res.body);
+      throw Exception(err['message'] ?? 'Failed to load additional fee types');
+    }
+  }
+
+  /// Create a new additional fee type
+  Future<Map<String, dynamic>> createAdditionalFeeType(Map<String, dynamic> data) async {
+    final uri = Uri.parse('$baseUrl/api/school/additional-fees/types');
+    final res = await http.post(uri, headers: _headers, body: json.encode(data));
+    final decoded = json.decode(res.body);
+    if (res.statusCode == 200 || res.statusCode == 201) {
+      return decoded;
+    } else {
+      String msg = 'Failed to create additional fee';
+      if (decoded['message'] != null) {
+        msg = decoded['message'].toString();
+      } else if (decoded['errors'] != null) {
+        final errs = decoded['errors'];
+        msg = errs is Map ? errs.values.first.toString() : errs.toString();
+      }
+      throw Exception(msg);
+    }
+  }
+
+  /// Update an existing additional fee type
+  Future<Map<String, dynamic>> updateAdditionalFeeType(int id, Map<String, dynamic> data) async {
+    final uri = Uri.parse('$baseUrl/api/school/additional-fees/types/$id');
+    final res = await http.put(uri, headers: _headers, body: json.encode(data));
+    final decoded = json.decode(res.body);
+    if (res.statusCode == 200) {
+      return decoded;
+    } else {
+      String msg = 'Failed to update additional fee';
+      if (decoded['message'] != null) {
+        msg = decoded['message'].toString();
+      } else if (decoded['errors'] != null) {
+        final errs = decoded['errors'];
+        msg = errs is Map ? errs.values.first.toString() : errs.toString();
+      }
+      throw Exception(msg);
+    }
+  }
+
+  /// Delete an additional fee type
+  Future<void> deleteAdditionalFeeType(int id) async {
+    final uri = Uri.parse('$baseUrl/api/school/additional-fees/types/$id');
+    final res = await http.delete(uri, headers: _headers);
+    if (res.statusCode != 200) {
+      final decoded = json.decode(res.body);
+      throw Exception(decoded['message'] ?? 'Failed to delete additional fee');
+    }
+  }
+
+  /// Create Annual Fee
+  Future<Map<String, dynamic>> createAnnualFee(Map<String, dynamic> data) async {
+    final uri = Uri.parse('$baseUrl/api/school/annual-fees');
+    final res = await http.post(uri, headers: _headers, body: json.encode(data));
+    final decoded = json.decode(res.body);
+    if (res.statusCode == 200 || res.statusCode == 201) {
+      return decoded;
+    } else {
+      String msg = 'Failed to create annual fee';
+      if (decoded['message'] != null) {
+        msg = decoded['message'].toString();
+      } else if (decoded['errors'] != null) {
+        final errs = decoded['errors'];
+        msg = errs is Map ? errs.values.first.toString() : errs.toString();
+      }
+      throw Exception(msg);
+    }
+  }
+
+  /// Fetch list of transport fees
+  Future<List<dynamic>> getTransportFees({String? status}) async {
+    var url = '$baseUrl/api/school/transport-fees';
+    if (status != null && status.isNotEmpty && status != 'All') {
+      url += '?status=$status';
+    }
+    final uri = Uri.parse(url);
+    final res = await http.get(uri, headers: _headers);
+    if (res.statusCode == 200) {
+      final decoded = json.decode(res.body);
+      return (decoded['data'] ?? decoded) as List<dynamic>;
+    } else {
+      final err = json.decode(res.body);
+      throw Exception(err['message'] ?? 'Failed to load transport fees');
+    }
+  }
+
+  /// Assign a new transport fee
+  Future<Map<String, dynamic>> assignTransportFee(Map<String, dynamic> data) async {
+    final uri = Uri.parse('$baseUrl/api/school/transport-fees');
+    final res = await http.post(uri, headers: _headers, body: json.encode(data));
+    final decoded = json.decode(res.body);
+    if (res.statusCode == 200 || res.statusCode == 201) {
+      return decoded;
+    } else {
+      String msg = 'Failed to assign transport fee';
+      if (decoded['message'] != null) {
+        msg = decoded['message'].toString();
+      } else if (decoded['errors'] != null) {
+        final errs = decoded['errors'];
+        msg = errs is Map ? errs.values.first.toString() : errs.toString();
+      }
+      throw Exception(msg);
+    }
+  }
+
+  /// Update an existing transport fee assignment
+  Future<Map<String, dynamic>> updateTransportFee(int id, Map<String, dynamic> data) async {
+    final uri = Uri.parse('$baseUrl/api/school/transport-fees/$id');
+    final res = await http.put(uri, headers: _headers, body: json.encode(data));
+    final decoded = json.decode(res.body);
+    if (res.statusCode == 200) {
+      return decoded;
+    } else {
+      String msg = 'Failed to update transport fee';
+      if (decoded['message'] != null) {
+        msg = decoded['message'].toString();
+      } else if (decoded['errors'] != null) {
+        final errs = decoded['errors'];
+        msg = errs is Map ? errs.values.first.toString() : errs.toString();
+      }
+      throw Exception(msg);
+    }
+  }
+
+  /// Delete transport fee assignment
+  Future<void> deleteTransportFee(int id) async {
+    final uri = Uri.parse('$baseUrl/api/school/transport-fees/$id');
+    final res = await http.delete(uri, headers: _headers);
+    if (res.statusCode != 200) {
+      final decoded = json.decode(res.body);
+      throw Exception(decoded['message'] ?? 'Failed to delete transport fee');
+    }
+  }
+
+  /// Toggle transport fee status (Active <-> Inactive)
+  Future<Map<String, dynamic>> toggleTransportFeeStatus(int id, {required String status}) async {
+    final uri = Uri.parse('$baseUrl/api/school/transport-fees/$id/status');
+    final res = await http.put(uri, headers: _headers, body: json.encode({'status': status}));
+    final decoded = json.decode(res.body);
+    if (res.statusCode == 200) {
+      return decoded;
+    } else {
+      final decoded = json.decode(res.body);
+      throw Exception(decoded['message'] ?? 'Failed to update transport status');
+    }
+  }
+
+  /// Fetch classes
+  Future<List<dynamic>> getClasses() async {
+    final uri = Uri.parse('$baseUrl/api/school/classes');
+    final res = await http.get(uri, headers: _headers);
+    if (res.statusCode == 200) {
+      final decoded = json.decode(res.body);
+      return (decoded['data'] ?? []) as List<dynamic>;
+    }
+    return [];
+  }
+
+  /// Fetch students with optional limit
+  Future<List<dynamic>> getStudents({int limit = 1000}) async {
+    final uri = Uri.parse('$baseUrl/api/school/students?limit=$limit');
+    final res = await http.get(uri, headers: _headers);
+    if (res.statusCode == 200) {
+      final decoded = json.decode(res.body);
+      return (decoded['data'] ?? []) as List<dynamic>;
+    }
+    return [];
+  }
+
+  /// Fetch academic years
+  Future<List<dynamic>> getAcademicYears() async {
+    final uri = Uri.parse('$baseUrl/api/school/academic-years');
+    final res = await http.get(uri, headers: _headers);
+    if (res.statusCode == 200) {
+      final decoded = json.decode(res.body);
+      return (decoded['data'] ?? []) as List<dynamic>;
+    }
+    return [];
+  }
 }
 

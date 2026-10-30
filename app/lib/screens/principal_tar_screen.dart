@@ -220,6 +220,8 @@ class _PrincipalTarScreenState extends State<PrincipalTarScreen> with SingleTick
             ),
             child: TabBar(
               controller: _tabController,
+              splashFactory: NoSplash.splashFactory,
+              overlayColor: const WidgetStatePropertyAll(Colors.transparent),
               labelColor: const Color(0xFF0F766E),
               unselectedLabelColor: const Color(0xFF64748B),
               indicatorColor: const Color(0xFF0F766E),
@@ -826,38 +828,83 @@ class _PrincipalTarScreenState extends State<PrincipalTarScreen> with SingleTick
                       ),
                     ),
                     const SizedBox(width: 8),
-                    // Month Dropdown only (Year dropdown removed per academic year logic)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.grey.shade300),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<int>(
-                          value: _reportMonth,
-                          isDense: true,
-                          icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF0F766E)),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF0F172A),
-                          ),
-                          items: _kMonths.map((m) {
-                            return DropdownMenuItem<int>(
-                              value: m['value'] as int,
-                              child: Text(m['name'] as String),
+                    // Month Dropdown with curved floating menu
+                    Builder(
+                      builder: (btnContext) {
+                        final selectedMonthName = selectedMonthObj['name'] as String? ?? 'Month';
+                        return InkWell(
+                          onTap: () async {
+                            final renderBox = btnContext.findRenderObject() as RenderBox?;
+                            if (renderBox == null) return;
+                            final offset = renderBox.localToGlobal(Offset.zero);
+                            final size = renderBox.size;
+                            final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
+                            if (overlay == null) return;
+
+                            final position = RelativeRect.fromRect(
+                              Rect.fromLTWH(offset.dx, offset.dy + size.height + 4, size.width, size.height),
+                              Offset.zero & overlay.size,
                             );
-                          }).toList(),
-                          onChanged: (val) {
-                            if (val != null) {
-                              setState(() => _reportMonth = val);
+
+                            final selected = await showMenu<int>(
+                              context: context,
+                              position: position,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              color: Colors.white,
+                              elevation: 6,
+                              constraints: BoxConstraints(
+                                minWidth: size.width < 140 ? 140 : size.width,
+                                maxWidth: size.width < 160 ? 160 : size.width,
+                                maxHeight: 320,
+                              ),
+                              items: _kMonths.map((m) {
+                                final isSelected = m['value'] == _reportMonth;
+                                return PopupMenuItem<int>(
+                                  value: m['value'] as int,
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                  child: Text(
+                                    m['name'] as String,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
+                                      color: isSelected ? const Color(0xFF0F766E) : const Color(0xFF1E293B),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            );
+
+                            if (selected != null) {
+                              setState(() => _reportMonth = selected);
                               _fetchMonthlyReport();
                             }
                           },
-                        ),
-                      ),
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.grey.shade300),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  selectedMonthName,
+                                  style: const TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.arrow_drop_down, color: Color(0xFF0F766E), size: 18),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -1128,6 +1175,8 @@ class _PrincipalTarScreenState extends State<PrincipalTarScreen> with SingleTick
                   child: Column(
                     children: [
                       TabBar(
+                        splashFactory: NoSplash.splashFactory,
+                        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
                         labelColor: const Color(0xFF0F766E),
                         unselectedLabelColor: const Color(0xFF64748B),
                         indicatorColor: const Color(0xFF0F766E),
@@ -1176,6 +1225,61 @@ class _PrincipalTarScreenState extends State<PrincipalTarScreen> with SingleTick
     }
   }
 
+  String? _calculateTimeDiff(String? entryTimeStr, {String? officialTimeStr, bool? isLate}) {
+    if (entryTimeStr == null || entryTimeStr == '—' || entryTimeStr.isEmpty) {
+      return isLate == true ? 'Late' : null;
+    }
+    try {
+      final officialStr = (officialTimeStr != null && officialTimeStr.isNotEmpty) ? officialTimeStr : '08:30 AM';
+      final entryMins = _parseTimeToMinutes(entryTimeStr);
+      final officialMins = _parseTimeToMinutes(officialStr);
+      if (entryMins == null || officialMins == null) {
+        return isLate == true ? 'Late' : null;
+      }
+      if (entryMins > officialMins) {
+        final diff = entryMins - officialMins;
+        return '${_formatMinutes(diff)} Late';
+      } else if (entryMins < officialMins) {
+        final diff = officialMins - entryMins;
+        return '${_formatMinutes(diff)} Early';
+      } else {
+        return 'On Time';
+      }
+    } catch (_) {
+      return isLate == true ? 'Late' : null;
+    }
+  }
+
+  int? _parseTimeToMinutes(String timeStr) {
+    try {
+      final clean = timeStr.trim().toUpperCase();
+      final isPM = clean.contains('PM');
+      final isAM = clean.contains('AM');
+      final parts = clean.replaceAll('AM', '').replaceAll('PM', '').trim().split(':');
+      if (parts.length >= 2) {
+        int h = int.parse(parts[0].trim());
+        final m = int.parse(parts[1].trim());
+        if (isPM && h < 12) h += 12;
+        if (isAM && h == 12) h = 0;
+        return h * 60 + m;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  String _formatMinutes(int minutes) {
+    if (minutes <= 0) return '0 min';
+    final h = minutes ~/ 60;
+    final m = minutes % 60;
+    if (h > 0 && m > 0) {
+      return '$h hr $m min';
+    } else if (h > 0) {
+      return '$h hr${h > 1 ? 's' : ''}';
+    } else {
+      return '$m min';
+    }
+  }
+
   Widget _buildDateList(List<dynamic> items, {bool isPresentTab = false, bool isLateTab = false}) {
     if (items.isEmpty) {
       return const Center(child: Text('No records found for this category.', style: TextStyle(color: Colors.grey)));
@@ -1191,6 +1295,13 @@ class _PrincipalTarScreenState extends State<PrincipalTarScreen> with SingleTick
         final entryTime = (it['entry_time'] as String?) ?? '—';
         final isLate = it['is_late'] == true;
 
+        final diffText = (it['diff_text'] ?? it['late_text'] ?? it['early_text'])?.toString() ??
+            _calculateTimeDiff(
+              entryTime,
+              officialTimeStr: it['official_entry_time']?.toString(),
+              isLate: isLate || isLateTab,
+            );
+
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: Row(
@@ -1200,31 +1311,41 @@ class _PrincipalTarScreenState extends State<PrincipalTarScreen> with SingleTick
                 _formatBreakdownDate(date),
                 style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFF0F172A)),
               ),
-              if (isPresentTab || isLateTab)
-                Row(
-                  children: [
-                    if (entryTime != '—')
-                      Text(
-                        entryTime,
-                        style: const TextStyle(fontSize: 12, color: Color(0xFF475569), fontWeight: FontWeight.w600),
-                      ),
-                    if (isLate || isLateTab) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              if (isPresentTab || isLateTab) ...[
+                if (diffText != null && diffText.isNotEmpty)
+                  Builder(
+                    builder: (_) {
+                      final bool isLateRecord = diffText.toLowerCase().contains('late') || isLate || isLateTab;
+                      final bool isEarlyRecord = diffText.toLowerCase().contains('early');
+                      final Color badgeBg = isLateRecord
+                          ? const Color(0xFFFEF2F2)
+                          : (isEarlyRecord ? const Color(0xFFF0FDF4) : const Color(0xFFF0FDFA));
+                      final Color badgeBorder = isLateRecord
+                          ? const Color(0xFFFECACA)
+                          : (isEarlyRecord ? const Color(0xFFBBF7D0) : const Color(0xFF99F6E4));
+                      final Color badgeText = isLateRecord
+                          ? const Color(0xFFDC2626)
+                          : (isEarlyRecord ? const Color(0xFF16A34A) : const Color(0xFF0F766E));
+
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
                         decoration: BoxDecoration(
-                          color: Colors.red.shade50,
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: Colors.red.shade200),
+                          color: badgeBg,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: badgeBorder),
                         ),
                         child: Text(
-                          'Late',
-                          style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.red.shade700),
+                          diffText,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: badgeText,
+                          ),
                         ),
-                      ),
-                    ],
-                  ],
-                ),
+                      );
+                    },
+                  ),
+              ],
             ],
           ),
         );

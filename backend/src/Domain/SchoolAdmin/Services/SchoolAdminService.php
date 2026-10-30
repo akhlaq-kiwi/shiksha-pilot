@@ -835,11 +835,13 @@ class SchoolAdminService extends BaseService
                 JOIN classes c_old ON s.class_id = c_old.id
                 JOIN classes c_new ON c_old.school_id = c_new.school_id 
                                   AND c_old.name COLLATE utf8mb4_unicode_ci = c_new.name COLLATE utf8mb4_unicode_ci
+                                  AND (c_old.academic_year_id = c_new.academic_year_id OR (c_old.academic_year_id IS NULL AND c_new.academic_year_id IS NULL))
                 SET s.class_id = c_new.id
                 WHERE s.school_id = :sid 
                   AND (c_old.section IS NULL OR TRIM(c_old.section) = '')
                   AND c_new.section IS NOT NULL 
                   AND TRIM(c_new.section) != ''
+                  AND (s.academic_year_id = c_old.academic_year_id OR (s.academic_year_id IS NULL AND c_old.academic_year_id IS NULL))
             ");
             $stmtAutoReassign->execute([':sid' => $schoolId]);
         } catch (\Throwable $e) {}
@@ -3132,19 +3134,7 @@ class SchoolAdminService extends BaseService
         if (empty($data['phone']) || !preg_match('/^[0-9]{10}$/', trim($data['phone']))) {
             throw new ValidationException(['phone' => 'Contact number must be exactly 10 digits.']);
         }
-        if (!empty($data['emergency_phone'])) {
-            if (!preg_match('/^[0-9]{10}$/', trim($data['emergency_phone']))) {
-                throw new ValidationException(['emergency_phone' => 'Emergency contact number must be exactly 10 digits.']);
-            }
-            if (trim($data['emergency_phone']) === trim($data['phone'])) {
-                throw new ValidationException(['emergency_phone' => 'Emergency contact number must be different from contact number.']);
-            }
-        }
-        if (!empty($data['email'])) {
-            if (!filter_var(trim($data['email']), FILTER_VALIDATE_EMAIL)) {
-                throw new ValidationException(['email' => 'Invalid email address format.']);
-            }
-        }
+        // emergency_phone and email validations removed as fields are no longer required for teachers
         if (empty($data['joining_date']) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', trim($data['joining_date']))) {
             throw new ValidationException(['joining_date' => 'Joining date is required.']);
         }
@@ -3202,14 +3192,14 @@ class SchoolAdminService extends BaseService
             'role'                    => $data['role'] ?? 'Teacher',
             'department'              => $data['department'] ?? null,
             'phone'                   => $data['phone'],
-            'email'                   => !empty($data['email']) ? $data['email'] : null,
+            'email'                   => null,
             'status'                  => $status,
             'salary'                  => $data['salary'] ?? null,
             'joining_date'            => $data['joining_date'],
             'photo_path'              => $data['photo_path'] ?? null,
             'father_name'             => $data['father_name'],
             'mother_name'             => $data['mother_name'],
-            'emergency_phone'         => !empty($data['emergency_phone']) ? $data['emergency_phone'] : null,
+            'emergency_phone'         => null,
             'exit_date'               => !empty($data['exit_date']) ? $data['exit_date'] : null,
             'current_address_line'    => $data['current_address_line'] ?? null,
             'current_city'            => $data['current_city'] ?? null,
@@ -3275,19 +3265,7 @@ class SchoolAdminService extends BaseService
         if (empty($data['phone']) || !preg_match('/^[0-9]{10}$/', trim($data['phone']))) {
             throw new ValidationException(['phone' => 'Contact number must be exactly 10 digits.']);
         }
-        if (!empty($data['emergency_phone'])) {
-            if (!preg_match('/^[0-9]{10}$/', trim($data['emergency_phone']))) {
-                throw new ValidationException(['emergency_phone' => 'Emergency contact number must be exactly 10 digits.']);
-            }
-            if (trim($data['emergency_phone']) === trim($data['phone'])) {
-                throw new ValidationException(['emergency_phone' => 'Emergency contact number must be different from contact number.']);
-            }
-        }
-        if (!empty($data['email'])) {
-            if (!filter_var(trim($data['email']), FILTER_VALIDATE_EMAIL)) {
-                throw new ValidationException(['email' => 'Invalid email address format.']);
-            }
-        }
+        // emergency_phone and email validations removed as fields are no longer required for teachers
         if (empty($data['joining_date']) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', trim($data['joining_date']))) {
             throw new ValidationException(['joining_date' => 'Joining date is required.']);
         }
@@ -3356,14 +3334,14 @@ class SchoolAdminService extends BaseService
             'role'                    => $data['role'] ?? 'Teacher',
             'department'              => $data['department'] ?? null,
             'phone'                   => $data['phone'],
-            'email'                   => !empty($data['email']) ? $data['email'] : null,
+            'email'                   => null,
             'status'                  => $status,
             'salary'                  => $data['salary'] ?? null,
             'joining_date'            => $data['joining_date'],
             'photo_path'              => $data['photo_path'] ?? null,
             'father_name'             => $data['father_name'],
             'mother_name'             => $data['mother_name'],
-            'emergency_phone'         => !empty($data['emergency_phone']) ? $data['emergency_phone'] : null,
+            'emergency_phone'         => null,
             'exit_date'               => !empty($data['exit_date']) ? $data['exit_date'] : null,
             'current_address_line'    => $data['current_address_line'] ?? null,
             'current_city'            => $data['current_city'] ?? null,
@@ -3732,28 +3710,29 @@ class SchoolAdminService extends BaseService
         if (empty($cleaned) || strlen($cleaned) < 10) return;
         $normPhone = substr($cleaned, -10);
 
-        // Check active staff in any school (including same school if different staff ID)
+        // Check active staff in other schools
         $stmt = $pdo->prepare("
             SELECT st.school_id, sch.name AS school_name
             FROM staff st
             JOIN schools sch ON st.school_id = sch.id
             WHERE UPPER(st.status) = 'ACTIVE'
+              AND st.school_id != :current_sid
               AND RIGHT(REGEXP_REPLACE(st.phone, '[^0-9]', ''), 10) = :phone
               " . ($excludeStaffId !== null ? "AND st.id != {$excludeStaffId}" : "") . "
             LIMIT 1
         ");
-        $stmt->execute([':phone' => $normPhone]);
+        $stmt->execute([':phone' => $normPhone, ':current_sid' => $currentSchoolId]);
         $conflict = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$conflict) {
-            // Also check active user in any school (excluding staff's own user record in current school)
+            // Also check active user in other schools
             $stmtUser = $pdo->prepare("
                 SELECT u.school_id, sch.name AS school_name
                 FROM users u
                 JOIN schools sch ON u.school_id = sch.id
                 WHERE UPPER(u.status) = 'ACTIVE'
+                  AND u.school_id != :current_sid
                   AND RIGHT(REGEXP_REPLACE(u.phone, '[^0-9]', ''), 10) = :phone
-                  AND NOT (u.school_id = :current_sid AND UPPER(u.role) IN ('TEACHER', 'STAFF'))
                 LIMIT 1
             ");
             $stmtUser->execute([':phone' => $normPhone, ':current_sid' => $currentSchoolId]);
@@ -19088,8 +19067,9 @@ Only approve the settlement after reviewing all financial records.
         }
 
         // Generate or use manual password
-        if (!empty($data['password'])) {
-            $password = trim($data['password']);
+        $manualPassword = $data['password'] ?? $data['new_password'] ?? null;
+        if (!empty($manualPassword)) {
+            $password = trim((string)$manualPassword);
             if (strlen($password) < 6) {
                 throw new ValidationException(['password' => 'Password must be at least 6 characters long.']);
             }

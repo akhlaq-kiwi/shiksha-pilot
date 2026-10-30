@@ -12,7 +12,10 @@ const String _kUsbBaseUrl = 'http://127.0.0.1:8000';
 const String _kWifiBaseUrl = 'http://10.144.32.71:8000';
 const String _kWifiBaseUrlOld = 'http://10.22.6.71:8000';
 
+String? _inMemoryWorkingBase;
+
 Future<void> _saveWorkingBaseUrl(String base) async {
+  _inMemoryWorkingBase = base;
   try {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('base_url', base);
@@ -37,9 +40,10 @@ Future<http.Response> _executeWithFallback(
   final List<String> candidateBaseUrls = isProductionOrQa
       ? [origin]
       : [
-          _kUsbBaseUrl,
-          _kWifiBaseUrl,
+          if (_inMemoryWorkingBase != null && _inMemoryWorkingBase!.isNotEmpty) _inMemoryWorkingBase!,
           if (savedBase != null && savedBase.isNotEmpty && !savedBase.contains('10.57.197.71') && !savedBase.contains('10.184.196.71') && !savedBase.contains('10.155.82.71') && !savedBase.contains('10.22.6.71')) savedBase,
+          _kWifiBaseUrl,
+          _kUsbBaseUrl,
           origin,
           _kWifiBaseUrlOld,
         ];
@@ -59,9 +63,11 @@ Future<http.Response> _executeWithFallback(
       final pathAndQuery = originalUrl.hasQuery ? '${originalUrl.path}?${originalUrl.query}' : originalUrl.path;
       final targetUri = Uri.parse('$base$pathAndQuery');
 
-      final timeoutDuration = (base.contains('127.0.0.1') || base.contains('10.') || base.contains('localhost'))
-          ? const Duration(seconds: 4)
-          : const Duration(seconds: 25);
+      final timeoutDuration = (base.contains('127.0.0.1') || base.contains('localhost'))
+          ? const Duration(milliseconds: 1500)
+          : (base.contains('10.'))
+              ? const Duration(seconds: 4)
+              : const Duration(seconds: 25);
 
       final response = await requestFn(targetUri).timeout(timeoutDuration);
       _checkUnauthorized(response);

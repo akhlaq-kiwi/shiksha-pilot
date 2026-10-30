@@ -454,6 +454,8 @@ class _PrincipalTarSettingsScreenState extends State<PrincipalTarSettingsScreen>
               ),
               child: TabBar(
                 controller: _tabController,
+                splashFactory: NoSplash.splashFactory,
+                overlayColor: const WidgetStatePropertyAll(Colors.transparent),
                 labelColor: const Color(0xFF0F766E),
                 unselectedLabelColor: const Color(0xFF64748B),
                 indicatorColor: const Color(0xFF0F766E),
@@ -694,28 +696,82 @@ class _PrincipalTarSettingsScreenState extends State<PrincipalTarSettingsScreen>
     required List<String> items,
     required ValueChanged<String?> onChanged,
   }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: value,
-          isExpanded: true,
-          icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF0F766E)),
-          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Color(0xFF0F172A)),
-          items: items.map((item) {
-            return DropdownMenuItem<String>(
-              value: item,
-              child: Center(child: Text(item)),
+    return Builder(
+      builder: (btnContext) {
+        return InkWell(
+          onTap: () async {
+            final renderBox = btnContext.findRenderObject() as RenderBox?;
+            if (renderBox == null) return;
+            final offset = renderBox.localToGlobal(Offset.zero);
+            final size = renderBox.size;
+            final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
+            if (overlay == null) return;
+
+            final position = RelativeRect.fromRect(
+              Rect.fromLTWH(offset.dx, offset.dy + size.height + 4, size.width, size.height),
+              Offset.zero & overlay.size,
             );
-          }).toList(),
-          onChanged: onChanged,
-        ),
-      ),
+
+            final selected = await showMenu<String>(
+              context: context,
+              position: position,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              color: Colors.white,
+              elevation: 6,
+              constraints: BoxConstraints(
+                minWidth: size.width,
+                maxWidth: size.width,
+                maxHeight: 280,
+              ),
+              items: items.map((item) {
+                final isSelected = item == value;
+                return PopupMenuItem<String>(
+                  value: item,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  child: Center(
+                    child: Text(
+                      item,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
+                        color: isSelected ? const Color(0xFF0F766E) : const Color(0xFF1E293B),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            );
+
+            if (selected != null) {
+              onChanged(selected);
+            }
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Center(
+                    child: Text(
+                      value,
+                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Color(0xFF0F172A)),
+                    ),
+                  ),
+                ),
+                const Icon(Icons.arrow_drop_down, color: Color(0xFF0F766E), size: 18),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

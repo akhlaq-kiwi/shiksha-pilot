@@ -39,6 +39,14 @@ import 'package:school_hub/screens/fees_portal_screen.dart';
 import 'package:school_hub/screens/teacher_salary_disbursement_screen.dart';
 import 'package:school_hub/screens/class_teacher_assignment_screen.dart';
 import 'package:school_hub/screens/expense_screen.dart';
+import 'package:school_hub/screens/teachers_screen.dart';
+import 'package:school_hub/services/teacher_management_service.dart';
+import 'package:school_hub/screens/classes_screen.dart';
+import 'package:school_hub/services/class_management_service.dart';
+import 'package:school_hub/screens/revenue_screen.dart';
+import 'package:school_hub/services/financial_report_service.dart';
+import 'package:school_hub/screens/principal_examinations_screen.dart';
+import 'package:school_hub/services/school_examination_service.dart';
 
 class LauncherFeature {
   final String name;
@@ -159,7 +167,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       isAvailable: true,
     ),
     LauncherFeature(
-      name: 'Exams',
+      name: 'Examinations',
       icon: Icons.assignment_turned_in_rounded,
       color: Colors.red,
       allowedRoles: ['PARENT', 'TEACHER', 'PRINCIPAL', 'STUDENT'],
@@ -240,6 +248,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       icon: Icons.supervised_user_circle_rounded,
       color: const Color(0xFF1E3A8A),
       allowedRoles: ['TEACHER', 'PRINCIPAL', 'SCHOOL_ADMIN'],
+      isAvailable: true,
+    ),
+    LauncherFeature(
+      name: 'Teachers',
+      icon: Icons.badge_rounded,
+      color: const Color(0xFF0D9488),
+      allowedRoles: ['TEACHER', 'PRINCIPAL', 'FEE_COLLECTOR'],
+      isAvailable: true,
+    ),
+    LauncherFeature(
+      name: 'Classes',
+      icon: Icons.meeting_room_rounded,
+      color: const Color(0xFFD97706),
+      allowedRoles: ['TEACHER', 'PRINCIPAL', 'FEE_COLLECTOR'],
+      isAvailable: true,
+    ),
+    LauncherFeature(
+      name: 'Revenue',
+      icon: Icons.trending_up_rounded,
+      color: const Color(0xFFD97706),
+      allowedRoles: ['TEACHER', 'FEE_COLLECTOR'],
       isAvailable: true,
     ),
   ];
@@ -767,6 +796,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       examService: examService,
                       userRole: widget.userRole,
                       selectedStudentId: _activeStudentId,
+                      isPrincipal: _isPrincipal,
                     ),
                   ),
                 ).then((_) async {
@@ -916,6 +946,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
       if (f.name == 'Class Teacher') {
         return (_isPrincipal == true || role == 'PRINCIPAL');
+      }
+      if (f.name == 'Teachers') {
+        return (_isPrincipal == true || role == 'PRINCIPAL' || _isFeeCollector == true);
+      }
+      if (f.name == 'Classes') {
+        return (_isPrincipal == true || role == 'PRINCIPAL' || _isFeeCollector == true);
+      }
+      if (f.name == 'Revenue') {
+        return _isFeeCollector == true;
       }
       if (isStaffTeacher) {
         return f.allowedRoles.contains('TEACHER') || f.allowedRoles.contains('PRINCIPAL');
@@ -1217,7 +1256,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           await _markFeatureNotificationsRead('timetable');
           await _fetchUnreadNotificationsCount();
         });
-      } else if (feature.name == 'Exams' || feature.name == 'Exam' || feature.name == 'Examinations') {
+      } else if (feature.name == 'Examinations' || feature.name == 'Exams' || feature.name == 'Exam') {
         setState(() {
           _unreadExamsCount = 0;
         });
@@ -1229,24 +1268,50 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           baseUrl: baseUrl,
           token: token,
         );
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ExamListScreen(
-              examService: examService,
-              userRole: widget.userRole,
-              selectedStudentId: _activeStudentId,
+        if (_isPrincipal || widget.userRole.toUpperCase() == 'PRINCIPAL') {
+          final schoolExamService = SchoolExaminationService(
+            baseUrl: baseUrl,
+            token: token,
+          );
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PrincipalExaminationsScreen(
+                examService: schoolExamService,
+                leaveService: widget.leaveService,
+                userRole: widget.userRole,
+              ),
             ),
-          ),
-        ).then((_) async {
-          if (mounted) {
-            setState(() {
-              _unreadExamsCount = 0;
-            });
-          }
-          await _markFeatureNotificationsRead('exams');
-          await _fetchUnreadNotificationsCount();
-        });
+          ).then((_) async {
+            if (mounted) {
+              setState(() {
+                _unreadExamsCount = 0;
+              });
+            }
+            await _markFeatureNotificationsRead('exams');
+            await _fetchUnreadNotificationsCount();
+          });
+        } else {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ExamListScreen(
+                examService: examService,
+                userRole: widget.userRole,
+                selectedStudentId: _activeStudentId,
+                isPrincipal: _isPrincipal,
+              ),
+            ),
+          ).then((_) async {
+            if (mounted) {
+              setState(() {
+                _unreadExamsCount = 0;
+              });
+            }
+            await _markFeatureNotificationsRead('exams');
+            await _fetchUnreadNotificationsCount();
+          });
+        }
       } else if (feature.name == 'Achievements') {
         final prefs = await SharedPreferences.getInstance();
         final token = prefs.getString('auth_token') ?? widget.leaveService.token;
@@ -1352,6 +1417,68 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             builder: (context) => ClassTeacherAssignmentScreen(
               baseUrl: effectiveBase,
               token: token,
+            ),
+          ),
+        );
+      } else if (feature.name == 'Teachers') {
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('auth_token') ?? widget.leaveService.token;
+        String effectiveBase = widget.leaveService.baseUrl;
+        if (effectiveBase.isEmpty || effectiveBase.contains('10.22.6.71') || effectiveBase.contains('10.155.82.71')) {
+          effectiveBase = resolveBaseUrlFrom(prefs);
+        }
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => TeachersScreen(
+              teacherService: TeacherManagementService(
+                baseUrl: effectiveBase,
+                token: token,
+              ),
+              userRole: widget.userRole,
+              isPrincipal: _isPrincipal,
+              isFeeCollector: _isFeeCollector,
+            ),
+          ),
+        );
+      } else if (feature.name == 'Classes') {
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('auth_token') ?? widget.leaveService.token;
+        String effectiveBase = widget.leaveService.baseUrl;
+        if (effectiveBase.isEmpty || effectiveBase.contains('10.22.6.71') || effectiveBase.contains('10.155.82.71')) {
+          effectiveBase = resolveBaseUrlFrom(prefs);
+        }
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ClassesScreen(
+              classService: ClassManagementService(
+                baseUrl: effectiveBase,
+                token: token,
+              ),
+              userRole: widget.userRole,
+              isPrincipal: _isPrincipal,
+              isFeeCollector: _isFeeCollector,
+            ),
+          ),
+        );
+      } else if (feature.name == 'Revenue') {
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('auth_token') ?? widget.leaveService.token;
+        String effectiveBase = widget.leaveService.baseUrl;
+        if (effectiveBase.isEmpty || effectiveBase.contains('10.22.6.71') || effectiveBase.contains('10.155.82.71')) {
+          effectiveBase = resolveBaseUrlFrom(prefs);
+        }
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => RevenueScreen(
+              reportService: FinancialReportService(
+                baseUrl: effectiveBase,
+                token: token,
+              ),
+              userRole: widget.userRole,
+              isFeeCollector: _isFeeCollector,
             ),
           ),
         );
@@ -1546,7 +1673,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           final bool isNotification = feature.name == 'Notifications' || feature.name == 'Messages';
                           final bool isTimetable = feature.name == 'Timetable' || feature.name == 'Time Table';
                           final bool isSalary = feature.name == 'Salary' || feature.name == 'Staff Salary' || feature.name == 'Salaries';
-                          final bool isExams = feature.name == 'Exams' || feature.name == 'Exam' || feature.name == 'Examinations';
+                          final bool isExams = feature.name == 'Examinations' || feature.name == 'Exams' || feature.name == 'Exam';
                           final int badgeCount = isNotice 
                               ? _unreadNoticeCount 
                               : (isNotification 

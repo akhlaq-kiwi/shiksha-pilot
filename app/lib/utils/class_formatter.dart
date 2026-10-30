@@ -1,6 +1,6 @@
 /// Utility helper to format class names consistently across the mobile app.
 /// Classes before Class 1 like "Lower Kindergarten (LKG)", "Upper Kindergarten (UKG)", 
-/// "Pre-Nursery (P-NUR)" etc. are converted to their short name e.g. "LKG", "UKG", "NUR", "PG".
+/// "Pre-Nursery (PNC)", "Nursery (NC)" etc. are converted to their short name e.g. "LKG", "UKG", "NC", "PNC", "PG".
 String formatShortClassName(String? rawName, {String? section}) {
   if (rawName == null || rawName.trim().isEmpty) return '';
 
@@ -15,17 +15,19 @@ String formatShortClassName(String? rawName, {String? section}) {
     }
   }
 
-  // 2. Normalize common long pre-primary names if parentheses weren't present or name is still long
-  final lower = name.toLowerCase();
-  if (lower.contains('lower kindergarten') || lower.contains('lower kg')) {
+  // 2. Normalize common long pre-primary names
+  final lower = name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+  if (lower.contains('prenursery') || lower.contains('prenur') || lower == 'pnc' || lower == 'pnur') {
+    name = 'PNC';
+  } else if (lower.contains('nursery') || lower == 'nc' || lower == 'nur') {
+    name = 'NC';
+  } else if (lower.contains('lowerkindergarten') || lower.contains('lowerkg') || lower == 'lkg') {
     name = 'LKG';
-  } else if (lower.contains('upper kindergarten') || lower.contains('upper kg')) {
+  } else if (lower.contains('upperkindergarten') || lower.contains('upperkg') || lower == 'ukg') {
     name = 'UKG';
-  } else if (lower.contains('pre-nursery') || lower.contains('pre nursery')) {
-    name = 'Pre-NUR';
-  } else if (lower.contains('kindergarten')) {
+  } else if (lower.contains('kindergarten') || lower == 'kg') {
     name = 'KG';
-  } else if (lower.contains('play group') || lower.contains('playgroup')) {
+  } else if (lower.contains('playgroup') || lower == 'pg') {
     name = 'PG';
   }
 
@@ -41,24 +43,24 @@ String formatShortClassName(String? rawName, {String? section}) {
 }
 
 /// Returns a numeric sort rank for a class name so classes can be ordered ascending:
-/// PG (1) -> Pre-NUR (2) -> NUR (3) -> LKG (4) -> UKG (5) -> KG (6) -> 1st/Class 1 (11) -> Class 2 (12) ... Class 12 (22)
+/// PG (1) -> PNC (2) -> NC (3) -> LKG (4) -> UKG (5) -> KG (6) -> 1st/Class 1 (11) -> Class 2 (12) ... Class 12 (22)
 int getClassSortRank(String? rawName) {
   if (rawName == null || rawName.trim().isEmpty) return 999;
-  final lower = rawName.toLowerCase().trim();
+  final lower = rawName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
 
-  if (lower.contains('play group') || lower.contains('playgroup') || lower == 'pg') {
+  if (lower.contains('playgroup') || lower == 'pg') {
     return 1;
   }
-  if (lower.contains('pre-nursery') || lower.contains('pre nursery') || lower.contains('p-nur')) {
+  if (lower.contains('prenursery') || lower.contains('prenur') || lower == 'pnc' || lower == 'pnur') {
     return 2;
   }
-  if (lower.contains('nursery') || lower == 'nur') {
+  if (lower.contains('nursery') || lower == 'nc') {
     return 3;
   }
-  if (lower.contains('lower kindergarten') || lower.contains('lower kg') || lower == 'lkg') {
+  if (lower.contains('lowerkindergarten') || lower.contains('lowerkg') || lower == 'lkg') {
     return 4;
   }
-  if (lower.contains('upper kindergarten') || lower.contains('upper kg') || lower == 'ukg') {
+  if (lower.contains('upperkindergarten') || lower.contains('upperkg') || lower == 'ukg') {
     return 5;
   }
   if (lower.contains('kindergarten') || lower == 'kg') {
