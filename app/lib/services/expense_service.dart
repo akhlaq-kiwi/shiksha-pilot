@@ -17,13 +17,16 @@ class ExpenseService {
   };
 
   /// Fetch expenses with optional month and search filtering
-  Future<List<Map<String, dynamic>>> getExpenses({String? month, String? search}) async {
+  Future<List<Map<String, dynamic>>> getExpenses({String? month, String? search, String? status}) async {
     final queryParams = <String, String>{};
     if (month != null && month.isNotEmpty && month != 'ALL') {
       queryParams['month'] = month;
     }
     if (search != null && search.trim().isNotEmpty) {
       queryParams['search'] = search.trim();
+    }
+    if (status != null && status.isNotEmpty && status != 'ALL') {
+      queryParams['status'] = status;
     }
 
     final uri = Uri.parse('$baseUrl/api/school/expenses').replace(
@@ -184,5 +187,58 @@ class ExpenseService {
       debugPrint('Error fetching academic years: $e');
     }
     return [];
+  }
+
+  /// Fetch expense settings (e.g. expense_approval_required toggle)
+  Future<Map<String, dynamic>> getExpenseSettings() async {
+    try {
+      final uri = Uri.parse('$baseUrl/api/school/expenses/settings');
+      final response = await http.get(uri, headers: _headers);
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+        return Map<String, dynamic>.from(decoded['data'] ?? decoded);
+      }
+    } catch (e) {
+      debugPrint('Error fetching expense settings: $e');
+    }
+    return {'expense_approval_required': false};
+  }
+
+  /// Update expense settings (toggle approval requirement)
+  Future<Map<String, dynamic>> updateExpenseSettings(bool required) async {
+    final uri = Uri.parse('$baseUrl/api/school/expenses/settings');
+    final response = await http.post(
+      uri,
+      headers: _headers,
+      body: json.encode({'expense_approval_required': required}),
+    );
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final decoded = json.decode(response.body);
+      return Map<String, dynamic>.from(decoded['data'] ?? decoded);
+    }
+    try {
+      final decoded = json.decode(response.body);
+      throw Exception(decoded['message'] ?? 'Failed to update expense approval setting');
+    } catch (e) {
+      if (e is Exception && !e.toString().contains('FormatException')) rethrow;
+      throw Exception('Failed to update expense approval setting');
+    }
+  }
+
+  /// Approve a pending expense (School Admin only)
+  Future<Map<String, dynamic>> approveExpense(int id) async {
+    final uri = Uri.parse('$baseUrl/api/school/expenses/$id/approve');
+    final response = await http.post(uri, headers: _headers, body: '{}');
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final decoded = json.decode(response.body);
+      return Map<String, dynamic>.from(decoded['data'] ?? decoded);
+    }
+    try {
+      final decoded = json.decode(response.body);
+      throw Exception(decoded['message'] ?? 'Failed to approve expense');
+    } catch (e) {
+      if (e is Exception && !e.toString().contains('FormatException')) rethrow;
+      throw Exception('Failed to approve expense');
+    }
   }
 }

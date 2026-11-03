@@ -366,7 +366,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         } else {
           _userRoleDisplay = 'Teacher Profile';
         }
-      } else if (roleUpper == 'SCHOOL_ADMIN' || roleUpper == 'PRINCIPAL') {
+      } else if (roleUpper == 'SCHOOL_ADMIN') {
+        _userRoleDisplay = 'School Admin Profile';
+      } else if (roleUpper == 'PRINCIPAL') {
         _userRoleDisplay = 'Principal Profile';
       } else {
         _userRoleDisplay = roleUpper;
@@ -428,6 +430,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             } else {
               _userRoleDisplay = 'Teacher Profile';
             }
+          } else if (role == 'SCHOOL_ADMIN') {
+            _userRoleDisplay = 'School Admin Profile';
           }
         });
       }
@@ -928,7 +932,53 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   List<LauncherFeature> _getFilteredFeatures() {
     final role = widget.userRole.toUpperCase();
+    final bool isSchoolAdmin = (role == 'SCHOOL_ADMIN');
     final bool isStaffTeacher = (role == 'TEACHER' || role == 'PRINCIPAL');
+
+    if (isSchoolAdmin) {
+      // School Admin explicit 12 features in exact ordered sequence:
+      // 1 - Timetable
+      // 2 - Examinations
+      // 3 - Notifications
+      // 4 - Settings
+      // 5 - Achievements
+      // 6 - TAR
+      // 7 - TSD
+      // 8 - Fees Portal
+      // 9 - Revenue
+      // 10 - Teachers
+      // 11 - Classes
+      // 12 - Expense
+      const orderedFeatureNames = [
+        'Timetable',
+        'Examinations',
+        'Notifications',
+        'Settings',
+        'Achievements',
+        'TAR',
+        'TSD',
+        'Fees Portal',
+        'Revenue',
+        'Teachers',
+        'Classes',
+        'Expense',
+      ];
+      final Map<String, LauncherFeature> featureMap = {
+        for (var f in _allFeatures) f.name: f
+      };
+      final List<LauncherFeature> schoolAdminFeatures = [];
+      for (final name in orderedFeatureNames) {
+        if (featureMap.containsKey(name)) {
+          schoolAdminFeatures.add(featureMap[name]!);
+        }
+      }
+
+      if (_searchQuery.trim().isEmpty) {
+        return schoolAdminFeatures;
+      }
+      final query = _searchQuery.toLowerCase().trim();
+      return schoolAdminFeatures.where((f) => f.name.toLowerCase().contains(query)).toList();
+    }
     
     // Filter by allowed role first
     final List<LauncherFeature> roleScoped = _allFeatures.where((f) {
@@ -1270,7 +1320,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           baseUrl: baseUrl,
           token: token,
         );
-        if (_isPrincipal || widget.userRole.toUpperCase() == 'PRINCIPAL') {
+        if (_isPrincipal || widget.userRole.toUpperCase() == 'PRINCIPAL' || widget.userRole.toUpperCase() == 'SCHOOL_ADMIN') {
           final schoolExamService = SchoolExaminationService(
             baseUrl: baseUrl,
             token: token,
@@ -1403,6 +1453,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             builder: (context) => ExpenseScreen(
               baseUrl: effectiveBase,
               token: token,
+              userRole: widget.userRole,
             ),
           ),
         );
@@ -1438,7 +1489,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 token: token,
               ),
               userRole: widget.userRole,
-              isPrincipal: _isPrincipal,
+              isPrincipal: _isPrincipal || (widget.userRole.toUpperCase() == 'SCHOOL_ADMIN'),
               isFeeCollector: _isFeeCollector,
             ),
           ),
@@ -1459,7 +1510,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 token: token,
               ),
               userRole: widget.userRole,
-              isPrincipal: _isPrincipal,
+              isPrincipal: _isPrincipal || (widget.userRole.toUpperCase() == 'SCHOOL_ADMIN'),
               isFeeCollector: _isFeeCollector,
             ),
           ),
@@ -1675,14 +1726,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       ),
                     )
                   : SliverGrid(
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 4,
-                        crossAxisSpacing: 14,
-                        mainAxisSpacing: 24,
-                        childAspectRatio: 0.75, // accommodates icon + padding + label
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: (widget.userRole.toUpperCase() == 'SCHOOL_ADMIN') ? 3 : 4,
+                        crossAxisSpacing: (widget.userRole.toUpperCase() == 'SCHOOL_ADMIN') ? 18 : 14,
+                        mainAxisSpacing: (widget.userRole.toUpperCase() == 'SCHOOL_ADMIN') ? 22 : 24,
+                        childAspectRatio: (widget.userRole.toUpperCase() == 'SCHOOL_ADMIN') ? 0.80 : 0.75,
                       ),
                       delegate: SliverChildBuilderDelegate(
                         (BuildContext context, int index) {
+                          final isSchoolAdmin = (widget.userRole.toUpperCase() == 'SCHOOL_ADMIN');
                           final feature = filteredFeatures[index];
                           final bool isNotice = feature.name == 'Notice' || feature.name == 'Notice Board' || feature.name == 'Notices';
                           final bool isNotification = feature.name == 'Notifications' || feature.name == 'Messages';
@@ -1715,16 +1767,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                         height: double.infinity,
                                         decoration: BoxDecoration(
                                           color: feature.color.withOpacity(0.08),
-                                          borderRadius: BorderRadius.circular(16),
+                                          borderRadius: BorderRadius.circular(isSchoolAdmin ? 20 : 16),
                                           border: Border.all(
                                             color: feature.color.withOpacity(0.25),
-                                            width: 1.5,
+                                            width: isSchoolAdmin ? 1.8 : 1.5,
                                           ),
                                         ),
                                         child: Center(
                                           child: Icon(
                                             feature.icon,
-                                            size: 28,
+                                            size: isSchoolAdmin ? 38 : 28,
                                             color: feature.color,
                                           ),
                                         ),
@@ -1772,7 +1824,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                   overflow: TextOverflow.ellipsis,
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
-                                    fontSize: 12,
+                                    fontSize: isSchoolAdmin ? 13 : 12,
                                     fontWeight: FontWeight.w700,
                                     color: Colors.grey.shade800,
                                   ),

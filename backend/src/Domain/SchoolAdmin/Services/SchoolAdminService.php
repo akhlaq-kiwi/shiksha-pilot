@@ -10740,6 +10740,7 @@ class SchoolAdminService extends BaseService
             SELECT COALESCE(SUM(amount), 0) 
             FROM school_expenses 
             WHERE school_id = :sid 
+              AND (approval_status IS NULL OR approval_status = 'Approved')
               AND (academic_year_id = :ayid OR academic_year_id IS NULL)
               {$cutoffClauseExp}
               AND (
@@ -11470,6 +11471,7 @@ Only approve the settlement after reviewing all financial records.
             FROM school_expenses se
             LEFT JOIN users u ON u.id = se.created_by
             WHERE se.school_id = :sid 
+              AND (se.approval_status IS NULL OR se.approval_status = 'Approved')
               {$ayClauseExp}
               {$createdClauseExp}
               AND se.created_at <= :to_ts
@@ -11777,6 +11779,7 @@ Only approve the settlement after reviewing all financial records.
             FROM school_expenses se
             LEFT JOIN users u ON u.id = se.created_by
             WHERE se.school_id = :sid 
+              AND (se.approval_status IS NULL OR se.approval_status = 'Approved')
               {$ayClauseExp}
               {$cutoffClauseExp}
               AND (
@@ -12129,10 +12132,17 @@ Only approve the settlement after reviewing all financial records.
         // Default sorting is always newest first
         $sortBy = "se.expense_date DESC, se.id DESC";
 
+        // Filter by Status
+        if (!empty($filters['status']) && $filters['status'] !== 'ALL') {
+            $where .= " AND se.approval_status = :status_val";
+            $params[':status_val'] = $filters['status'];
+        }
+
         $stmt = $pdo->prepare("
-            SELECT se.*, u.name as creator_name 
+            SELECT se.*, u.name as creator_name, app_u.name as approver_name 
             FROM school_expenses se
             JOIN users u ON u.id = se.created_by
+            LEFT JOIN users app_u ON app_u.id = se.approved_by
             WHERE {$where}
             ORDER BY {$sortBy}
         ");
@@ -12149,6 +12159,7 @@ Only approve the settlement after reviewing all financial records.
             $e['id'] = (int)$e['id'];
             $e['amount'] = (float)$e['amount'];
             $e['created_by'] = (int)$e['created_by'];
+            $e['approval_status'] = $e['approval_status'] ?? 'Approved';
             
             // Check if expense is locked by an existing financial report
             $stmtReports->execute([':sid' => $schoolId, ':expense_date' => $e['expense_date']]);
@@ -12191,9 +12202,25 @@ Only approve the settlement after reviewing all financial records.
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
         $ayid = $workingYear ? (int)$workingYear['id'] : null;
 
+        // Check if school has expense approval required
+        $stmtSchool = $pdo->prepare("SELECT expense_approval_required FROM schools WHERE id = :sid LIMIT 1");
+        $stmtSchool->execute([':sid' => $schoolId]);
+        $approvalRequired = (int)$stmtSchool->fetchColumn();
+
+        $role = strtoupper((string)($user['role'] ?? ''));
+        if ($approvalRequired === 1 && $role !== 'SCHOOL_ADMIN') {
+            $approvalStatus = 'Pending';
+            $approvedBy = null;
+            $approvedAt = null;
+        } else {
+            $approvalStatus = 'Approved';
+            $approvedBy = $createdBy;
+            $approvedAt = date('Y-m-d H:i:s');
+        }
+
         $stmt = $pdo->prepare("
-            INSERT INTO school_expenses (school_id, description, amount, created_by, expense_date, category, payment_method, reference_number, academic_year_id, bill_attachment_path)
-            VALUES (:sid, :desc, :amount, :created_by, :expense_date, :cat, :pmethod, :ref, :ayid, :bill)
+            INSERT INTO school_expenses (school_id, description, amount, created_by, expense_date, category, payment_method, reference_number, academic_year_id, bill_attachment_path, approval_status, approved_by, approved_at)
+            VALUES (:sid, :desc, :amount, :created_by, :expense_date, :cat, :pmethod, :ref, :ayid, :bill, :status, :approved_by, :approved_at)
         ");
         $stmt->execute([
             ':sid' => $schoolId,
@@ -12205,7 +12232,10 @@ Only approve the settlement after reviewing all financial records.
             ':pmethod' => $payMethod,
             ':ref' => $refNo,
             ':ayid' => $ayid,
-            ':bill' => $billPath
+            ':bill' => $billPath,
+            ':status' => $approvalStatus,
+            ':approved_by' => $approvedBy,
+            ':approved_at' => $approvedAt,
         ]);
 
         $id = (int)$pdo->lastInsertId();
@@ -12217,9 +12247,10 @@ Only approve the settlement after reviewing all financial records.
     {
         $pdo = $this->staffRepo->getPdo();
         $stmtGet = $pdo->prepare("
-            SELECT se.*, u.name as creator_name 
+            SELECT se.*, u.name as creator_name, app_u.name as approver_name 
             FROM school_expenses se
             JOIN users u ON u.id = se.created_by
+            LEFT JOIN users app_u ON app_u.id = se.approved_by
             WHERE se.id = :id AND se.school_id = :sid
             LIMIT 1
         ");
@@ -12230,9 +12261,58 @@ Only approve the settlement after reviewing all financial records.
             $expense['id'] = (int)$expense['id'];
             $expense['amount'] = (float)$expense['amount'];
             $expense['created_by'] = (int)$expense['created_by'];
+            $expense['approval_status'] = $expense['approval_status'] ?? 'Approved';
         }
 
         return $expense ?: [];
+    }
+
+    public function getExpenseSettings(array $user): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->staffRepo->getPdo();
+        $stmt = $pdo->prepare("SELECT expense_approval_required FROM schools WHERE id = :sid LIMIT 1");
+        $stmt->execute([':sid' => $schoolId]);
+        $val = (int)$stmt->fetchColumn();
+        return [
+            'expense_approval_required' => ($val === 1),
+        ];
+    }
+
+    public function updateExpenseSettings(array $user, array $body): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->staffRepo->getPdo();
+        $required = !empty($body['expense_approval_required']) ? 1 : 0;
+        $stmt = $pdo->prepare("UPDATE schools SET expense_approval_required = :val WHERE id = :sid");
+        $stmt->execute([':val' => $required, ':sid' => $schoolId]);
+        return [
+            'expense_approval_required' => ($required === 1),
+        ];
+    }
+
+    public function approveSchoolExpense(array $user, int $id): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->staffRepo->getPdo();
+        $userId = (int)$user['id'];
+
+        $stmtCheck = $pdo->prepare("SELECT * FROM school_expenses WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtCheck->execute([':id' => $id, ':sid' => $schoolId]);
+        $expense = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+
+        if (!$expense) {
+            throw new NotFoundException('Expense not found.');
+        }
+
+        $stmt = $pdo->prepare("
+            UPDATE school_expenses 
+            SET approval_status = 'Approved', approved_by = :uid, approved_at = NOW() 
+            WHERE id = :id AND school_id = :sid
+        ");
+        $stmt->execute([':uid' => $userId, ':id' => $id, ':sid' => $schoolId]);
+
+        return $this->getExpenseById($schoolId, $id);
     }
 
     public function updateSchoolExpense(array $user, int $id, array $data): array

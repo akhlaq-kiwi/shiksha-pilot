@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:school_hub/services/expense_service.dart';
 import 'package:school_hub/screens/full_screen_image_screen.dart';
@@ -7,11 +8,13 @@ import 'package:school_hub/screens/full_screen_image_screen.dart';
 class ExpenseScreen extends StatefulWidget {
   final String baseUrl;
   final String token;
+  final String? userRole;
 
   const ExpenseScreen({
     super.key,
     required this.baseUrl,
     required this.token,
+    this.userRole,
   });
 
   @override
@@ -22,6 +25,9 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
   late ExpenseService _expenseService;
   bool _isLoading = true;
   String _errorMessage = '';
+  bool _isSchoolAdmin = false;
+  bool _approvalRequired = false;
+  bool _isUpdatingToggle = false;
 
   static const List<String> _academicMonths = [
     'ALL',
@@ -41,6 +47,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
   void initState() {
     super.initState();
     _expenseService = ExpenseService(baseUrl: widget.baseUrl, token: widget.token);
+    _isSchoolAdmin = (widget.userRole?.toUpperCase() == 'SCHOOL_ADMIN');
     for (final m in _academicMonths) {
       _monthKeys[m] = GlobalKey();
     }
@@ -51,10 +58,123 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
       });
     });
 
+    _initRoleAndSettings();
     _loadExpenses();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToMonth(_selectedMonth, animate: false);
     });
+  }
+
+  Future<void> _initRoleAndSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final role = (prefs.getString('user_role') ?? widget.userRole ?? '').toUpperCase();
+      if (role == 'SCHOOL_ADMIN') {
+        if (mounted) setState(() => _isSchoolAdmin = true);
+        _loadSettings();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _loadSettings() async {
+    try {
+      final settings = await _expenseService.getExpenseSettings();
+      if (mounted) {
+        setState(() {
+          _approvalRequired = settings['expense_approval_required'] == true ||
+              settings['expense_approval_required'] == 1 ||
+              settings['expense_approval_required'] == '1';
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _toggleApprovalSetting(bool value) async {
+    setState(() {
+      _isUpdatingToggle = true;
+    });
+    try {
+      final res = await _expenseService.updateExpenseSettings(value);
+      if (mounted) {
+        setState(() {
+          _approvalRequired = res['expense_approval_required'] == true;
+          _isUpdatingToggle = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  value
+                      ? 'Expense approval workflow enabled.'
+                      : 'Expense approval workflow disabled.',
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFF0F766E),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isUpdatingToggle = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception:', '').trim()),
+            backgroundColor: const Color(0xFFEF4444),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _approveExpense(Map<String, dynamic> item) async {
+    final id = item['id'] as int;
+    try {
+      final updated = await _expenseService.approveExpense(id);
+      if (mounted) {
+        setState(() {
+          final idx = _expenses.indexWhere((e) => e['id'] == id);
+          if (idx != -1) {
+            _expenses[idx] = updated.isNotEmpty
+                ? updated
+                : {
+                    ..._expenses[idx],
+                    'approval_status': 'Approved',
+                  };
+          }
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+                SizedBox(width: 8),
+                Text('Expense approved and included in financial report!'),
+              ],
+            ),
+            backgroundColor: Color(0xFF059669),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception:', '').trim()),
+            backgroundColor: const Color(0xFFEF4444),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -159,16 +279,25 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
           setState(() {
             _expenses.insert(0, newExpense);
           });
+          final isPending = (newExpense['approval_status'] ?? '').toString().toLowerCase() == 'pending';
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
+            SnackBar(
               content: Row(
                 children: [
-                  Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
-                  SizedBox(width: 10),
-                  Text('Expense recorded successfully!'),
+                  Icon(
+                    isPending ? Icons.schedule_rounded : Icons.check_circle_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    isPending
+                        ? 'Expense recorded! Awaiting School Admin approval.'
+                        : 'Expense recorded successfully!',
+                  ),
                 ],
               ),
-              backgroundColor: Color(0xFF059669),
+              backgroundColor: isPending ? const Color(0xFFD97706) : const Color(0xFF059669),
               behavior: SnackBarBehavior.floating,
             ),
           );
@@ -256,6 +385,15 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
       0.0,
       (sum, e) => sum + (double.tryParse((e['amount'] ?? 0).toString()) ?? 0.0),
     );
+    final totalApprovedAmount = filteredExpenses
+        .where((e) => (e['approval_status'] ?? 'Approved').toString().toLowerCase() != 'pending')
+        .fold<double>(
+          0.0,
+          (sum, e) => sum + (double.tryParse((e['amount'] ?? 0).toString()) ?? 0.0),
+        );
+    final pendingCount = filteredExpenses
+        .where((e) => (e['approval_status'] ?? 'Approved').toString().toLowerCase() == 'pending')
+        .length;
 
     return Scaffold(
       backgroundColor: const Color(0xFFFAF9F6),
@@ -327,8 +465,14 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (_isSchoolAdmin) _buildApprovalToggleCard(),
                     // 2. Summary Card: Total Expenses for Selected Month
-                    _buildTotalExpenseCard(totalExpenseAmount, filteredExpenses.length),
+                    _buildTotalExpenseCard(
+                      totalExpenseAmount,
+                      filteredExpenses.length,
+                      pendingCount: pendingCount,
+                      approvedTotal: totalApprovedAmount,
+                    ),
 
                     const SizedBox(height: 14),
 
@@ -415,7 +559,84 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
     );
   }
 
-  Widget _buildTotalExpenseCard(double total, int count) {
+  Widget _buildApprovalToggleCard() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: _approvalRequired ? const Color(0xFF0D9488).withOpacity(0.4) : const Color(0xFFE2E8F0),
+          width: _approvalRequired ? 1.5 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: (_approvalRequired ? const Color(0xFF0D9488) : const Color(0xFF64748B)).withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              Icons.verified_user_rounded,
+              color: _approvalRequired ? const Color(0xFF0D9488) : const Color(0xFF64748B),
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Require Expense Approval',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _approvalRequired
+                      ? 'Fee collector expenses require admin approval'
+                      : 'Expenses are auto-approved directly',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (_isUpdatingToggle)
+            const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0D9488)),
+            )
+          else
+            Switch.adaptive(
+              value: _approvalRequired,
+              activeColor: const Color(0xFF0D9488),
+              onChanged: _toggleApprovalSetting,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTotalExpenseCard(double total, int count, {int pendingCount = 0, double approvedTotal = 0}) {
     final monthLabel = _selectedMonth == 'ALL' ? 'Selected Period' : _selectedMonth;
     return Container(
       width: double.infinity,
@@ -432,58 +653,90 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
           ),
         ],
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEF4444).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.receipt_long_rounded, color: Color(0xFFEF4444), size: 28),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'TOTAL EXPENSES FOR $monthLabel'.toUpperCase(),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEF4444).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.receipt_long_rounded, color: Color(0xFFEF4444), size: 28),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'TOTAL EXPENSES FOR $monthLabel'.toUpperCase(),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '₹${_formatCurrency(total)}',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFFEF4444),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '$count ${count == 1 ? 'entry' : 'entries'}',
                   style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.5,
-                    color: Color(0xFF64748B),
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF475569),
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  '₹${_formatCurrency(total)}',
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFFEF4444),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              '$count ${count == 1 ? 'entry' : 'entries'}',
-              style: const TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF475569),
+          if (pendingCount > 0) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF3C7),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline_rounded, size: 14, color: Color(0xFFB45309)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      '₹${_formatCurrency(approvedTotal)} approved in report • $pendingCount pending approval',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFFB45309),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -518,6 +771,8 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
 
   Widget _buildExpenseCard(Map<String, dynamic> item) {
     final isLocked = item['is_locked'] == true;
+    final approvalStatus = (item['approval_status'] ?? 'Approved').toString();
+    final isPending = approvalStatus.toLowerCase() == 'pending';
     final billUrl = item['bill_attachment_path']?.toString();
     final creatorName = item['creator_name']?.toString() ?? '';
     final amount = double.tryParse((item['amount'] ?? 0).toString()) ?? 0.0;
@@ -553,6 +808,57 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                   color: Color(0xFF475569),
                 ),
               ),
+              if (isPending) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFFFDE68A)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.schedule_rounded, size: 11, color: Color(0xFFB45309)),
+                      SizedBox(width: 3),
+                      Text(
+                        'Pending',
+                        style: TextStyle(
+                          color: Color(0xFFB45309),
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ] else ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDCFCE7),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFFBBF7D0)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.check_circle_rounded, size: 11, color: Color(0xFF15803D)),
+                      SizedBox(width: 3),
+                      Text(
+                        'Approved',
+                        style: TextStyle(
+                          color: Color(0xFF15803D),
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               if (isLocked) ...[
                 const SizedBox(width: 8),
                 Container(
@@ -664,6 +970,28 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                       ],
                     ),
                   ),
+                ),
+                const SizedBox(width: 8),
+              ],
+
+              // Approve button for School Admin when expense is pending
+              if (_isSchoolAdmin && isPending) ...[
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF059669),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  icon: const Icon(Icons.check_rounded, size: 14),
+                  label: const Text(
+                    'Approve',
+                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                  ),
+                  onPressed: () => _approveExpense(item),
                 ),
                 const SizedBox(width: 8),
               ],

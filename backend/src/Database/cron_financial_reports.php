@@ -154,11 +154,12 @@ try {
                 ]);
                 $salariesPaid = (float)$stmtSalaries->fetchColumn();
 
-            // Expenses paid
+            // Expenses paid (only approved expenses)
             $stmtExpenses = $pdo->prepare("
                 SELECT COALESCE(SUM(amount), 0) 
                 FROM school_expenses 
                 WHERE school_id = :sid 
+                  AND (approval_status IS NULL OR approval_status = 'Approved')
                   AND academic_year_id = :ayid 
                   AND created_at >= :from_ts AND created_at <= :to_ts
             ");
@@ -348,6 +349,7 @@ try {
                 FROM school_expenses se
                 LEFT JOIN users u ON u.id = se.created_by
                 WHERE se.school_id = :sid 
+                  AND (se.approval_status IS NULL OR se.approval_status = 'Approved')
                   AND se.created_at {$operator} :from_ts 
                   AND se.created_at <= :to_ts
             ");

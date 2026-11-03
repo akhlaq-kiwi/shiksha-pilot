@@ -2096,6 +2096,35 @@ class SchoolAdminController extends BaseController
         return $this->success($response, $data, 'School expense recorded successfully', 201);
     }
 
+    public function getExpenseSettings(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'TEACHER']);
+
+        $data = $this->service->getExpenseSettings($user);
+        return $this->success($response, $data);
+    }
+
+    public function updateExpenseSettings(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body = RequestParser::body($request);
+        $data = $this->service->updateExpenseSettings($user, $body);
+        return $this->success($response, $data, 'Expense settings updated successfully');
+    }
+
+    public function approveSchoolExpense(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int)$args['id'];
+        $data = $this->service->approveSchoolExpense($user, $id);
+        return $this->success($response, $data, 'School expense approved successfully');
+    }
+
     public function getAdditionalFeeTypes(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
