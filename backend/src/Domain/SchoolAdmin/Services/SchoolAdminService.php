@@ -1130,59 +1130,119 @@ class SchoolAdminService extends BaseService
         $pdo = $this->studentRepo->getPdo();
 
         if ($isAdditional) {
-            $stmt = $pdo->prepare("
+            // 1. First locate target payment or history record to identify its receipt_no
+            $stmtTarget = $pdo->prepare("
                 SELECT 
+                    afp.id AS payment_id,
                     afph.id AS history_id,
-                    afp.id,
-                    COALESCE(afph.receipt_no, afp.receipt_no) AS receipt_no,
-                    COALESCE(afph.amount_paid, afp.amount_paid, afp.amount) AS amount_paid,
-                    COALESCE(afph.discount_amount, afp.discount_amount, 0) AS discount_amount,
-                    afp.amount AS gross_amount,
-                    COALESCE(afph.payment_method, afp.payment_method) AS payment_method,
-                    COALESCE(afph.collected_by, afp.collected_by) AS collected_by,
-                    COALESCE(afph.payment_date, afp.payment_date) AS payment_date,
-                    s.first_name, s.last_name, s.roll_no, s.sr_no, c.name AS class_name, c.section, sch.name AS school_name, sch.logo_path, aft.name AS fee_name, ay.name AS academic_year_name
+                    COALESCE(afph.receipt_no, afp.receipt_no) AS receipt_no
                 FROM additional_fee_payments afp
                 LEFT JOIN additional_fee_payment_history afph ON afph.payment_id = afp.id
-                JOIN students s ON afp.student_id = s.id
-                LEFT JOIN classes c ON s.class_id = c.id
-                JOIN schools sch ON afp.school_id = sch.id
-                JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
-                LEFT JOIN academic_years ay ON s.academic_year_id = ay.id
-                WHERE (afph.id = :id_1 OR afp.id = :id_2 OR afph.receipt_no = :rno_1 OR afp.receipt_no = :rno_2) 
-                  AND afp.student_id = :student_id 
+                WHERE (afp.id = :pid OR afph.id = :hid OR afp.receipt_no = :rno OR afph.receipt_no = :rno2)
+                  AND afp.student_id = :student_id
                   AND afp.school_id = :sid
                 ORDER BY afph.id DESC
+                LIMIT 1
             ");
-            $stmt->execute([
-                ':id_1' => $paymentId,
-                ':id_2' => $paymentId,
-                ':rno_1' => (string)$paymentId,
-                ':rno_2' => (string)$paymentId,
+            $stmtTarget->execute([
+                ':pid' => $paymentId,
+                ':hid' => $paymentId,
+                ':rno' => (string)$paymentId,
+                ':rno2' => (string)$paymentId,
                 ':student_id' => $studentId,
                 ':sid' => $schoolId
             ]);
-            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $targetRec = $stmtTarget->fetch(PDO::FETCH_ASSOC);
+            if (!$targetRec) {
+                throw new NotFoundException('Additional fee payment record not found');
+            }
+            $targetReceiptNo = !empty($targetRec['receipt_no']) ? trim($targetRec['receipt_no']) : null;
+
+            if (!empty($targetReceiptNo)) {
+                $stmt = $pdo->prepare("
+                    SELECT 
+                        afph.id AS history_id,
+                        afp.id,
+                        COALESCE(afph.receipt_no, afp.receipt_no) AS receipt_no,
+                        COALESCE(afph.amount_paid, afp.amount_paid, afp.amount) AS amount_paid,
+                        COALESCE(afph.discount_amount, afp.discount_amount, 0) AS discount_amount,
+                        afp.amount AS gross_amount,
+                        COALESCE(afph.payment_method, afp.payment_method) AS payment_method,
+                        COALESCE(afph.collected_by, afp.collected_by) AS collected_by,
+                        COALESCE(afph.payment_date, afp.payment_date) AS payment_date,
+                        s.first_name, s.last_name, s.roll_no, s.sr_no, c.name AS class_name, c.section, sch.name AS school_name, sch.logo_path, aft.name AS fee_name, ay.name AS academic_year_name,
+                        afp.status
+                    FROM additional_fee_payments afp
+                    JOIN students s ON afp.student_id = s.id
+                    LEFT JOIN classes c ON s.class_id = c.id
+                    JOIN schools sch ON afp.school_id = sch.id
+                    JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+                    LEFT JOIN academic_years ay ON s.academic_year_id = ay.id
+                    LEFT JOIN additional_fee_payment_history afph ON (afph.payment_id = afp.id AND afph.receipt_no = :rno_h)
+                    WHERE (afph.receipt_no = :rno_1 OR afp.receipt_no = :rno_2) 
+                      AND afp.student_id = :student_id 
+                      AND afp.school_id = :sid
+                    ORDER BY afp.id ASC
+                ");
+                $stmt->execute([
+                    ':rno_h' => $targetReceiptNo,
+                    ':rno_1' => $targetReceiptNo,
+                    ':rno_2' => $targetReceiptNo,
+                    ':student_id' => $studentId,
+                    ':sid' => $schoolId
+                ]);
+                $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            } else {
+                $stmt = $pdo->prepare("
+                    SELECT 
+                        afph.id AS history_id,
+                        afp.id,
+                        COALESCE(afph.receipt_no, afp.receipt_no) AS receipt_no,
+                        COALESCE(afph.amount_paid, afp.amount_paid, afp.amount) AS amount_paid,
+                        COALESCE(afph.discount_amount, afp.discount_amount, 0) AS discount_amount,
+                        afp.amount AS gross_amount,
+                        COALESCE(afph.payment_method, afp.payment_method) AS payment_method,
+                        COALESCE(afph.collected_by, afp.collected_by) AS collected_by,
+                        COALESCE(afph.payment_date, afp.payment_date) AS payment_date,
+                        s.first_name, s.last_name, s.roll_no, s.sr_no, c.name AS class_name, c.section, sch.name AS school_name, sch.logo_path, aft.name AS fee_name, ay.name AS academic_year_name,
+                        afp.status
+                    FROM additional_fee_payments afp
+                    LEFT JOIN additional_fee_payment_history afph ON afph.payment_id = afp.id
+                    JOIN students s ON afp.student_id = s.id
+                    LEFT JOIN classes c ON s.class_id = c.id
+                    JOIN schools sch ON afp.school_id = sch.id
+                    JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+                    LEFT JOIN academic_years ay ON s.academic_year_id = ay.id
+                    WHERE afp.id = :id
+                      AND afp.student_id = :student_id 
+                      AND afp.school_id = :sid
+                    ORDER BY afph.id DESC
+                    LIMIT 1
+                ");
+                $stmt->execute([
+                    ':id' => $paymentId,
+                    ':student_id' => $studentId,
+                    ':sid' => $schoolId
+                ]);
+                $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            }
+
             if (empty($rows)) {
                 throw new NotFoundException('Additional fee payment record not found');
             }
 
-            $firstRow = $rows[0];
-            $targetReceiptNo = $firstRow['receipt_no'];
-
+            // Deduplicate by afp.id so each fee is counted once
             $groupedRows = [];
-            if (!empty($targetReceiptNo)) {
-                foreach ($rows as $r) {
-                    if ($r['receipt_no'] === $targetReceiptNo) {
-                        $groupedRows[] = $r;
-                    }
+            $seenPids = [];
+            foreach ($rows as $r) {
+                $pid = (int)$r['id'];
+                if (!isset($seenPids[$pid])) {
+                    $seenPids[$pid] = true;
+                    $groupedRows[] = $r;
                 }
             }
-            if (empty($groupedRows)) {
-                $groupedRows = [$firstRow];
-            }
 
-            $payment = $firstRow;
+            $payment = $groupedRows[0];
             $feeNames = array_values(array_unique(array_filter(array_column($groupedRows, 'fee_name'))));
             $title = implode(', ', $feeNames);
 
@@ -4234,6 +4294,9 @@ class SchoolAdminService extends BaseService
         $stmtHoliday = $pdo->prepare("
             INSERT INTO holidays (school_id, academic_year_id, name, date)
             VALUES (:school_id, :academic_year_id, :name, :date)
+            ON DUPLICATE KEY UPDATE 
+                academic_year_id = VALUES(academic_year_id),
+                name = VALUES(name)
         ");
         foreach ($defaultHolidays as $h) {
             $stmtHoliday->execute([
@@ -4297,15 +4360,15 @@ class SchoolAdminService extends BaseService
         }
 
         // Parse and validate the name
-        if (!preg_match('/^(\d{4})[-–—](\d{4})$/u', trim($body['name']), $matches)) {
-            throw new ValidationException(['name' => 'Academic Year name must be in YYYY–YYYY format (e.g., 2027–2028).']);
+        if (!preg_match('/^(\d{4})[-\x{2013}\x{2014}](\d{4})$/u', trim($body['name']), $matches)) {
+            throw new ValidationException(['name' => 'Academic Year name must be in YYYY-YYYY format (e.g., 2027-2028).']);
         }
 
         $startYear = (int)$matches[1];
         $endYear = (int)$matches[2];
 
         if ($endYear !== $startYear + 1) {
-            throw new ValidationException(['name' => 'The academic year must span exactly one year, starting on 1 April and ending on 31 March (e.g. 2027–2028).']);
+            throw new ValidationException(['name' => 'The academic year must span exactly one year, starting on 1 April and ending on 31 March (e.g. 2027-2028).']);
         }
 
         $startDate = isset($body['start_date']) ? trim($body['start_date']) : "{$startYear}-04-01";
@@ -10759,24 +10822,47 @@ class SchoolAdminService extends BaseService
             return $r;
         }, $reports);
 
-        // 3. Determine next suggested start date based on the latest generated report
+        // 3. Determine next suggested start date and cutoff transaction time based on the latest generated report
         $suggestedStartDate = '';
+        $fromTimeFormatted = '12:00 AM';
         $latestReport = $reports[0] ?? null;
 
         if ($latestReport && !empty($latestReport['to_date'])) {
             $suggestedStartDate = $latestReport['to_date'];
+            // Point-in-time exact transaction isolation cutoff: matches the latest report's generation time
+            if (!empty($latestReport['created_at'])) {
+                $fromTimeFormatted = date('h:i A', strtotime($latestReport['created_at']));
+            }
         } else {
-            if ($workingYear) {
+            // First report: start checking from the start date of the academic year
+            if ($workingYear && !empty($workingYear['start_date']) && strtotime($workingYear['start_date']) <= strtotime(date('Y-m-d'))) {
                 $suggestedStartDate = $workingYear['start_date'];
             } else {
-                $suggestedStartDate = date('Y-m-d');
+                $stmtMinDate = $pdo->prepare("
+                    SELECT MIN(DATE(payment_date)) as min_pdate, MIN(DATE(created_at)) as min_cdate 
+                    FROM fee_payments 
+                    WHERE school_id = :sid AND (academic_year_id = :ayid OR academic_year_id IS NULL)
+                ");
+                $stmtMinDate->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+                $minRow = $stmtMinDate->fetch(PDO::FETCH_ASSOC);
+                $minDate = $minRow['min_pdate'] ?? $minRow['min_cdate'] ?? null;
+                if ($minDate && strtotime($minDate) <= strtotime(date('Y-m-d'))) {
+                    $suggestedStartDate = $minDate;
+                } else {
+                    $suggestedStartDate = date('Y') . '-04-01';
+                    if (strtotime($suggestedStartDate) > strtotime(date('Y-m-d'))) {
+                        $suggestedStartDate = (date('Y') - 1) . '-04-01';
+                    }
+                }
             }
         }
 
         return [
             'reports' => $reports,
             'next_suggested_start_date' => $suggestedStartDate,
-            'has_previous_report' => $latestReport ? true : false
+            'from_time' => $fromTimeFormatted,
+            'has_previous_report' => $latestReport ? true : false,
+            'academic_year_start_date' => $workingYear['start_date'] ?? null
         ];
     }
 
@@ -10909,7 +10995,7 @@ class SchoolAdminService extends BaseService
             throw new ValidationException(['fields' => 'A settled report must never be editable or re-submittable.']);
         }
 
-        if ($report['status'] === 'Request Sent') {
+        if ($report['status'] === 'Request Sent' || $report['status'] === 'Pending') {
             throw new ValidationException(['fields' => 'A settlement request has already been submitted for this report.']);
         }
 
@@ -10921,15 +11007,79 @@ class SchoolAdminService extends BaseService
             throw new NotFoundException('School not found.');
         }
 
-        // Generate Excel report file using exportFinancialReport so attached email file matches portal export
-        $filename = '';
-        $excelData = $this->exportFinancialReport($user, $id, $filename);
-
-        // Email variables
         $toEmail = isset($school['contact_email']) ? trim((string)$school['contact_email']) : '';
         if (empty($toEmail) || filter_var($toEmail, FILTER_VALIDATE_EMAIL) === false) {
             throw new ValidationException(['email' => 'The School Owner Email Address is not set or is invalid. Please contact the Super Admin to update it.']);
         }
+
+        // Update status to 'Pending' immediately
+        $this->financialReportRepo->update($id, [
+            'status' => 'Pending'
+        ]);
+
+        $baseUrl = getenv('APP_URL');
+        if (!$baseUrl && isset($_SERVER['HTTP_HOST'])) {
+            $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+            $baseUrl = "{$scheme}://{$_SERVER['HTTP_HOST']}";
+        }
+        if (!$baseUrl) {
+            $baseUrl = 'http://localhost:8000';
+        }
+        $baseUrl = rtrim($baseUrl, '/');
+
+        // Launch background job to generate Excel and dispatch email without blocking the client response
+        $scriptPath = realpath(__DIR__ . '/../../Database/send_settlement_email.php');
+        $phpBin = PHP_BINARY ?: 'php';
+        $bgLaunched = false;
+
+        if ($scriptPath && file_exists($scriptPath)) {
+            if (strncasecmp(PHP_OS, 'WIN', 3) === 0) {
+                $cmd = 'start /B "" ' . escapeshellarg($phpBin) . ' ' . escapeshellarg($scriptPath) . ' ' . (int)$id . ' ' . (int)$schoolId . ' ' . escapeshellarg($baseUrl);
+                $handle = popen($cmd, 'r');
+                if ($handle) {
+                    pclose($handle);
+                    $bgLaunched = true;
+                }
+            } else {
+                $cmd = escapeshellarg($phpBin) . ' ' . escapeshellarg($scriptPath) . ' ' . (int)$id . ' ' . (int)$schoolId . ' ' . escapeshellarg($baseUrl) . ' > /dev/null 2>&1 &';
+                exec($cmd);
+                $bgLaunched = true;
+            }
+        }
+
+        if (!$bgLaunched) {
+            $this->dispatchSettlementEmail($user, $id, $baseUrl);
+        }
+
+        return $this->financialReportRepo->findById($id);
+    }
+
+    public function dispatchSettlementEmail(array $user, int $id, string $baseUrl = ''): void
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->financialReportRepo->getPdo();
+
+        $report = $this->financialReportRepo->findById($id);
+        if ($report === null || (int)$report['school_id'] !== $schoolId) {
+            return;
+        }
+
+        $stmtSchool = $pdo->prepare("SELECT name, contact_email FROM schools WHERE id = :sid LIMIT 1");
+        $stmtSchool->execute([':sid' => $schoolId]);
+        $school = $stmtSchool->fetch(PDO::FETCH_ASSOC);
+        if (!$school) {
+            return;
+        }
+
+        $toEmail = isset($school['contact_email']) ? trim((string)$school['contact_email']) : '';
+        if (empty($toEmail) || filter_var($toEmail, FILTER_VALIDATE_EMAIL) === false) {
+            return;
+        }
+
+        // Generate Excel report file using exportFinancialReport so attached email file matches portal export
+        $filename = '';
+        $excelData = $this->exportFinancialReport($user, $id, $filename);
+
         $subject = "Settlement Approval Request – Financial Report " . $report['report_id'];
         $sender = "shikshapilot@gmail.com";
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
@@ -10962,13 +11112,15 @@ Only approve the settlement after reviewing all financial records.
         $approveSig = hash_hmac('sha256', "report-{$report['id']}-action-approve", $secret);
         $rejectSig = hash_hmac('sha256', "report-{$report['id']}-action-reject", $secret);
 
-        $baseUrl = getenv('APP_URL');
-        if (!$baseUrl && isset($_SERVER['HTTP_HOST'])) {
-            $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-            $baseUrl = "{$scheme}://{$_SERVER['HTTP_HOST']}";
-        }
-        if (!$baseUrl) {
-            $baseUrl = 'http://localhost:8000';
+        if (empty($baseUrl)) {
+            $baseUrl = getenv('APP_URL');
+            if (!$baseUrl && isset($_SERVER['HTTP_HOST'])) {
+                $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                $baseUrl = "{$scheme}://{$_SERVER['HTTP_HOST']}";
+            }
+            if (!$baseUrl) {
+                $baseUrl = 'http://localhost:8000';
+            }
         }
         $baseUrl = rtrim($baseUrl, '/');
 
@@ -11026,18 +11178,10 @@ Only approve the settlement after reviewing all financial records.
             SmtpMailer::send($toEmail, $subject, $emailBodyHtml, $excelData, $filename);
             $logEntry .= "STATUS: Email sent via SMTP successfully.\n\n";
         } catch (\Throwable $e) {
-            // Log SMTP failure for debugging while preserving local flow
             $logEntry .= "SMTP WARNING: " . $e->getMessage() . " (Fallback to local log)\n\n";
         }
 
         file_put_contents($logPath, $logEntry, FILE_APPEND);
-
-        // Update status to 'Pending'
-        $this->financialReportRepo->update($id, [
-            'status' => 'Pending'
-        ]);
-
-        return $this->financialReportRepo->findById($id);
     }
 
     public function ownerApproveSettlement(int $id, string $signature): string
@@ -11160,20 +11304,24 @@ Only approve the settlement after reviewing all financial records.
 
         $stmtFeeList = $pdo->prepare("
             SELECT 
+                fp.id,
+                fp.receipt_no,
+                fp.student_id,
                 fp.created_at AS deposit_time, 
                 s.name AS student_name, 
                 c.name AS class_name, 
                 c.section AS class_section,
                 c.id AS class_id, 
                 s.roll_no, 
-                CONCAT('Monthly Fee (', fp.fee_month, ')') AS fee_type, 
+                'Monthly Fee' AS fee_type, 
                 fp.fee_month AS months_covered, 
                 COALESCE(fp.discount_amount, 0) AS discount_amount,
                 fp.amount_paid AS amount,
                 fp.academic_year_id,
                 s.academic_year_id AS student_academic_year_id,
                 COALESCE(u.phone, '') AS collector_phone,
-                COALESCE(fp.collected_by, 'School Admin') AS collected_by
+                COALESCE(fp.collected_by, 'School Admin') AS collected_by,
+                'monthly' AS item_type
             FROM fee_payments fp
             JOIN students s ON fp.student_id = s.id
             LEFT JOIN classes c ON s.class_id = c.id
@@ -11197,6 +11345,9 @@ Only approve the settlement after reviewing all financial records.
 
         $stmtAddFeeList = $pdo->prepare("
             SELECT 
+                afph.id,
+                COALESCE(afph.receipt_no, afp.receipt_no) AS receipt_no,
+                afp.student_id,
                 afph.created_at AS deposit_time, 
                 s.name AS student_name, 
                 c.name AS class_name, 
@@ -11210,7 +11361,8 @@ Only approve the settlement after reviewing all financial records.
                 aft.academic_year_id,
                 s.academic_year_id AS student_academic_year_id,
                 COALESCE(u.phone, '') AS collector_phone,
-                COALESCE(afph.collected_by, afp.collected_by, 'School Admin') AS collected_by
+                COALESCE(afph.collected_by, afp.collected_by, 'School Admin') AS collected_by,
+                'additional' AS item_type
             FROM additional_fee_payment_history afph
             JOIN additional_fee_payments afp ON afph.payment_id = afp.id
             JOIN students s ON afp.student_id = s.id
@@ -11242,7 +11394,7 @@ Only approve the settlement after reviewing all financial records.
                     $fp['fee_type'] = $fp['fee_type'] . " for " . $ayName;
                 }
             }
-            unset($fp['academic_year_id'], $fp['student_academic_year_id']);
+            unset($fp['academic_year_id']);
         }
         unset($fp);
 
@@ -11254,26 +11406,12 @@ Only approve the settlement after reviewing all financial records.
                     $ap['fee_type'] = $ap['fee_type'] . " for " . $ayName;
                 }
             }
-            unset($ap['academic_year_id'], $ap['student_academic_year_id']);
+            unset($ap['academic_year_id']);
         }
         unset($ap);
 
-        $feeCollections = array_merge($feePayments, $addPayments);
-        
-        // Sort by class creation order, then deposit time, then name
-        usort($feeCollections, function($a, $b) {
-            $classIdA = isset($a['class_id']) ? (int)$a['class_id'] : 999999;
-            $classIdB = isset($b['class_id']) ? (int)$b['class_id'] : 999999;
-            if ($classIdA !== $classIdB) {
-                return $classIdA <=> $classIdB;
-            }
-            $timeA = strtotime($a['deposit_time'] ?? '1970-01-01 00:00:00');
-            $timeB = strtotime($b['deposit_time'] ?? '1970-01-01 00:00:00');
-            if ($timeA !== $timeB) {
-                return $timeA <=> $timeB;
-            }
-            return strcmp($a['student_name'] ?? '', $b['student_name'] ?? '');
-        });
+        // Consolidate multi-month tuition and multi-additional fee payments sharing receipt_no into 1 transaction row
+        $feeCollections = ExcelGenerator::consolidateFeeCollections(array_merge($feePayments, $addPayments));
 
         $salParams = [':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts];
         $ayClauseSal = "";
@@ -11283,7 +11421,7 @@ Only approve the settlement after reviewing all financial records.
         }
 
         $stmtSalaryList = $pdo->prepare("
-            SELECT sp.payment_month, sp.academic_year_id, st.name AS staff_name, sp.payment_date AS expense_date, sp.amount_paid AS amount, ay.name AS ay_name
+            SELECT sp.payment_month, sp.academic_year_id, st.name AS staff_name, COALESCE(sp.payment_date, DATE(sp.created_at)) AS expense_date, sp.created_at, sp.amount_paid AS amount, ay.name AS ay_name
             FROM staff_payments sp
             JOIN staff st ON sp.staff_id = st.id
             LEFT JOIN academic_years ay ON sp.academic_year_id = ay.id
@@ -11307,6 +11445,7 @@ Only approve the settlement after reviewing all financial records.
                 'description' => $spr['staff_name'],
                 'category' => $categoryStr,
                 'expense_date' => $spr['expense_date'],
+                'created_at' => $spr['created_at'] ?? $spr['expense_date'],
                 'amount' => $spr['amount'],
                 'added_by' => 'School Admin'
             ];
@@ -11323,7 +11462,8 @@ Only approve the settlement after reviewing all financial records.
             SELECT 
                 se.description, 
                 'School Expense' AS category, 
-                se.expense_date, 
+                COALESCE(se.expense_date, DATE(se.created_at)) AS expense_date, 
+                se.created_at,
                 se.amount,
                 COALESCE(u.phone, '') AS added_by_phone,
                 COALESCE(u.name, 'School Admin') AS added_by
@@ -11339,7 +11479,17 @@ Only approve the settlement after reviewing all financial records.
 
         $expenses = array_merge($salaryPayments, $expensesItems);
         usort($expenses, function($a, $b) {
-            return strcmp($a['expense_date'] ?? '', $b['expense_date'] ?? '');
+            $timeA = !empty($a['expense_date']) ? strtotime((string)$a['expense_date']) : (!empty($a['created_at']) ? strtotime((string)$a['created_at']) : 0);
+            $timeB = !empty($b['expense_date']) ? strtotime((string)$b['expense_date']) : (!empty($b['created_at']) ? strtotime((string)$b['created_at']) : 0);
+            if ($timeA !== $timeB) {
+                return $timeB <=> $timeA;
+            }
+            $createdA = !empty($a['created_at']) ? strtotime((string)$a['created_at']) : 0;
+            $createdB = !empty($b['created_at']) ? strtotime((string)$b['created_at']) : 0;
+            if ($createdA !== $createdB) {
+                return $createdB <=> $createdA;
+            }
+            return strcmp($a['description'] ?? '', $b['description'] ?? '');
         });
 
         // Profit / Loss Summary - calculate exact sum from itemized collections and expenses
@@ -11437,20 +11587,24 @@ Only approve the settlement after reviewing all financial records.
 
         $stmtFeeList = $pdo->prepare("
             SELECT 
+                fp.id,
+                fp.receipt_no,
+                fp.student_id,
                 fp.created_at AS deposit_time, 
                 s.name AS student_name, 
                 c.name AS class_name, 
                 c.section AS class_section,
                 c.id AS class_id, 
                 s.roll_no, 
-                CONCAT('Monthly Fee (', fp.fee_month, ')') AS fee_type, 
+                'Monthly Fee' AS fee_type, 
                 fp.fee_month AS months_covered, 
                 COALESCE(fp.discount_amount, 0) AS discount_amount,
                 fp.amount_paid AS amount,
                 fp.academic_year_id,
                 s.academic_year_id AS student_academic_year_id,
                 COALESCE(u.phone, '') AS collector_phone,
-                COALESCE(fp.collected_by, 'School Admin') AS collected_by
+                COALESCE(fp.collected_by, 'School Admin') AS collected_by,
+                'monthly' AS item_type
             FROM fee_payments fp
             JOIN students s ON fp.student_id = s.id
             LEFT JOIN classes c ON s.class_id = c.id
@@ -11483,6 +11637,9 @@ Only approve the settlement after reviewing all financial records.
 
         $stmtAddFeeList = $pdo->prepare("
             SELECT 
+                afph.id,
+                COALESCE(afph.receipt_no, afp.receipt_no) AS receipt_no,
+                afp.student_id,
                 afph.created_at AS deposit_time, 
                 s.name AS student_name, 
                 c.name AS class_name, 
@@ -11496,7 +11653,8 @@ Only approve the settlement after reviewing all financial records.
                 aft.academic_year_id,
                 s.academic_year_id AS student_academic_year_id,
                 COALESCE(u.phone, '') AS collector_phone,
-                COALESCE(afph.collected_by, afp.collected_by, 'School Admin') AS collected_by
+                COALESCE(afph.collected_by, afp.collected_by, 'School Admin') AS collected_by,
+                'additional' AS item_type
             FROM additional_fee_payment_history afph
             JOIN additional_fee_payments afp ON afph.payment_id = afp.id
             JOIN students s ON afp.student_id = s.id
@@ -11527,7 +11685,7 @@ Only approve the settlement after reviewing all financial records.
                     $fp['fee_type'] = $fp['fee_type'] . " for " . $ayName;
                 }
             }
-            unset($fp['academic_year_id'], $fp['student_academic_year_id']);
+            unset($fp['academic_year_id']);
         }
         unset($fp);
 
@@ -11539,25 +11697,12 @@ Only approve the settlement after reviewing all financial records.
                     $ap['fee_type'] = $ap['fee_type'] . " for " . $ayName;
                 }
             }
-            unset($ap['academic_year_id'], $ap['student_academic_year_id']);
+            unset($ap['academic_year_id']);
         }
         unset($ap);
 
-        $feeCollections = array_merge($feePayments, $addPayments);
-
-        usort($feeCollections, function($a, $b) {
-            $classIdA = isset($a['class_id']) ? (int)$a['class_id'] : 999999;
-            $classIdB = isset($b['class_id']) ? (int)$b['class_id'] : 999999;
-            if ($classIdA !== $classIdB) {
-                return $classIdA <=> $classIdB;
-            }
-            $timeA = strtotime($a['deposit_time'] ?? '1970-01-01 00:00:00');
-            $timeB = strtotime($b['deposit_time'] ?? '1970-01-01 00:00:00');
-            if ($timeA !== $timeB) {
-                return $timeA <=> $timeB;
-            }
-            return strcmp($a['student_name'] ?? '', $b['student_name'] ?? '');
-        });
+        // Consolidate multi-month tuition and multi-additional fee payments sharing receipt_no into 1 transaction row
+        $feeCollections = ExcelGenerator::consolidateFeeCollections(array_merge($feePayments, $addPayments));
 
         $salParams = array_merge([
             ':sid' => $schoolId,
@@ -11573,7 +11718,7 @@ Only approve the settlement after reviewing all financial records.
         }
 
         $stmtSalaryList = $pdo->prepare("
-            SELECT sp.payment_month, sp.academic_year_id, st.name AS staff_name, sp.payment_date AS expense_date, sp.amount_paid AS amount, ay.name AS ay_name
+            SELECT sp.payment_month, sp.academic_year_id, st.name AS staff_name, COALESCE(sp.payment_date, DATE(sp.created_at)) AS expense_date, sp.created_at, sp.amount_paid AS amount, ay.name AS ay_name
             FROM staff_payments sp
             JOIN staff st ON sp.staff_id = st.id
             LEFT JOIN academic_years ay ON sp.academic_year_id = ay.id
@@ -11601,6 +11746,7 @@ Only approve the settlement after reviewing all financial records.
                 'description' => $spr['staff_name'],
                 'category' => $categoryStr,
                 'expense_date' => $spr['expense_date'],
+                'created_at' => $spr['created_at'] ?? $spr['expense_date'],
                 'amount' => $spr['amount'],
                 'added_by' => 'School Admin'
             ];
@@ -11623,7 +11769,8 @@ Only approve the settlement after reviewing all financial records.
             SELECT 
                 se.description, 
                 'School Expense' AS category, 
-                se.expense_date, 
+                COALESCE(se.expense_date, DATE(se.created_at)) AS expense_date, 
+                se.created_at,
                 se.amount,
                 COALESCE(u.phone, '') AS added_by_phone,
                 COALESCE(u.name, 'School Admin') AS added_by
@@ -11642,7 +11789,17 @@ Only approve the settlement after reviewing all financial records.
 
         $expenses = array_merge($salaryPayments, $expensesItems);
         usort($expenses, function($a, $b) {
-            return strcmp($a['expense_date'] ?? '', $b['expense_date'] ?? '');
+            $timeA = !empty($a['expense_date']) ? strtotime((string)$a['expense_date']) : (!empty($a['created_at']) ? strtotime((string)$a['created_at']) : 0);
+            $timeB = !empty($b['expense_date']) ? strtotime((string)$b['expense_date']) : (!empty($b['created_at']) ? strtotime((string)$b['created_at']) : 0);
+            if ($timeA !== $timeB) {
+                return $timeB <=> $timeA;
+            }
+            $createdA = !empty($a['created_at']) ? strtotime((string)$a['created_at']) : 0;
+            $createdB = !empty($b['created_at']) ? strtotime((string)$b['created_at']) : 0;
+            if ($createdA !== $createdB) {
+                return $createdB <=> $createdA;
+            }
+            return strcmp($a['description'] ?? '', $b['description'] ?? '');
         });
 
         $totalRev = array_reduce($feeCollections, fn($sum, $item) => $sum + (float)$item['amount'], 0.0);
@@ -14704,6 +14861,69 @@ Only approve the settlement after reviewing all financial records.
 
     }
 
+    private function validateSiblingExamDates(\PDO $pdo, int $schoolId, int $academicYearId, ?int $parentId, string $name, ?string $startDate, ?string $endDate, ?int $currentId = null): void
+    {
+        if ($parentId === null || (empty($startDate) && empty($endDate))) {
+            return;
+        }
+
+        $stmtSiblings = $pdo->prepare("
+            SELECT id, name, start_date, end_date 
+            FROM examinations 
+            WHERE parent_id = :pid AND school_id = :sid AND academic_year_id = :ayid
+        ");
+        $stmtSiblings->execute([
+            ':pid' => $parentId,
+            ':sid' => $schoolId,
+            ':ayid' => $academicYearId,
+        ]);
+        $siblings = $stmtSiblings->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        $getSubTestRank = function(string $testName): int {
+            $lower = strtolower($testName);
+            if (preg_match('/(?:unit\\s*test|ut|test|term)\\s*(\\d+)/i', $lower, $m)) {
+                return (int)$m[1];
+            }
+            if (str_contains($lower, 'quarterly')) return 1;
+            if (str_contains($lower, 'half')) return 2;
+            if (str_contains($lower, 'annual')) return 3;
+            return 99;
+        };
+
+        $currentRank = $getSubTestRank($name);
+
+        foreach ($siblings as $sib) {
+            if ($currentId !== null && (int)$sib['id'] === $currentId) {
+                continue;
+            }
+            $sibRank = $getSubTestRank($sib['name'] ?? '');
+            $sibEnd = !empty($sib['end_date']) ? $sib['end_date'] : null;
+            $sibStart = !empty($sib['start_date']) ? $sib['start_date'] : null;
+
+            // Preceding sibling: must finish before current test starts
+            $isPreceding = ($sibRank < $currentRank);
+            if ($isPreceding && $sibEnd !== null && !empty($startDate)) {
+                if ($startDate <= $sibEnd) {
+                    $minAllowed = date('Y-m-d', strtotime($sibEnd . ' +1 day'));
+                    throw new ValidationException([
+                        'start_date' => "Start Date cannot be before {$minAllowed} because previous test/examination ({$sib['name']}) is scheduled until {$sibEnd}."
+                    ]);
+                }
+            }
+
+            // Succeeding sibling: must start after current test ends
+            $isSucceeding = ($sibRank > $currentRank);
+            if ($isSucceeding && $sibStart !== null && !empty($endDate)) {
+                if ($endDate >= $sibStart) {
+                    $maxAllowed = date('Y-m-d', strtotime($sibStart . ' -1 day'));
+                    throw new ValidationException([
+                        'end_date' => "End Date cannot be after {$maxAllowed} because subsequent test/examination ({$sib['name']}) is scheduled to start on {$sibStart}."
+                    ]);
+                }
+            }
+        }
+    }
+
     public function createExamination(array $user, array $data): array
     {
         $pdo = $this->classRepo->getPdo();
@@ -14732,6 +14952,8 @@ Only approve the settlement after reviewing all financial records.
         if (!empty($endDate) && !empty($publishDate) && $publishDate < $endDate) {
             throw new ValidationException(['publish_date' => 'Publish Date cannot be before End Date.']);
         }
+        // Validate sibling test / examination date sequences
+        $this->validateSiblingExamDates($pdo, $schoolId, $academicYearId, $parentId, $name, $startDate, $endDate, null);
 
         // Check duplicate name within same parent level in this academic year
         if ($parentId === null) {
@@ -14883,6 +15105,8 @@ Only approve the settlement after reviewing all financial records.
         if (!empty($endDate) && !empty($publishDate) && $publishDate < $endDate) {
             throw new ValidationException(['publish_date' => 'Publish Date cannot be before End Date.']);
         }
+        // Validate sibling test / examination date sequences
+        $this->validateSiblingExamDates($pdo, $schoolId, (int)$exam['academic_year_id'], $parentId, $name, $startDate, $endDate, $id);
 
         // Check duplicate name within same parent level in this academic year (excluding current exam)
         if ($parentId === null) {
@@ -15414,12 +15638,22 @@ Only approve the settlement after reviewing all financial records.
         ]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
         
-        return array_map(function($row) {
+        $papers = array_map(function($row) {
             $total = (int)$row['total_students'];
             $entered = (int)$row['entered_marks_count'];
             $row['marks_completed'] = ($total > 0 && $entered >= $total);
             return $row;
         }, $rows);
+
+        // Fetch scheme_published from examination_class_status
+        $stmtStatus = $pdo->prepare("SELECT scheme_published FROM examination_class_status WHERE exam_id = :exam_id AND class_id = :class_id LIMIT 1");
+        $stmtStatus->execute([':exam_id' => $examId, ':class_id' => $classId]);
+        $schemePublished = (int)$stmtStatus->fetchColumn();
+
+        return [
+            'papers' => $papers,
+            'scheme_published' => $schemePublished,
+        ];
     }
 
     public function saveExamTimetable(array $user, int $examId, int $classId, array $data): void
@@ -16633,16 +16867,30 @@ Only approve the settlement after reviewing all financial records.
                     $totalMax += $maxM;
                 }
 
+                $isGradeOnly = ((float)$p['max_marks'] === 0.0) || (($p['evaluation_type'] ?? '') === 'grade') || ($obtained !== null && !is_numeric($obtained) && $obtained !== 'ABSENT');
+
                 $subjectMarks[] = [
+                    'subject_id' => (int)($p['subject_id'] ?? 0),
                     'subject_name' => $p['subject_name'],
-                    'max_marks' => (float)$p['max_marks'] === 0.0 ? '—' : $maxM,
-                    'passing_marks' => (float)$p['max_marks'] === 0.0 ? '—' : $passM,
+                    'evaluation_type' => $isGradeOnly ? 'grade' : 'marks',
+                    'is_grade_only' => $isGradeOnly,
+                    'max_marks' => $isGradeOnly ? 'GRADE' : ((float)$p['max_marks'] === 0.0 ? '—' : $maxM),
+                    'passing_marks' => $isGradeOnly ? 'C' : ((float)$p['max_marks'] === 0.0 ? '—' : $passM),
                     'marks_obtained' => $absent ? 'ABSENT' : ($obtained !== null ? $obtained : '—'),
                     'grade' => $absent ? 'F' : ($obtained !== null ? $subjectGrade : '—'),
                     'remarks' => $remarks,
                     'result' => $absent ? 'FAIL' : ($obtained !== null ? ($passed ? 'PASS' : 'FAIL') : '—')
                 ];
             }
+
+            usort($subjectMarks, function($a, $b) {
+                $aGrade = !empty($a['is_grade_only']) || ($a['evaluation_type'] ?? '') === 'grade' || ($a['max_marks'] ?? '') === 'GRADE' || (float)($a['max_marks'] ?? 0) === 0.0 || $a['max_marks'] === '—' || $a['max_marks'] === '-';
+                $bGrade = !empty($b['is_grade_only']) || ($b['evaluation_type'] ?? '') === 'grade' || ($b['max_marks'] ?? '') === 'GRADE' || (float)($b['max_marks'] ?? 0) === 0.0 || $b['max_marks'] === '—' || $b['max_marks'] === '-';
+                if ($aGrade !== $bGrade) {
+                    return $aGrade ? 1 : -1;
+                }
+                return ($a['subject_id'] ?? 0) <=> ($b['subject_id'] ?? 0);
+            });
 
             // Attendance rate
             $stmtAtt = $pdo->prepare("
@@ -16702,6 +16950,8 @@ Only approve the settlement after reviewing all financial records.
             $reportCards[] = [
                 'student_id' => $sid,
                 'student_name' => $s['name'],
+                'photo' => $s['photo'] ?? $s['photo_path'] ?? null,
+                'photo_path' => $s['photo_path'] ?? $s['photo'] ?? null,
                 'roll_no' => $s['roll_no'],
                 'admission_no' => $s['sr_no'] ?? $s['admission_no'] ?? '',
                 'father_name' => $s['father_name'] ?? '',
@@ -17121,6 +17371,8 @@ Only approve the settlement after reviewing all financial records.
                 'template_code' => 'cbse_classic',
                 'student_id' => $sid,
                 'student_name' => $s['name'],
+                'photo' => $s['photo'] ?? $s['photo_path'] ?? null,
+                'photo_path' => $s['photo_path'] ?? $s['photo'] ?? null,
                 'roll_no' => $s['roll_no'],
                 'admission_no' => $s['sr_no'] ?? $s['admission_no'] ?? '',
                 'father_name' => $s['father_name'] ?? '',

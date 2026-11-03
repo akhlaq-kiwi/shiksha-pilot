@@ -2137,7 +2137,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                                    ),
                                                  ),
                                                  // Table Rows
-                                                 ...((rcData['subjects'] as List? ?? []).map((sub) {
+                                                 ..._sortSubjectsWithGradeAtBottom(rcData['subjects'] as List? ?? []).map((sub) {
                                                    final String sName = (sub['subject_name'] ?? '').toString();
                                                    final String rawObt = (sub['marks_obtained'] ?? '').toString().toUpperCase().trim();
                                                    final String rawMax = (sub['max_marks'] ?? '').toString().toUpperCase().trim();
@@ -2190,7 +2190,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                                        ],
                                                      ),
                                                    );
-                                                 })).toList(),
+                                                 }).toList(),
                                                ],
                                              ),
                                            ),
@@ -2266,6 +2266,35 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
     );
   }
 
+  bool _isGradeSubject(Map<String, dynamic> sub) {
+    if (sub['is_grade_only'] == true || sub['is_grade_based'] == true) return true;
+    if (sub['evaluation_type'] == 'grade') return true;
+    final maxM = sub['max_marks']?.toString().toUpperCase().trim() ?? '';
+    if (maxM == 'GRADE' || maxM == '-' || maxM == '—' || maxM == '0' || maxM == '0.0') return true;
+    final grandMax = sub['grand_total_max']?.toString().toUpperCase().trim() ?? '';
+    if (grandMax == 'GRADE' || grandMax == '-' || grandMax == '—' || grandMax == '0' || grandMax == '0.0') return true;
+    final parsedMax = double.tryParse(maxM);
+    if (parsedMax != null && parsedMax == 0.0) return true;
+    final obt = sub['marks_obtained']?.toString().toUpperCase().trim() ?? '';
+    if (['A+', 'A', 'B', 'C', 'D', 'E', 'F'].contains(obt) && obt != 'ABSENT') return true;
+    return false;
+  }
+
+  List<Map<String, dynamic>> _sortSubjectsWithGradeAtBottom(List<dynamic> subjects) {
+    final list = List<Map<String, dynamic>>.from(
+      subjects.map((e) => Map<String, dynamic>.from(e as Map))
+    );
+    list.sort((a, b) {
+      final aGrade = _isGradeSubject(a);
+      final bGrade = _isGradeSubject(b);
+      if (aGrade != bGrade) return aGrade ? 1 : -1;
+      final idA = int.tryParse(a['subject_id']?.toString() ?? '') ?? 0;
+      final idB = int.tryParse(b['subject_id']?.toString() ?? '') ?? 0;
+      return idA.compareTo(idB);
+    });
+    return list;
+  }
+
   Map<String, dynamic> _buildFallbackReportCardData(Map<String, dynamic> result) {
     final List<dynamic> papers = result['papers'] ?? [];
     final double totalMax = double.tryParse((result['total_max_marks'] ?? 0.0).toString()) ?? 0.0;
@@ -2301,7 +2330,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
   }
 
   Widget _buildFinalReportCardTable(Map<String, dynamic> rcData) {
-    final List<dynamic> subjects = (rcData['subjects'] as List?) ?? [];
+    final List<dynamic> subjects = _sortSubjectsWithGradeAtBottom(rcData['subjects'] as List? ?? []);
     final String templateCode = (rcData['template_code'] ?? 'traditional').toString().toLowerCase();
     final List<dynamic> defaultExams = (templateCode == 'cbse_classic')
         ? ['Unit Test 1', 'Half Yearly Exam', 'Unit Test 2', 'Unit Test 3', 'Annual Exam', 'Final Assessment']
@@ -2658,7 +2687,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
       final String fatherName = (reportCard['father_name'] ?? '-').toString();
       final String motherName = (reportCard['mother_name'] ?? '-').toString();
       final String admissionNo = (reportCard['admission_no'] ?? '-').toString();
-      final List<dynamic> subjects = reportCard['subjects'] as List? ?? [];
+      final List<dynamic> subjects = _sortSubjectsWithGradeAtBottom(reportCard['subjects'] as List? ?? []);
       final bool isPdfFinalReport = false;
 
       final double totalMax = double.tryParse((reportCard['total_max'] ?? reportCard['total_max_marks'] ?? 0.0).toString()) ?? 0.0;

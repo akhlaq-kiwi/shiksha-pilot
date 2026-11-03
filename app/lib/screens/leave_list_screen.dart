@@ -31,6 +31,13 @@ class _LeaveListScreenState extends State<LeaveListScreen> {
   bool _isLoadingLeaves = true;
   bool _isLoadingHolidays = true;
   bool _isPrincipal = false;
+  final ScrollController _holidaysScrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _holidaysScrollController.dispose();
+    super.dispose();
+  }
 
   // Principal Filters
   String _statusFilter = 'ALL'; // 'ALL', 'PENDING', 'APPROVED', 'REJECTED'
@@ -145,10 +152,17 @@ class _LeaveListScreenState extends State<LeaveListScreen> {
     });
     try {
       final data = await widget.leaveService.getHolidays();
+      final sortedHolidays = List<dynamic>.from(data);
+      sortedHolidays.sort((a, b) {
+        final da = (a['date'] ?? '').toString();
+        final db = (b['date'] ?? '').toString();
+        return da.compareTo(db);
+      });
       if (mounted) {
         setState(() {
-          _holidays = data;
+          _holidays = sortedHolidays;
         });
+        _scrollToFirstUpcoming();
       }
     } catch (e) {
       debugPrint('Error loading holidays: $e');
@@ -159,6 +173,31 @@ class _LeaveListScreenState extends State<LeaveListScreen> {
         });
       }
     }
+  }
+
+  void _scrollToFirstUpcoming() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _holidays.isEmpty) return;
+      final todayStr = DateTime.now().toIso8601String().split('T')[0];
+      int targetIndex = -1;
+      for (int i = 0; i < _holidays.length; i++) {
+        final dStr = (_holidays[i]['date'] ?? '').toString();
+        if (dStr.isNotEmpty && dStr.compareTo(todayStr) >= 0) {
+          targetIndex = i;
+          break;
+        }
+      }
+
+      if (targetIndex > 0 && _holidaysScrollController.hasClients) {
+        const double itemHeight = 78.0;
+        final targetOffset = (targetIndex * itemHeight).clamp(0.0, _holidaysScrollController.position.maxScrollExtent);
+        _holidaysScrollController.animateTo(
+          targetOffset,
+          duration: const Duration(milliseconds: 380),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    });
   }
 
   List<LeaveRequest> get _filteredLeaves {
@@ -1196,37 +1235,45 @@ class _LeaveListScreenState extends State<LeaveListScreen> {
     return RefreshIndicator(
       onRefresh: _loadHolidays,
       child: ListView.builder(
+        controller: _holidaysScrollController,
+        cacheExtent: 5000,
         padding: const EdgeInsets.all(16),
         itemCount: _holidays.length,
         itemBuilder: (context, index) {
           final holiday = _holidays[index];
           final String hName = holiday['name'] ?? 'Holiday';
           final String hDateStr = holiday['date'] ?? '';
-          final String hDesc = holiday['description'] ?? 'School Holiday';
 
           // Determine status
           bool isToday = hDateStr == todayStr;
           bool isUpcoming = false;
+          bool isPast = false;
           try {
             if (!isToday && hDateStr.isNotEmpty) {
               final hDate = DateTime.parse(hDateStr);
               final todayDate = DateTime.parse(todayStr);
-              isUpcoming = hDate.isAfter(todayDate);
+              if (hDate.isAfter(todayDate)) {
+                isUpcoming = true;
+              } else if (hDate.isBefore(todayDate)) {
+                isPast = true;
+              }
             }
           } catch (_) {}
 
           // Styling variables
-          Color borderColor = Colors.grey.shade200;
+          Color borderColor = const Color(0xFFE2E8F0);
+          double borderWidth = 1.0;
           Color bgColor = Colors.white;
           Widget? badge;
 
           if (isToday) {
-            borderColor = Colors.green.shade600;
-            bgColor = Colors.green.shade50.withOpacity(0.3);
+            borderColor = const Color(0xFF16A34A);
+            borderWidth = 1.8;
+            bgColor = const Color(0xFFF0FDF4);
             badge = Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
               decoration: BoxDecoration(
-                color: Colors.green.shade600,
+                color: const Color(0xFF16A34A),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: const Text(
@@ -1235,32 +1282,39 @@ class _LeaveListScreenState extends State<LeaveListScreen> {
               ),
             );
           } else if (isUpcoming) {
-            borderColor = Colors.blue.shade300;
-            bgColor = Colors.blue.shade50.withOpacity(0.15);
+            // Yellow/amber highlight according to platform theme
+            borderColor = const Color(0xFFF59E0B);
+            borderWidth = 1.6;
+            bgColor = const Color(0xFFFFFBEB);
             badge = Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
               decoration: BoxDecoration(
-                color: Colors.blue.shade600,
+                color: const Color(0xFFD97706),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: const Text(
                 'Upcoming',
-                style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800),
               ),
             );
+          } else if (isPast) {
+            // Past leaves highlighted with green border
+            borderColor = const Color(0xFF22C55E);
+            borderWidth = 1.3;
+            bgColor = Colors.white;
           }
 
           return Container(
             margin: const EdgeInsets.only(bottom: 12),
             decoration: BoxDecoration(
               color: bgColor,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: borderColor, width: isToday ? 2 : 1),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: borderColor, width: borderWidth),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.015),
+                  color: Colors.black.withOpacity(0.02),
                   blurRadius: 8,
-                  offset: const Offset(0, 4),
+                  offset: const Offset(0, 3),
                 ),
               ],
             ),
@@ -1280,7 +1334,7 @@ class _LeaveListScreenState extends State<LeaveListScreen> {
                                 style: const TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
+                                  color: Color(0xFF0F172A),
                                 ),
                               ),
                             ),
@@ -1293,29 +1347,18 @@ class _LeaveListScreenState extends State<LeaveListScreen> {
                         const SizedBox(height: 6),
                         Row(
                           children: [
-                            const Icon(Icons.calendar_month_rounded, size: 14, color: Colors.grey),
+                            const Icon(Icons.calendar_month_rounded, size: 14, color: Color(0xFF64748B)),
                             const SizedBox(width: 6),
                             Text(
                               _formatDate(hDateStr),
                               style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.black54,
+                                color: Color(0xFF475569),
                               ),
                             ),
                           ],
                         ),
-                        if (hDesc.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          Text(
-                            hDesc,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade600,
-                              height: 1.3,
-                            ),
-                          ),
-                        ],
                       ],
                     ),
                   ),

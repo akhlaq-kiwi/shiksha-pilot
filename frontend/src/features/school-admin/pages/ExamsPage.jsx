@@ -658,7 +658,7 @@ export default function ExamsPage() {
     start_time: '09:00',
     end_time: '11:00',
     evaluation_type: 'marks',
-    grading_scale: 'A,B,C,D,E',
+    grading_scale: 'A,B,C,D',
     max_marks: '100',
     passing_marks: '40',
     room: ''
@@ -1491,6 +1491,13 @@ export default function ExamsPage() {
       setError('Please enter test/examination name.');
       return;
     }
+
+    // Terminal examination: only examination name can be changed!
+    if (!editExamData?.parent_id) {
+      await executeExamUpdate(false);
+      return;
+    }
+
     if (editExamData.max_marks !== '' && editExamData.max_marks !== null && editExamData.max_marks !== undefined) {
       const maxMarksStr = String(editExamData.max_marks).trim();
       if (maxMarksStr.includes('.') || !Number.isInteger(Number(maxMarksStr))) {
@@ -1805,7 +1812,7 @@ export default function ExamsPage() {
             ...p,
             ...newPaper,
             evaluation_type: newPaper.evaluation_type || 'marks',
-            grading_scale: newPaper.grading_scale || 'A,B,C,D,E',
+            grading_scale: newPaper.grading_scale || 'A,B,C,D',
             max_marks: maxMarksParsed,
             passing_marks: passingMarksParsed,
             subject_name: matchedSubject ? matchedSubject.name : 'Unknown Subject'
@@ -1818,7 +1825,7 @@ export default function ExamsPage() {
       const paperObj = {
         ...newPaper,
         evaluation_type: newPaper.evaluation_type || 'marks',
-        grading_scale: newPaper.grading_scale || 'A,B,C,D,E',
+        grading_scale: newPaper.grading_scale || 'A,B,C,D',
         max_marks: maxMarksParsed,
         passing_marks: passingMarksParsed,
         subject_name: matchedSubject ? matchedSubject.name : 'Unknown Subject'
@@ -1847,7 +1854,7 @@ export default function ExamsPage() {
         start_time: newPaper.start_time || '09:00',
         end_time: newPaper.end_time || '11:00',
         evaluation_type: 'marks',
-        grading_scale: 'A,B,C,D,E',
+        grading_scale: 'A,B,C,D',
         max_marks: String(examMaxMarks),
         passing_marks: String(examPassMarks),
         room: ''
@@ -3987,10 +3994,9 @@ export default function ExamsPage() {
                         <div className="space-y-1.5 md:col-span-2">
                           <label className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase">Grading Scale (Direct Grade)</label>
                           <CustomSelect 
-                            value={newPaper.grading_scale || 'A,B,C,D,E'} 
+                            value={newPaper.grading_scale || 'A,B,C,D'} 
                             onChange={val => setNewPaper(p => ({ ...p, grading_scale: val }))}
                             options={[
-                              { value: 'A+,A,B,C,D,E', label: '5-Tier Scale (A+, A, B, C, D, E)' },
                               { value: 'A,B,C,D', label: '4-Tier Scale (A, B, C, D)' }
                             ]}
                             buttonClassName="h-9"
@@ -4276,23 +4282,29 @@ export default function ExamsPage() {
                         <TableCell>
                           {isGradeSheet ? (
                             (() => {
-                              const dynamicGrades = (gradeScales && gradeScales.length > 0)
-                                ? Array.from(new Set(gradeScales.map(g => g.grade).filter(Boolean)))
-                                : ['A', 'B', 'C', 'D'];
+                              const dynamicGrades = (() => {
+                                const list = (gradeScales && gradeScales.length > 0)
+                                  ? Array.from(new Set(gradeScales.map(g => g.grade).filter(Boolean)))
+                                  : ['A', 'B', 'C', 'D'];
+                                const filtered = list.filter(g => g && g.toUpperCase() !== 'E');
+                                return filtered.length > 0 ? filtered : ['A', 'B', 'C', 'D'];
+                              })();
 
                               return (
-                                <Select
+                                <CustomSelect
                                   ref={el => { markInputRefs.current[s.student_id] = el; }}
-                                  className="h-8 text-xs font-bold w-full cursor-pointer"
-                                  disabled={s.is_absent === 1}
                                   value={s.is_absent === 1 ? '' : (s.marks_obtained || '')}
-                                  onChange={e => handleMarkCellChange(s.student_id, 'marks_obtained', e.target.value)}
-                                >
-                                  <option value="">-- Grade --</option>
-                                  {dynamicGrades.map(g => (
-                                    <option key={g} value={g}>Grade {g}</option>
-                                  ))}
-                                </Select>
+                                  onChange={val => handleMarkCellChange(s.student_id, 'marks_obtained', val)}
+                                  disabled={s.is_absent === 1}
+                                  placeholder="-- Grade --"
+                                  options={[
+                                    { value: '', label: '-- Grade --' },
+                                    ...dynamicGrades.map(g => ({ value: g, label: `Grade ${g}` }))
+                                  ]}
+                                  className="w-full"
+                                  buttonClassName="h-8 text-xs font-bold rounded-xl"
+                                  dropdownClassName="rounded-xl"
+                                />
                               );
                             })()
                           ) : (
@@ -5079,32 +5091,34 @@ export default function ExamsPage() {
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">Start Date *</label>
-              <Input 
-                type="date" 
-                min={getExamMinStartDate(editExamData.id, exams, editExamData.parent_id)} 
-                max={getExamMaxEndDate(editExamData.id, exams, editExamData.parent_id) || undefined}
-                value={editExamData.start_date || ''} 
-                onChange={e => setEditExamData(p => ({ ...p, start_date: e.target.value }))} 
-                required
-                className="focus:ring-0 focus-visible:ring-0 focus:outline-none focus:border-border-strong"
-              />
+          {Boolean(editExamData?.parent_id) && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-text-secondary uppercase">Start Date *</label>
+                <Input 
+                  type="date" 
+                  min={getExamMinStartDate(editExamData.id, exams, editExamData.parent_id)} 
+                  max={getExamMaxEndDate(editExamData.id, exams, editExamData.parent_id) || undefined}
+                  value={editExamData.start_date || ''} 
+                  onChange={e => setEditExamData(p => ({ ...p, start_date: e.target.value }))} 
+                  required
+                  className="focus:ring-0 focus-visible:ring-0 focus:outline-none focus:border-border-strong"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-text-secondary uppercase">End Date *</label>
+                <Input 
+                  type="date" 
+                  min={editExamData.start_date || getExamMinStartDate(editExamData.id, exams, editExamData.parent_id)} 
+                  max={getExamMaxEndDate(editExamData.id, exams, editExamData.parent_id) || undefined}
+                  value={editExamData.end_date || ''} 
+                  onChange={e => setEditExamData(p => ({ ...p, end_date: e.target.value }))} 
+                  required
+                  className="focus:ring-0 focus-visible:ring-0 focus:outline-none focus:border-border-strong"
+                />
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase">End Date *</label>
-              <Input 
-                type="date" 
-                min={editExamData.start_date || getExamMinStartDate(editExamData.id, exams, editExamData.parent_id)} 
-                max={getExamMaxEndDate(editExamData.id, exams, editExamData.parent_id) || undefined}
-                value={editExamData.end_date || ''} 
-                onChange={e => setEditExamData(p => ({ ...p, end_date: e.target.value }))} 
-                required
-                className="focus:ring-0 focus-visible:ring-0 focus:outline-none focus:border-border-strong"
-              />
-            </div>
-          </div>
+          )}
 
         </form>
       </Dialog>

@@ -249,10 +249,10 @@ export const REPORT_CARD_THEMES = {
     key: 'ocean_teal',
     templateCode: 'cbse_ocean_teal',
     templateId: 9,
-    name: 'Manage Finance & Dark Black',
-    displayName: 'Manage Finance & Dark Black',
+    name: 'Dark Black',
+    displayName: 'Dark Black',
     subtitle: 'Report card in exact Manage Finance container color (#FAFAFA) with crisp dark black borders on all tables.',
-    tag: 'Finance & Dark Black',
+    tag: 'Dark Black',
     badgeClass: 'bg-[#fafafa] text-black border-black/40',
     swatches: {
       primary: '#000000', // Crisp dark black borders

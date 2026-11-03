@@ -238,11 +238,15 @@ function DepositModal({ student, payments = [], classFeeConfig, onSave, onClose 
   const handleAmountChange = (m, value) => {
     // Only positive whole numbers allowed (no decimals, no negative numbers)
     const sanitized = value.replace(/[^0-9]/g, '');
-    const num = sanitized === '' ? '' : parseInt(sanitized, 10);
-    setDepositAmounts(prev => ({
-      ...prev,
-      [m]: num
-    }));
+    if (sanitized === '') {
+      setDepositAmounts(prev => ({ ...prev, [m]: '' }));
+    } else {
+      const num = parseInt(sanitized, 10);
+      const remaining = getRemainingFee(m);
+      if (num <= remaining) {
+        setDepositAmounts(prev => ({ ...prev, [m]: num }));
+      }
+    }
     setError('');
   };
 
@@ -291,8 +295,8 @@ function DepositModal({ student, payments = [], classFeeConfig, onSave, onClose 
       if (isNaN(disc) || disc < 0 || !Number.isInteger(disc)) {
         return 'Please enter a valid positive whole number for discount amount.';
       }
-      if (disc >= gross) {
-        return `Discount amount (₹${disc}) must be less than payable fee (₹${gross.toLocaleString()}).`;
+      if (disc > gross) {
+        return `Discount amount (₹${disc}) cannot exceed payable fee (₹${gross.toLocaleString()}).`;
       }
     }
     if (selectedMonths.length === 1) {
@@ -392,7 +396,15 @@ function DepositModal({ student, payments = [], classFeeConfig, onSave, onClose 
                   }}
                   onChange={(e) => {
                     const sanitized = e.target.value.replace(/[^0-9]/g, '');
-                    setDiscountAmount(sanitized === '' ? '' : parseInt(sanitized, 10));
+                    if (sanitized === '') {
+                      setDiscountAmount('');
+                    } else {
+                      const num = parseInt(sanitized, 10);
+                      const gross = calculateGrossTotal();
+                      if (num <= gross) {
+                        setDiscountAmount(num);
+                      }
+                    }
                     setError('');
                   }}
                   className="w-full rounded-lg border border-border bg-surface text-text-primary pl-7 pr-3 py-1.5 text-xs font-bold outline-none focus:border-primary focus:ring-primary"
@@ -602,11 +614,16 @@ function AdditionalDepositModal({ student, unpaidFees, initialSelectedIds = [], 
 
   const handleAmountChange = (id, value) => {
     const sanitized = value.replace(/[^0-9]/g, '');
-    const num = sanitized === '' ? '' : parseInt(sanitized, 10);
-    setDepositAmounts(prev => ({
-      ...prev,
-      [id]: num
-    }));
+    if (sanitized === '') {
+      setDepositAmounts(prev => ({ ...prev, [id]: '' }));
+    } else {
+      const num = parseInt(sanitized, 10);
+      const fee = unpaidFees.find(f => f.id === id);
+      const remaining = fee ? getFeeRemaining(fee) : 0;
+      if (num <= remaining) {
+        setDepositAmounts(prev => ({ ...prev, [id]: num }));
+      }
+    }
     setError('');
   };
 
@@ -658,8 +675,8 @@ function AdditionalDepositModal({ student, unpaidFees, initialSelectedIds = [], 
       if (isNaN(disc) || disc < 0 || !Number.isInteger(disc)) {
         return 'Please enter a valid positive whole number for discount amount.';
       }
-      if (disc >= gross) {
-        return `Discount amount (₹${disc}) must be less than payable fee (₹${gross.toLocaleString()}).`;
+      if (disc > gross) {
+        return `Discount amount (₹${disc}) cannot exceed payable fee (₹${gross.toLocaleString()}).`;
       }
     }
     if (isSingleFee) {
@@ -771,7 +788,15 @@ function AdditionalDepositModal({ student, unpaidFees, initialSelectedIds = [], 
                   }}
                   onChange={(e) => {
                     const sanitized = e.target.value.replace(/[^0-9]/g, '');
-                    setDiscountAmount(sanitized === '' ? '' : parseInt(sanitized, 10));
+                    if (sanitized === '') {
+                      setDiscountAmount('');
+                    } else {
+                      const num = parseInt(sanitized, 10);
+                      const gross = calculateGrossTotal();
+                      if (num <= gross) {
+                        setDiscountAmount(num);
+                      }
+                    }
                     setError('');
                   }}
                   className="w-full rounded-lg border border-border bg-surface text-text-primary pl-7 pr-3 py-1.5 text-xs font-bold outline-none focus:border-primary focus:ring-primary"

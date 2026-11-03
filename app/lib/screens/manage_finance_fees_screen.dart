@@ -1,6 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import '../services/fee_service.dart';
 import '../utils/class_formatter.dart';
+
+class ClassFeeGroup {
+  final String name;
+  final String primaryId;
+  final List<String> allIds;
+  final bool isConfigured;
+  final dynamic config;
+
+  ClassFeeGroup({
+    required this.name,
+    required this.primaryId,
+    required this.allIds,
+    required this.isConfigured,
+    this.config,
+  });
+}
 
 class ManageFinanceFeesScreen extends StatefulWidget {
   final FeeService feeService;
@@ -23,6 +42,24 @@ class _ManageFinanceFeesScreenState extends State<ManageFinanceFeesScreen> with 
   List<dynamic> _classes = [];
   List<dynamic> _students = [];
   List<dynamic> _academicYears = [];
+  List<dynamic> _classFeeConfigs = [];
+  List<dynamic> _classCourseFeeConfigs = [];
+
+  // Tab 4: Monthly Fee State
+  String? _monthlySelectedShortName;
+  final TextEditingController _monthlyAmountController = TextEditingController();
+  bool _monthlySaving = false;
+  String _monthlySuccessMessage = '';
+  String _monthlyErrorMessage = '';
+  bool _downloadingMonthlyPdf = false;
+
+  // Tab 5: Course Fee State
+  String? _courseSelectedShortName;
+  final TextEditingController _courseAmountController = TextEditingController();
+  bool _courseSaving = false;
+  String _courseSuccessMessage = '';
+  String _courseErrorMessage = '';
+  bool _downloadingCoursePdf = false;
 
   // Search & Filters
   String _additionalFeeSearch = '';
@@ -32,13 +69,15 @@ class _ManageFinanceFeesScreenState extends State<ManageFinanceFeesScreen> with 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _loadAllData();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _monthlyAmountController.dispose();
+    _courseAmountController.dispose();
     super.dispose();
   }
 
@@ -49,21 +88,36 @@ class _ManageFinanceFeesScreenState extends State<ManageFinanceFeesScreen> with 
     });
 
     try {
+      final years = await widget.feeService.getAcademicYears();
+      int? activeYearId;
+      for (final y in years) {
+        if (y['is_current'] == true || y['is_current'] == 1 || y['is_current'] == '1') {
+          activeYearId = y['id'] is int ? y['id'] : int.tryParse(y['id'].toString());
+          break;
+        }
+      }
+      activeYearId ??= years.isNotEmpty
+          ? (years.first['id'] is int ? years.first['id'] : int.tryParse(years.first['id'].toString()))
+          : null;
+
       final results = await Future.wait([
         widget.feeService.getAdditionalFeeTypes(),
         widget.feeService.getTransportFees(),
         widget.feeService.getClasses(),
         widget.feeService.getStudents(limit: 1000),
-        widget.feeService.getAcademicYears(),
+        widget.feeService.getClassFeeConfigurations(academicYearId: activeYearId),
+        widget.feeService.getClassCourseFeeConfigurations(academicYearId: activeYearId),
       ]);
 
       if (mounted) {
         setState(() {
-          _feeTypes = results[0] as List<dynamic>;
-          _transportFees = results[1] as List<dynamic>;
-          _classes = results[2] as List<dynamic>;
-          _students = results[3] as List<dynamic>;
-          _academicYears = results[4] as List<dynamic>;
+          _academicYears = years;
+          _feeTypes = results[0];
+          _transportFees = results[1];
+          _classes = results[2];
+          _students = results[3];
+          _classFeeConfigs = results[4];
+          _classCourseFeeConfigs = results[5];
           _isLoading = false;
         });
       }
@@ -97,6 +151,100 @@ class _ManageFinanceFeesScreenState extends State<ManageFinanceFeesScreen> with 
         });
       }
     } catch (_) {}
+  }
+
+  Future<void> _reloadMonthlyFeeConfigs() async {
+    try {
+      final activeYear = _getCurrentAcademicYear();
+      final activeYearId = activeYear != null
+          ? (activeYear['id'] is int ? activeYear['id'] : int.tryParse(activeYear['id'].toString()))
+          : null;
+      final list = await widget.feeService.getClassFeeConfigurations(academicYearId: activeYearId);
+      if (mounted) {
+        setState(() {
+          _classFeeConfigs = list;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _reloadCourseFeeConfigs() async {
+    try {
+      final activeYear = _getCurrentAcademicYear();
+      final activeYearId = activeYear != null
+          ? (activeYear['id'] is int ? activeYear['id'] : int.tryParse(activeYear['id'].toString()))
+          : null;
+      final list = await widget.feeService.getClassCourseFeeConfigurations(academicYearId: activeYearId);
+      if (mounted) {
+        setState(() {
+          _classCourseFeeConfigs = list;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Map<String, dynamic>? _getCurrentAcademicYear() {
+    for (final y in _academicYears) {
+      if (y['is_current'] == true || y['is_current'] == 1 || y['is_current'] == '1') {
+        return y as Map<String, dynamic>;
+      }
+    }
+    if (_academicYears.isNotEmpty) {
+      return _academicYears.first as Map<String, dynamic>;
+    }
+    return null;
+  }
+
+  List<ClassFeeGroup> _getUniqueClassFeeGroups({required bool isCourse}) {
+    final Map<String, List<dynamic>> groupMap = {};
+    for (final c in _classes) {
+      final rawName = (c['name'] ?? '').toString().trim();
+      if (rawName.isEmpty) continue;
+      final shortName = formatShortClassName(rawName);
+      groupMap.putIfAbsent(shortName, () => []).add(c);
+    }
+
+    final configs = isCourse ? _classCourseFeeConfigs : _classFeeConfigs;
+
+    final List<ClassFeeGroup> list = [];
+    for (final entry in groupMap.entries) {
+      final shortName = entry.key;
+      final items = entry.value;
+      final allIds = items.map((i) => i['id'].toString()).toList();
+      final primaryId = allIds.isNotEmpty ? allIds.first : '';
+
+      dynamic matchedConfig;
+      bool isConfigured = false;
+
+      for (final cfg in configs) {
+        final cfgClassId = cfg['class_id']?.toString() ?? '';
+        if (allIds.contains(cfgClassId)) {
+          isConfigured = true;
+          matchedConfig = cfg;
+          break;
+        }
+        final matchedClass = _classes.firstWhere(
+          (cl) => cl['id']?.toString() == cfgClassId,
+          orElse: () => null,
+        );
+        if (matchedClass != null && formatShortClassName(matchedClass['name']) == shortName) {
+          isConfigured = true;
+          matchedConfig = cfg;
+          break;
+        }
+      }
+
+      list.add(ClassFeeGroup(
+        name: shortName,
+        primaryId: primaryId,
+        allIds: allIds,
+        isConfigured: isConfigured,
+        config: matchedConfig,
+      ));
+    }
+
+    list.sort((a, b) => getClassSortRank(a.name).compareTo(getClassSortRank(b.name)));
+    return list;
   }
 
   // ---------------------------------------------------------------------------
@@ -245,12 +393,15 @@ class _ManageFinanceFeesScreenState extends State<ManageFinanceFeesScreen> with 
           indicatorWeight: 3,
           labelColor: const Color(0xFFD97706),
           unselectedLabelColor: const Color(0xFF64748B),
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+          labelPadding: const EdgeInsets.symmetric(horizontal: 2),
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: -0.3),
+          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11, letterSpacing: -0.3),
           tabs: const [
-            Tab(text: 'ADDITIONAL FEE', icon: Icon(Icons.local_offer_outlined, size: 18)),
-            Tab(text: 'ANNUAL FEE', icon: Icon(Icons.calendar_month_outlined, size: 18)),
-            Tab(text: 'TRANSPORT FEE', icon: Icon(Icons.directions_bus_outlined, size: 18)),
+            Tab(text: 'ADDITIONAL', icon: Icon(Icons.local_offer_outlined, size: 17)),
+            Tab(text: 'ANNUAL', icon: Icon(Icons.calendar_month_outlined, size: 17)),
+            Tab(text: 'TRANSPORT', icon: Icon(Icons.directions_bus_outlined, size: 17)),
+            Tab(text: 'MONTHLY', icon: Icon(Icons.event_repeat_rounded, size: 17)),
+            Tab(text: 'COURSE', icon: Icon(Icons.school_outlined, size: 17)),
           ],
         ),
       ),
@@ -269,6 +420,8 @@ class _ManageFinanceFeesScreenState extends State<ManageFinanceFeesScreen> with 
                     _buildAdditionalFeeTab(),
                     _buildAnnualFeeTab(),
                     _buildTransportFeeTab(),
+                    _buildMonthlyFeeTab(),
+                    _buildCourseFeeTab(),
                   ],
                 ),
     );
@@ -2886,5 +3039,1248 @@ class _ManageFinanceFeesScreenState extends State<ManageFinanceFeesScreen> with 
         ],
       ),
     );
+  }
+
+  // ===========================================================================
+  // TAB 4: MONTHLY FEE (CLASS FEE CONFIGURATION)
+  // ===========================================================================
+
+  Widget _buildMonthlyFeeTab() {
+    final classGroups = _getUniqueClassFeeGroups(isCourse: false);
+    final ClassFeeGroup? selectedGroup = _monthlySelectedShortName != null
+        ? classGroups.firstWhere(
+            (g) => g.name == _monthlySelectedShortName,
+            orElse: () => classGroups.first,
+          )
+        : null;
+
+    final isConfigured = selectedGroup?.isConfigured ?? false;
+
+    return RefreshIndicator(
+      onRefresh: _reloadMonthlyFeeConfigs,
+      color: const Color(0xFFD97706),
+      child: ListView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+        children: [
+          // Header / Info Card
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.02),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFFBEB),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFFDE68A)),
+                      ),
+                      child: const Icon(Icons.event_repeat_rounded, color: Color(0xFFD97706), size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text(
+                            'Class Fee Configuration',
+                            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Color(0xFF0F172A)),
+                          ),
+                          SizedBox(height: 3),
+                          Text(
+                            'Define standard monthly tuition fees for each academic class. All sections of the class inherit this configuration.',
+                            style: TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.3),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: OutlinedButton.icon(
+                    onPressed: _downloadingMonthlyPdf ? null : _downloadFeeStructurePdf,
+                    icon: _downloadingMonthlyPdf
+                        ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFD97706)))
+                        : const Icon(Icons.download_rounded, size: 16, color: Color(0xFFD97706)),
+                    label: Text(
+                      _downloadingMonthlyPdf ? 'Generating...' : 'Download Fee Structure',
+                      style: const TextStyle(color: Color(0xFFD97706), fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFFFDE68A)),
+                      backgroundColor: const Color(0xFFFFFBEB),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Main Configuration Form Card
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.02),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_monthlyErrorMessage.isNotEmpty) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF2F2),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFFECACA)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.error_outline_rounded, color: Color(0xFFDC2626), size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _monthlyErrorMessage,
+                            style: const TextStyle(color: Color(0xFFDC2626), fontSize: 12, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                if (_monthlySuccessMessage.isNotEmpty) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0FDF4),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFBBF7D0)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.check_circle_outline_rounded, color: Color(0xFF16A34A), size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _monthlySuccessMessage,
+                            style: const TextStyle(color: Color(0xFF16A34A), fontSize: 12, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                // Class Dropdown Label
+                const Text(
+                  'CLASS *',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF64748B), letterSpacing: 0.5),
+                ),
+                const SizedBox(height: 6),
+
+                // Curved Class Dropdown
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.02),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _monthlySelectedShortName,
+                      isExpanded: true,
+                      borderRadius: BorderRadius.circular(14),
+                      dropdownColor: Colors.white,
+                      icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
+                      hint: const Text(
+                        '-- Select Class --',
+                        style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontWeight: FontWeight.normal),
+                      ),
+                      items: classGroups.map((group) {
+                        return DropdownMenuItem<String>(
+                          value: group.name,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                group.name,
+                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF0F172A)),
+                              ),
+                              if (group.isConfigured)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFECFDF5),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: const Color(0xFFA7F3D0)),
+                                  ),
+                                  child: const Text(
+                                    'Configured',
+                                    style: TextStyle(color: Color(0xFF059669), fontSize: 11, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        setState(() {
+                          _monthlySelectedShortName = val;
+                          _monthlyErrorMessage = '';
+                          _monthlySuccessMessage = '';
+                          if (val != null) {
+                            final sel = classGroups.firstWhere((g) => g.name == val);
+                            if (sel.isConfigured && sel.config != null) {
+                              final cfg = sel.config;
+                              if (cfg['mode'] == 'SAME') {
+                                final amt = cfg['monthly_fees']?['April'] ?? cfg['same_amount'] ?? '';
+                                _monthlyAmountController.text = amt.toString().replaceAll(RegExp(r'\.00$'), '');
+                              } else if (cfg['monthly_fees'] is Map) {
+                                final fees = cfg['monthly_fees'] as Map;
+                                final firstVal = fees.values.firstWhere(
+                                  (v) => v != null && v.toString().isNotEmpty,
+                                  orElse: () => '',
+                                );
+                                _monthlyAmountController.text = firstVal.toString().replaceAll(RegExp(r'\.00$'), '');
+                              }
+                            } else {
+                              _monthlyAmountController.clear();
+                            }
+                          }
+                        });
+                      },
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 18),
+                const Divider(color: Color(0xFFE2E8F0), height: 1),
+                const SizedBox(height: 18),
+
+                // Monthly Fee Amount Field
+                const Text(
+                  'FEE AMOUNT',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF64748B), letterSpacing: 0.5),
+                ),
+                const SizedBox(height: 6),
+
+                TextFormField(
+                  controller: _monthlyAmountController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  enabled: _monthlySelectedShortName != null && !isConfigured,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: isConfigured ? const Color(0xFF64748B) : const Color(0xFF0F172A),
+                  ),
+                  decoration: InputDecoration(
+                    prefixText: '₹  ',
+                    prefixStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF64748B)),
+                    hintText: 'e.g. 1500',
+                    hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    filled: isConfigured,
+                    fillColor: isConfigured ? const Color(0xFFF8FAFC) : Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFD97706), width: 1.5),
+                    ),
+                    disabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 6),
+                const Text(
+                  'This amount will be applied to all 12 academic months automatically.',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                ),
+
+                const SizedBox(height: 24),
+
+                // Status or Save Button
+                if (_monthlySelectedShortName != null && isConfigured) ...[
+                  // Locked Banner
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFE2E8F0),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.lock_rounded, size: 16, color: Color(0xFF64748B)),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: const [
+                              Text(
+                                'Fee Configuration Locked',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF1E293B)),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                'This class fee configuration is permanently saved and locked for this academic year.',
+                                style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE2E8F0),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFFCBD5E1)),
+                          ),
+                          child: const Text(
+                            'LOCKED',
+                            style: TextStyle(color: Color(0xFF475569), fontSize: 10, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: null,
+                      icon: const Icon(Icons.check_circle_rounded, size: 18),
+                      label: const Text('Fee Configured'),
+                      style: ElevatedButton.styleFrom(
+                        disabledBackgroundColor: const Color(0xFFE2E8F0),
+                        disabledForegroundColor: const Color(0xFF94A3B8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                    ),
+                  ),
+                ] else ...[
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: (_monthlySelectedShortName == null || _monthlySaving)
+                          ? null
+                          : () => _showSaveMonthlyFeeDialog(selectedGroup!),
+                      icon: _monthlySaving
+                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Icon(Icons.save_rounded, size: 18),
+                      label: Text(_monthlySaving ? 'Saving...' : 'Save Fee Configuration'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD97706),
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: const Color(0xFFCBD5E1),
+                        disabledForegroundColor: Colors.white70,
+                        elevation: 1,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSaveMonthlyFeeDialog(ClassFeeGroup group) {
+    final amountText = _monthlyAmountController.text.trim();
+    final amount = double.tryParse(amountText);
+    if (amount == null || amount <= 0) {
+      setState(() {
+        _monthlyErrorMessage = 'Monthly fee must be greater than ₹0.';
+        _monthlySuccessMessage = '';
+      });
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (dlgCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+        titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+        title: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: const Icon(Icons.help_outline_rounded, color: Color(0xFFD97706), size: 30),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Confirm Save',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Are you sure you want to save the class fee configuration for ${group.name}?\n\nThis will update future unpaid billing cycles.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.4),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Monthly Fee:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF92400E))),
+                  Text('₹${amount.toStringAsFixed(0)} / month', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF92400E))),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        actions: [
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(dlgCtx),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFFCBD5E1)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(dlgCtx);
+                    _saveMonthlyFeeConfig(group, amount);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFD97706),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: const Text('Confirm', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _saveMonthlyFeeConfig(ClassFeeGroup group, double amount) async {
+    setState(() {
+      _monthlySaving = true;
+      _monthlyErrorMessage = '';
+      _monthlySuccessMessage = '';
+    });
+
+    try {
+      final activeYear = _getCurrentAcademicYear();
+      final activeYearId = activeYear != null
+          ? (activeYear['id'] is int ? activeYear['id'] : int.tryParse(activeYear['id'].toString()))
+          : null;
+
+      final feesMap = <String, dynamic>{};
+      for (final m in [
+        'April', 'May', 'June', 'July', 'August', 'September',
+        'October', 'November', 'December', 'January', 'February', 'March'
+      ]) {
+        feesMap[m] = amount;
+      }
+
+      for (final cid in group.allIds) {
+        await widget.feeService.saveClassFeeConfiguration({
+          'class_id': int.parse(cid),
+          'academic_year_id': activeYearId,
+          'mode': 'SAME',
+          'monthly_fees': feesMap,
+        });
+      }
+
+      await _reloadMonthlyFeeConfigs();
+
+      if (mounted) {
+        setState(() {
+          _monthlySuccessMessage = 'Fee configuration saved successfully.';
+          _monthlySaving = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Fee configuration saved successfully.'),
+            backgroundColor: Color(0xFF059669),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _monthlyErrorMessage = e.toString().replaceAll('Exception:', '').trim();
+          _monthlySaving = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _downloadFeeStructurePdf() async {
+    setState(() => _downloadingMonthlyPdf = true);
+    try {
+      final activeYear = _getCurrentAcademicYear();
+      final yearName = activeYear?['name']?.toString() ?? '2026-2027';
+
+      String startYr = '2026';
+      String endYr = '2027';
+      final yearMatch = RegExp(r'(\d{4})\s*[-–—]\s*(\d{4})').firstMatch(yearName);
+      if (yearMatch != null) {
+        startYr = yearMatch.group(1)!;
+        endYr = yearMatch.group(2)!;
+      }
+
+      final headerTitle = 'FEE STRUCTURE FOR $startYr - $endYr';
+      final headerSubtitle = '(Applicable from 1st April to 31st March $endYr)';
+
+      final classGroups = _getUniqueClassFeeGroups(isCourse: false);
+
+      final pdf = pw.Document();
+
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(32),
+          build: (pw.Context context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
+              children: [
+                pw.Text(
+                  headerTitle,
+                  style: pw.TextStyle(
+                    fontSize: 16,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColor.fromHex('#0F172A'),
+                  ),
+                ),
+                pw.SizedBox(height: 4),
+                pw.Text(
+                  headerSubtitle,
+                  style: pw.TextStyle(
+                    fontSize: 10,
+                    color: PdfColor.fromHex('#475569'),
+                  ),
+                ),
+                pw.SizedBox(height: 16),
+                pw.Table(
+                  border: pw.TableBorder.all(color: PdfColor.fromHex('#CBD5E1'), width: 0.5),
+                  columnWidths: {
+                    0: const pw.FixedColumnWidth(40),
+                    1: const pw.FlexColumnWidth(),
+                    2: const pw.FixedColumnWidth(80),
+                  },
+                  children: [
+                    // Header Row
+                    pw.TableRow(
+                      decoration: pw.BoxDecoration(color: PdfColor.fromHex('#0F172A')),
+                      children: [
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+                          child: pw.Text('S. NO.', textAlign: pw.TextAlign.center, style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                          child: pw.Text('CLASS', textAlign: pw.TextAlign.left, style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                          child: pw.Text('AMOUNT (Rs.)', textAlign: pw.TextAlign.right, style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                        ),
+                      ],
+                    ),
+                    // Data Rows
+                    ...classGroups.asMap().entries.map((entry) {
+                      final idx = entry.key;
+                      final grp = entry.value;
+                      final isEven = idx % 2 == 1;
+
+                      double feeAmt = 0;
+                      if (grp.config != null) {
+                        final cfg = grp.config;
+                        if (cfg['mode'] == 'SAME') {
+                          feeAmt = double.tryParse((cfg['monthly_fees']?['April'] ?? cfg['same_amount'] ?? 0).toString()) ?? 0;
+                        } else if (cfg['monthly_fees'] is Map) {
+                          final vals = (cfg['monthly_fees'] as Map)
+                              .values
+                              .map((v) => double.tryParse(v.toString()) ?? 0)
+                              .where((v) => v > 0)
+                              .toList();
+                          if (vals.isNotEmpty) feeAmt = vals.first;
+                        }
+                      }
+
+                      return pw.TableRow(
+                        decoration: isEven ? pw.BoxDecoration(color: PdfColor.fromHex('#F8FAFC')) : const pw.BoxDecoration(),
+                        children: [
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 6),
+                            child: pw.Text('${idx + 1}', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey800)),
+                          ),
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                            child: pw.Text(grp.name, textAlign: pw.TextAlign.left, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#0F172A'))),
+                          ),
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                            child: pw.Text('Rs. ${feeAmt.round()}', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#0F172A'))),
+                          ),
+                        ],
+                      );
+                    }),
+                  ],
+                ),
+              ],
+            );
+          },
+        ),
+      );
+
+      final pdfBytes = await pdf.save();
+      await Printing.layoutPdf(
+        onLayout: (_) async => pdfBytes,
+        name: 'Fee_Structure_$startYr-$endYr.pdf',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to generate PDF: ${e.toString().replaceAll('Exception:', '').trim()}'),
+            backgroundColor: const Color(0xFFEF4444),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _downloadingMonthlyPdf = false);
+      }
+    }
+  }
+
+  // ===========================================================================
+  // TAB 5: COURSE FEE CONFIGURATION
+  // ===========================================================================
+
+  Widget _buildCourseFeeTab() {
+    final classGroups = _getUniqueClassFeeGroups(isCourse: true);
+    final ClassFeeGroup? selectedGroup = _courseSelectedShortName != null
+        ? classGroups.firstWhere(
+            (g) => g.name == _courseSelectedShortName,
+            orElse: () => classGroups.first,
+          )
+        : null;
+
+    final isConfigured = selectedGroup?.isConfigured ?? false;
+
+    return RefreshIndicator(
+      onRefresh: _reloadCourseFeeConfigs,
+      color: const Color(0xFFD97706),
+      child: ListView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+        children: [
+          // Header / Info Card
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.02),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFFBEB),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFFDE68A)),
+                      ),
+                      child: const Icon(Icons.school_outlined, color: Color(0xFFD97706), size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text(
+                            'Course Fee Configuration',
+                            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Color(0xFF0F172A)),
+                          ),
+                          SizedBox(height: 3),
+                          Text(
+                            'Define one-time or course-based fees per class. Course fees are maintained separately from monthly academic fees.',
+                            style: TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.3),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: OutlinedButton.icon(
+                    onPressed: _downloadingCoursePdf ? null : _downloadCourseFeeStructurePdf,
+                    icon: _downloadingCoursePdf
+                        ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFD97706)))
+                        : const Icon(Icons.download_rounded, size: 16, color: Color(0xFFD97706)),
+                    label: Text(
+                      _downloadingCoursePdf ? 'Generating...' : 'Download Course Fee Structure',
+                      style: const TextStyle(color: Color(0xFFD97706), fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFFFDE68A)),
+                      backgroundColor: const Color(0xFFFFFBEB),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Main Configuration Form Card
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.02),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_courseErrorMessage.isNotEmpty) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF2F2),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFFECACA)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.error_outline_rounded, color: Color(0xFFDC2626), size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _courseErrorMessage,
+                            style: const TextStyle(color: Color(0xFFDC2626), fontSize: 12, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                if (_courseSuccessMessage.isNotEmpty) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0FDF4),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFBBF7D0)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.check_circle_outline_rounded, color: Color(0xFF16A34A), size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _courseSuccessMessage,
+                            style: const TextStyle(color: Color(0xFF16A34A), fontSize: 12, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                // Class Dropdown Label
+                const Text(
+                  'CLASS *',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF64748B), letterSpacing: 0.5),
+                ),
+                const SizedBox(height: 6),
+
+                // Curved Class Dropdown
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.02),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _courseSelectedShortName,
+                      isExpanded: true,
+                      borderRadius: BorderRadius.circular(14),
+                      dropdownColor: Colors.white,
+                      icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
+                      hint: const Text(
+                        '-- Select Class --',
+                        style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontWeight: FontWeight.normal),
+                      ),
+                      items: classGroups.map((group) {
+                        return DropdownMenuItem<String>(
+                          value: group.name,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                group.name,
+                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF0F172A)),
+                              ),
+                              if (group.isConfigured)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFECFDF5),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: const Color(0xFFA7F3D0)),
+                                  ),
+                                  child: const Text(
+                                    'Configured',
+                                    style: TextStyle(color: Color(0xFF059669), fontSize: 11, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        setState(() {
+                          _courseSelectedShortName = val;
+                          _courseErrorMessage = '';
+                          _courseSuccessMessage = '';
+                          if (val != null) {
+                            final sel = classGroups.firstWhere((g) => g.name == val);
+                            if (sel.isConfigured && sel.config != null) {
+                              final amt = sel.config['amount'] ?? '';
+                              _courseAmountController.text = amt.toString().replaceAll(RegExp(r'\.00$'), '');
+                            } else {
+                              _courseAmountController.clear();
+                            }
+                          }
+                        });
+                      },
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 18),
+                const Divider(color: Color(0xFFE2E8F0), height: 1),
+                const SizedBox(height: 18),
+
+                // Course Fee Amount Field
+                const Text(
+                  'COURSE FEE',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF64748B), letterSpacing: 0.5),
+                ),
+                const SizedBox(height: 6),
+
+                TextFormField(
+                  controller: _courseAmountController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  enabled: _courseSelectedShortName != null && !isConfigured,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: isConfigured ? const Color(0xFF64748B) : const Color(0xFF0F172A),
+                  ),
+                  decoration: InputDecoration(
+                    prefixText: '₹  ',
+                    prefixStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF64748B)),
+                    hintText: 'e.g. 1500',
+                    hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    filled: isConfigured,
+                    fillColor: isConfigured ? const Color(0xFFF8FAFC) : Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFD97706), width: 1.5),
+                    ),
+                    disabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 6),
+                Text(
+                  isConfigured
+                      ? 'Course fee for this class has been configured.'
+                      : 'Course fee is maintained separately from monthly academic fees.',
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                ),
+
+                const SizedBox(height: 24),
+
+                // Status or Save Button
+                if (_courseSelectedShortName != null && isConfigured) ...[
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: null,
+                      icon: const Icon(Icons.check_circle_rounded, size: 18),
+                      label: const Text('Course Fee Configured'),
+                      style: ElevatedButton.styleFrom(
+                        disabledBackgroundColor: const Color(0xFFE2E8F0),
+                        disabledForegroundColor: const Color(0xFF94A3B8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                    ),
+                  ),
+                ] else ...[
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: (_courseSelectedShortName == null || _courseSaving)
+                          ? null
+                          : () => _saveCourseFeeConfig(selectedGroup!),
+                      icon: _courseSaving
+                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Icon(Icons.save_rounded, size: 18),
+                      label: Text(_courseSaving ? 'Saving...' : 'Save Course Fee Configuration'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD97706),
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: const Color(0xFFCBD5E1),
+                        disabledForegroundColor: Colors.white70,
+                        elevation: 1,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _saveCourseFeeConfig(ClassFeeGroup group) async {
+    final amountText = _courseAmountController.text.trim();
+    final amount = double.tryParse(amountText);
+    if (amount == null || amount <= 0) {
+      setState(() {
+        _courseErrorMessage = 'Please enter a valid positive course fee amount.';
+        _courseSuccessMessage = '';
+      });
+      return;
+    }
+
+    setState(() {
+      _courseSaving = true;
+      _courseErrorMessage = '';
+      _courseSuccessMessage = '';
+    });
+
+    try {
+      final activeYear = _getCurrentAcademicYear();
+      final activeYearId = activeYear != null
+          ? (activeYear['id'] is int ? activeYear['id'] : int.tryParse(activeYear['id'].toString()))
+          : null;
+
+      await widget.feeService.saveClassCourseFeeConfiguration({
+        'class_id': int.parse(group.primaryId),
+        'academic_year_id': activeYearId,
+        'amount': amount,
+      });
+
+      await _reloadCourseFeeConfigs();
+
+      if (mounted) {
+        setState(() {
+          _courseSuccessMessage = 'Course fee configuration saved successfully.';
+          _courseSaving = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Course fee configuration saved successfully.'),
+            backgroundColor: Color(0xFF059669),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _courseErrorMessage = e.toString().replaceAll('Exception:', '').trim();
+          _courseSaving = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _downloadCourseFeeStructurePdf() async {
+    setState(() => _downloadingCoursePdf = true);
+    try {
+      final activeYear = _getCurrentAcademicYear();
+      final yearName = activeYear?['name']?.toString() ?? '2026-2027';
+
+      String startYr = '2026';
+      String endYr = '2027';
+      final yearMatch = RegExp(r'(\d{4})\s*[-–—]\s*(\d{4})').firstMatch(yearName);
+      if (yearMatch != null) {
+        startYr = yearMatch.group(1)!;
+        endYr = yearMatch.group(2)!;
+      }
+
+      final headerTitle = 'COURSE FEE STRUCTURE FOR $startYr - $endYr';
+      final headerSubtitle = '(Applicable for $startYr - $endYr)';
+
+      final classGroups = _getUniqueClassFeeGroups(isCourse: true);
+
+      final pdf = pw.Document();
+
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(32),
+          build: (pw.Context context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
+              children: [
+                pw.Text(
+                  headerTitle,
+                  style: pw.TextStyle(
+                    fontSize: 16,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColor.fromHex('#0F172A'),
+                  ),
+                ),
+                pw.SizedBox(height: 4),
+                pw.Text(
+                  headerSubtitle,
+                  style: pw.TextStyle(
+                    fontSize: 10,
+                    color: PdfColor.fromHex('#475569'),
+                  ),
+                ),
+                pw.SizedBox(height: 16),
+                pw.Table(
+                  border: pw.TableBorder.all(color: PdfColor.fromHex('#CBD5E1'), width: 0.5),
+                  columnWidths: {
+                    0: const pw.FixedColumnWidth(40),
+                    1: const pw.FlexColumnWidth(),
+                    2: const pw.FixedColumnWidth(80),
+                  },
+                  children: [
+                    // Header Row
+                    pw.TableRow(
+                      decoration: pw.BoxDecoration(color: PdfColor.fromHex('#0F172A')),
+                      children: [
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+                          child: pw.Text('S. NO.', textAlign: pw.TextAlign.center, style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                          child: pw.Text('CLASS', textAlign: pw.TextAlign.left, style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                          child: pw.Text('AMOUNT (Rs.)', textAlign: pw.TextAlign.right, style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                        ),
+                      ],
+                    ),
+                    // Data Rows
+                    ...classGroups.asMap().entries.map((entry) {
+                      final idx = entry.key;
+                      final grp = entry.value;
+                      final isEven = idx % 2 == 1;
+
+                      final double feeAmt = grp.config != null
+                          ? (double.tryParse((grp.config['amount'] ?? 0).toString()) ?? 0)
+                          : 0;
+
+                      return pw.TableRow(
+                        decoration: isEven ? pw.BoxDecoration(color: PdfColor.fromHex('#F8FAFC')) : const pw.BoxDecoration(),
+                        children: [
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 6),
+                            child: pw.Text('${idx + 1}', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey800)),
+                          ),
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                            child: pw.Text(grp.name, textAlign: pw.TextAlign.left, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#0F172A'))),
+                          ),
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                            child: pw.Text('Rs. ${feeAmt.round()}', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#0F172A'))),
+                          ),
+                        ],
+                      );
+                    }),
+                  ],
+                ),
+              ],
+            );
+          },
+        ),
+      );
+
+      final pdfBytes = await pdf.save();
+      await Printing.layoutPdf(
+        onLayout: (_) async => pdfBytes,
+        name: 'Course_Fee_Structure_$startYr-$endYr.pdf',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to generate PDF: ${e.toString().replaceAll('Exception:', '').trim()}'),
+            backgroundColor: const Color(0xFFEF4444),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _downloadingCoursePdf = false);
+      }
+    }
   }
 }

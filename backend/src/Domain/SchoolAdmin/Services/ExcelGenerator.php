@@ -21,8 +21,159 @@ class ExcelGenerator
         return self::buildZipXlsx($sheets);
     }
 
+    public static function consolidateFeeCollections(array $feeCollections): array
+    {
+        $academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+        $groups = [];
+
+        foreach ($feeCollections as $item) {
+            $rNo = !empty($item['receipt_no']) ? trim((string)$item['receipt_no']) : '';
+            $stuId = (int)($item['student_id'] ?? 0);
+
+            // Group by receipt_no + student_id if receipt_no exists, otherwise unique per row
+            $groupKey = ($rNo !== '') ? "r_{$stuId}_{$rNo}" : "id_" . ($item['item_type'] ?? 'fee') . '_' . ($item['id'] ?? uniqid());
+
+            if (!isset($groups[$groupKey])) {
+                $groups[$groupKey] = [
+                    'receipt_no' => $rNo,
+                    'deposit_time' => $item['deposit_time'] ?? '',
+                    'student_name' => $item['student_name'] ?? '',
+                    'class_name' => $item['class_name'] ?? '',
+                    'class_section' => $item['class_section'] ?? '',
+                    'class_id' => $item['class_id'] ?? 999999,
+                    'roll_no' => $item['roll_no'] ?? '',
+                    'collector_phone' => $item['collector_phone'] ?? '',
+                    'collected_by' => $item['collected_by'] ?? 'School Admin',
+                    'amount' => (float)($item['amount'] ?? 0),
+                    'discount_amount' => (float)($item['discount_amount'] ?? 0),
+                    'student_academic_year_id' => $item['student_academic_year_id'] ?? null,
+                    'items' => [$item]
+                ];
+            } else {
+                $groups[$groupKey]['items'][] = $item;
+                $groups[$groupKey]['amount'] += (float)($item['amount'] ?? 0);
+                $groups[$groupKey]['discount_amount'] += (float)($item['discount_amount'] ?? 0);
+                if (!empty($item['deposit_time']) && strtotime((string)$item['deposit_time']) < strtotime((string)$groups[$groupKey]['deposit_time'])) {
+                    $groups[$groupKey]['deposit_time'] = $item['deposit_time'];
+                }
+            }
+        }
+
+        $consolidated = [];
+        foreach ($groups as $g) {
+            $items = $g['items'];
+
+            $monthsList = [];
+            $feeNamesList = [];
+            foreach ($items as $it) {
+                $rawType = trim((string)($it['fee_type'] ?? ''));
+                $rawMonths = trim((string)($it['months_covered'] ?? ''));
+                $itemType = $it['item_type'] ?? '';
+
+                // Detect monthly fee
+                if ($itemType === 'monthly' || str_starts_with(strtolower($rawType), 'monthly fee')) {
+                    if (!empty($rawMonths) && $rawMonths !== 'N/A') {
+                        $parts = array_map('trim', explode(',', $rawMonths));
+                        foreach ($parts as $p) {
+                            if ($p !== '') $monthsList[] = $p;
+                        }
+                    } elseif (preg_match('/monthly fee\s*\(([^)]+)\)/i', $rawType, $m)) {
+                        $parts = array_map('trim', explode(',', $m[1]));
+                        foreach ($parts as $p) {
+                            if ($p !== '') $monthsList[] = $p;
+                        }
+                    }
+                } else {
+                    if (!empty($rawType)) {
+                        $feeNamesList[] = $rawType;
+                    }
+                }
+            }
+
+            $feeTypeDisplay = '';
+            $monthsCoveredDisplay = 'N/A';
+
+            if (!empty($monthsList)) {
+                $uniqueMonths = array_values(array_unique($monthsList));
+                usort($uniqueMonths, function($a, $b) use ($academicMonths) {
+                    $idxA = array_search($a, $academicMonths, true);
+                    $idxB = array_search($b, $academicMonths, true);
+                    return ($idxA === false ? 99 : $idxA) - ($idxB === false ? 99 : $idxB);
+                });
+
+                $isConsecutive = true;
+                for ($i = 0; $i < count($uniqueMonths) - 1; $i++) {
+                    $idx1 = array_search($uniqueMonths[$i], $academicMonths, true);
+                    $idx2 = array_search($uniqueMonths[$i+1], $academicMonths, true);
+                    if ($idx1 === false || $idx2 === false || $idx2 !== $idx1 + 1) {
+                        $isConsecutive = false;
+                        break;
+                    }
+                }
+
+                if ($isConsecutive && count($uniqueMonths) > 1) {
+                    $monthsCoveredDisplay = $uniqueMonths[0] . ' to ' . $uniqueMonths[count($uniqueMonths) - 1];
+                } else {
+                    $monthsCoveredDisplay = implode(', ', $uniqueMonths);
+                }
+
+                $feeTypeDisplay = 'Monthly Fee';
+            }
+
+            if (!empty($feeNamesList)) {
+                $uniqueNames = array_values(array_unique($feeNamesList));
+                $addStr = implode(', ', $uniqueNames);
+                if ($feeTypeDisplay !== '') {
+                    $feeTypeDisplay .= ', ' . $addStr;
+                } else {
+                    $feeTypeDisplay = $addStr;
+                }
+            }
+
+            if ($feeTypeDisplay === '') {
+                $feeTypeDisplay = 'Fee Payment';
+            }
+
+            $consolidated[] = [
+                'receipt_no' => $g['receipt_no'],
+                'deposit_time' => $g['deposit_time'],
+                'student_name' => $g['student_name'],
+                'class_name' => $g['class_name'],
+                'class_section' => $g['class_section'],
+                'class_id' => $g['class_id'],
+                'roll_no' => $g['roll_no'],
+                'fee_type' => $feeTypeDisplay,
+                'months_covered' => $monthsCoveredDisplay,
+                'discount_amount' => round($g['discount_amount'], 2),
+                'amount' => round($g['amount'], 2),
+                'collector_phone' => $g['collector_phone'],
+                'collected_by' => $g['collected_by']
+            ];
+        }
+
+        // Sort fee collections in descending order (most recent deposit on top, like PhonePe/Paytm)
+        usort($consolidated, function($a, $b) {
+            $timeA = !empty($a['deposit_time']) ? strtotime((string)$a['deposit_time']) : 0;
+            $timeB = !empty($b['deposit_time']) ? strtotime((string)$b['deposit_time']) : 0;
+            if ($timeA !== $timeB) {
+                return $timeB <=> $timeA;
+            }
+            $classIdA = isset($a['class_id']) ? (int)$a['class_id'] : 999999;
+            $classIdB = isset($b['class_id']) ? (int)$b['class_id'] : 999999;
+            if ($classIdA !== $classIdB) {
+                return $classIdA <=> $classIdB;
+            }
+            return strcmp($a['student_name'] ?? '', $b['student_name'] ?? '');
+        });
+
+        return $consolidated;
+    }
+
     private static function buildFeeCollectionSheet(array $feeCollections): array
     {
+        // Consolidate multi-month tuition and multi-additional fees sharing receipt_no into 1 transaction row
+        $feeCollections = self::consolidateFeeCollections($feeCollections);
+
         $rows = [];
         
         // Header Row
@@ -97,6 +248,21 @@ class ExcelGenerator
 
     private static function buildExpensesSheet(array $expenses): array
     {
+        // Sort expenses in descending order (most recent expense on top, like PhonePe/Paytm)
+        usort($expenses, function($a, $b) {
+            $timeA = !empty($a['expense_date']) ? strtotime((string)$a['expense_date']) : (!empty($a['created_at']) ? strtotime((string)$a['created_at']) : 0);
+            $timeB = !empty($b['expense_date']) ? strtotime((string)$b['expense_date']) : (!empty($b['created_at']) ? strtotime((string)$b['created_at']) : 0);
+            if ($timeA !== $timeB) {
+                return $timeB <=> $timeA;
+            }
+            $createdA = !empty($a['created_at']) ? strtotime((string)$a['created_at']) : 0;
+            $createdB = !empty($b['created_at']) ? strtotime((string)$b['created_at']) : 0;
+            if ($createdA !== $createdB) {
+                return $createdB <=> $createdA;
+            }
+            return strcmp($a['description'] ?? '', $b['description'] ?? '');
+        });
+
         $rows = [];
 
         // Header Row
@@ -117,8 +283,9 @@ class ExcelGenerator
             $totalExp = round($totalExp + $amt, 2);
 
             $expDate = '';
-            if (!empty($row['expense_date'])) {
-                $expDate = date('j M Y', strtotime((string)$row['expense_date']));
+            $rawDate = !empty($row['expense_date']) ? $row['expense_date'] : ($row['created_at'] ?? '');
+            if (!empty($rawDate)) {
+                $expDate = date('j M Y', strtotime((string)$rawDate));
             }
 
             $addedBy = !empty($row['added_by_phone']) ? (string)$row['added_by_phone'] : (!empty($row['added_by']) ? (string)$row['added_by'] : 'School Admin');

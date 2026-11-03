@@ -1120,6 +1120,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               leaveService: widget.leaveService,
               userRole: widget.userRole,
               selectedStudentId: _activeStudentId,
+              isPrincipal: _isPrincipal,
+              isFeeCollector: _isFeeCollector,
             ),
           ),
         ).then((_) => _loadSessionInfo());
@@ -1501,10 +1503,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      body: SafeArea(
-        child: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
-          slivers: [
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () {
+          FocusScope.of(context).unfocus();
+        },
+        child: SafeArea(
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (scrollInfo) {
+              if (scrollInfo is UserScrollNotification) {
+                FocusScope.of(context).unfocus();
+              }
+              return false;
+            },
+            child: CustomScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+              slivers: [
             // Home Header bar
             SliverToBoxAdapter(
               child: Padding(
@@ -1773,6 +1788,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ],
         ),
       ),
-    );
+    ),
+  ),
+);
   }
 }

@@ -564,7 +564,7 @@ export default function FinancePage() {
                         }}
                         className="px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30 transition-all inline-flex items-center gap-1 leading-none h-[22px] shadow-2xs"
                       >
-                        Open Ledger <ChevronRight className="h-3 w-3 text-text-muted" />
+                        Fees Card <ChevronRight className="h-3 w-3 text-text-muted" />
                       </button>
                     </TableCell>
                   </TableRow>

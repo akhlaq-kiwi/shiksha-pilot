@@ -347,5 +347,75 @@ class FeeService {
     }
     return [];
   }
+
+  /// Fetch class fee configurations (Monthly)
+  Future<List<dynamic>> getClassFeeConfigurations({int? academicYearId, int? classId}) async {
+    final queryParams = <String, String>{};
+    if (academicYearId != null) queryParams['academic_year_id'] = academicYearId.toString();
+    if (classId != null) queryParams['class_id'] = classId.toString();
+    final uri = Uri.parse('$baseUrl/api/school/class-fee-configurations').replace(
+      queryParameters: queryParams.isNotEmpty ? queryParams : null,
+    );
+    final res = await http.get(uri, headers: _headers);
+    if (res.statusCode == 200) {
+      final decoded = json.decode(res.body);
+      return (decoded['data'] ?? []) as List<dynamic>;
+    }
+    return [];
+  }
+
+  /// Save class fee configuration (Monthly)
+  Future<Map<String, dynamic>> saveClassFeeConfiguration(Map<String, dynamic> data) async {
+    final uri = Uri.parse('$baseUrl/api/school/class-fee-configurations');
+    final res = await http.post(uri, headers: _headers, body: json.encode(data));
+    final decoded = json.decode(res.body);
+    if (res.statusCode == 200 || res.statusCode == 201) {
+      return decoded;
+    } else {
+      String msg = 'Failed to save class fee configuration';
+      if (decoded['message'] != null) {
+        msg = decoded['message'].toString();
+      } else if (decoded['errors'] != null) {
+        final errs = decoded['errors'];
+        msg = errs is Map ? errs.values.first.toString() : errs.toString();
+      }
+      throw Exception(msg);
+    }
+  }
+
+  /// Fetch class course fee configurations
+  Future<List<dynamic>> getClassCourseFeeConfigurations({int? academicYearId, int? classId}) async {
+    final queryParams = <String, String>{};
+    if (academicYearId != null) queryParams['academic_year_id'] = academicYearId.toString();
+    if (classId != null) queryParams['class_id'] = classId.toString();
+    final uri = Uri.parse('$baseUrl/api/school/class-course-fee-configurations').replace(
+      queryParameters: queryParams.isNotEmpty ? queryParams : null,
+    );
+    final res = await http.get(uri, headers: _headers);
+    if (res.statusCode == 200) {
+      final decoded = json.decode(res.body);
+      return (decoded['data'] ?? []) as List<dynamic>;
+    }
+    return [];
+  }
+
+  /// Save class course fee configuration
+  Future<Map<String, dynamic>> saveClassCourseFeeConfiguration(Map<String, dynamic> data) async {
+    final uri = Uri.parse('$baseUrl/api/school/class-course-fee-configurations');
+    final res = await http.post(uri, headers: _headers, body: json.encode(data));
+    final decoded = json.decode(res.body);
+    if (res.statusCode == 200 || res.statusCode == 201) {
+      return decoded;
+    } else {
+      String msg = 'Failed to save course fee configuration';
+      if (decoded['message'] != null) {
+        msg = decoded['message'].toString();
+      } else if (decoded['errors'] != null) {
+        final errs = decoded['errors'];
+        msg = errs is Map ? errs.values.first.toString() : errs.toString();
+      }
+      throw Exception(msg);
+    }
+  }
 }
 

@@ -663,6 +663,310 @@ class SchoolAdminController extends BaseController
         return $this->success($response, $data);
     }
 
+    public function getExamReportCardsPrintHtml(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'STUDENT', 'PARENT', 'SUPER_ADMIN']);
+        $examId = (int)$args['id'];
+        $params = $request->getQueryParams();
+        $classId = isset($params['class_id']) ? (int)$params['class_id'] : 0;
+        $studentId = isset($params['student_id']) && $params['student_id'] !== '' ? (int)$params['student_id'] : null;
+        $autoprint = !empty($params['autoprint']);
+
+        $data = $this->service->getReportCards($user, $examId, $classId, $studentId);
+        $cards = [];
+        if (!empty($data)) {
+            if (isset($data['student_id'])) {
+                $cards = [$data];
+            } elseif (is_array($data)) {
+                $cards = $data;
+            }
+        }
+
+        if (empty($cards)) {
+            $response->getBody()->write('<!DOCTYPE html><html><body><h3 style="font-family:sans-serif;text-align:center;margin-top:40px;">No report cards available for this selection.</h3></body></html>');
+            return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+        }
+
+        $allCardsHtml = '';
+        foreach ($cards as $card) {
+            $schoolName = strtoupper(htmlspecialchars($card['school_name'] ?? 'SPLENDID PUBLIC SCHOOL'));
+            $schoolAddress = strtoupper(htmlspecialchars($card['school_address'] ?? 'CIVIL LINES, CENTRAL EDUCATION HUB'));
+            $schoolLogo = !empty($card['school_logo']) ? $card['school_logo'] : null;
+
+            $examName = strtoupper(htmlspecialchars($card['exam_name'] ?? 'UNIT TEST 1'));
+            $academicYear = htmlspecialchars($card['academic_year_name'] ?? '2026-2027');
+
+            $studentName = strtoupper(htmlspecialchars($card['student_name'] ?? 'STUDENT'));
+            $className = htmlspecialchars($card['class_name'] ?? '');
+            if (!empty($card['class_section'])) {
+                $className .= ' (' . htmlspecialchars($card['class_section']) . ')';
+            }
+            $fatherName = htmlspecialchars(!empty($card['father_name']) ? $card['father_name'] : '—');
+            $motherName = htmlspecialchars(!empty($card['mother_name']) ? $card['mother_name'] : '—');
+
+            $dob = $card['dob'] ?? $card['date_of_birth'] ?? '—';
+            if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $dob, $m)) {
+                $dob = $m[3] . '/' . $m[2] . '/' . $m[1];
+            } else {
+                $dob = htmlspecialchars($dob);
+            }
+
+            $rollNo = htmlspecialchars((string)($card['roll_no'] ?? '—'));
+            $admissionNo = htmlspecialchars((string)($card['admission_no'] ?? '—'));
+
+            // Sort subjects: numeric first, grade-only at bottom
+            $subjects = $card['subjects'] ?? [];
+            $numSubs = [];
+            $gradeSubs = [];
+            foreach ($subjects as $sub) {
+                $maxM = (string)($sub['max_marks'] ?? '');
+                $subName = strtolower($sub['subject_name'] ?? '');
+                $isGrade = ($maxM === '—' || $maxM === '0' || $maxM === '' || $subName === 'ptm' || $subName === 'hindi');
+                if ($isGrade) {
+                    $gradeSubs[] = $sub;
+                } else {
+                    $numSubs[] = $sub;
+                }
+            }
+            $sortedSubjects = array_merge($numSubs, $gradeSubs);
+
+            $subCount = count($sortedSubjects);
+            $cellPadding = $subCount <= 4 ? '12px 10px' : ($subCount <= 6 ? '9px 8px' : '6px 6px');
+            $cellFontSize = $subCount <= 4 ? '11px' : ($subCount <= 6 ? '10.5px' : '9.5px');
+
+            $rowsHtml = '';
+            foreach ($sortedSubjects as $s) {
+                $sName = htmlspecialchars($s['subject_name'] ?? '');
+                $sMax = htmlspecialchars((string)($s['max_marks'] ?? '—'));
+                $sPass = htmlspecialchars((string)($s['passing_marks'] ?? '—'));
+                $sObt = htmlspecialchars((string)($s['marks_obtained'] ?? '—'));
+                $sGrade = htmlspecialchars((string)($s['grade'] ?? '—'));
+                $sResult = htmlspecialchars(strtoupper((string)($s['result'] ?? 'PASS')));
+
+                $subNameLower = strtolower($s['subject_name'] ?? '');
+                if ($sMax === '—' || $sMax === '0' || $sMax === '' || $subNameLower === 'ptm' || $subNameLower === 'hindi') {
+                    $sMax = 'GRADE';
+                    $sPass = 'C';
+                }
+
+                $rowsHtml .= '<tr style="border-bottom: 1px solid #000000;">';
+                $rowsHtml .= '<td style="padding: ' . $cellPadding . '; font-weight: 700; border-right: 1px solid #000000; text-align: left;">' . $sName . '</td>';
+                $rowsHtml .= '<td style="padding: ' . $cellPadding . '; text-align: center; border-right: 1px solid #000000; font-family: monospace, sans-serif;">' . $sMax . '</td>';
+                $rowsHtml .= '<td style="padding: ' . $cellPadding . '; text-align: center; border-right: 1px solid #000000; font-family: monospace, sans-serif; color: #475569;">' . $sPass . '</td>';
+                $rowsHtml .= '<td style="padding: ' . $cellPadding . '; text-align: center; border-right: 1px solid #000000; font-family: monospace, sans-serif; font-weight: 800;">' . $sObt . '</td>';
+                $rowsHtml .= '<td style="padding: ' . $cellPadding . '; text-align: center; border-right: 1px solid #000000; font-weight: 800;">' . $sGrade . '</td>';
+                $rowsHtml .= '<td style="padding: ' . $cellPadding . '; text-align: center; font-weight: 800; font-size: 10px;">' . $sResult . '</td>';
+                $rowsHtml .= '</tr>';
+            }
+
+            $totalMax = htmlspecialchars((string)($card['total_max'] ?? '—'));
+            $totalObtained = htmlspecialchars((string)($card['total_obtained'] ?? '—'));
+            $percentage = isset($card['percentage']) ? number_format((float)$card['percentage'], 2) : '—';
+            $overallGrade = htmlspecialchars((string)($card['grade'] ?? '—'));
+            $overallResult = htmlspecialchars(strtoupper((string)($card['result'] ?? 'PASS')));
+
+            $classRank = (string)($card['class_rank'] ?? '1');
+            if (preg_match('/^(\d+)/', $classRank, $rm)) {
+                $classRank = $rm[1];
+            }
+            $classRank = htmlspecialchars($classRank);
+
+            $attRate = '0%';
+            if (isset($card['attendance']['attendance_rate']) && is_numeric($card['attendance']['attendance_rate'])) {
+                $attRate = round((float)$card['attendance']['attendance_rate']) . '%';
+            }
+
+            $teacherRemark = trim((string)($card['teacher_remark'] ?? $card['report_card_remark'] ?? ''));
+
+            $logoHtml = '';
+            if (!empty($schoolLogo)) {
+                $logoHtml = '<img src="' . htmlspecialchars($schoolLogo) . '" style="height: 54px; max-width: 140px; object-fit: contain; margin: 0 auto 4px auto; display: block;" alt="School Logo" />';
+            } else {
+                $logoHtml = '<div style="width: 48px; height: 48px; border-radius: 50%; border: 2px solid #000000; margin: 0 auto 4px auto; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 800; color: #000000;">' . substr($schoolName, 0, 1) . '</div>';
+            }
+
+            $remarkSection = '';
+            if ($teacherRemark !== '') {
+                $remarkSection = '<div style="margin-top: 8px; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 11px; line-height: 1.4;">'
+                    . '<strong style="font-weight: 800; color: #000000;">Teacher Remarks:</strong> '
+                    . '<span style="font-weight: 700; font-style: italic; color: #000000;">' . htmlspecialchars($teacherRemark) . '</span>'
+                    . '</div>';
+            }
+
+            $allCardsHtml .= '
+<div class="report-card-root">
+  <!-- School Header -->
+  <div style="text-align: center; margin-bottom: 2px;">
+    ' . $logoHtml . '
+    <h1 style="font-family: Georgia, \'Times New Roman\', serif; font-size: 22px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.6px; margin: 0; line-height: 1.2; color: #000000;">' . $schoolName . '</h1>
+    <div style="font-family: ui-sans-serif, system-ui, sans-serif; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; margin: 2px 0 6px 0; color: #475569;">' . $schoolAddress . '</div>
+    
+    <div style="margin: 6px 0 8px 0; border-top: 2px solid #000000; border-bottom: 2px solid #000000; padding: 4px 0; text-align: center;">
+      <span style="display: inline-block; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; border: 1.5px solid #000000; border-radius: 4px; padding: 4px 20px; background-color: #ffffff; color: #000000;">
+        ' . $examName . ' REPORT CARD (' . $academicYear . ')
+      </span>
+    </div>
+  </div>
+
+  <!-- Student Details Grid (3x4) -->
+  <table style="width: 100%; border-collapse: collapse; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 11px; border: 2px solid #000000; margin-bottom: 8px;">
+    <tbody>
+      <tr style="border-bottom: 1px solid #000000;">
+        <td style="width: 18%; background-color: #f4f4f5; font-weight: 700; padding: 5px 8px; border-right: 1px solid #000000; color: #1e293b; white-space: nowrap;">Student Name</td>
+        <td style="width: 32%; font-weight: 800; padding: 5px 8px; border-right: 1px solid #000000; text-transform: uppercase; color: #000000;">' . $studentName . '</td>
+        <td style="width: 18%; background-color: #f4f4f5; font-weight: 700; padding: 5px 8px; border-right: 1px solid #000000; color: #1e293b; white-space: nowrap;">Class &amp; Sec</td>
+        <td style="width: 32%; font-weight: 800; padding: 5px 8px; color: #000000;">' . $className . '</td>
+      </tr>
+      <tr style="border-bottom: 1px solid #000000;">
+        <td style="width: 18%; background-color: #f4f4f5; font-weight: 700; padding: 5px 8px; border-right: 1px solid #000000; color: #1e293b; white-space: nowrap;">Father\'s Name</td>
+        <td style="width: 32%; font-weight: 800; padding: 5px 8px; border-right: 1px solid #000000; color: #000000;">' . $fatherName . '</td>
+        <td style="width: 18%; background-color: #f4f4f5; font-weight: 700; padding: 5px 8px; border-right: 1px solid #000000; color: #1e293b; white-space: nowrap;">Mother\'s Name</td>
+        <td style="width: 32%; font-weight: 800; padding: 5px 8px; color: #000000;">' . $motherName . '</td>
+      </tr>
+      <tr>
+        <td style="width: 18%; background-color: #f4f4f5; font-weight: 700; padding: 5px 8px; border-right: 1px solid #000000; color: #1e293b; white-space: nowrap;">Date of Birth</td>
+        <td style="width: 32%; font-weight: 800; padding: 5px 8px; border-right: 1px solid #000000; font-family: ui-sans-serif, system-ui, sans-serif; color: #000000;">' . $dob . '</td>
+        <td style="width: 18%; background-color: #f4f4f5; font-weight: 700; padding: 5px 8px; border-right: 1px solid #000000; color: #1e293b; white-space: nowrap;">Roll / SR No</td>
+        <td style="width: 32%; font-weight: 800; padding: 5px 8px; font-family: ui-sans-serif, system-ui, sans-serif; color: #000000;">' . $rollNo . ' | ' . $admissionNo . '</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Scholastic Marks Table -->
+  <div class="marks-table-container">
+    <table style="width: 100%; border-collapse: collapse; font-family: ui-sans-serif, system-ui, sans-serif; font-size: ' . $cellFontSize . '; border: 2px solid #000000;">
+      <thead>
+        <tr style="background-color: #e4e4e7; font-weight: 800; font-size: 10px; text-transform: uppercase; border-bottom: 2px solid #000000; color: #000000;">
+          <th style="padding: 7px 8px; text-align: left; border-right: 1px solid #000000;">Subject</th>
+          <th style="padding: 7px 6px; text-align: center; border-right: 1px solid #000000; width: 15%;">Max Marks</th>
+          <th style="padding: 7px 6px; text-align: center; border-right: 1px solid #000000; width: 15%;">Pass Marks</th>
+          <th style="padding: 7px 6px; text-align: center; border-right: 1px solid #000000; width: 18%;">Marks Obtained</th>
+          <th style="padding: 7px 6px; text-align: center; border-right: 1px solid #000000; width: 12%;">Grade</th>
+          <th style="padding: 7px 6px; text-align: center; width: 14%;">Result</th>
+        </tr>
+      </thead>
+      <tbody>
+        ' . $rowsHtml . '
+        <!-- Grand Total Row -->
+        <tr style="background-color: #e4e4e7; font-weight: 800; border-top: 2px solid #000000; border-bottom: 2px solid #000000; color: #000000;">
+          <td style="padding: ' . $cellPadding . '; font-weight: 800; border-right: 1px solid #000000; text-align: left;">Grand Total</td>
+          <td style="padding: ' . $cellPadding . '; text-align: center; border-right: 1px solid #000000; font-family: monospace, sans-serif;">' . $totalMax . '</td>
+          <td style="padding: ' . $cellPadding . '; text-align: center; border-right: 1px solid #000000;">—</td>
+          <td style="padding: ' . $cellPadding . '; text-align: center; border-right: 1px solid #000000; font-family: monospace, sans-serif; font-size: 12px;">' . $totalObtained . '</td>
+          <td style="padding: ' . $cellPadding . '; text-align: center; border-right: 1px solid #000000; font-size: 12px;">' . $overallGrade . '</td>
+          <td style="padding: ' . $cellPadding . '; text-align: center; font-size: 11px;">' . $overallResult . '</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 5 Performance Summary Cards -->
+  <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 6px 0; font-family: ui-sans-serif, system-ui, sans-serif;">
+    <div style="background-color: #f4f4f5; border: 2px solid #000000; border-radius: 4px; padding: 6px 3px; text-align: center;">
+      <div style="font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: #000000; opacity: 0.9;">Total Marks</div>
+      <div style="font-size: 11px; font-weight: 800; font-family: monospace, sans-serif; margin-top: 2px; color: #000000;">' . $totalObtained . ' / ' . $totalMax . '</div>
+    </div>
+    <div style="background-color: #f4f4f5; border: 2px solid #000000; border-radius: 4px; padding: 6px 3px; text-align: center;">
+      <div style="font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: #000000; opacity: 0.9;">Percentage</div>
+      <div style="font-size: 11px; font-weight: 800; font-family: monospace, sans-serif; margin-top: 2px; color: #000000;">' . $percentage . '%</div>
+    </div>
+    <div style="background-color: #f4f4f5; border: 2px solid #000000; border-radius: 4px; padding: 6px 3px; text-align: center;">
+      <div style="font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: #000000; opacity: 0.9;">Overall Grade</div>
+      <div style="font-size: 11px; font-weight: 800; font-family: monospace, sans-serif; margin-top: 2px; color: #000000;">Grade ' . $overallGrade . '</div>
+    </div>
+    <div style="background-color: #f4f4f5; border: 2px solid #000000; border-radius: 4px; padding: 6px 3px; text-align: center;">
+      <div style="font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: #000000; opacity: 0.9;">Attendance</div>
+      <div style="font-size: 11px; font-weight: 800; font-family: monospace, sans-serif; margin-top: 2px; color: #000000;">' . $attRate . '</div>
+    </div>
+    <div style="background-color: #f4f4f5; border: 2px solid #000000; border-radius: 4px; padding: 6px 3px; text-align: center;">
+      <div style="font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: #000000; opacity: 0.9;">Class Rank</div>
+      <div style="font-size: 11px; font-weight: 800; font-family: monospace, sans-serif; margin-top: 2px; color: #000000;">' . $classRank . '</div>
+    </div>
+  </div>
+
+  ' . $remarkSection . '
+
+  <!-- Dual Signatures -->
+  <div style="display: flex; justify-content: space-between; align-items: flex-end; padding: 0 24px 2px 24px; margin-top: 22px; font-family: ui-sans-serif, system-ui, sans-serif;">
+    <div style="display: flex; flex-direction: column; align-items: center;">
+      <div style="width: 160px; border-bottom: 2px solid #000000; margin-bottom: 6px;"></div>
+      <span style="font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; color: #000000;">CLASS TEACHER SIGNATURE</span>
+    </div>
+    <div style="display: flex; flex-direction: column; align-items: center;">
+      <div style="width: 160px; border-bottom: 2px solid #000000; margin-bottom: 6px;"></div>
+      <span style="font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; color: #000000;">PRINCIPAL SIGNATURE &amp; STAMP</span>
+    </div>
+  </div>
+</div>';
+        }
+
+        $scriptAutoprint = $autoprint ? '<script>window.onload = function() { setTimeout(function() { window.print(); }, 250); };</script>' : '';
+        $docTitle = 'Report_Cards_' . date('Ymd_His');
+
+        $html = '<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>' . $docTitle . '</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 5mm;
+    }
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #ffffff;
+      color: #000000;
+    }
+    .report-card-root {
+      width: 194mm;
+      min-height: 275mm;
+      max-height: 284mm;
+      margin: 0 auto;
+      padding: 7mm;
+      border: 6px double #000000;
+      border-radius: 4px;
+      background-color: #ffffff;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-sizing: border-box;
+      page-break-after: always;
+      break-after: page;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .report-card-root:last-child {
+      page-break-after: avoid;
+      break-after: avoid;
+    }
+    .marks-table-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      margin: 4px 0;
+    }
+  </style>
+  ' . $scriptAutoprint . '
+</head>
+<body>
+  ' . $allCardsHtml . '
+</body>
+</html>';
+
+        $response->getBody()->write($html);
+        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    }
+
     public function getAchievements(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
@@ -829,7 +1133,7 @@ class SchoolAdminController extends BaseController
     public function getSubjects(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'PRINCIPAL', 'SUPER_ADMIN']);
 
         $params = $request->getQueryParams();
         $classId = isset($params['class_id']) && $params['class_id'] !== '' ? (int)$params['class_id'] : null;
@@ -1483,7 +1787,7 @@ class SchoolAdminController extends BaseController
     public function createAcademicYear(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'PRINCIPAL', 'SUPER_ADMIN']);
 
         $body = RequestParser::body($request);
         $data = $this->service->createAcademicYear($user, $body);
@@ -1494,7 +1798,7 @@ class SchoolAdminController extends BaseController
     public function activateAcademicYear(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'PRINCIPAL', 'SUPER_ADMIN']);
 
         $id = (int)$args['id'];
         $body = RequestParser::body($request);
@@ -1506,7 +1810,7 @@ class SchoolAdminController extends BaseController
     public function migrateAcademicYear(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'PRINCIPAL', 'SUPER_ADMIN']);
 
         $id = (int)$args['id'];
         $body = RequestParser::body($request);
@@ -2281,7 +2585,7 @@ class SchoolAdminController extends BaseController
     public function checkLatePaymentPenaltyConfig(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN', 'SUPER_ADMIN']);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'PRINCIPAL', 'SUPER_ADMIN']);
         $data = $this->service->checkLatePaymentPenaltyConfig($user);
         return $this->success($response, $data);
     }
@@ -2513,5 +2817,731 @@ class SchoolAdminController extends BaseController
         $data = $this->teacherAttendanceService->checkAndSendLateTeachersAlert($schoolId, $force);
 
         return $this->success($response, $data, 'Late teacher alert check processed');
+    }
+
+    // -------------------------------------------------------------------------
+    // Report Card Templates & Preview APIs
+    // -------------------------------------------------------------------------
+
+    public function getReportCardTemplates(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'PRINCIPAL']);
+
+        $schoolProfile = $this->service->getSchoolProfile($user);
+        $currentThemeKey = $schoolProfile['report_card_color_theme'] ?? 'ocean_teal';
+
+        $templates = [
+            [
+                'key' => 'classic',
+                'name' => 'Classic Slate (Default)',
+                'displayName' => 'Classic CBSE Slate',
+                'templateCode' => 'cbse_classic',
+                'templateId' => 2,
+                'hexCode' => '#18181b',
+                'subtitle' => 'Original formal CBSE format with classic monochrome slate styling and dual accent summary cards.',
+                'tag' => 'Formal Monochrome',
+                'badgeClass' => 'bg-zinc-100 text-zinc-800 border-zinc-300',
+                'swatches' => ['#18181b', '#3f3f46', '#059669', '#f4f4f5'],
+                'isActive' => ($currentThemeKey === 'classic'),
+            ],
+            [
+                'key' => 'royal_blue',
+                'name' => 'Soft Sky Sapphire',
+                'displayName' => 'Soft Sky Sapphire',
+                'templateCode' => 'cbse_royal_blue',
+                'templateId' => 5,
+                'hexCode' => '#38bdf8',
+                'subtitle' => 'Light pastel sky blue double border with gentle ice-blue tables and crystal accents.',
+                'tag' => 'Sky & Azure Pastel',
+                'badgeClass' => 'bg-sky-50 text-sky-800 border-sky-200',
+                'swatches' => ['#38bdf8', '#7dd3fc', '#bae6fd', '#f0f9ff'],
+                'isActive' => ($currentThemeKey === 'royal_blue'),
+            ],
+            [
+                'key' => 'emerald_green',
+                'name' => 'Soft Sage Mint',
+                'displayName' => 'Soft Sage Mint',
+                'templateCode' => 'cbse_emerald_green',
+                'templateId' => 6,
+                'hexCode' => '#34d399',
+                'subtitle' => 'Light botanical pastel mint double border with delicate sage headers and fresh highlights.',
+                'tag' => 'Sage & Mint Pastel',
+                'badgeClass' => 'bg-emerald-50 text-emerald-800 border-emerald-200',
+                'swatches' => ['#34d399', '#6ee7b7', '#a7f3d0', '#ecfdf5'],
+                'isActive' => ($currentThemeKey === 'emerald_green'),
+            ],
+            [
+                'key' => 'warm_amber',
+                'name' => 'Soft Peach Amber',
+                'displayName' => 'Soft Peach Amber',
+                'templateCode' => 'cbse_warm_amber',
+                'templateId' => 7,
+                'hexCode' => '#fb923c',
+                'subtitle' => 'Light peach and apricot double border with warm biscuit tinting and honey accents.',
+                'tag' => 'Peach & Honey Pastel',
+                'badgeClass' => 'bg-amber-50 text-amber-800 border-amber-200',
+                'swatches' => ['#fb923c', '#fdba74', '#fed7aa', '#fff7ed'],
+                'isActive' => ($currentThemeKey === 'warm_amber'),
+            ],
+            [
+                'key' => 'burgundy_plum',
+                'name' => 'Soft Rose Plum',
+                'displayName' => 'Soft Rose Plum',
+                'templateCode' => 'cbse_burgundy_plum',
+                'templateId' => 8,
+                'hexCode' => '#f472b6',
+                'subtitle' => 'Light blush rose double border with delicate mauve styling and soft lavender highlights.',
+                'tag' => 'Blush & Rose Pastel',
+                'badgeClass' => 'bg-pink-50 text-pink-800 border-pink-200',
+                'swatches' => ['#f472b6', '#f9a8d4', '#fbcfe8', '#fdf2f8'],
+                'isActive' => ($currentThemeKey === 'burgundy_plum'),
+            ],
+            [
+                'key' => 'ocean_teal',
+                'name' => 'Dark Black',
+                'displayName' => 'Dark Black',
+                'templateCode' => 'cbse_ocean_teal',
+                'templateId' => 9,
+                'hexCode' => '#000000',
+                'subtitle' => 'Report card in exact Manage Finance container color (#FAFAFA) with crisp dark black borders on all tables.',
+                'tag' => 'Dark Black',
+                'badgeClass' => 'bg-[#fafafa] text-black border-black/40',
+                'swatches' => ['#000000', '#fafafa', '#27272a', '#fafafa'],
+                'isActive' => ($currentThemeKey === 'ocean_teal'),
+            ],
+        ];
+
+        return $this->success($response, [
+            'templates' => $templates,
+            'currentTheme' => $currentThemeKey,
+        ]);
+    }
+
+    public function selectReportCardTemplate(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'PRINCIPAL']);
+
+        $body = RequestParser::body($request);
+        $themeKey = trim((string)($body['theme'] ?? $body['report_card_color_theme'] ?? 'classic'));
+        $templateId = (int)($body['template_id'] ?? 2);
+
+        $templateMap = [
+            'classic' => 2,
+            'royal_blue' => 5,
+            'emerald_green' => 6,
+            'warm_amber' => 7,
+            'burgundy_plum' => 8,
+            'ocean_teal' => 9,
+        ];
+        if (isset($templateMap[$themeKey])) {
+            $templateId = $templateMap[$themeKey];
+        }
+
+        $profile = $this->service->updateSchoolProfile($user, [
+            'report_card_color_theme' => $themeKey,
+            'report_card_template_id' => $templateId,
+        ]);
+
+        return $this->success($response, $profile, "Report card template updated successfully.");
+    }
+
+    public function getReportCardTemplatePreviewHtml(Request $request, Response $response, array $args): Response
+    {
+        $themeKey = strtolower(trim((string)($args['theme'] ?? 'ocean_teal')));
+        $queryParams = $request->getQueryParams();
+        $schoolName = !empty($queryParams['school_name']) ? htmlspecialchars($queryParams['school_name']) : 'SPLENDID PUBLIC SCHOOL';
+        $schoolAddress = !empty($queryParams['school_address']) ? htmlspecialchars($queryParams['school_address']) : 'MAIN CAMPUS, CIVIL LINES';
+
+        $themesConfig = [
+            'classic' => [
+                'outerBorder' => '6px double #18181b',
+                'cardBg' => '#ffffff',
+                'headerBorder' => '2px solid #18181b',
+                'schoolLogoBorder' => '2px solid #18181b',
+                'schoolLogoText' => '#18181b',
+                'schoolNameText' => '#18181b',
+                'schoolAddressText' => '#52525b',
+                'examBannerBorder' => '1px solid #27272a',
+                'examBannerBg' => '#f4f4f5',
+                'examBannerText' => '#18181b',
+                'studentTableBorder' => '1px solid #a1a1aa',
+                'studentLabelBg' => '#f4f4f5',
+                'studentCellBorder' => '1px solid #d4d4d8',
+                'studentValueText' => '#18181b',
+                'marksTableBorder' => '1.5px solid #27272a',
+                'marksHeaderBg1' => '#27272a',
+                'marksHeaderBg2' => '#3f3f46',
+                'marksHeaderTextColor1' => '#ffffff',
+                'marksHeaderTextColor2' => '#ffffff',
+                'marksDivider' => '1px solid #3f3f46',
+                'marksSubDivider' => '1px solid #52525b',
+                'marksCellBorder' => '1px solid #d4d4d8',
+                'marksCellText' => '#18181b',
+                'marksTotalRowBg' => '#f4f4f5',
+                'marksTotalRowBorder' => '2px solid #27272a',
+                'statTotalBg' => '#ecfdf5', 'statTotalBorder' => '#a7f3d0', 'statTotalText' => '#064e3b',
+                'statPercentageBg' => '#fffbeb', 'statPercentageBorder' => '#fde68a', 'statPercentageText' => '#78350f',
+                'statGradeBg' => '#ecfdf5', 'statGradeBorder' => '#a7f3d0', 'statGradeText' => '#064e3b',
+                'statAttendanceBg' => '#fffbeb', 'statAttendanceBorder' => '#fde68a', 'statAttendanceText' => '#78350f',
+                'statRankBg' => '#ecfdf5', 'statRankBorder' => '#a7f3d0', 'statRankText' => '#064e3b',
+                'remarksLabel' => '#18181b', 'remarksText' => '#047857',
+                'signatureBorder' => '1.5px solid #27272a', 'signatureText' => '#27272a',
+            ],
+            'royal_blue' => [
+                'outerBorder' => '6px double #38bdf8',
+                'cardBg' => '#ffffff',
+                'headerBorder' => '2px solid #7dd3fc',
+                'schoolLogoBorder' => '2px solid #38bdf8',
+                'schoolLogoText' => '#075985',
+                'schoolNameText' => '#082f49',
+                'schoolAddressText' => '#64748b',
+                'examBannerBorder' => '1px solid #bae6fd',
+                'examBannerBg' => '#f0f9ff',
+                'examBannerText' => '#0c4a6e',
+                'studentTableBorder' => '1px solid #bae6fd',
+                'studentLabelBg' => '#f0f9ff',
+                'studentCellBorder' => '1px solid #e0f2fe',
+                'studentValueText' => '#1e293b',
+                'marksTableBorder' => '1.5px solid #7dd3fc',
+                'marksHeaderBg1' => '#e0f2fe',
+                'marksHeaderBg2' => '#f0f9ff',
+                'marksHeaderTextColor1' => '#082f49',
+                'marksHeaderTextColor2' => '#0c4a6e',
+                'marksDivider' => '1px solid #bae6fd',
+                'marksSubDivider' => '1px solid #bae6fd',
+                'marksCellBorder' => '1px solid #e0f2fe',
+                'marksCellText' => '#1e293b',
+                'marksTotalRowBg' => '#f0f9ff',
+                'marksTotalRowBorder' => '2px solid #7dd3fc',
+                'statTotalBg' => '#f0f9ff', 'statTotalBorder' => '#bae6fd', 'statTotalText' => '#082f49',
+                'statPercentageBg' => '#eff6ff', 'statPercentageBorder' => '#bfdbfe', 'statPercentageText' => '#172554',
+                'statGradeBg' => '#f0f9ff', 'statGradeBorder' => '#bae6fd', 'statGradeText' => '#082f49',
+                'statAttendanceBg' => '#eff6ff', 'statAttendanceBorder' => '#bfdbfe', 'statAttendanceText' => '#172554',
+                'statRankBg' => '#f0f9ff', 'statRankBorder' => '#bae6fd', 'statRankText' => '#082f49',
+                'remarksLabel' => '#082f49', 'remarksText' => '#0369a1',
+                'signatureBorder' => '1.5px solid #7dd3fc', 'signatureText' => '#0c4a6e',
+            ],
+            'emerald_green' => [
+                'outerBorder' => '6px double #34d399',
+                'cardBg' => '#ffffff',
+                'headerBorder' => '2px solid #6ee7b7',
+                'schoolLogoBorder' => '2px solid #34d399',
+                'schoolLogoText' => '#065f46',
+                'schoolNameText' => '#022c22',
+                'schoolAddressText' => '#64748b',
+                'examBannerBorder' => '1px solid #a7f3d0',
+                'examBannerBg' => '#ecfdf5',
+                'examBannerText' => '#064e3b',
+                'studentTableBorder' => '1px solid #a7f3d0',
+                'studentLabelBg' => '#ecfdf5',
+                'studentCellBorder' => '1px solid #d1fae5',
+                'studentValueText' => '#1e293b',
+                'marksTableBorder' => '1.5px solid #6ee7b7',
+                'marksHeaderBg1' => '#d1fae5',
+                'marksHeaderBg2' => '#ecfdf5',
+                'marksHeaderTextColor1' => '#064e3b',
+                'marksHeaderTextColor2' => '#065f46',
+                'marksDivider' => '1px solid #a7f3d0',
+                'marksSubDivider' => '1px solid #a7f3d0',
+                'marksCellBorder' => '1px solid #d1fae5',
+                'marksCellText' => '#1e293b',
+                'marksTotalRowBg' => '#ecfdf5',
+                'marksTotalRowBorder' => '2px solid #6ee7b7',
+                'statTotalBg' => '#ecfdf5', 'statTotalBorder' => '#a7f3d0', 'statTotalText' => '#064e3b',
+                'statPercentageBg' => '#f0fdfa', 'statPercentageBorder' => '#99f6e4', 'statPercentageText' => '#134e4a',
+                'statGradeBg' => '#ecfdf5', 'statGradeBorder' => '#a7f3d0', 'statGradeText' => '#064e3b',
+                'statAttendanceBg' => '#f0fdfa', 'statAttendanceBorder' => '#99f6e4', 'statAttendanceText' => '#134e4a',
+                'statRankBg' => '#ecfdf5', 'statRankBorder' => '#a7f3d0', 'statRankText' => '#064e3b',
+                'remarksLabel' => '#022c22', 'remarksText' => '#047857',
+                'signatureBorder' => '1.5px solid #6ee7b7', 'signatureText' => '#064e3b',
+            ],
+            'warm_amber' => [
+                'outerBorder' => '6px double #fb923c',
+                'cardBg' => '#ffffff',
+                'headerBorder' => '2px solid #fcd34d',
+                'schoolLogoBorder' => '2px solid #fbbf24',
+                'schoolLogoText' => '#92400e',
+                'schoolNameText' => '#451a03',
+                'schoolAddressText' => '#64748b',
+                'examBannerBorder' => '1px solid #fde68a',
+                'examBannerBg' => '#fef3c7',
+                'examBannerText' => '#78350f',
+                'studentTableBorder' => '1px solid #fde68a',
+                'studentLabelBg' => '#fef3c7',
+                'studentCellBorder' => '1px solid #fef3c7',
+                'studentValueText' => '#1e293b',
+                'marksTableBorder' => '1.5px solid #fcd34d',
+                'marksHeaderBg1' => '#fef3c7',
+                'marksHeaderBg2' => '#fffbeb',
+                'marksHeaderTextColor1' => '#78350f',
+                'marksHeaderTextColor2' => '#92400e',
+                'marksDivider' => '1px solid #fde68a',
+                'marksSubDivider' => '1px solid #fde68a',
+                'marksCellBorder' => '1px solid #fef3c7',
+                'marksCellText' => '#1e293b',
+                'marksTotalRowBg' => '#fef3c7',
+                'marksTotalRowBorder' => '2px solid #fcd34d',
+                'statTotalBg' => '#fef3c7', 'statTotalBorder' => '#fde68a', 'statTotalText' => '#78350f',
+                'statPercentageBg' => '#fff7ed', 'statPercentageBorder' => '#fed7aa', 'statPercentageText' => '#7c2d12',
+                'statGradeBg' => '#fef3c7', 'statGradeBorder' => '#fde68a', 'statGradeText' => '#78350f',
+                'statAttendanceBg' => '#fff7ed', 'statAttendanceBorder' => '#fed7aa', 'statAttendanceText' => '#7c2d12',
+                'statRankBg' => '#fef3c7', 'statRankBorder' => '#fde68a', 'statRankText' => '#78350f',
+                'remarksLabel' => '#451a03', 'remarksText' => '#b45309',
+                'signatureBorder' => '1.5px solid #fcd34d', 'signatureText' => '#78350f',
+            ],
+            'burgundy_plum' => [
+                'outerBorder' => '6px double #f472b6',
+                'cardBg' => '#ffffff',
+                'headerBorder' => '2px solid #f9a8d4',
+                'schoolLogoBorder' => '2px solid #f472b6',
+                'schoolLogoText' => '#9d174d',
+                'schoolNameText' => '#500724',
+                'schoolAddressText' => '#64748b',
+                'examBannerBorder' => '1px solid #fbcfe8',
+                'examBannerBg' => '#fdf2f8',
+                'examBannerText' => '#831843',
+                'studentTableBorder' => '1px solid #fbcfe8',
+                'studentLabelBg' => '#fdf2f8',
+                'studentCellBorder' => '1px solid #fce7f3',
+                'studentValueText' => '#1e293b',
+                'marksTableBorder' => '1.5px solid #f9a8d4',
+                'marksHeaderBg1' => '#fce7f3',
+                'marksHeaderBg2' => '#fdf2f8',
+                'marksHeaderTextColor1' => '#831843',
+                'marksHeaderTextColor2' => '#9d174d',
+                'marksDivider' => '1px solid #fbcfe8',
+                'marksSubDivider' => '1px solid #fbcfe8',
+                'marksCellBorder' => '1px solid #fce7f3',
+                'marksCellText' => '#1e293b',
+                'marksTotalRowBg' => '#fdf2f8',
+                'marksTotalRowBorder' => '2px solid #f9a8d4',
+                'statTotalBg' => '#fdf2f8', 'statTotalBorder' => '#fbcfe8', 'statTotalText' => '#831843',
+                'statPercentageBg' => '#faf5ff', 'statPercentageBorder' => '#e9d5ff', 'statPercentageText' => '#581c87',
+                'statGradeBg' => '#fdf2f8', 'statGradeBorder' => '#fbcfe8', 'statGradeText' => '#831843',
+                'statAttendanceBg' => '#faf5ff', 'statAttendanceBorder' => '#e9d5ff', 'statAttendanceText' => '#581c87',
+                'statRankBg' => '#fdf2f8', 'statRankBorder' => '#fbcfe8', 'statRankText' => '#831843',
+                'remarksLabel' => '#500724', 'remarksText' => '#be185d',
+                'signatureBorder' => '1.5px solid #f9a8d4', 'signatureText' => '#831843',
+            ],
+            'ocean_teal' => [
+                'outerBorder' => '6px double #000000',
+                'cardBg' => '#fafafa',
+                'headerBorder' => '2px solid #000000',
+                'schoolLogoBorder' => '2px solid #000000',
+                'schoolLogoText' => '#000000',
+                'schoolNameText' => '#000000',
+                'schoolAddressText' => '#27272a',
+                'examBannerBorder' => '2px solid #000000',
+                'examBannerBg' => '#f4f4f5',
+                'examBannerText' => '#000000',
+                'studentTableBorder' => '2px solid #000000',
+                'studentLabelBg' => '#f4f4f5',
+                'studentCellBorder' => '1px solid #000000',
+                'studentValueText' => '#000000',
+                'marksTableBorder' => '2px solid #000000',
+                'marksHeaderBg1' => '#e4e4e7',
+                'marksHeaderBg2' => '#f4f4f5',
+                'marksHeaderTextColor1' => '#000000',
+                'marksHeaderTextColor2' => '#000000',
+                'marksDivider' => '1px solid #000000',
+                'marksSubDivider' => '1px solid #000000',
+                'marksCellBorder' => '1px solid #000000',
+                'marksCellText' => '#000000',
+                'marksTotalRowBg' => '#e4e4e7',
+                'marksTotalRowBorder' => '2px solid #000000',
+                'statTotalBg' => '#f4f4f5', 'statTotalBorder' => '2px solid #000000', 'statTotalText' => '#000000',
+                'statPercentageBg' => '#f4f4f5', 'statPercentageBorder' => '2px solid #000000', 'statPercentageText' => '#000000',
+                'statGradeBg' => '#f4f4f5', 'statGradeBorder' => '2px solid #000000', 'statGradeText' => '#000000',
+                'statAttendanceBg' => '#f4f4f5', 'statAttendanceBorder' => '2px solid #000000', 'statAttendanceText' => '#000000',
+                'statRankBg' => '#f4f4f5', 'statRankBorder' => '2px solid #000000', 'statRankText' => '#000000',
+                'remarksLabel' => '#000000', 'remarksText' => '#000000',
+                'signatureBorder' => '2px solid #000000', 'signatureText' => '#000000',
+            ],
+        ];
+
+        $c = $themesConfig[$themeKey] ?? $themesConfig['ocean_teal'];
+
+        $subjects = [
+            ['English Language', 26, 27, 35, 27, 28, 37, 'A'],
+            ['Hindi Literature', 25, 26, 34, 26, 27, 36, 'A'],
+            ['Mathematics', 28, 29, 38, 29, 30, 39, 'A+'],
+            ['Science & Technology', 27, 26, 36, 28, 28, 37, 'A'],
+            ['Social Studies', 24, 25, 33, 25, 26, 35, 'B+'],
+            ['Sanskrit', 26, 27, 36, 27, 27, 36, 'A'],
+            ['Computer Applications', 29, 28, 39, 30, 29, 39, 'A+'],
+            ['Environmental Studies', 25, 26, 35, 26, 27, 36, 'A'],
+            ['General Knowledge', 27, 28, 37, 28, 29, 38, 'A'],
+            ['Moral Science & Ethics', 28, 29, 38, 29, 29, 38, 'A+'],
+        ];
+
+        $rowsHtml = '';
+        foreach ($subjects as $s) {
+            $rowsHtml .= '<tr>';
+            $rowsHtml .= '<td class="marks-td-sub">' . $s[0] . '</td>';
+            $rowsHtml .= '<td class="marks-td-score">' . $s[1] . '</td>';
+            $rowsHtml .= '<td class="marks-td-score">' . $s[2] . '</td>';
+            $rowsHtml .= '<td class="marks-td-score">' . $s[3] . '</td>';
+            $rowsHtml .= '<td class="marks-td-score">' . $s[4] . '</td>';
+            $rowsHtml .= '<td class="marks-td-score">' . $s[5] . '</td>';
+            $rowsHtml .= '<td class="marks-td-score">' . $s[6] . '</td>';
+            $rowsHtml .= '<td class="marks-td-grade">' . $s[7] . '</td>';
+            $rowsHtml .= '</tr>';
+        }
+
+        $html = '<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Report Card Template - ' . htmlspecialchars($themeKey) . '</title>
+<style>
+  @page {
+    size: A4 portrait;
+    margin: 4mm;
+  }
+  * {
+    box-sizing: border-box;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background-color: #ffffff;
+  }
+  .report-card-root {
+    width: 202mm;
+    min-height: 289mm;
+    height: 289mm;
+    margin: 0 auto;
+    padding: 6mm 7mm;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    border: ' . $c['outerBorder'] . ';
+    border-radius: 4px;
+    background-color: ' . $c['cardBg'] . ';
+    box-sizing: border-box;
+  }
+  .header-box {
+    text-align: center;
+    border-bottom: ' . $c['headerBorder'] . ';
+    padding-bottom: 7px;
+    margin-bottom: 4px;
+  }
+  .logo-box {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    margin: 0 auto 5px auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    font-weight: 800;
+    border: ' . $c['schoolLogoBorder'] . ';
+    color: ' . $c['schoolLogoText'] . ';
+  }
+  .school-title {
+    font-family: "Georgia", "Times New Roman", serif;
+    font-size: 20px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    line-height: 1.2;
+    margin: 0;
+    color: ' . $c['schoolNameText'] . ';
+  }
+  .school-address {
+    font-size: 9.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin: 2px 0 6px 0;
+    color: ' . $c['schoolAddressText'] . ';
+  }
+  .exam-banner {
+    display: inline-block;
+    padding: 4px 18px;
+    font-size: 9.5px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    border-top: ' . $c['examBannerBorder'] . ';
+    border-bottom: ' . $c['examBannerBorder'] . ';
+    background-color: ' . $c['examBannerBg'] . ';
+    color: ' . $c['examBannerText'] . ';
+  }
+  .student-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+    border: ' . $c['studentTableBorder'] . ';
+    margin-bottom: 6px;
+  }
+  .student-table td {
+    padding: 5px 8px;
+    border-bottom: ' . $c['studentCellBorder'] . ';
+    vertical-align: middle;
+  }
+  .student-label {
+    width: 18%;
+    font-weight: 700;
+    background-color: ' . $c['studentLabelBg'] . ';
+    border-right: ' . $c['studentCellBorder'] . ';
+    color: #1e293b;
+    white-space: nowrap;
+  }
+  .student-val {
+    width: 32%;
+    font-weight: 700;
+    color: ' . $c['studentValueText'] . ';
+  }
+  .student-val.right-border {
+    border-right: ' . $c['studentCellBorder'] . ';
+  }
+  .marks-table-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 6px;
+  }
+  .marks-table {
+    width: 100%;
+    height: 100%;
+    border-collapse: collapse;
+    border: ' . $c['marksTableBorder'] . ';
+  }
+  .marks-table th, .marks-table td {
+    vertical-align: middle;
+    box-sizing: border-box;
+  }
+  .marks-th-top {
+    background-color: ' . $c['marksHeaderBg1'] . ';
+    color: ' . $c['marksHeaderTextColor1'] . ';
+    font-weight: 800;
+    font-size: 10px;
+    text-transform: uppercase;
+    padding: 5px 6px;
+    border-right: ' . $c['marksDivider'] . ';
+  }
+  .marks-th-sub {
+    background-color: ' . $c['marksHeaderBg2'] . ';
+    color: ' . $c['marksHeaderTextColor2'] . ';
+    font-weight: 700;
+    font-size: 7.5px;
+    text-transform: uppercase;
+    padding: 3px 2px;
+    text-align: center;
+    border-right: ' . $c['marksSubDivider'] . ';
+  }
+  .marks-td-sub {
+    padding: 4.5px 7px;
+    font-size: 9.5px;
+    font-weight: 700;
+    border-right: ' . $c['marksCellBorder'] . ';
+    border-bottom: ' . $c['marksCellBorder'] . ';
+    color: ' . $c['marksCellText'] . ';
+  }
+  .marks-td-score {
+    padding: 4.5px 3px;
+    font-size: 9.5px;
+    font-family: monospace, sans-serif;
+    font-weight: 700;
+    text-align: center;
+    border-right: ' . $c['marksCellBorder'] . ';
+    border-bottom: ' . $c['marksCellBorder'] . ';
+    color: ' . $c['marksCellText'] . ';
+  }
+  .marks-td-grade {
+    padding: 4.5px 3px;
+    font-size: 10.5px;
+    font-weight: 800;
+    text-align: center;
+    border-bottom: ' . $c['marksCellBorder'] . ';
+    color: ' . $c['marksCellText'] . ';
+  }
+  .marks-total-row {
+    background-color: ' . $c['marksTotalRowBg'] . ';
+    border-top: ' . $c['marksTotalRowBorder'] . ';
+    font-weight: 800;
+  }
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+  .stat-card {
+    padding: 5px 3px;
+    border-radius: 4px;
+    text-align: center;
+  }
+  .stat-title {
+    font-size: 9px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    opacity: 0.9;
+  }
+  .stat-value {
+    font-size: 11px;
+    font-weight: 800;
+    font-family: monospace, sans-serif;
+    margin-top: 2px;
+  }
+  .remarks-box {
+    font-size: 10.5px;
+    line-height: 1.35;
+    padding: 2px 4px;
+    margin-bottom: 10px;
+  }
+  .remarks-label {
+    font-weight: 800;
+    color: ' . $c['remarksLabel'] . ';
+  }
+  .remarks-text {
+    font-weight: 700;
+    font-style: italic;
+    color: ' . $c['remarksText'] . ';
+  }
+  .signatures-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding: 0 28px 4px 28px;
+    margin-top: 16px;
+  }
+  .sig-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .sig-line {
+    width: 155px;
+    border-bottom: ' . $c['signatureBorder'] . ';
+    margin-bottom: 5px;
+  }
+  .sig-text {
+    font-size: 9px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: ' . $c['signatureText'] . ';
+  }
+</style>
+</head>
+<body>
+<div class="report-card-root">
+  <div class="header-box">
+    <div class="logo-box">' . substr($schoolName, 0, 1) . '</div>
+    <h1 class="school-title">' . $schoolName . '</h1>
+    <div class="school-address">' . $schoolAddress . '</div>
+    <div class="exam-banner">FINAL ACADEMIC REPORT CARD (2026-2027)</div>
+  </div>
+
+  <table class="student-table">
+    <tr>
+      <td class="student-label">Student Name</td>
+      <td class="student-val right-border">AARAV SHARMA</td>
+      <td class="student-label">Class &amp; Sec</td>
+      <td class="student-val">Class 5 (A)</td>
+    </tr>
+    <tr>
+      <td class="student-label">Father\'s Name</td>
+      <td class="student-val right-border">Vikram Sharma</td>
+      <td class="student-label">Mother\'s Name</td>
+      <td class="student-val">Meenakshi Sharma</td>
+    </tr>
+    <tr>
+      <td class="student-label">Date of Birth</td>
+      <td class="student-val right-border">12/04/2016</td>
+      <td class="student-label">Roll / SR No</td>
+      <td class="student-val">01 | SR-2026-104</td>
+    </tr>
+  </table>
+
+  <div class="marks-table-container">
+    <table class="marks-table">
+      <thead>
+        <tr>
+          <th rowspan="2" class="marks-th-top" style="text-align: left; width: 28%;">Subject</th>
+          <th colspan="3" class="marks-th-top" style="text-align: center;">First Term Examinations (100)</th>
+          <th colspan="3" class="marks-th-top" style="text-align: center;">Second Term Examinations (100)</th>
+          <th rowspan="2" class="marks-th-top" style="text-align: center; width: 10%;">Grade</th>
+        </tr>
+        <tr>
+          <th class="marks-th-sub"><div>Unit Test 1</div><div style="font-size: 7px; opacity: 0.85;">(30)</div></th>
+          <th class="marks-th-sub"><div>Unit Test 2</div><div style="font-size: 7px; opacity: 0.85;">(30)</div></th>
+          <th class="marks-th-sub"><div>Unit Test 3</div><div style="font-size: 7px; opacity: 0.85;">(40)</div></th>
+          <th class="marks-th-sub"><div>Unit Test 1</div><div style="font-size: 7px; opacity: 0.85;">(30)</div></th>
+          <th class="marks-th-sub"><div>Unit Test 2</div><div style="font-size: 7px; opacity: 0.85;">(30)</div></th>
+          <th class="marks-th-sub"><div>Unit Test 3</div><div style="font-size: 7px; opacity: 0.85;">(40)</div></th>
+        </tr>
+      </thead>
+      <tbody>
+        ' . $rowsHtml . '
+        <tr class="marks-total-row">
+          <td class="marks-td-sub" style="font-weight: 800;">Grand Total</td>
+          <td class="marks-td-score" style="font-weight: 800;">265</td>
+          <td class="marks-td-score" style="font-weight: 800;">270</td>
+          <td class="marks-td-score" style="font-weight: 800;">364</td>
+          <td class="marks-td-score" style="font-weight: 800;">275</td>
+          <td class="marks-td-score" style="font-weight: 800;">280</td>
+          <td class="marks-td-score" style="font-weight: 800;">368</td>
+          <td class="marks-td-grade" style="font-weight: 800; font-size: 11.5px;">A+</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-card" style="background: ' . $c['statTotalBg'] . '; border: 1px solid ' . $c['statTotalBorder'] . '; color: ' . $c['statTotalText'] . ';">
+      <div class="stat-title">Total Marks</div>
+      <div class="stat-value">1822 / 2000</div>
+    </div>
+    <div class="stat-card" style="background: ' . $c['statPercentageBg'] . '; border: 1px solid ' . $c['statPercentageBorder'] . '; color: ' . $c['statPercentageText'] . ';">
+      <div class="stat-title">Percentage</div>
+      <div class="stat-value">91.1%</div>
+    </div>
+    <div class="stat-card" style="background: ' . $c['statGradeBg'] . '; border: 1px solid ' . $c['statGradeBorder'] . '; color: ' . $c['statGradeText'] . ';">
+      <div class="stat-title">Overall Grade</div>
+      <div class="stat-value">Grade A+</div>
+    </div>
+    <div class="stat-card" style="background: ' . $c['statAttendanceBg'] . '; border: 1px solid ' . $c['statAttendanceBorder'] . '; color: ' . $c['statAttendanceText'] . ';">
+      <div class="stat-title">Attendance</div>
+      <div class="stat-value">96%</div>
+    </div>
+    <div class="stat-card" style="background: ' . $c['statRankBg'] . '; border: 1px solid ' . $c['statRankBorder'] . '; color: ' . $c['statRankText'] . ';">
+      <div class="stat-title">Class Rank</div>
+      <div class="stat-value">1</div>
+    </div>
+  </div>
+
+  <div class="remarks-box">
+    <strong class="remarks-label">Teacher Remarks:</strong>
+    <span class="remarks-text">Outstanding academic performance throughout the session! Demonstrates exemplary dedication, discipline, and leadership.</span>
+  </div>
+
+  <div class="signatures-row">
+    <div class="sig-col">
+      <div class="sig-line"></div>
+      <span class="sig-text">Class Teacher Signature</span>
+    </div>
+    <div class="sig-col">
+      <div class="sig-line"></div>
+      <span class="sig-text">Principal Signature &amp; Stamp</span>
+    </div>
+  </div>
+</div>
+</body>
+</html>';
+
+        $response->getBody()->write($html);
+        return $response->withHeader('Content-Type', 'text/html; charset=UTF-8');
     }
 }

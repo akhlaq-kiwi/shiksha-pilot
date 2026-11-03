@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { twMerge } from 'tailwind-merge';
 import { createPortal } from 'react-dom';
 import { ChevronDown } from 'lucide-react';
 
-export const CustomSelect = ({
+export const CustomSelect = React.forwardRef(({
   value,
   onChange,
   options = [],
@@ -11,7 +12,7 @@ export const CustomSelect = ({
   className = "",
   buttonClassName = "",
   dropdownClassName = ""
-}) => {
+}, forwardedRef) => {
   const [isOpen, setIsOpen] = useState(false);
   const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
   const buttonRef = useRef(null);
@@ -70,13 +71,22 @@ export const CustomSelect = ({
   return (
     <div className={`relative ${className}`}>
       <button
-        ref={buttonRef}
+        ref={(node) => {
+          buttonRef.current = node;
+          if (typeof forwardedRef === 'function') {
+            forwardedRef(node);
+          } else if (forwardedRef) {
+            forwardedRef.current = node;
+          }
+        }}
         type="button"
         disabled={disabled}
         onClick={toggleOpen}
-        className={`flex h-9 w-full items-center justify-between rounded-full border border-border-strong bg-surface px-4 py-2 text-xs font-bold text-text-primary shadow-2xs outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border-strong focus-visible:border-border-strong active:outline-none select-none transition-colors ${
-          disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-border-strong'
-        } ${buttonClassName}`}
+        className={twMerge(
+          "flex h-9 w-full items-center justify-between rounded-xl border border-border-strong bg-surface px-4 py-2 text-xs font-bold text-text-primary shadow-2xs outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border-strong focus-visible:border-border-strong active:outline-none select-none transition-colors",
+          disabled ? "opacity-60 cursor-not-allowed" : "cursor-pointer hover:border-border-strong",
+          buttonClassName
+        )}
       >
         <span className="truncate">
           {selectedOption ? selectedOption.label : placeholder}
@@ -94,7 +104,7 @@ export const CustomSelect = ({
             width: `${coords.width}px`,
             zIndex: 99999,
           }}
-          className={`rounded-2xl border border-border bg-surface shadow-2xl overflow-hidden animate-in fade-in duration-150 ${dropdownClassName}`}
+          className={twMerge("rounded-xl border border-border bg-surface shadow-2xl overflow-hidden animate-in fade-in duration-150", dropdownClassName)}
         >
           <div className="max-h-60 overflow-y-auto p-1.5 space-y-0.5 scrollbar-thin">
             {options.map((opt) => {
@@ -121,6 +131,7 @@ export const CustomSelect = ({
       )}
     </div>
   );
-};
+});
 
+CustomSelect.displayName = 'CustomSelect';
 export default CustomSelect;

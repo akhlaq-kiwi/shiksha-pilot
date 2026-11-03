@@ -797,7 +797,7 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        item['description'] ?? '',
+                                        (item['description'] ?? '').toString().toUpperCase(),
                                         style: const TextStyle(
                                           fontSize: 15,
                                           fontWeight: FontWeight.bold,

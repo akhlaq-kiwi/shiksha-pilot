@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:school_hub/services/financial_report_service.dart';
+import 'package:school_hub/services/notification_helper.dart';
 
 class RevenueScreen extends StatefulWidget {
   final FinancialReportService reportService;
@@ -27,6 +29,7 @@ class _RevenueScreenState extends State<RevenueScreen> {
   // Inspection date filters
   DateTime _fromDate = DateTime(DateTime.now().year, DateTime.now().month, 1);
   DateTime _toDate = DateTime.now();
+  String _fromTimeStr = '12:00 AM';
 
   // Preview state
   Map<String, dynamic>? _previewData;
@@ -41,11 +44,34 @@ class _RevenueScreenState extends State<RevenueScreen> {
   int? _handingOverId;
   int? _deletingReportId;
   bool _isExporting = false;
+  Timer? _successTimer;
+
+  void _showSuccess(String message) {
+    _successTimer?.cancel();
+    if (mounted) {
+      setState(() {
+        _success = message;
+      });
+    }
+    _successTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) {
+        setState(() {
+          _success = '';
+        });
+      }
+    });
+  }
 
   @override
   void initState() {
     super.initState();
     _loadInitialData();
+  }
+
+  @override
+  void dispose() {
+    _successTimer?.cancel();
+    super.dispose();
   }
 
   String _formatCurrency(num val) {
@@ -124,18 +150,26 @@ class _RevenueScreenState extends State<RevenueScreen> {
       final res = await widget.reportService.getFinancialReports();
       final reports = res['reports'] as List<dynamic>;
       final suggestedStart = res['next_suggested_start_date']?.toString() ?? '';
-      final hasPrev = res['has_previous_report'] == true;
+      final fromTime = res['from_time']?.toString() ?? '12:00 AM';
+      final ayStart = res['academic_year_start_date']?.toString() ?? '';
 
-      DateTime effectiveFrom = DateTime(DateTime.now().year, DateTime.now().month, 1);
-      if (hasPrev && suggestedStart.isNotEmpty) {
-        try {
-          effectiveFrom = DateTime.parse(suggestedStart);
-        } catch (_) {}
+      DateTime effectiveFrom;
+      if (suggestedStart.isNotEmpty) {
+        effectiveFrom = DateTime.tryParse(suggestedStart) ??
+            (ayStart.isNotEmpty ? DateTime.tryParse(ayStart) ?? DateTime(DateTime.now().year, 4, 1) : DateTime(DateTime.now().year, 4, 1));
+      } else if (ayStart.isNotEmpty) {
+        effectiveFrom = DateTime.tryParse(ayStart) ?? DateTime(DateTime.now().year, 4, 1);
+      } else {
+        effectiveFrom = DateTime(DateTime.now().year, 4, 1);
+        if (effectiveFrom.isAfter(DateTime.now())) {
+          effectiveFrom = DateTime(DateTime.now().year - 1, 4, 1);
+        }
       }
 
       if (mounted) {
         setState(() {
           _reports = reports;
+          _fromTimeStr = fromTime;
           _fromDate = effectiveFrom;
           _toDate = DateTime.now();
           _isLoading = false;
@@ -193,40 +227,6 @@ class _RevenueScreenState extends State<RevenueScreen> {
     }
   }
 
-  Future<void> _pickDate(bool isFrom) async {
-    final initial = isFrom ? _fromDate : _toDate;
-    final first = DateTime(2020);
-    final last = DateTime(2035);
-
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: initial,
-      firstDate: first,
-      lastDate: last,
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Color(0xFFD97706),
-              onPrimary: Colors.white,
-              onSurface: Color(0xFF1E293B),
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-
-    if (picked != null) {
-      setState(() {
-        if (isFrom) {
-          _fromDate = picked;
-        } else {
-          _toDate = picked;
-        }
-      });
-    }
-  }
 
   void _onStartGenerate() {
     // Exact web rule:
@@ -246,60 +246,107 @@ class _RevenueScreenState extends State<RevenueScreen> {
   void _showBlockedDialog(dynamic blockedReport) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: const [
-            Icon(Icons.warning_amber_rounded, color: Color(0xFFD97706), size: 24),
-            SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Previous Report Settlement Required',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
-              ),
-            ),
-          ],
-        ),
-        content: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFEF3C7),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFFDE68A)),
-          ),
+      barrierDismissible: true,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: Colors.white,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: Padding(
+          padding: const EdgeInsets.all(22),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Cannot Generate New Report',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF92400E)),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.error_outline_rounded,
+                      color: Color(0xFFD97706),
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.only(top: 2),
+                      child: Text(
+                        'Settlement Required',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF0F172A),
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 6),
-              Text(
-                'You cannot generate a new financial report because the last generated report (${blockedReport['report_id']}) is currently in ${blockedReport['status']} status.',
-                style: const TextStyle(fontSize: 12, color: Color(0xFF78350F), height: 1.4),
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFFDE68A)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Cannot Generate New Report',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5, color: Color(0xFF92400E)),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'You cannot generate a new financial report because the last generated report (${blockedReport['report_id']}) is currently in ${blockedReport['status']} status.',
+                      style: const TextStyle(fontSize: 11.5, color: Color(0xFF78350F), height: 1.4),
+                    ),
+                    const SizedBox(height: 8),
+                    const Divider(color: Color(0xFFFDE68A), height: 1),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Please make sure the previous report is settled or deleted before generating a new financial report.',
+                      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF92400E)),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 8),
-              const Divider(color: Color(0xFFFDE68A), height: 1),
-              const SizedBox(height: 8),
-              const Text(
-                'Please make sure the previous report is settled or deleted before generating a new financial report.',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF92400E)),
+              const SizedBox(height: 18),
+              const Divider(color: Color(0xFFE2E8F0), height: 1),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFD97706),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text(
+                    'Understand & Close',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
         ),
-        actions: [
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFD97706),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text('Understand & Close', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          ),
-        ],
       ),
     );
   }
@@ -310,52 +357,133 @@ class _RevenueScreenState extends State<RevenueScreen> {
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          'Generate Financial Report?',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1E293B)),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Are you sure you want to generate a financial report for the period $fromStr to $toStr?',
-              style: const TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.4),
-            ),
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFFBEB),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFFDE68A)),
+      barrierDismissible: true,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: Colors.white,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: Padding(
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.error_outline_rounded,
+                      color: Color(0xFFD97706),
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.only(top: 2),
+                      child: Text(
+                        'Generate Financial Report?',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF0F172A),
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              child: const Text(
-                'This will freeze transactions for this period into your history with status Hand Over.',
-                style: TextStyle(fontSize: 11, color: Color(0xFF92400E), fontWeight: FontWeight.w600),
+              const SizedBox(height: 14),
+              Text(
+                'Are you sure you want to generate a financial report for the period $fromStr ($_fromTimeStr) to $toStr (Till now)?',
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  color: Color(0xFF475569),
+                  height: 1.45,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFFBEB),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFFDE68A)),
+                ),
+                child: const Text(
+                  'This will freeze transactions for this period into your history with status Hand Over.',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: Color(0xFF92400E),
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Divider(color: Color(0xFFE2E8F0), height: 1),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 44,
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFFCBD5E1)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          foregroundColor: const Color(0xFF475569),
+                        ),
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: SizedBox(
+                      height: 44,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFD97706),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _handleGenerateReport();
+                        },
+                        child: const Text(
+                          'Generate Report',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _handleGenerateReport();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFD97706),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text('Generate Report', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          ),
-        ],
       ),
     );
   }
@@ -373,9 +501,7 @@ class _RevenueScreenState extends State<RevenueScreen> {
         toDate: _toIsoDate(_toDate),
       );
       if (mounted) {
-        setState(() {
-          _success = 'Financial report generated successfully.';
-        });
+        _showSuccess('Financial report generated successfully.');
         await _loadInitialData();
       }
     } catch (e) {
@@ -396,57 +522,138 @@ class _RevenueScreenState extends State<RevenueScreen> {
   void _showHandOverConfirmDialog(dynamic report) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          'Hand Over Financial Report?',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1E293B)),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Are you sure you want to hand over report ${report['report_id']} to the School Admin / Owner?',
-              style: const TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.4),
-            ),
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF0FDF4),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFBBF7D0)),
+      barrierDismissible: true,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: Colors.white,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: Padding(
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.error_outline_rounded,
+                      color: Color(0xFFD97706),
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.only(top: 2),
+                      child: Text(
+                        'Hand Over Financial Report?',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF0F172A),
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              child: const Text(
-                'An email containing the financial statement summary and Excel file attachment will be sent to the School Admin email address.',
-                style: TextStyle(fontSize: 11, color: Color(0xFF166534), height: 1.3),
+              const SizedBox(height: 14),
+              Text(
+                'Are you sure you want to hand over report ${report['report_id']} to the School Admin / Owner?',
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  color: Color(0xFF475569),
+                  height: 1.45,
+                ),
               ),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              'The status will update to Pending until approved or rejected via email.',
-              style: TextStyle(fontSize: 11, color: Color(0xFF92400E), fontWeight: FontWeight.bold),
-            ),
-          ],
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFFBEB),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFFDE68A)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      'An email containing the financial statement summary and Excel file attachment will be sent to the School Admin email address.',
+                      style: TextStyle(fontSize: 11.5, color: Color(0xFF92400E), height: 1.35),
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      'The status will update to Pending until approved or rejected via email.',
+                      style: TextStyle(fontSize: 11.5, color: Color(0xFF78350F), fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Divider(color: Color(0xFFE2E8F0), height: 1),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 44,
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFFCBD5E1)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          foregroundColor: const Color(0xFF475569),
+                        ),
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: SizedBox(
+                      height: 44,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFD97706),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _handleConfirmHandOver(report);
+                        },
+                        child: const Text(
+                          'Hand Over',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _handleConfirmHandOver(report);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0D9488),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text('Hand Over', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          ),
-        ],
       ),
     );
   }
@@ -462,10 +669,18 @@ class _RevenueScreenState extends State<RevenueScreen> {
     try {
       await widget.reportService.submitSettlementRequest(reportId);
       if (mounted) {
+        _showSuccess('Hand over request submitted successfully. Email notification sent to School Admin.');
+        if (_reports.isNotEmpty) {
+          for (var r in _reports) {
+            if (r is Map && r['id'] != null && r['id'].toString() == reportId.toString()) {
+              r['status'] = 'Pending';
+            }
+          }
+        }
         setState(() {
-          _success = 'Hand over request submitted successfully. Email notification sent to School Admin.';
+          _handingOverId = null;
         });
-        await _loadInitialData();
+        _loadInitialData();
       }
     } catch (e) {
       if (mounted) {
@@ -485,62 +700,138 @@ class _RevenueScreenState extends State<RevenueScreen> {
   void _showDeleteConfirmDialog(dynamic report) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          'Delete Unsettled Report?',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFFDC2626)),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Are you sure you want to delete report ${report['report_id']}?',
-              style: const TextStyle(fontSize: 13, color: Color(0xFF475569)),
-            ),
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFEF2F2),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFFECACA)),
-              ),
-              child: Column(
+      barrierDismissible: true,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: Colors.white,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: Padding(
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text(
-                    'Transaction Safety Guaranteed:',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF991B1B)),
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF2F2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.delete_outline_rounded,
+                      color: Color(0xFFDC2626),
+                      size: 24,
+                    ),
                   ),
-                  SizedBox(height: 4),
-                  Text(
-                    'All fee payments, salary disbursements, and expenses from this period will remain safe in the database and will automatically be included in your next generated report.',
-                    style: TextStyle(fontSize: 11, color: Color(0xFF7F1D1D), height: 1.3),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.only(top: 2),
+                      child: Text(
+                        'Delete Unsettled Report?',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF0F172A),
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
-            ),
-          ],
+              const SizedBox(height: 14),
+              Text(
+                'Are you sure you want to delete report ${report['report_id']}?',
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  color: Color(0xFF475569),
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF2F2),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFFECACA)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      'Transaction Safety Guaranteed:',
+                      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF991B1B)),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'All fee payments, salary disbursements, and expenses from this period will remain safe in the database and will automatically be included in your next generated report.',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF7F1D1D), height: 1.35),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Divider(color: Color(0xFFE2E8F0), height: 1),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 44,
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFFCBD5E1)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          foregroundColor: const Color(0xFF475569),
+                        ),
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: SizedBox(
+                      height: 44,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFDC2626),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _handleDeleteReport(report);
+                        },
+                        child: const Text(
+                          'Delete Report',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _handleDeleteReport(report);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFDC2626),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text('Delete Report', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          ),
-        ],
       ),
     );
   }
@@ -556,9 +847,7 @@ class _RevenueScreenState extends State<RevenueScreen> {
     try {
       await widget.reportService.deleteFinancialReport(reportId);
       if (mounted) {
-        setState(() {
-          _success = 'Financial report ${report['report_id']} deleted successfully.';
-        });
+        _showSuccess('Financial report ${report['report_id']} deleted successfully.');
         await _loadInitialData();
       }
     } catch (e) {
@@ -587,21 +876,44 @@ class _RevenueScreenState extends State<RevenueScreen> {
       if (Platform.isAndroid) {
         const platform = MethodChannel('com.shikshapilot.schoolhub/battery');
         try {
-          await platform.invokeMethod<String>('saveFileToDownloads', {
+          final savedPathOrUri = await platform.invokeMethod<String>('saveFileToDownloads', {
             'fileName': filename,
             'bytes': bytes,
           });
+
+          await NotificationHelper.showDownloadNotification(
+            title: 'Financial Report Downloaded',
+            fileName: filename,
+            bytes: bytes,
+          );
+
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text('$filename saved to Downloads!'),
                 backgroundColor: const Color(0xFF059669),
                 behavior: SnackBarBehavior.floating,
+                action: SnackBarAction(
+                  label: 'OPEN',
+                  textColor: Colors.white,
+                  onPressed: () async {
+                    try {
+                      await platform.invokeMethod('openFile', {
+                        'fileName': filename,
+                        'fileUri': savedPathOrUri,
+                      });
+                    } catch (e) {
+                      debugPrint('Error opening exported file: $e');
+                    }
+                  },
+                ),
               ),
             );
           }
           return;
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('saveFileToDownloads error: $e');
+        }
       }
 
       if (mounted) {
@@ -628,6 +940,7 @@ class _RevenueScreenState extends State<RevenueScreen> {
     }
   }
 
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -638,7 +951,7 @@ class _RevenueScreenState extends State<RevenueScreen> {
         elevation: 0,
         centerTitle: false,
         title: const Text(
-          'Revenue',
+          'FINANCIAL REPORT',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w900,
@@ -646,13 +959,6 @@ class _RevenueScreenState extends State<RevenueScreen> {
             letterSpacing: -0.5,
           ),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: Color(0xFFD97706)),
-            onPressed: _loadInitialData,
-            tooltip: 'Refresh Revenue',
-          ),
-        ],
       ),
       body: _isLoading
           ? const Center(
@@ -667,10 +973,7 @@ class _RevenueScreenState extends State<RevenueScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Title Header Card
-                    _buildHeaderBanner(),
 
-                    const SizedBox(height: 16),
 
                     // Error & Success alerts
                     if (_error.isNotEmpty) ...[
@@ -742,67 +1045,6 @@ class _RevenueScreenState extends State<RevenueScreen> {
     );
   }
 
-  Widget _buildHeaderBanner() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFF1EAD9)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFEF3C7),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              Icons.receipt_long_rounded,
-              color: Color(0xFFD97706),
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text(
-                  'FINANCIAL REPORTS',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFF0F172A),
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'On-demand financial accounting reports for school owners and live profit/loss preview for ongoing period.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF64748B),
-                    height: 1.35,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildOngoingMonthCard() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -839,7 +1081,7 @@ class _RevenueScreenState extends State<RevenueScreen> {
               border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
             child: const Text(
-              'Inspect live transaction ledgers and generate on-demand financial accounting reports for any period. Click Generate Financial Report below to freeze transactions and log a report into history.',
+              'View live transactions from the last financial report up to now. Click "Generate Financial Report" below to freeze these transactions into an official statement with status Hand Over, ready for owner settlement.',
               style: TextStyle(
                 fontSize: 11.5,
                 color: Color(0xFF64748B),
@@ -849,7 +1091,7 @@ class _RevenueScreenState extends State<RevenueScreen> {
           ),
           const SizedBox(height: 14),
 
-          // Date Pickers Row
+          // Date Display Row (Read-only, without calendar icons)
           Row(
             children: [
               Expanded(
@@ -861,25 +1103,20 @@ class _RevenueScreenState extends State<RevenueScreen> {
                       style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: Color(0xFF64748B)),
                     ),
                     const SizedBox(height: 6),
-                    InkWell(
-                      onTap: () => _pickDate(true),
-                      borderRadius: BorderRadius.circular(10),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFDFBF7),
-                          border: Border.all(color: const Color(0xFFCBD5E1)),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              _toIsoDate(_fromDate),
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
-                            ),
-                            const Icon(Icons.calendar_month_rounded, size: 16, color: Color(0xFF64748B)),
-                          ],
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFDFBF7),
+                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          '${_toIsoDate(_fromDate)} ($_fromTimeStr)',
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
                         ),
                       ),
                     ),
@@ -896,25 +1133,20 @@ class _RevenueScreenState extends State<RevenueScreen> {
                       style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: Color(0xFF64748B)),
                     ),
                     const SizedBox(height: 6),
-                    InkWell(
-                      onTap: () => _pickDate(false),
-                      borderRadius: BorderRadius.circular(10),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFDFBF7),
-                          border: Border.all(color: const Color(0xFFCBD5E1)),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              _toIsoDate(_toDate),
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
-                            ),
-                            const Icon(Icons.calendar_month_rounded, size: 16, color: Color(0xFF64748B)),
-                          ],
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFDFBF7),
+                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          '${_toIsoDate(_toDate)} (Till now)',
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
                         ),
                       ),
                     ),
@@ -1040,7 +1272,7 @@ class _RevenueScreenState extends State<RevenueScreen> {
                 style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: Color(0xFF64748B)),
               ),
               Text(
-                '$fromStr ➔ $toStr',
+                '$fromStr ➔ $toStr (Till now)',
                 style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
               ),
             ],

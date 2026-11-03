@@ -10,8 +10,6 @@ import android.os.Environment
 import java.io.File
 
 class MainActivity : FlutterActivity() {
-    // Named for the battery handlers it used to carry; today it only saves
-    // generated PDFs (receipts, report cards, salary slips) to Downloads.
     private val CHANNEL = "com.shikshapilot.schoolhub/battery"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -42,14 +40,27 @@ class MainActivity : FlutterActivity() {
                     }
 
                     try {
-                        val safeFileName = if (fileName.endsWith(".pdf", ignoreCase = true)) {
-                            val withoutExt = fileName.substring(0, fileName.length - 4)
-                            val clean = withoutExt.replace(Regex("[^a-zA-Z0-9_\\-]"), "_").replace(Regex("_+"), "_").trim('_')
-                            "${if (clean.isEmpty()) "Fee_Receipt" else clean}.pdf"
-                        } else {
-                            val clean = fileName.replace(Regex("[^a-zA-Z0-9_\\-]"), "_").replace(Regex("_+"), "_").trim('_')
-                            "${if (clean.isEmpty()) "Fee_Receipt" else clean}.pdf"
+                        val lowerName = fileName.lowercase()
+                        val (ext, mimeType) = when {
+                            lowerName.endsWith(".xlsx") -> Pair(".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                            lowerName.endsWith(".xls") -> Pair(".xls", "application/vnd.ms-excel")
+                            lowerName.endsWith(".csv") -> Pair(".csv", "text/csv")
+                            lowerName.endsWith(".pdf") -> Pair(".pdf", "application/pdf")
+                            lowerName.endsWith(".png") -> Pair(".png", "image/png")
+                            lowerName.endsWith(".jpg") -> Pair(".jpg", "image/jpeg")
+                            lowerName.endsWith(".jpeg") -> Pair(".jpeg", "image/jpeg")
+                            lowerName.endsWith(".zip") -> Pair(".zip", "application/zip")
+                            else -> Pair(".pdf", "application/pdf")
                         }
+
+                        val nameWithoutExt = if (lowerName.endsWith(ext)) {
+                            fileName.substring(0, fileName.length - ext.length)
+                        } else {
+                            fileName
+                        }
+                        val clean = nameWithoutExt.replace(Regex("[^a-zA-Z0-9_\\-]"), "_").replace(Regex("_+"), "_").trim('_')
+                        val baseName = if (clean.isEmpty()) "Download" else clean
+                        val safeFileName = "$baseName$ext"
 
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                             val resolver = contentResolver
@@ -63,7 +74,7 @@ class MainActivity : FlutterActivity() {
 
                             val contentValues = ContentValues().apply {
                                 put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, safeFileName)
-                                put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "application/pdf")
+                                put(android.provider.MediaStore.MediaColumns.MIME_TYPE, mimeType)
                                 put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
                                 put(android.provider.MediaStore.MediaColumns.IS_PENDING, 1)
                             }
@@ -85,14 +96,14 @@ class MainActivity : FlutterActivity() {
                                     android.media.MediaScannerConnection.scanFile(
                                         applicationContext,
                                         arrayOf(file.absolutePath),
-                                        arrayOf("application/pdf"),
+                                        arrayOf(mimeType),
                                         null
                                     )
                                 } catch (_: Throwable) { }
 
                                 result.success(uri.toString())
                             } else {
-                                result.error("INSERT_ERROR", "Failed to insert PDF", null)
+                                result.error("INSERT_ERROR", "Failed to insert file", null)
                             }
                         } else {
                             val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
@@ -102,13 +113,57 @@ class MainActivity : FlutterActivity() {
                             android.media.MediaScannerConnection.scanFile(
                                 applicationContext,
                                 arrayOf(file.absolutePath),
-                                arrayOf("application/pdf"),
+                                arrayOf(mimeType),
                                 null
                             )
                             result.success(file.absolutePath)
                         }
                     } catch (t: Throwable) {
                         result.error("WRITE_ERROR", t.message ?: t.toString(), null)
+                    }
+                }
+                "openFile" -> {
+                    val fileUriStr = call.argument<String>("fileUri")
+                    val fileName = call.argument<String>("fileName")
+                    try {
+                        val nameToCheck = fileName ?: fileUriStr ?: ""
+                        val lower = nameToCheck.lowercase()
+                        val mime = when {
+                            lower.endsWith(".xlsx") -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                            lower.endsWith(".xls") -> "application/vnd.ms-excel"
+                            lower.endsWith(".csv") -> "text/csv"
+                            lower.endsWith(".pdf") -> "application/pdf"
+                            lower.endsWith(".png") -> "image/png"
+                            lower.endsWith(".jpg") || lower.endsWith(".jpeg") -> "image/jpeg"
+                            else -> "*/*"
+                        }
+
+                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                            if (fileUriStr != null && fileUriStr.startsWith("content://")) {
+                                setDataAndType(Uri.parse(fileUriStr), mime)
+                            } else {
+                                val targetFile = if (fileUriStr != null && fileUriStr.startsWith("/")) {
+                                    File(fileUriStr)
+                                } else {
+                                    val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                                    File(downloadDir, fileName ?: "file")
+                                }
+                                val contentUri = androidx.core.content.FileProvider.getUriForFile(
+                                    this@MainActivity,
+                                    "${applicationContext.packageName}.fileprovider",
+                                    targetFile
+                                )
+                                setDataAndType(contentUri, mime)
+                            }
+                            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        val chooser = android.content.Intent.createChooser(intent, "Open with")
+                        chooser.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        startActivity(chooser)
+                        result.success(true)
+                    } catch (t: Throwable) {
+                        result.error("OPEN_ERROR", t.message ?: t.toString(), null)
                     }
                 }
                 "openDownloadsFolder" -> {

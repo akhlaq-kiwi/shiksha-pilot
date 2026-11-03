@@ -247,18 +247,22 @@ try {
             // Fetch Student Fee Collections
             $stmtFeeList = $pdo->prepare("
                 SELECT 
+                    fp.id,
+                    fp.receipt_no,
+                    fp.student_id,
                     fp.created_at AS deposit_time, 
                     s.name AS student_name, 
                     c.name AS class_name, 
                     c.section AS class_section,
                     c.id AS class_id, 
                     s.roll_no, 
-                    'Tuition Fee' AS fee_type, 
+                    'Monthly Fee' AS fee_type, 
                     fp.fee_month AS months_covered, 
                     COALESCE(fp.discount_amount, 0) AS discount_amount,
                     fp.amount_paid AS amount,
                     COALESCE(u.phone, '') AS collector_phone,
-                    COALESCE(fp.collected_by, 'School Admin') AS collected_by
+                    COALESCE(fp.collected_by, 'School Admin') AS collected_by,
+                    'monthly' AS item_type
                 FROM fee_payments fp
                 JOIN students s ON fp.student_id = s.id
                 LEFT JOIN classes c ON s.class_id = c.id
@@ -273,7 +277,10 @@ try {
 
             $stmtAddFeeList = $pdo->prepare("
                 SELECT 
-                    afp.updated_at AS deposit_time, 
+                    afph.id,
+                    COALESCE(afph.receipt_no, afp.receipt_no) AS receipt_no,
+                    afp.student_id,
+                    afph.created_at AS deposit_time, 
                     s.name AS student_name, 
                     c.name AS class_name, 
                     c.section AS class_section,
@@ -281,39 +288,25 @@ try {
                     s.roll_no, 
                     aft.name AS fee_type, 
                     'N/A' AS months_covered, 
-                    COALESCE(afp.discount_amount, 0) AS discount_amount,
-                    afp.amount AS amount,
+                    COALESCE(afph.discount_amount, afp.discount_amount, 0) AS discount_amount,
+                    afph.amount_paid AS amount,
                     COALESCE(u.phone, '') AS collector_phone,
-                    COALESCE(afp.collected_by, 'School Admin') AS collected_by
-                FROM additional_fee_payments afp
+                    COALESCE(afph.collected_by, afp.collected_by, 'School Admin') AS collected_by,
+                    'additional' AS item_type
+                FROM additional_fee_payment_history afph
+                JOIN additional_fee_payments afp ON afph.payment_id = afp.id
                 JOIN students s ON afp.student_id = s.id
                 LEFT JOIN classes c ON s.class_id = c.id
                 JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
-                LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = afp.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = afp.school_id)
+                LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = afph.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = afp.school_id)
                 WHERE afp.school_id = :sid 
-                  AND LOWER(afp.status) IN ('paid', 'partial')
-                  AND afp.updated_at {$operator} :from_ts 
-                  AND afp.updated_at <= :to_ts
+                  AND afph.created_at {$operator} :from_ts 
+                  AND afph.created_at <= :to_ts
             ");
             $stmtAddFeeList->execute([':sid' => $schoolId, ':from_ts' => $from_ts, ':to_ts' => $to_ts]);
             $addPayments = $stmtAddFeeList->fetchAll();
 
-            $feeCollections = array_merge($feePayments, $addPayments);
-            
-            // Sort by class creation order, then deposit time, then name
-            usort($feeCollections, function($a, $b) {
-                $classIdA = isset($a['class_id']) ? (int)$a['class_id'] : 999999;
-                $classIdB = isset($b['class_id']) ? (int)$b['class_id'] : 999999;
-                if ($classIdA !== $classIdB) {
-                    return $classIdA <=> $classIdB;
-                }
-                $timeA = strtotime($a['deposit_time'] ?? '1970-01-01 00:00:00');
-                $timeB = strtotime($b['deposit_time'] ?? '1970-01-01 00:00:00');
-                if ($timeA !== $timeB) {
-                    return $timeA <=> $timeB;
-                }
-                return strcmp($a['student_name'] ?? '', $b['student_name'] ?? '');
-            });
+            $feeCollections = ExcelGenerator::consolidateFeeCollections(array_merge($feePayments, $addPayments));
 
             $stmtSalaryList = $pdo->prepare("
                 SELECT 
@@ -329,7 +322,8 @@ try {
                             ELSE ''
                         END
                     ) AS category, 
-                    sp.payment_date AS expense_date, 
+                    COALESCE(sp.payment_date, DATE(sp.created_at)) AS expense_date, 
+                    sp.created_at,
                     sp.amount_paid AS amount,
                     'School Admin' AS added_by
                 FROM staff_payments sp
@@ -346,7 +340,8 @@ try {
                 SELECT 
                     se.description, 
                     'School Expense' AS category, 
-                    se.expense_date, 
+                    COALESCE(se.expense_date, DATE(se.created_at)) AS expense_date, 
+                    se.created_at,
                     se.amount,
                     COALESCE(u.phone, '') AS added_by_phone,
                     COALESCE(u.name, 'School Admin') AS added_by
@@ -361,7 +356,17 @@ try {
 
             $expenses = array_merge($salaryPayments, $expensesItems);
             usort($expenses, function($a, $b) {
-                return strcmp($a['expense_date'] ?? '', $b['expense_date'] ?? '');
+                $timeA = !empty($a['expense_date']) ? strtotime((string)$a['expense_date']) : (!empty($a['created_at']) ? strtotime((string)$a['created_at']) : 0);
+                $timeB = !empty($b['expense_date']) ? strtotime((string)$b['expense_date']) : (!empty($b['created_at']) ? strtotime((string)$b['created_at']) : 0);
+                if ($timeA !== $timeB) {
+                    return $timeB <=> $timeA;
+                }
+                $createdA = !empty($a['created_at']) ? strtotime((string)$a['created_at']) : 0;
+                $createdB = !empty($b['created_at']) ? strtotime((string)$b['created_at']) : 0;
+                if ($createdA !== $createdB) {
+                    return $createdB <=> $createdA;
+                }
+                return strcmp($a['description'] ?? '', $b['description'] ?? '');
             });
 
             $summary = [

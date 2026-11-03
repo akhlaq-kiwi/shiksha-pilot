@@ -9,18 +9,23 @@ import '../services/account_service.dart';
 import '../main.dart';
 import '../widgets/change_password_dialog.dart';
 import 'full_screen_image_screen.dart';
+import 'academic_year_migration_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 class SettingsScreen extends StatefulWidget {
   final LeaveService leaveService;
   final String userRole;
   final int? selectedStudentId;
+  final bool? isPrincipal;
+  final bool? isFeeCollector;
 
   const SettingsScreen({
     Key? key,
     required this.leaveService,
     required this.userRole,
     this.selectedStudentId,
+    this.isPrincipal,
+    this.isFeeCollector,
   }) : super(key: key);
 
   @override
@@ -40,6 +45,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   int? _activeStudentId;
 
   bool _isFeeCollector = false;
+  bool _isPrincipal = false;
   List<dynamic> _academicYears = [];
   int? _selectedAcademicYearId;
   String _selectedAcademicYearName = '';
@@ -51,6 +57,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
+    final role = widget.userRole.toUpperCase();
+    _isPrincipal = widget.isPrincipal == true ||
+        role == 'PRINCIPAL' ||
+        role == 'SCHOOL_ADMIN' ||
+        role == 'SUPER_ADMIN';
+    _isFeeCollector = widget.isFeeCollector == true;
     _loadSettingsData();
     _loadDeletionRequest();
     _loadAppVersion();
@@ -86,20 +98,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _loadSettingsData() async {
     final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _userName = prefs.getString('user_name') ?? 'User';
-      _schoolName = (prefs.getString('school_name') ?? 'Shiksha Pilot Academy').toUpperCase();
-      _userPhone = prefs.getString('user_phone') ?? '';
-      _userPhoto = prefs.getString('user_photo') ?? '';
-      _workingBaseUrl = prefs.getString('base_url') ?? '';
-      _notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
-      _currentTheme = prefs.getString('theme_mode') ?? 'Light Mode';
-      _activeStudentId = prefs.getInt('selected_student_id') ?? widget.selectedStudentId;
-    });
+    final role = (prefs.getString('user_role') ?? widget.userRole).toUpperCase();
+    final bool isP = prefs.getBool('is_principal') == true ||
+        widget.isPrincipal == true ||
+        role == 'PRINCIPAL' ||
+        role == 'SCHOOL_ADMIN' ||
+        role == 'SUPER_ADMIN';
+    final bool isFC = prefs.getBool('is_fee_collector') == true ||
+        widget.isFeeCollector == true;
 
-    final role = widget.userRole.toUpperCase();
-    _isFeeCollector = prefs.getBool('is_fee_collector') == true;
-    _selectedAcademicYearStatus = prefs.getString('selected_academic_year_status') ?? 'ACTIVE';
+    if (mounted) {
+      setState(() {
+        _isPrincipal = isP;
+        _isFeeCollector = isFC;
+        _userName = prefs.getString('user_name') ?? 'User';
+        _schoolName = (prefs.getString('school_name') ?? 'Shiksha Pilot Academy').toUpperCase();
+        _userPhone = prefs.getString('user_phone') ?? '';
+        _userPhoto = prefs.getString('user_photo') ?? '';
+        _workingBaseUrl = prefs.getString('base_url') ?? '';
+        _notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
+        _currentTheme = prefs.getString('theme_mode') ?? 'Light Mode';
+        _activeStudentId = prefs.getInt('selected_student_id') ?? widget.selectedStudentId;
+        _selectedAcademicYearStatus = prefs.getString('selected_academic_year_status') ?? 'ACTIVE';
+      });
+    }
 
     if (role == 'PARENT' || role == 'STUDENT') {
       await _fetchChildrenList();
@@ -113,6 +135,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final role = widget.userRole.toUpperCase();
     return _isFeeCollector || role == 'SCHOOL_ADMIN' || role == 'SUPER_ADMIN' || role == 'PRINCIPAL';
   }
+
+  bool get _isPrincipalUser => _isPrincipal;
 
   Future<void> _fetchAcademicYears() async {
     try {
@@ -138,15 +162,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
           years = List<dynamic>.from(data);
         }
 
-        // Sort: Active first, then Archived by name DESC, then Draft
+        // Order: 1) Draft Academic Year at top, 2) Active Year below Draft, 3) Archived Years below Active
+        int getStatusPriority(dynamic y) {
+          final s = (y['status'] ?? '').toString().toUpperCase();
+          final bool isCurrent = y['is_current'] == 1 || y['is_current'] == true;
+          if (s == 'DRAFT') return 0; // Draft at top
+          if (s == 'ACTIVE' || isCurrent) return 1; // Active below draft
+          return 2; // Archived below active
+        }
+
         years.sort((a, b) {
-          final aStatus = (a['status'] ?? '').toString().toUpperCase();
-          final bStatus = (b['status'] ?? '').toString().toUpperCase();
-          if (aStatus == 'ACTIVE' || a['is_current'] == 1) return -1;
-          if (bStatus == 'ACTIVE' || b['is_current'] == 1) return 1;
-          final aName = (a['name'] ?? '').toString();
-          final bName = (b['name'] ?? '').toString();
-          return bName.compareTo(aName);
+          final pA = getStatusPriority(a);
+          final pB = getStatusPriority(b);
+          if (pA != pB) return pA.compareTo(pB);
+          final startA = (a['start_date'] ?? '').toString();
+          final startB = (b['start_date'] ?? '').toString();
+          return startB.compareTo(startA);
         });
 
         int? savedAyId = prefs.getInt('selected_academic_year_id');
@@ -228,7 +259,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  void _showSwitchAcademicYearSheet() {
+  Future<void> _showSwitchAcademicYearSheet() async {
+    final prefs = await SharedPreferences.getInstance();
+    final role = (prefs.getString('user_role') ?? widget.userRole).toUpperCase();
+    if (mounted) {
+      setState(() {
+        _isPrincipal = prefs.getBool('is_principal') == true ||
+            widget.isPrincipal == true ||
+            role == 'PRINCIPAL' ||
+            role == 'SCHOOL_ADMIN' ||
+            role == 'SUPER_ADMIN';
+        _isFeeCollector = prefs.getBool('is_fee_collector') == true ||
+            widget.isFeeCollector == true;
+      });
+    }
+
     if (_academicYears.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -308,7 +353,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 18),
+                if (_isPrincipalUser) ...[
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _handleCreateDraftAcademicYear(ctx),
+                      icon: const Icon(Icons.add_circle_outline_rounded, size: 16, color: Colors.white),
+                      label: const Text(
+                        'Create Draft AY',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.white),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD97706),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 16),
                 ConstrainedBox(
                   constraints: BoxConstraints(
                     maxHeight: MediaQuery.of(context).size.height * 0.45,
@@ -391,12 +457,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   ],
                                 ),
                               ),
-                              if (isSelected)
+                              // Migrate button: ONLY for Principal, ONLY on Active year, NEVER on Draft year, NEVER for Fee Collector
+                              if (_isPrincipalUser && isCurrentActive && yrStatus.toUpperCase() != 'DRAFT') ...[
+                                const SizedBox(width: 6),
+                                ElevatedButton(
+                                  onPressed: () {
+                                    Navigator.pop(ctx);
+                                    _handleStartMigration(yr);
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFFD97706),
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                  child: const Text(
+                                    'Migrate',
+                                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: Colors.white),
+                                  ),
+                                ),
+                              ],
+                              if (isSelected) ...[
+                                const SizedBox(width: 6),
                                 const Icon(
                                   Icons.check_circle_rounded,
                                   color: Color(0xFFD97706),
                                   size: 22,
                                 ),
+                              ],
                             ],
                           ),
                         ),
@@ -409,6 +500,676 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         );
       },
+    );
+  }
+
+  Future<void> _handleCreateDraftAcademicYear(BuildContext? sheetContext) async {
+    final hasDraft = _academicYears.any(
+      (y) => (y['status'] ?? '').toString().toUpperCase() == 'DRAFT',
+    );
+    if (hasDraft) {
+      if (sheetContext != null && sheetContext.mounted) {
+        Navigator.pop(sheetContext);
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('A Draft academic year already exists. Promote or delete it first.'),
+          backgroundColor: Color(0xFFDC2626),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    String nextSessionName = '';
+    String nextStartDate = '';
+    String nextEndDate = '';
+
+    final sorted = List<dynamic>.from(_academicYears);
+    sorted.sort((a, b) {
+      final endA = DateTime.tryParse(a['end_date']?.toString() ?? '') ?? DateTime(1970);
+      final endB = DateTime.tryParse(b['end_date']?.toString() ?? '') ?? DateTime(1970);
+      return endB.compareTo(endA);
+    });
+
+    if (sorted.isNotEmpty) {
+      final nameStr = sorted[0]['name']?.toString() ?? '';
+      final parts = nameStr.trim().split(RegExp(r'[-\u2013\u2014]'));
+      if (parts.length == 2) {
+        final start = int.tryParse(parts[0].trim()) ?? 0;
+        final end = int.tryParse(parts[1].trim()) ?? 0;
+        if (start > 0 && end > 0) {
+          nextSessionName = '${start + 1}\u2013${end + 1}';
+          nextStartDate = '${start + 1}-04-01';
+          nextEndDate = '${end + 1}-03-31';
+        }
+      }
+    }
+
+    if (nextSessionName.isEmpty) {
+      final curr = DateTime.now().year;
+      nextSessionName = '$curr\u2013${curr + 1}';
+      nextStartDate = '$curr-04-01';
+      nextEndDate = '${curr + 1}-03-31';
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: Colors.white,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: Padding(
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.post_add_rounded,
+                      color: Color(0xFFD97706),
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.only(top: 2),
+                      child: Text(
+                        'Create Draft Academic Year',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF0F172A),
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Create upcoming academic session $nextSessionName ($nextStartDate to $nextEndDate) in Draft status?',
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF475569),
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFFBEB),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFFDE68A)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFFB45309)),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'This session will remain in Draft mode until rollover migration. Live session records are completely untouched.',
+                        style: TextStyle(fontSize: 11.5, color: Color(0xFF92400E), height: 1.35),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Divider(color: Color(0xFFE2E8F0), height: 1),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 44,
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFFCBD5E1)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          foregroundColor: const Color(0xFF475569),
+                        ),
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: SizedBox(
+                      height: 44,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFD97706),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text(
+                          'Create Draft',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    if (sheetContext != null && sheetContext.mounted) {
+      Navigator.pop(sheetContext);
+    }
+
+    if (!mounted) return;
+
+    // Show persistent spinner loader modal dialog
+    BuildContext? loaderCtx;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (lCtx) {
+        loaderCtx = lCtx;
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          backgroundColor: Colors.white,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 26),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                SizedBox(
+                  width: 26,
+                  height: 26,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.8,
+                    color: Color(0xFFD97706),
+                  ),
+                ),
+                SizedBox(width: 18),
+                Expanded(
+                  child: Text(
+                    'Creating Draft Academic Year...',
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token') ?? widget.leaveService.token;
+      final url = Uri.parse('${widget.leaveService.baseUrl}/api/school/academic-years');
+
+      final res = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode({
+          'name': nextSessionName,
+          'start_date': nextStartDate,
+          'end_date': nextEndDate,
+        }),
+      );
+
+      final data = json.decode(res.body);
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        await _fetchAcademicYears();
+        if (loaderCtx != null && loaderCtx!.mounted) {
+          Navigator.pop(loaderCtx!);
+        }
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Draft Academic Year $nextSessionName created successfully.'),
+            backgroundColor: const Color(0xFF15803D),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        if (loaderCtx != null && loaderCtx!.mounted) {
+          Navigator.pop(loaderCtx!);
+        }
+        String msg = data['message'] ?? data['error'] ?? 'Failed to create Draft Academic Year.';
+        if (data['errors'] != null && data['errors'] is Map) {
+          final errs = (data['errors'] as Map).values.map((v) => v.toString()).join('\n');
+          if (errs.isNotEmpty) msg = errs;
+        }
+        throw Exception(msg);
+      }
+    } catch (e) {
+      if (loaderCtx != null && loaderCtx!.mounted) {
+        Navigator.pop(loaderCtx!);
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+          backgroundColor: const Color(0xFFDC2626),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleStartMigration(dynamic selectedYear) async {
+    final draftYear = _academicYears.firstWhere(
+      (y) => (y['status'] ?? '').toString().toUpperCase() == 'DRAFT',
+      orElse: () => null,
+    );
+
+    if (draftYear == null) {
+      showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (ctx) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          backgroundColor: Colors.white,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Padding(
+            padding: const EdgeInsets.all(22),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.warning_amber_rounded,
+                        color: Color(0xFFD97706),
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.only(top: 2),
+                        child: Text(
+                          'Draft Academic Year Required',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF0F172A),
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  'A Draft Academic Year is required before migration can begin. No Draft Academic Year exists for the upcoming session.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF475569),
+                    height: 1.45,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFBEB),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFFDE68A)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFFB45309)),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Create a Draft Academic Year first to set up student promotions and rollover structures safely.',
+                          style: TextStyle(fontSize: 11.5, color: Color(0xFF92400E), height: 1.35),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+                const Divider(color: Color(0xFFE2E8F0), height: 1),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 44,
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFFCBD5E1)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            foregroundColor: const Color(0xFF475569),
+                          ),
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text(
+                            'Cancel',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: SizedBox(
+                        height: 44,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFD97706),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _handleCreateDraftAcademicYear(null);
+                          },
+                          child: const Text(
+                            'Create Draft AY',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      return;
+    }
+
+    final activeYear = _academicYears.firstWhere(
+      (y) => (y['status'] ?? '').toString().toUpperCase() == 'ACTIVE' || y['is_current'] == 1,
+      orElse: () => selectedYear,
+    );
+
+    bool penaltyConfigured = false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token') ?? widget.leaveService.token;
+      final res = await http.get(
+        Uri.parse('${widget.leaveService.baseUrl}/api/school/late-payment-penalty-config'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+      if (res.statusCode == 200) {
+        final d = json.decode(res.body);
+        penaltyConfigured = (d is Map && (d['configured'] == true || d['data']?['configured'] == true));
+      }
+    } catch (_) {}
+
+    if (!penaltyConfigured) {
+      if (!mounted) return;
+      final proceed = await showDialog<bool>(
+        context: context,
+        barrierDismissible: true,
+        builder: (ctx) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          backgroundColor: Colors.white,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Padding(
+            padding: const EdgeInsets.all(22),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.payments_rounded,
+                        color: Color(0xFFD97706),
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.only(top: 2),
+                        child: Text(
+                          'Late Payment Penalty Alert',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF0F172A),
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  'Students with outstanding dues will be migrated without any Late Payment Penalty being applied.\n\nIf you wish to charge a penalty on pending dues, configure it before proceeding with Academic Year Migration.\n\nYou may continue the migration without configuring a penalty if your school does not wish to apply one.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF475569),
+                    height: 1.45,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                const Divider(color: Color(0xFFE2E8F0), height: 1),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 44,
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFFCBD5E1)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            foregroundColor: const Color(0xFF475569),
+                          ),
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: const Text('Cancel', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: SizedBox(
+                        height: 44,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFD97706),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onPressed: () => Navigator.pop(ctx, true),
+                          child: const Text('Continue Migration', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      if (proceed != true) return;
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token') ?? widget.leaveService.token;
+      final res = await http.get(
+        Uri.parse('${widget.leaveService.baseUrl}/api/school/financial-reports'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+      if (res.statusCode == 200) {
+        final d = json.decode(res.body);
+        List<dynamic> reports = [];
+        if (d is Map && d['reports'] is List) {
+          reports = d['reports'];
+        } else if (d is List) {
+          reports = d;
+        }
+
+        final unsettledReport = reports.firstWhere(
+          (r) => (r['status'] ?? '').toString() != 'Settled',
+          orElse: () => null,
+        );
+
+        if (unsettledReport != null) {
+          final repId = unsettledReport['report_id'] ?? 'Report';
+          final repStatus = unsettledReport['status'] ?? 'Pending';
+          if (!mounted) return;
+          showDialog(
+            context: context,
+            barrierDismissible: true,
+            builder: (ctx) => Dialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              backgroundColor: Colors.white,
+              insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+              child: Padding(
+                padding: const EdgeInsets.all(22),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEE2E2),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            Icons.error_outline_rounded,
+                            color: Color(0xFFDC2626),
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.only(top: 2),
+                            child: Text(
+                              'Unsettled Financial Report',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF0F172A),
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      'Cannot start Academic Year Migration because Financial Report \'$repId\' is currently in \'$repStatus\' status.\n\nPlease make sure all financial reports in the active session are settled or cleared before proceeding with migration.',
+                      style: const TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.45),
+                    ),
+                    const SizedBox(height: 18),
+                    const Divider(color: Color(0xFFE2E8F0), height: 1),
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 44,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFD97706),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('Understood', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+          return;
+        }
+      }
+    } catch (err) {
+      debugPrint('Failed to check financial reports: $err');
+    }
+
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AcademicYearMigrationScreen(
+          leaveService: widget.leaveService,
+          activeYear: activeYear,
+          draftYear: draftYear,
+          academicYears: _academicYears,
+          onMigrationSuccess: () async {
+            await _fetchAcademicYears();
+            if (mounted) setState(() {});
+          },
+        ),
+      ),
     );
   }
 
@@ -428,32 +1189,94 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (isLeavingActive) {
       final confirmed = await showDialog<bool>(
         context: context,
-        builder: (dialogCtx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text(
-            'Switch from active year to $nextName?',
-            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
-          ),
-          content: Text(
-            'All dashboards, fees, and student records will show $nextName data until you switch back.\n\n'
-            'Fees deposited for inactive or alumni students will be credited to the active academic year.',
-            style: const TextStyle(fontSize: 13, height: 1.4, color: Color(0xFF334155)),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogCtx, false),
-              child: const Text('Cancel', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600)),
+        barrierDismissible: true,
+        builder: (dialogCtx) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          backgroundColor: Colors.white,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Padding(
+            padding: const EdgeInsets.all(22),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.swap_horiz_rounded,
+                        color: Color(0xFFD97706),
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          'Switch to $nextName ($nextStatus)?',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF0F172A),
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'All dashboards, fees, and student records will show $nextName data until you switch back.\n\nFees deposited for inactive or alumni students will be credited to the active academic year.',
+                  style: const TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.45),
+                ),
+                const SizedBox(height: 18),
+                const Divider(color: Color(0xFFE2E8F0), height: 1),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 44,
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFFCBD5E1)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            foregroundColor: const Color(0xFF475569),
+                          ),
+                          onPressed: () => Navigator.pop(dialogCtx, false),
+                          child: const Text('Cancel', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: SizedBox(
+                        height: 44,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFD97706),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onPressed: () => Navigator.pop(dialogCtx, true),
+                          child: const Text('Switch Year', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(dialogCtx, true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFD97706),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              child: const Text('Switch Year', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          ],
+          ),
         ),
       );
 
@@ -461,7 +1284,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
 
     if (!mounted) return;
-    Navigator.pop(bottomSheetContext);
+    if (bottomSheetContext.mounted) {
+      Navigator.pop(bottomSheetContext);
+    }
     await _handleSwitchAcademicYear(nextId, nextName, nextStatus);
   }
 

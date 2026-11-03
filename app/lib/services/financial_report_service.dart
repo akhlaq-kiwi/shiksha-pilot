@@ -29,6 +29,8 @@ class FinancialReportService {
         'reports': (data['reports'] as List<dynamic>?) ?? [],
         'next_suggested_start_date': data['next_suggested_start_date']?.toString() ?? '',
         'has_previous_report': data['has_previous_report'] == true || data['has_previous_report'] == 1,
+        'from_time': data['from_time']?.toString() ?? '12:00 AM',
+        'academic_year_start_date': data['academic_year_start_date']?.toString() ?? '',
       };
     } else {
       final err = json.decode(response.body);

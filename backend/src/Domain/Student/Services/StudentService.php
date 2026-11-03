@@ -615,10 +615,13 @@ class StudentService extends BaseService
                     $totalMax += $maxM;
                 }
 
-                $isGradeSubject = ((float)$p['max_marks'] === 0.0) || ($m && !is_null($m['marks_obtained']) && $m['marks_obtained'] !== '' && !is_numeric($m['marks_obtained']) && strtoupper(trim((string)$m['marks_obtained'])) !== 'ABSENT');
+                $isGradeSubject = ((float)$p['max_marks'] === 0.0) || (($p['evaluation_type'] ?? '') === 'grade') || ($m && !is_null($m['marks_obtained']) && $m['marks_obtained'] !== '' && !is_numeric($m['marks_obtained']) && strtoupper(trim((string)$m['marks_obtained'])) !== 'ABSENT');
 
                 $subjectMarks[] = [
+                    'subject_id' => (int)($p['subject_id'] ?? 0),
                     'subject_name' => $p['subject_name'],
+                    'evaluation_type' => $isGradeSubject ? 'grade' : 'marks',
+                    'is_grade_only' => $isGradeSubject,
                     'max_marks' => $isGradeSubject ? 'GRADE' : $maxM,
                     'passing_marks' => $isGradeSubject ? 'C' : $passM,
                     'marks_obtained' => $absent ? 'ABSENT' : ($obtained !== null ? $obtained : '-'),
@@ -627,6 +630,15 @@ class StudentService extends BaseService
                     'result' => $absent ? 'FAIL' : ($obtained !== null ? ($passed ? 'PASS' : 'FAIL') : '-')
                 ];
             }
+
+            usort($subjectMarks, function($a, $b) {
+                $aGrade = !empty($a['is_grade_only']) || ($a['evaluation_type'] ?? '') === 'grade' || ($a['max_marks'] ?? '') === 'GRADE' || (float)($a['max_marks'] ?? 0) === 0.0 || $a['max_marks'] === '—' || $a['max_marks'] === '-';
+                $bGrade = !empty($b['is_grade_only']) || ($b['evaluation_type'] ?? '') === 'grade' || ($b['max_marks'] ?? '') === 'GRADE' || (float)($b['max_marks'] ?? 0) === 0.0 || $b['max_marks'] === '—' || $b['max_marks'] === '-';
+                if ($aGrade !== $bGrade) {
+                    return $aGrade ? 1 : -1;
+                }
+                return ($a['subject_id'] ?? 0) <=> ($b['subject_id'] ?? 0);
+            });
 
             // Attendance rate
             $stmtAtt = $pdo->prepare("
@@ -1121,7 +1133,7 @@ class StudentService extends BaseService
 
             $additionalFees[] = [
                 'id' => (int)$row['id'],
-                'description' => $row['fee_name'] === 'Transport Fees' ? 'Transport Fee' : $row['fee_name'],
+                'description' => strtoupper($row['fee_name'] === 'Transport Fees' ? 'Transport Fee' : $row['fee_name']),
                 'custom_description' => $row['description'] ?? '',
                 'amount' => (int)round($totalAmt),
                 'paid_amount' => (int)round($paidAmt),
@@ -1153,34 +1165,120 @@ class StudentService extends BaseService
         $pdo = $this->repo->getPdo();
 
         if ($isAdditional) {
-            $stmt = $pdo->prepare("
-                SELECT afp.*, 
-                       COALESCE(afph.amount_paid, afp.amount_paid, afp.amount) AS tx_amount_paid,
-                       COALESCE(afph.discount_amount, afp.discount_amount, 0.00) AS tx_discount_amount,
-                       s.first_name, s.last_name, s.roll_no, s.sr_no, c.name AS class_name, c.section, sch.name AS school_name, sch.logo_path, aft.name AS fee_name, ay.name AS academic_year_name
+            // Locate target payment or history record
+            $stmtTarget = $pdo->prepare("
+                SELECT 
+                    afp.id AS payment_id,
+                    afph.id AS history_id,
+                    COALESCE(afph.receipt_no, afp.receipt_no) AS receipt_no
                 FROM additional_fee_payments afp
                 LEFT JOIN additional_fee_payment_history afph ON afph.payment_id = afp.id
-                JOIN students s ON afp.student_id = s.id
-                LEFT JOIN classes c ON s.class_id = c.id
-                JOIN schools sch ON afp.school_id = sch.id
-                JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
-                LEFT JOIN academic_years ay ON s.academic_year_id = ay.id
-                WHERE afp.id = :id AND afp.student_id = :student_id AND afp.school_id = :sid
+                WHERE (afp.id = :pid OR afph.id = :hid OR afp.receipt_no = :rno OR afph.receipt_no = :rno2)
+                  AND afp.student_id = :student_id
+                  AND afp.school_id = :sid
                 ORDER BY afph.id DESC
                 LIMIT 1
             ");
-            $stmt->execute([':id' => $paymentId, ':student_id' => $studentId, ':sid' => $schoolId]);
-            $payment = $stmt->fetch(PDO::FETCH_ASSOC);
-            if (!$payment) {
+            $stmtTarget->execute([
+                ':pid' => $paymentId,
+                ':hid' => $paymentId,
+                ':rno' => (string)$paymentId,
+                ':rno2' => (string)$paymentId,
+                ':student_id' => $studentId,
+                ':sid' => $schoolId
+            ]);
+            $targetRec = $stmtTarget->fetch(PDO::FETCH_ASSOC);
+            if (!$targetRec) {
                 throw new NotFoundException('Additional fee payment record not found');
             }
-            $title = "Exam Fees"; // Default fallback
-            if (!empty($payment['fee_name'])) {
-                $title = $payment['fee_name'];
+            $targetReceiptNo = !empty($targetRec['receipt_no']) ? trim($targetRec['receipt_no']) : null;
+
+            if (!empty($targetReceiptNo)) {
+                $stmt = $pdo->prepare("
+                    SELECT 
+                        afph.id AS history_id,
+                        afp.id,
+                        COALESCE(afph.receipt_no, afp.receipt_no) AS receipt_no,
+                        COALESCE(afph.amount_paid, afp.amount_paid, afp.amount) AS tx_amount_paid,
+                        COALESCE(afph.discount_amount, afp.discount_amount, 0.00) AS tx_discount_amount,
+                        afp.amount AS gross_amount,
+                        COALESCE(afph.payment_method, afp.payment_method) AS payment_method,
+                        COALESCE(afph.collected_by, afp.collected_by) AS collected_by,
+                        COALESCE(afph.payment_date, afp.payment_date) AS payment_date,
+                        s.first_name, s.last_name, s.roll_no, s.sr_no, c.name AS class_name, c.section, sch.name AS school_name, sch.logo_path, aft.name AS fee_name, ay.name AS academic_year_name,
+                        afp.status
+                    FROM additional_fee_payments afp
+                    JOIN students s ON afp.student_id = s.id
+                    LEFT JOIN classes c ON s.class_id = c.id
+                    JOIN schools sch ON afp.school_id = sch.id
+                    JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+                    LEFT JOIN academic_years ay ON s.academic_year_id = ay.id
+                    LEFT JOIN additional_fee_payment_history afph ON (afph.payment_id = afp.id AND afph.receipt_no = :rno_h)
+                    WHERE (afph.receipt_no = :rno_1 OR afp.receipt_no = :rno_2) 
+                      AND afp.student_id = :student_id 
+                      AND afp.school_id = :sid
+                    ORDER BY afp.id ASC
+                ");
+                $stmt->execute([
+                    ':rno_h' => $targetReceiptNo,
+                    ':rno_1' => $targetReceiptNo,
+                    ':rno_2' => $targetReceiptNo,
+                    ':student_id' => $studentId,
+                    ':sid' => $schoolId
+                ]);
+                $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            } else {
+                $stmt = $pdo->prepare("
+                    SELECT 
+                        afph.id AS history_id,
+                        afp.id,
+                        COALESCE(afph.receipt_no, afp.receipt_no) AS receipt_no,
+                        COALESCE(afph.amount_paid, afp.amount_paid, afp.amount) AS tx_amount_paid,
+                        COALESCE(afph.discount_amount, afp.discount_amount, 0.00) AS tx_discount_amount,
+                        afp.amount AS gross_amount,
+                        COALESCE(afph.payment_method, afp.payment_method) AS payment_method,
+                        COALESCE(afph.collected_by, afp.collected_by) AS collected_by,
+                        COALESCE(afph.payment_date, afp.payment_date) AS payment_date,
+                        s.first_name, s.last_name, s.roll_no, s.sr_no, c.name AS class_name, c.section, sch.name AS school_name, sch.logo_path, aft.name AS fee_name, ay.name AS academic_year_name,
+                        afp.status
+                    FROM additional_fee_payments afp
+                    LEFT JOIN additional_fee_payment_history afph ON afph.payment_id = afp.id
+                    JOIN students s ON afp.student_id = s.id
+                    LEFT JOIN classes c ON s.class_id = c.id
+                    JOIN schools sch ON afp.school_id = sch.id
+                    JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+                    LEFT JOIN academic_years ay ON s.academic_year_id = ay.id
+                    WHERE afp.id = :id AND afp.student_id = :student_id AND afp.school_id = :sid
+                    ORDER BY afph.id DESC
+                    LIMIT 1
+                ");
+                $stmt->execute([':id' => $paymentId, ':student_id' => $studentId, ':sid' => $schoolId]);
+                $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
             }
-            $billingItem = "Item: " . $title;
+
+            if (empty($rows)) {
+                throw new NotFoundException('Additional fee payment record not found');
+            }
+
+            $groupedRows = [];
+            $seenPids = [];
+            foreach ($rows as $r) {
+                $pid = (int)$r['id'];
+                if (!isset($seenPids[$pid])) {
+                    $seenPids[$pid] = true;
+                    $groupedRows[] = $r;
+                }
+            }
+
+            $payment = $groupedRows[0];
+            $feeNames = array_values(array_unique(array_filter(array_column($groupedRows, 'fee_name'))));
+            $title = implode(', ', $feeNames);
+
+            $billingItem = "Description: " . $title;
             $receiptNo = !empty($payment['receipt_no']) ? $payment['receipt_no'] : ("AFP-" . str_pad((string)$payment['id'], 5, '0', STR_PAD_LEFT));
             $monthTitle = $title;
+            $payment['tx_amount_paid'] = array_sum(array_column($groupedRows, 'tx_amount_paid'));
+            $payment['tx_discount_amount'] = array_sum(array_column($groupedRows, 'tx_discount_amount'));
         } else {
             $stmt = $pdo->prepare("
                 SELECT fp.*, s.first_name, s.last_name, s.roll_no, s.sr_no, c.name AS class_name, c.section, sch.name AS school_name, sch.logo_path, ay.name AS academic_year_name, s.class_id

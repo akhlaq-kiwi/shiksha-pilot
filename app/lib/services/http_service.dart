@@ -63,11 +63,14 @@ Future<http.Response> _executeWithFallback(
       final pathAndQuery = originalUrl.hasQuery ? '${originalUrl.path}?${originalUrl.query}' : originalUrl.path;
       final targetUri = Uri.parse('$base$pathAndQuery');
 
-      final timeoutDuration = (base.contains('127.0.0.1') || base.contains('localhost'))
-          ? const Duration(milliseconds: 1500)
-          : (base.contains('10.'))
-              ? const Duration(seconds: 4)
-              : const Duration(seconds: 25);
+      final isKnownBase = (base == _inMemoryWorkingBase || base == savedBase || base == _kWifiBaseUrl);
+      final timeoutDuration = isKnownBase
+          ? const Duration(seconds: 45)
+          : (base.contains('127.0.0.1') || base.contains('localhost'))
+              ? const Duration(milliseconds: 1500)
+              : (base.contains('10.'))
+                  ? const Duration(seconds: 4)
+                  : const Duration(seconds: 25);
 
       final response = await requestFn(targetUri).timeout(timeoutDuration);
       _checkUnauthorized(response);

@@ -642,7 +642,7 @@ export default function ReportCardTemplatesPage() {
       <Dialog isOpen={isAssignModalOpen} onClose={() => setIsAssignModalOpen(false)} title="Assign Report Card Template to School">
         <form onSubmit={handleAssignSubmit} className="space-y-4 pt-2">
           <p className="text-xs text-text-secondary leading-relaxed">
-            Select a school and choose which report card template layout should be officially assigned. By default, <strong>Classic CBSE (Manage Finance & Dark Black)</strong> is pre-selected.
+            Select a school and choose which report card template layout should be officially assigned. By default, <strong>Classic CBSE (Dark Black)</strong> is pre-selected.
           </p>
 
           <div className="space-y-1.5">
@@ -676,7 +676,7 @@ export default function ReportCardTemplatesPage() {
               ))}
             </Select>
             <p className="text-[11px] text-text-muted">
-              By default, <strong>Classic CBSE (Manage Finance & Dark Black)</strong> is selected as the primary system template.
+              By default, <strong>Classic CBSE (Dark Black)</strong> is selected as the primary system template.
             </p>
           </div>
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/timetable_service.dart';
+import '../utils/class_formatter.dart';
 
 class DropdownMenuItemModel<T> {
   final T value;
@@ -127,12 +128,7 @@ class _PrincipalTimetableManageScreenState
   }
 
   String _getShortClassName(dynamic name, dynamic section) {
-    final n = (name ?? '').toString();
-    final s = (section ?? '').toString().trim();
-    if (s.isNotEmpty) {
-      return '$n - $s';
-    }
-    return n;
+    return formatShortClassName(name?.toString(), section: section?.toString());
   }
 
   Future<void> _initData() async {
@@ -150,6 +146,7 @@ class _PrincipalTimetableManageScreenState
       ]);
 
       _classes = results[0] as List<dynamic>;
+      _classes.sort(compareClassItems);
       _subjects = results[1] as List<dynamic>;
       _holidays = results[2] as List<dynamic>;
       if (results[3] != null && results[3] is Map<String, dynamic>) {

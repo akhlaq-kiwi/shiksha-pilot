@@ -1,8 +1,8 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:printing/printing.dart';
@@ -62,10 +62,22 @@ class NotificationHelper {
             // Handle file download notification click
             if (notif['type'] == 'download_complete') {
               if (_lastDownloadedBytes != null && _lastDownloadedFileName != null) {
-                await Printing.layoutPdf(
-                  onLayout: (format) async => _lastDownloadedBytes!,
-                  name: _lastDownloadedFileName!,
-                );
+                final isPdf = _lastDownloadedFileName!.toLowerCase().endsWith('.pdf');
+                if (isPdf) {
+                  await Printing.layoutPdf(
+                    onLayout: (format) async => _lastDownloadedBytes!,
+                    name: _lastDownloadedFileName!,
+                  );
+                } else {
+                  const platform = MethodChannel('com.shikshapilot.schoolhub/battery');
+                  try {
+                    await platform.invokeMethod('openFile', {
+                      'fileName': _lastDownloadedFileName,
+                    });
+                  } catch (e) {
+                    debugPrint('Error opening downloaded file: $e');
+                  }
+                }
               }
               return;
             }

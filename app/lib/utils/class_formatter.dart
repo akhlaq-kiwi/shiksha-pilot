@@ -21,9 +21,9 @@ String formatShortClassName(String? rawName, {String? section}) {
     name = 'PNC';
   } else if (lower.contains('nursery') || lower == 'nc' || lower == 'nur') {
     name = 'NC';
-  } else if (lower.contains('lowerkindergarten') || lower.contains('lowerkg') || lower == 'lkg') {
+  } else if (lower.contains('lowerkindergarten') || lower.contains('lowerkg') || lower.contains('juniorkg') || lower.contains('jrkg') || lower == 'lkg') {
     name = 'LKG';
-  } else if (lower.contains('upperkindergarten') || lower.contains('upperkg') || lower == 'ukg') {
+  } else if (lower.contains('upperkindergarten') || lower.contains('upperkg') || lower.contains('seniorkg') || lower.contains('srkg') || lower == 'ukg') {
     name = 'UKG';
   } else if (lower.contains('kindergarten') || lower == 'kg') {
     name = 'KG';
@@ -34,8 +34,8 @@ String formatShortClassName(String? rawName, {String? section}) {
   // 3. Format section cleanly if passed
   final secStr = section?.trim() ?? '';
   if (secStr.isNotEmpty) {
-    if (!name.endsWith('-$secStr') && !name.endsWith(' $secStr')) {
-      return '$name-$secStr';
+    if (!name.endsWith(' - $secStr') && !name.endsWith('-$secStr') && !name.endsWith(' $secStr')) {
+      return '$name - $secStr';
     }
   }
 
@@ -48,22 +48,22 @@ int getClassSortRank(String? rawName) {
   if (rawName == null || rawName.trim().isEmpty) return 999;
   final lower = rawName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
 
-  if (lower.contains('playgroup') || lower == 'pg') {
+  if (lower.contains('playgroup') || lower.contains('play') || lower == 'pg' || lower == 'classpg') {
     return 1;
   }
-  if (lower.contains('prenursery') || lower.contains('prenur') || lower == 'pnc' || lower == 'pnur') {
+  if (lower.contains('prenursery') || lower.contains('prenur') || lower.contains('pnc') || lower.contains('pnur')) {
     return 2;
   }
-  if (lower.contains('nursery') || lower == 'nc') {
+  if (lower.contains('nursery') || lower.contains('nur') || lower == 'nc' || lower == 'classnc') {
     return 3;
   }
-  if (lower.contains('lowerkindergarten') || lower.contains('lowerkg') || lower == 'lkg') {
+  if (lower.contains('lowerkindergarten') || lower.contains('lowerkg') || lower.contains('juniorkg') || lower.contains('jrkg') || lower.contains('lkg')) {
     return 4;
   }
-  if (lower.contains('upperkindergarten') || lower.contains('upperkg') || lower == 'ukg') {
+  if (lower.contains('upperkindergarten') || lower.contains('upperkg') || lower.contains('seniorkg') || lower.contains('srkg') || lower.contains('ukg')) {
     return 5;
   }
-  if (lower.contains('kindergarten') || lower == 'kg') {
+  if (lower.contains('kindergarten') || lower.contains('kg')) {
     return 6;
   }
 

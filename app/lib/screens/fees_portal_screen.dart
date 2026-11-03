@@ -1408,7 +1408,7 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: const [
                     Text(
-                      'OPEN LEDGER',
+                      'FEES CARD',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w800,
@@ -1649,7 +1649,7 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
     final List<Map<String, dynamic>> processedAdditional = [];
     for (final item in rawAdditional) {
       final id = int.tryParse(item['id']?.toString() ?? '0') ?? 0;
-      final feeName = (item['fee_name'] ?? 'Additional Fee').toString();
+      final feeName = (item['fee_name'] ?? 'Additional Fee').toString().trim().toUpperCase();
       final total = double.tryParse(item['amount']?.toString() ?? '0') ?? 0.0;
       final paid = double.tryParse(item['amount_paid']?.toString() ?? '0') ?? 0.0;
       final disc = double.tryParse(item['discount_amount']?.toString() ?? '0') ?? 0.0;
@@ -1895,134 +1895,189 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
 
                 // TAB 0: MONTHLY TUITION BREAKDOWN
                 if (_selectedLedgerTab == 0) ...[
-                  const Text(
-                    'Monthly Tuition Fees Breakdown',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF1E293B)),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Monthly Tuition Fees Breakdown',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF1E293B)),
+                      ),
+                      if (monthRows.where((m) => (m['status'] as String) != 'PAID' && (m['fee'] as num) > 0).isNotEmpty)
+                        Text(
+                          '${monthRows.where((m) => (m['status'] as String) != 'PAID' && (m['fee'] as num) > 0).length} Unpaid',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFD97706)),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 10),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: monthRows.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                      itemBuilder: (context, index) {
-                        final mRow = monthRows[index];
-                        final mStatus = mRow['status'] as String;
-                        final isPaid = mStatus == 'PAID';
-                        final isPartial = mStatus == 'PARTIAL';
-                        final monthPayments = payments
-                            .where((p) => (p['fee_month'] ?? '').toString().trim().toLowerCase() == (mRow['month'] as String).toLowerCase())
-                            .map((p) => {
-                                  if (p is Map) ...Map<String, dynamic>.from(p),
-                                  'remaining': mRow['remaining'],
-                                  'fee': mRow['fee'],
-                                })
-                            .toList();
+                  ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: monthRows.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemBuilder: (context, index) {
+                      final mRow = monthRows[index];
+                      final monthName = (mRow['month'] as String);
+                      final mStatus = mRow['status'] as String;
+                      final isPaid = mStatus == 'PAID';
+                      final isPartial = mStatus == 'PARTIAL';
+                      final fee = (mRow['fee'] as num).round();
+                      final paid = (mRow['paid'] as num).round();
+                      final rem = (mRow['remaining'] as num).round();
+                      final monthPayments = payments
+                          .where((p) => (p['fee_month'] ?? '').toString().trim().toLowerCase() == monthName.toLowerCase())
+                          .map((p) => {
+                                if (p is Map) ...Map<String, dynamic>.from(p),
+                                'remaining': mRow['remaining'],
+                                'fee': mRow['fee'],
+                              })
+                          .toList();
 
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                          child: Row(
-                            children: [
-                              SizedBox(
-                                width: 85,
-                                child: Text(
-                                  mRow['month'],
-                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                      return Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: !isPaid ? const Color(0xFFFED7AA) : const Color(0xFFE2E8F0),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    monthName.toUpperCase(),
+                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                                  ),
                                 ),
-                              ),
-                              Expanded(
-                                child: Column(
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 62,
+                                      height: 24,
+                                      alignment: Alignment.center,
+                                      decoration: BoxDecoration(
+                                        color: isPaid
+                                            ? const Color(0xFFD1FAE5)
+                                            : isPartial
+                                                ? const Color(0xFFDBEAFE)
+                                                : const Color(0xFFFEF3C7),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        mStatus,
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: 0.3,
+                                          color: isPaid
+                                              ? const Color(0xFF065F46)
+                                              : isPartial
+                                                  ? const Color(0xFF1E40AF)
+                                                  : const Color(0xFF92400E),
+                                        ),
+                                      ),
+                                    ),
+                                    if (isPaid || isPartial) ...[
+                                      const SizedBox(width: 6),
+                                      InkWell(
+                                        onTap: () {
+                                          final curRnos = monthPayments
+                                              .map((p) => p['receipt_no']?.toString().trim())
+                                              .where((r) => r != null && r.isNotEmpty)
+                                              .toSet();
+                                          List<dynamic> allMatchingPayments = monthPayments;
+                                          if (curRnos.isNotEmpty) {
+                                            final matches = payments.where((p) {
+                                              final r = p['receipt_no']?.toString().trim();
+                                              return r != null && curRnos.contains(r);
+                                            }).toList();
+                                            if (matches.isNotEmpty) {
+                                              allMatchingPayments = matches;
+                                            }
+                                          }
+                                          _showReceiptBottomSheet(
+                                            studentInfo: studentInfo,
+                                            title: '$monthName Tuition Fee',
+                                            payments: allMatchingPayments,
+                                            isAdditional: false,
+                                          );
+                                        },
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Container(
+                                          width: 28,
+                                          height: 24,
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFFFFBEB),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: const Color(0xFFFDE68A)),
+                                          ),
+                                          child: const Icon(
+                                            Icons.receipt_long_rounded,
+                                            size: 14,
+                                            color: Color(0xFFB45309),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ],
+                            ),
+                            const Divider(height: 16, color: Color(0xFFF1F5F9)),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      (mRow['paid'] is num && mRow['paid'] > 0)
-                                          ? 'Fee: ₹${mRow['fee']}  •  Paid: ₹${mRow['paid']}'
-                                          : 'Fee: ₹${mRow['fee']}',
+                                      paid > 0
+                                          ? 'Amount: ₹$fee  •  Paid: ₹$paid'
+                                          : 'Amount: ₹$fee',
                                       style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
                                     ),
-                                    if (!isPaid)
-                                      Text(
-                                        'Due: ₹${mRow['remaining']}',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w800,
-                                          color: isPartial ? Colors.blue.shade700 : const Color(0xFFDC2626),
-                                        ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      rem > 0 ? 'Due: ₹$rem' : 'Paid in Full',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w800,
+                                        color: rem > 0 ? const Color(0xFFDC2626) : const Color(0xFF10B981),
                                       ),
+                                    ),
                                   ],
                                 ),
-                              ),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    width: 62,
-                                    height: 24,
-                                    alignment: Alignment.center,
-                                    decoration: BoxDecoration(
-                                      color: isPaid
-                                          ? const Color(0xFFD1FAE5)
-                                          : isPartial
-                                              ? const Color(0xFFDBEAFE)
-                                              : const Color(0xFFFEF3C7),
-                                      borderRadius: BorderRadius.circular(8),
+                                if (rem > 0.01)
+                                  ElevatedButton(
+                                    onPressed: () => _openDepositModal(
+                                      student: studentInfo,
+                                      payments: payments,
+                                      classFeeConfig: _studentDetail['class_fee_config'] ?? studentInfo['class_fee_config'],
+                                      initialSelectedMonth: monthName,
                                     ),
-                                    child: Text(
-                                      mStatus,
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 9.5,
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing: 0.3,
-                                        color: isPaid
-                                            ? const Color(0xFF065F46)
-                                            : isPartial
-                                                ? const Color(0xFF1E40AF)
-                                                : const Color(0xFF92400E),
-                                      ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFFD97706),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                      minimumSize: Size.zero,
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                     ),
+                                    child: const Text('Deposit', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
                                   ),
-                                  if (isPaid || isPartial) ...[
-                                    const SizedBox(width: 6),
-                                    InkWell(
-                                      onTap: () {
-                                        _showReceiptBottomSheet(
-                                          studentInfo: studentInfo,
-                                          title: '${mRow['month']} Tuition Fee',
-                                          payments: monthPayments,
-                                          isAdditional: false,
-                                        );
-                                      },
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Container(
-                                        width: 28,
-                                        height: 24,
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFFFFBEB),
-                                          borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(color: const Color(0xFFFDE68A)),
-                                        ),
-                                        child: const Icon(
-                                          Icons.receipt_long_rounded,
-                                          size: 14,
-                                          color: Color(0xFFB45309),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                   ),
                 ],
 
@@ -2099,7 +2154,7 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
                                 children: [
                                   Expanded(
                                     child: Text(
-                                      title,
+                                      title.toUpperCase(),
                                       style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
                                     ),
                                   ),
@@ -2137,19 +2192,39 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
                                         const SizedBox(width: 6),
                                         InkWell(
                                           onTap: () {
+                                            final rawMap = af['raw'] is Map ? Map<String, dynamic>.from(af['raw']) : Map<String, dynamic>.from(af);
+                                            final curRno = (rawMap['receipt_no'] ?? af['receipt_no'] ?? '').toString().trim();
+                                            List<Map<String, dynamic>> matchingFees = [];
+                                            if (curRno.isNotEmpty) {
+                                              matchingFees = processedAdditional.where((item) {
+                                                final iRaw = item['raw'] is Map ? Map<String, dynamic>.from(item['raw']) : Map<String, dynamic>.from(item);
+                                                final r = (iRaw['receipt_no'] ?? item['receipt_no'] ?? '').toString().trim();
+                                                return r == curRno;
+                                              }).toList();
+                                            }
+                                            if (matchingFees.isEmpty) {
+                                              matchingFees = [af];
+                                            }
+
+                                            final names = matchingFees
+                                                .map((f) => (f['fee_name'] ?? 'Additional Fee').toString().trim())
+                                                .where((n) => n.isNotEmpty)
+                                                .toSet()
+                                                .toList();
+                                            final combinedTitle = names.join(', ');
+
                                             _showReceiptBottomSheet(
                                               studentInfo: studentInfo,
-                                              title: title,
-                                              payments: [
-                                                {
-                                                  if (af['raw'] is Map)
-                                                    ...Map<String, dynamic>.from(af['raw'])
-                                                  else
-                                                    ...Map<String, dynamic>.from(af),
-                                                  'remaining': rem,
-                                                  'fee': total,
-                                                }
-                                              ],
+                                              title: combinedTitle.isNotEmpty ? combinedTitle : title,
+                                              payments: matchingFees.map((f) {
+                                                final fRaw = f['raw'] is Map ? Map<String, dynamic>.from(f['raw']) : Map<String, dynamic>.from(f);
+                                                return {
+                                                  ...fRaw,
+                                                  'fee_name': f['fee_name'],
+                                                  'remaining': f['remaining'],
+                                                  'fee': f['amount'] ?? f['fee'],
+                                                };
+                                              }).toList(),
                                               isAdditional: true,
                                             );
                                           },
@@ -2306,6 +2381,7 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
     required Map<String, dynamic> student,
     required List<dynamic> payments,
     required dynamic classFeeConfig,
+    String? initialSelectedMonth,
   }) {
     showDialog(
       context: context,
@@ -2317,6 +2393,7 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
           payments: payments,
           classFeeConfig: classFeeConfig,
           feeService: widget.feeService,
+          initialSelectedMonth: initialSelectedMonth,
           onSuccess: () {
             _fetchDetail();
             widget.onPaymentSuccess();
@@ -2557,6 +2634,91 @@ class _ReceiptShareSheetState extends State<_ReceiptShareSheet> {
     final rollNo = (widget.studentInfo['roll_no'] ?? '—').toString();
     final srNo = (widget.studentInfo['sr_no'] ?? '—').toString();
 
+    // Consolidate payments by receipt_no so multiple additional fees deposited in 1 transaction form 1 single receipt slip!
+    final List<Map<String, dynamic>> consolidatedSlips = [];
+    final Map<String, List<Map<String, dynamic>>> byReceipt = {};
+    final List<Map<String, dynamic>> noReceipt = [];
+
+    for (final rawP in widget.payments) {
+      if (rawP is! Map) continue;
+      final p = Map<String, dynamic>.from(rawP);
+      final rno = (p['receipt_no'] ?? '').toString().trim();
+      if (rno.isNotEmpty && rno != '—' && !rno.startsWith('REC-0')) {
+        byReceipt.putIfAbsent(rno, () => []).add(p);
+      } else {
+        noReceipt.add(p);
+      }
+    }
+
+    for (final entry in byReceipt.entries) {
+      final rno = entry.key;
+      final group = entry.value;
+      final first = group.first;
+      final primaryPid = int.tryParse(first['id']?.toString() ?? '0') ?? 0;
+
+      final totalAmt = group.fold<double>(0.0, (sum, item) {
+        final amt = double.tryParse(item['amount_paid']?.toString() ?? item['amount']?.toString() ?? '0') ?? 0.0;
+        return sum + amt;
+      });
+      final totalDisc = group.fold<double>(0.0, (sum, item) {
+        return sum + (double.tryParse(item['discount_amount']?.toString() ?? '0') ?? 0.0);
+      });
+      final totalRem = group.fold<double>(0.0, (sum, item) {
+        return sum + (double.tryParse(item['remaining']?.toString() ?? '0') ?? 0.0);
+      });
+
+      String desc = '';
+      if (widget.isAdditional) {
+        final names = group
+            .map((item) => (item['fee_name'] ?? item['name'] ?? item['fee_month'] ?? '').toString().trim())
+            .where((n) => n.isNotEmpty)
+            .toSet()
+            .toList();
+        desc = names.isNotEmpty ? names.join(', ') : widget.title;
+      } else {
+        final months = group
+            .map((item) => (item['fee_month'] ?? item['month'] ?? '').toString().trim())
+            .where((m) => m.isNotEmpty)
+            .toSet()
+            .toList();
+        desc = months.isNotEmpty ? months.join(', ') : widget.title;
+      }
+
+      final hasPartial = group.any((item) {
+        final st = (item['status'] ?? '').toString().toUpperCase();
+        return st.contains('PART');
+      });
+
+      consolidatedSlips.add({
+        'id': primaryPid,
+        'receipt_no': rno,
+        'amount_paid': totalAmt,
+        'discount_amount': totalDisc,
+        'remaining': totalRem,
+        'status': hasPartial ? 'PARTIAL' : 'PAID',
+        'collected_by': first['collected_by'] ?? 'ADMIN',
+        'payment_date': first['payment_date'] ?? first['created_at'],
+        'created_at': first['created_at'],
+        'description': desc,
+      });
+    }
+
+    for (final p in noReceipt) {
+      final pid = int.tryParse(p['id']?.toString() ?? '0') ?? 0;
+      final desc = widget.isAdditional
+          ? (p['fee_name'] ?? widget.title).toString()
+          : (p['fee_month'] ?? widget.title).toString();
+      consolidatedSlips.add({
+        ...p,
+        'id': pid,
+        'description': desc,
+      });
+    }
+
+    final headerTitle = (consolidatedSlips.length == 1 && (consolidatedSlips.first['description'] ?? '').toString().isNotEmpty)
+        ? consolidatedSlips.first['description'].toString()
+        : widget.title;
+
     return Container(
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.88,
@@ -2602,7 +2764,9 @@ class _ReceiptShareSheetState extends State<_ReceiptShareSheet> {
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
                       ),
                       Text(
-                        widget.title,
+                        headerTitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
                       ),
                     ],
@@ -2655,7 +2819,7 @@ class _ReceiptShareSheetState extends State<_ReceiptShareSheet> {
                   ),
                   const SizedBox(height: 14),
 
-                  if (widget.payments.isEmpty)
+                  if (consolidatedSlips.isEmpty)
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 16),
@@ -2676,7 +2840,7 @@ class _ReceiptShareSheetState extends State<_ReceiptShareSheet> {
                       ),
                     )
                   else
-                    ...widget.payments.map((p) {
+                    ...consolidatedSlips.map((p) {
                       final pid = int.tryParse(p['id']?.toString() ?? '0') ?? 0;
                       var receiptNo = (p['receipt_no'] ?? (pid > 0 ? 'REC-$pid' : '—')).toString();
                       if (receiptNo.length == 15 && RegExp(r'^\d{15}$').hasMatch(receiptNo)) {
@@ -2698,6 +2862,7 @@ class _ReceiptShareSheetState extends State<_ReceiptShareSheet> {
                       final rawStatus = (p['status'] ?? (widget.isAdditional ? 'Paid' : 'PAID')).toString().toUpperCase();
                       final isPart = rawStatus.contains('PART');
                       final isSharing = _loadingPaymentId == pid;
+                      final itemDescription = (p['description'] ?? '').toString().trim();
 
                       return Container(
                         margin: const EdgeInsets.only(bottom: 12),
@@ -2795,6 +2960,33 @@ class _ReceiptShareSheetState extends State<_ReceiptShareSheet> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
+                                  if (itemDescription.isNotEmpty) ...[
+                                    Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                                      margin: const EdgeInsets.only(bottom: 12),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF8FAFC),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                                      ),
+                                      child: Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            widget.isAdditional ? 'Description: ' : 'Billing Months: ',
+                                            style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w700),
+                                          ),
+                                          Expanded(
+                                            child: Text(
+                                              itemDescription,
+                                              style: const TextStyle(fontSize: 11.5, color: Color(0xFF0F172A), fontWeight: FontWeight.w800),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     crossAxisAlignment: CrossAxisAlignment.center,
@@ -2877,7 +3069,7 @@ class _ReceiptShareSheetState extends State<_ReceiptShareSheet> {
                                     child: ElevatedButton.icon(
                                       onPressed: (pid <= 0 || isSharing)
                                           ? null
-                                          : () => _shareReceipt(pid, receiptNo, widget.title),
+                                          : () => _shareReceipt(pid, receiptNo, itemDescription.isNotEmpty ? itemDescription : widget.title),
                                       icon: isSharing
                                           ? const SizedBox(
                                               width: 16,
@@ -2904,7 +3096,7 @@ class _ReceiptShareSheetState extends State<_ReceiptShareSheet> {
                           ],
                         ),
                       );
-                    }).toList(),
+                    }),
                 ],
               ),
             ),
@@ -2912,6 +3104,30 @@ class _ReceiptShareSheetState extends State<_ReceiptShareSheet> {
         ],
       ),
     );
+  }
+}
+
+class MaxIntInputFormatter extends TextInputFormatter {
+  final int Function() maxGetter;
+  MaxIntInputFormatter(this.maxGetter);
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.isEmpty) {
+      return newValue;
+    }
+    final int? val = int.tryParse(newValue.text);
+    if (val == null) {
+      return oldValue;
+    }
+    final int max = maxGetter();
+    if (max >= 0 && val > max) {
+      return oldValue;
+    }
+    return newValue;
   }
 }
 
@@ -2925,6 +3141,7 @@ class _DepositDialog extends StatefulWidget {
   final dynamic classFeeConfig;
   final FeeService feeService;
   final VoidCallback onSuccess;
+  final String? initialSelectedMonth;
 
   const _DepositDialog({
     Key? key,
@@ -2934,6 +3151,7 @@ class _DepositDialog extends StatefulWidget {
     required this.classFeeConfig,
     required this.feeService,
     required this.onSuccess,
+    this.initialSelectedMonth,
   }) : super(key: key);
 
   @override
@@ -2968,7 +3186,25 @@ class _DepositDialogState extends State<_DepositDialog> {
     super.initState();
     _loadWorkingAy();
     _initMonthlyConfig();
-    _autoSelectEarliestUnpaid();
+    final partial = _getPartialMonth();
+    if (widget.initialSelectedMonth != null) {
+      if (partial != null && widget.initialSelectedMonth != partial) {
+        _errorMessage = 'Month $partial has a remaining balance of ₹${_getRemainingFee(partial).round()} and must be deposited separately first.';
+        _selectedMonths.add(partial);
+        final rem = _getRemainingFee(partial).round();
+        _depositAmounts[partial] = rem;
+        _partialAmountController.text = rem.toString();
+      } else if (!_isMonthFullyPaid(widget.initialSelectedMonth!)) {
+        _selectedMonths.add(widget.initialSelectedMonth!);
+        final rem = _getRemainingFee(widget.initialSelectedMonth!).round();
+        _depositAmounts[widget.initialSelectedMonth!] = rem;
+        _partialAmountController.text = rem.toString();
+      } else {
+        _autoSelectEarliestUnpaid();
+      }
+    } else {
+      _autoSelectEarliestUnpaid();
+    }
   }
 
   Future<void> _loadWorkingAy() async {
@@ -3131,6 +3367,11 @@ class _DepositDialogState extends State<_DepositDialog> {
           _partialAmountController.text = _depositAmounts[m].toString();
         }
       }
+      final gross = _calculateGrossTotal();
+      final currentDisc = int.tryParse(_discountController.text.trim()) ?? 0;
+      if (currentDisc > gross) {
+        _discountController.text = gross > 0 ? gross.toString() : '';
+      }
     });
   }
 
@@ -3186,8 +3427,8 @@ class _DepositDialogState extends State<_DepositDialog> {
       if (disc < 0) {
         return 'Please enter a valid positive whole number for discount amount.';
       }
-      if (disc >= gross) {
-        return 'Discount amount (₹$disc) must be less than payable fee (₹$gross).';
+      if (disc > gross) {
+        return 'Discount amount (₹$disc) cannot exceed payable fee (₹$gross).';
       }
     }
 
@@ -3393,7 +3634,10 @@ class _DepositDialogState extends State<_DepositDialog> {
                             TextField(
                               controller: _discountController,
                               keyboardType: TextInputType.number,
-                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                                MaxIntInputFormatter(() => _calculateGrossTotal()),
+                              ],
                               onChanged: (_) => setState(() => _errorMessage = ''),
                               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                               decoration: InputDecoration(
@@ -3634,7 +3878,10 @@ class _DepositDialogState extends State<_DepositDialog> {
                                                   child: TextField(
                                                     controller: _partialAmountController,
                                                     keyboardType: TextInputType.number,
-                                                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                                    inputFormatters: [
+                                                      FilteringTextInputFormatter.digitsOnly,
+                                                      MaxIntInputFormatter(() => remaining.round()),
+                                                    ],
                                                     textAlign: TextAlign.center,
                                                     style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
                                                     decoration: const InputDecoration(
@@ -3885,6 +4132,11 @@ class _AdditionalDepositModalState extends State<_AdditionalDepositModal> {
           _partialAmountController.text = rem.toString();
         }
       }
+      final gross = _calculateGrossTotal();
+      final currentDisc = int.tryParse(_discountController.text.trim()) ?? 0;
+      if (currentDisc > gross) {
+        _discountController.text = gross > 0 ? gross.toString() : '';
+      }
     });
   }
 
@@ -3951,8 +4203,8 @@ class _AdditionalDepositModalState extends State<_AdditionalDepositModal> {
       if (disc < 0) {
         return 'Please enter a valid positive whole number for discount amount.';
       }
-      if (disc >= gross) {
-        return 'Discount amount (₹$disc) must be less than payable fee (₹$gross).';
+      if (disc > gross) {
+        return 'Discount amount (₹$disc) cannot exceed payable fee (₹$gross).';
       }
     }
 
@@ -4129,7 +4381,10 @@ class _AdditionalDepositModalState extends State<_AdditionalDepositModal> {
                             TextField(
                               controller: _discountController,
                               keyboardType: TextInputType.number,
-                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                                MaxIntInputFormatter(() => _calculateGrossTotal()),
+                              ],
                               onChanged: (_) => setState(() => _errorMessage = ''),
                               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                               decoration: InputDecoration(
@@ -4354,7 +4609,10 @@ class _AdditionalDepositModalState extends State<_AdditionalDepositModal> {
                                                   child: TextField(
                                                     controller: _partialAmountController,
                                                     keyboardType: TextInputType.number,
-                                                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                                    inputFormatters: [
+                                                      FilteringTextInputFormatter.digitsOnly,
+                                                      MaxIntInputFormatter(() => rem),
+                                                    ],
                                                     textAlign: TextAlign.center,
                                                     style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
                                                     decoration: const InputDecoration(

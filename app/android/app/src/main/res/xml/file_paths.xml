@@ -3,4 +3,5 @@
     <cache-path name="shared_receipts" path="." />
     <external-cache-path name="external_shared_receipts" path="." />
     <external-files-path name="external_files" path="." />
+    <external-path name="external_storage" path="." />
 </paths>

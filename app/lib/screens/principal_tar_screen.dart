@@ -1104,112 +1104,396 @@ class _PrincipalTarScreenState extends State<PrincipalTarScreen> with SingleTick
   // ---------------------------------------------------------------------------
   // Date Breakdown Bottom Sheet (Without 4 top boxes, with 4 tabs including Late Days)
   // ---------------------------------------------------------------------------
+  final Set<String> _markingDates = {};
+
   void _showTeacherMonthlyBreakdown(dynamic teacher) {
     final name = teacher['name'] ?? 'Teacher';
     final empId = teacher['emp_id'] ?? '';
-    final presentDates = (teacher['present_dates'] as List<dynamic>?) ?? [];
-    final absentDates = (teacher['absent_dates'] as List<dynamic>?) ?? [];
-    final leaveDates = (teacher['leave_dates'] as List<dynamic>?) ?? [];
-    final lateDates = (teacher['late_dates'] as List<dynamic>?) ?? [];
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) {
-        return Container(
-          height: MediaQuery.of(context).size.height * 0.75,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            children: [
-              // Sheet handle
-              Container(
-                margin: const EdgeInsets.only(top: 10, bottom: 6),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
+      builder: (bottomSheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final presentDates = (teacher['present_dates'] as List<dynamic>?) ?? [];
+            final absentDates = (teacher['absent_dates'] as List<dynamic>?) ?? [];
+            final leaveDates = (teacher['leave_dates'] as List<dynamic>?) ?? [];
+            final lateDates = (teacher['late_dates'] as List<dynamic>?) ?? [];
+
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.78,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              // Sheet Header
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                child: Row(
-                  children: [
-                    Expanded(
+              child: Column(
+                children: [
+                  // Sheet handle
+                  Container(
+                    margin: const EdgeInsets.only(top: 10, bottom: 6),
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  // Sheet Header
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                name,
+                                style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '$empId • Attendance Breakdown',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF64748B),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+
+                  // 4 Tabs: Present, Absent, Leave, Late Days
+                  Expanded(
+                    child: DefaultTabController(
+                      length: 4,
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            name,
-                            style: const TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFF0F172A),
+                          Container(
+                            color: Colors.white,
+                            child: TabBar(
+                              splashFactory: NoSplash.splashFactory,
+                              overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+                              labelColor: const Color(0xFF0F766E),
+                              unselectedLabelColor: const Color(0xFF64748B),
+                              indicatorColor: const Color(0xFF0F766E),
+                              labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+                              labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+                              unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                              tabs: [
+                                Tab(text: 'Present (${presentDates.length})'),
+                                Tab(text: 'Absent (${absentDates.length})'),
+                                Tab(text: 'Leave (${leaveDates.length})'),
+                                Tab(text: 'Late Days (${lateDates.length})'),
+                              ],
                             ),
                           ),
-                          Text(
-                            '$empId • Attendance Breakdown',
-                            style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                          const Divider(height: 1),
+                          Expanded(
+                            child: Container(
+                              color: const Color(0xFFF8FAFC),
+                              child: TabBarView(
+                                children: [
+                                  _buildDateList(
+                                    presentDates,
+                                    teacher,
+                                    setSheetState,
+                                    isPresentTab: true,
+                                  ),
+                                  _buildDateList(
+                                    absentDates,
+                                    teacher,
+                                    setSheetState,
+                                    isAbsentTab: true,
+                                  ),
+                                  _buildDateList(
+                                    leaveDates,
+                                    teacher,
+                                    setSheetState,
+                                    isLeaveTab: true,
+                                  ),
+                                  _buildDateList(
+                                    lateDates,
+                                    teacher,
+                                    setSheetState,
+                                    isLateTab: true,
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ],
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.close_rounded),
-                      onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showMarkPresentConfirmDialog(
+    dynamic teacher,
+    dynamic item,
+    void Function(void Function()) setSheetState,
+  ) {
+    final staffName = teacher['name'] ?? 'Teacher';
+    final dateStr = (item['date'] as String?) ?? '';
+    final formattedDate = _formatBreakdownDate(dateStr);
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: Colors.white,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: Padding(
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.how_to_reg_rounded,
+                      color: Color(0xFFD97706),
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.only(top: 2),
+                      child: Text(
+                        'Mark as Present?',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF0F172A),
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              RichText(
+                text: TextSpan(
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF475569),
+                    height: 1.45,
+                  ),
+                  children: [
+                    const TextSpan(text: 'Are you sure you want to mark '),
+                    TextSpan(
+                      text: staffName,
+                      style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                    ),
+                    const TextSpan(text: ' as Present on '),
+                    TextSpan(
+                      text: formattedDate,
+                      style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                    ),
+                    const TextSpan(text: '?'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFFBEB),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFFDE68A)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFFB45309)),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'This will update the teacher\'s attendance record to Present (On Time) and recalculate the monthly report.',
+                        style: TextStyle(fontSize: 11.5, color: Color(0xFF92400E), height: 1.35),
+                      ),
                     ),
                   ],
                 ),
               ),
-              const Divider(height: 1),
-
-              // 4 Tabs: Present, Absent, Leave, Late Days (The 4 top boxes removed per instruction)
-              Expanded(
-                child: DefaultTabController(
-                  length: 4,
-                  child: Column(
-                    children: [
-                      TabBar(
-                        splashFactory: NoSplash.splashFactory,
-                        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
-                        labelColor: const Color(0xFF0F766E),
-                        unselectedLabelColor: const Color(0xFF64748B),
-                        indicatorColor: const Color(0xFF0F766E),
-                        labelPadding: const EdgeInsets.symmetric(horizontal: 2),
-                        labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11.5),
-                        unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11.5),
-                        tabs: [
-                          Tab(text: 'Present (${presentDates.length})'),
-                          Tab(text: 'Absent (${absentDates.length})'),
-                          Tab(text: 'Leave (${leaveDates.length})'),
-                          Tab(text: 'Late Days (${lateDates.length})'),
-                        ],
-                      ),
-                      const Divider(height: 1),
-                      Expanded(
-                        child: TabBarView(
-                          children: [
-                            _buildDateList(presentDates, isPresentTab: true),
-                            _buildDateList(absentDates),
-                            _buildDateList(leaveDates),
-                            _buildDateList(lateDates, isLateTab: true),
-                          ],
+              const SizedBox(height: 18),
+              const Divider(color: Color(0xFFE2E8F0), height: 1),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 44,
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFFCBD5E1)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          foregroundColor: const Color(0xFF475569),
+                        ),
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
-                    ],
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: SizedBox(
+                      height: 44,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFD97706),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _executeMarkPresent(teacher, item, setSheetState);
+                        },
+                        child: const Text(
+                          'Mark Present',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-        );
-      },
+        ),
+      ),
     );
+  }
+
+  Future<void> _executeMarkPresent(
+    dynamic teacher,
+    dynamic item,
+    void Function(void Function()) setSheetState,
+  ) async {
+    final staffId = teacher['staff_id'] ?? teacher['id'];
+    final dateStr = (item['date'] as String?) ?? '';
+    if (staffId == null || dateStr.isEmpty) return;
+
+    setSheetState(() {
+      _markingDates.add(dateStr);
+    });
+
+    final teacherName = teacher['staff_name'] ?? teacher['name'] ?? 'Teacher';
+    final url = Uri.parse('${widget.leaveService.baseUrl}/api/school/teacher-attendance');
+    try {
+      final res = await http_service.post(
+        url,
+        headers: {
+          'Authorization': 'Bearer ${widget.leaveService.token}',
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: json.encode({
+          'date': dateStr,
+          'records': [
+            {
+              'staff_id': staffId,
+              'status': 'Present',
+              'is_status_changed': true,
+            }
+          ],
+        }),
+      );
+
+      if (res.statusCode == 200) {
+        _showSnackBar('$teacherName marked as Present for $dateStr');
+
+        final absentDates = (teacher['absent_dates'] as List<dynamic>?) ?? [];
+        final presentDates = (teacher['present_dates'] as List<dynamic>?) ?? [];
+
+        absentDates.removeWhere((x) => x['date'] == dateStr);
+        presentDates.add({
+          'date': dateStr,
+          'status': 'Present',
+          'entry_time': '08:30 AM',
+          'official_entry_time': '08:30 AM',
+          'diff_text': 'On Time',
+          'is_late': false,
+          'is_early': false,
+        });
+
+        presentDates.sort((a, b) => (a['date'] ?? '').toString().compareTo((b['date'] ?? '').toString()));
+
+        final int currentPresent = int.tryParse(teacher['present_days']?.toString() ?? '0') ?? 0;
+        final int currentAbsent = int.tryParse(teacher['absent_days']?.toString() ?? '0') ?? 0;
+        final int totalWorking = int.tryParse(teacher['total_working_days']?.toString() ?? '0') ?? 0;
+
+        teacher['present_days'] = currentPresent + 1;
+        teacher['absent_days'] = (currentAbsent - 1).clamp(0, 999);
+        if (totalWorking > 0) {
+          teacher['attendance_percentage'] = double.parse(((teacher['present_days'] / totalWorking) * 100).toStringAsFixed(1));
+        }
+
+        setSheetState(() {});
+
+        _fetchMonthlyReport();
+        if (_dailyData != null) {
+          _fetchDailyAttendance();
+        }
+      } else {
+        String msg = 'Failed to mark attendance';
+        try {
+          final body = json.decode(res.body);
+          msg = body['message'] ?? body['error'] ?? msg;
+        } catch (_) {}
+        _showSnackBar(msg, isError: true);
+      }
+    } catch (e) {
+      _showSnackBar('Error marking attendance: $e', isError: true);
+    } finally {
+      setSheetState(() {
+        _markingDates.remove(dateStr);
+      });
+    }
   }
 
   String _formatBreakdownDate(String dateStr) {
@@ -1222,6 +1506,27 @@ class _PrincipalTarScreenState extends State<PrincipalTarScreen> with SingleTick
       return '${parsed.day} $monthName ${parsed.year} - $dayName';
     } catch (_) {
       return dateStr;
+    }
+  }
+
+  String _getBreakdownDateOnly(String dateStr) {
+    try {
+      final parsed = DateTime.parse(dateStr);
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      final monthName = months[parsed.month - 1];
+      return '${parsed.day} $monthName ${parsed.year}';
+    } catch (_) {
+      return dateStr;
+    }
+  }
+
+  String _getBreakdownDayOnly(String dateStr) {
+    try {
+      final parsed = DateTime.parse(dateStr);
+      const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      return days[parsed.weekday - 1];
+    } catch (_) {
+      return '';
     }
   }
 
@@ -1238,10 +1543,10 @@ class _PrincipalTarScreenState extends State<PrincipalTarScreen> with SingleTick
       }
       if (entryMins > officialMins) {
         final diff = entryMins - officialMins;
-        return '${_formatMinutes(diff)} Late';
+        return '${diff}m Late';
       } else if (entryMins < officialMins) {
         final diff = officialMins - entryMins;
-        return '${_formatMinutes(diff)} Early';
+        return '${diff}m Early';
       } else {
         return 'On Time';
       }
@@ -1274,26 +1579,112 @@ class _PrincipalTarScreenState extends State<PrincipalTarScreen> with SingleTick
     if (h > 0 && m > 0) {
       return '$h hr $m min';
     } else if (h > 0) {
-      return '$h hr${h > 1 ? 's' : ''}';
+      return '$h hr';
     } else {
       return '$m min';
     }
   }
 
-  Widget _buildDateList(List<dynamic> items, {bool isPresentTab = false, bool isLateTab = false}) {
+  Widget _buildEmptyTabState({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color iconColor,
+    required Color iconBg,
+  }) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: iconBg,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 36, color: iconColor),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 14.5,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF1E293B),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 12,
+                color: Color(0xFF64748B),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDateList(
+    List<dynamic> items,
+    dynamic teacher,
+    void Function(void Function()) setSheetState, {
+    bool isPresentTab = false,
+    bool isAbsentTab = false,
+    bool isLeaveTab = false,
+    bool isLateTab = false,
+  }) {
     if (items.isEmpty) {
-      return const Center(child: Text('No records found for this category.', style: TextStyle(color: Colors.grey)));
+      if (isPresentTab) {
+        return _buildEmptyTabState(
+          icon: Icons.event_available_rounded,
+          title: 'No Present Records',
+          subtitle: 'No attendance marked as present for this month.',
+          iconColor: const Color(0xFF16A34A),
+          iconBg: const Color(0xFFDCFCE7),
+        );
+      } else if (isAbsentTab) {
+        return _buildEmptyTabState(
+          icon: Icons.verified_rounded,
+          title: 'Zero Absences!',
+          subtitle: 'Great! All working days accounted for this teacher.',
+          iconColor: const Color(0xFF16A34A),
+          iconBg: const Color(0xFFDCFCE7),
+        );
+      } else if (isLeaveTab) {
+        return _buildEmptyTabState(
+          icon: Icons.event_note_rounded,
+          title: 'No Leave Records',
+          subtitle: 'No approved or recorded leaves for this month.',
+          iconColor: const Color(0xFF64748B),
+          iconBg: const Color(0xFFF1F5F9),
+        );
+      } else {
+        return _buildEmptyTabState(
+          icon: Icons.alarm_on_rounded,
+          title: 'Punctual Every Day',
+          subtitle: 'No late arrivals recorded this month.',
+          iconColor: const Color(0xFF0F766E),
+          iconBg: const Color(0xFFCCFBF1),
+        );
+      }
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.all(12),
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       itemCount: items.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (context, i) {
         final it = items[i];
         final date = (it['date'] as String?) ?? '—';
         final entryTime = (it['entry_time'] as String?) ?? '—';
         final isLate = it['is_late'] == true;
+        final bool isMarking = _markingDates.contains(date);
 
         final diffText = (it['diff_text'] ?? it['late_text'] ?? it['early_text'])?.toString() ??
             _calculateTimeDiff(
@@ -1302,49 +1693,189 @@ class _PrincipalTarScreenState extends State<PrincipalTarScreen> with SingleTick
               isLate: isLate || isLateTab,
             );
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                _formatBreakdownDate(date),
-                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFF0F172A)),
-              ),
-              if (isPresentTab || isLateTab) ...[
-                if (diffText != null && diffText.isNotEmpty)
-                  Builder(
-                    builder: (_) {
-                      final bool isLateRecord = diffText.toLowerCase().contains('late') || isLate || isLateTab;
-                      final bool isEarlyRecord = diffText.toLowerCase().contains('early');
-                      final Color badgeBg = isLateRecord
-                          ? const Color(0xFFFEF2F2)
-                          : (isEarlyRecord ? const Color(0xFFF0FDF4) : const Color(0xFFF0FDFA));
-                      final Color badgeBorder = isLateRecord
-                          ? const Color(0xFFFECACA)
-                          : (isEarlyRecord ? const Color(0xFFBBF7D0) : const Color(0xFF99F6E4));
-                      final Color badgeText = isLateRecord
-                          ? const Color(0xFFDC2626)
-                          : (isEarlyRecord ? const Color(0xFF16A34A) : const Color(0xFF0F766E));
+        Color cardBorderColor = const Color(0xFFE2E8F0);
+        Color iconBg = const Color(0xFFF0FDF4);
+        Color iconBorder = const Color(0xFFDCFCE7);
+        Color iconColor = const Color(0xFF16A34A);
+        IconData cardIcon = Icons.check_circle_rounded;
 
-                      return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-                        decoration: BoxDecoration(
-                          color: badgeBg,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: badgeBorder),
-                        ),
-                        child: Text(
-                          diffText,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: badgeText,
-                          ),
-                        ),
-                      );
-                    },
+        if (isAbsentTab) {
+          cardBorderColor = const Color(0xFFFEE2E2);
+          iconBg = const Color(0xFFFEF2F2);
+          iconBorder = const Color(0xFFFECACA);
+          iconColor = const Color(0xFFDC2626);
+          cardIcon = Icons.event_busy_rounded;
+        } else if (isLeaveTab) {
+          cardBorderColor = const Color(0xFFFEF3C7);
+          iconBg = const Color(0xFFFFFBEB);
+          iconBorder = const Color(0xFFFDE68A);
+          iconColor = const Color(0xFFD97706);
+          cardIcon = Icons.beach_access_rounded;
+        } else if (isLateTab) {
+          cardBorderColor = const Color(0xFFFFEDD5);
+          iconBg = const Color(0xFFFFF7ED);
+          iconBorder = const Color(0xFFFED7AA);
+          iconColor = const Color(0xFFEA580C);
+          cardIcon = Icons.alarm_rounded;
+        }
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: cardBorderColor),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.02),
+                blurRadius: 4,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: iconBg,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: iconBorder),
+                ),
+                child: Icon(cardIcon, color: iconColor, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _getBreakdownDateOnly(date),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13.5,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _getBreakdownDayOnly(date),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 11.5,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (isAbsentTab) ...[
+                ElevatedButton.icon(
+                  onPressed: isMarking
+                      ? null
+                      : () => _showMarkPresentConfirmDialog(teacher, it, setSheetState),
+                  icon: isMarking
+                      ? const SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.how_to_reg_rounded, size: 14, color: Colors.white),
+                  label: Text(
+                    isMarking ? 'Updating...' : 'Mark as present',
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
                   ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0F766E),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ] else if (isLeaveTab) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFBEB),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFFFDE68A)),
+                  ),
+                  child: const Text(
+                    'On Leave',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFFB45309),
+                    ),
+                  ),
+                ),
+              ] else ...[
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    if (entryTime != '—' && entryTime.isNotEmpty) ...[
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.access_time_rounded, size: 11, color: Color(0xFF64748B)),
+                          const SizedBox(width: 3),
+                          Text(
+                            entryTime,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF334155),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                    ],
+                    if (diffText != null && diffText.isNotEmpty)
+                      Builder(
+                        builder: (_) {
+                          final bool isLateRecord = diffText.toLowerCase().contains('late') || isLate || isLateTab;
+                          final bool isEarlyRecord = diffText.toLowerCase().contains('early');
+                          final Color badgeBg = isLateRecord
+                              ? const Color(0xFFFEF2F2)
+                              : (isEarlyRecord ? const Color(0xFFF0FDF4) : const Color(0xFFF0FDFA));
+                          final Color badgeBorder = isLateRecord
+                              ? const Color(0xFFFECACA)
+                              : (isEarlyRecord ? const Color(0xFFBBF7D0) : const Color(0xFF99F6E4));
+                          final Color badgeText = isLateRecord
+                              ? const Color(0xFFDC2626)
+                              : (isEarlyRecord ? const Color(0xFF16A34A) : const Color(0xFF0F766E));
+
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                            decoration: BoxDecoration(
+                              color: badgeBg,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: badgeBorder),
+                            ),
+                            child: Text(
+                              diffText,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: badgeText,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                  ],
+                ),
               ],
             ],
           ),

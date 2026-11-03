@@ -265,6 +265,16 @@ class SimplePdf
             $stream .= "0.75 w\n";
             $stream .= "50 655 m 545.28 655 l S\n";
 
+            // Vector drawing of a white-background, rounded-border Amount Card
+            $amtX = (595.28 - 220) / 2;
+            $rawMonths = array_filter(array_map('trim', explode(',', $billingMonths)));
+            $monthLines = $this->wrapText($billingMonths, 9.0, 133.0);
+            if (empty($monthLines)) {
+                $monthLines = [$billingMonths];
+            }
+            $extraLinesCount = max(0, count($monthLines) - 1);
+            $extraShift = $extraLinesCount * 14;
+
             // Grid Boxes
             $stream .= "0.88 0.90 0.94 RG\n";
             $stream .= "0.5 w\n";
@@ -273,24 +283,11 @@ class SimplePdf
             $stream .= "45 545 505.28 65 re\n";
             $stream .= "S\n";
 
-            // Payment details box
-            $stream .= "45 435 505.28 70 re\n";
+            // Payment details box (dynamically expands downward if extra description/month lines exist)
+            $payBoxBottom = 435 - $extraShift;
+            $payBoxHeight = 70 + $extraShift;
+            $stream .= "45 {$payBoxBottom} 505.28 {$payBoxHeight} re\n";
             $stream .= "S\n";
-
-            // Vector drawing of a white-background, rounded-border Amount Card
-            $amtX = (595.28 - 220) / 2;
-            // Chunk billing months (max 4 months per line)
-            $rawMonths = array_filter(array_map('trim', explode(',', $billingMonths)));
-            if (count($rawMonths) > 1) {
-                $chunks = array_chunk($rawMonths, 4);
-                $monthLines = array_map(function($chunk) {
-                    return implode(', ', $chunk);
-                }, $chunks);
-            } else {
-                $monthLines = [$billingMonths];
-            }
-            $extraLinesCount = count($monthLines) - 1;
-            $extraShift = $extraLinesCount * 14;
 
             $hasDiscount = !empty($fields['Discount']);
             $payableText = $fields['Payable Amount'] ?? null;
@@ -553,8 +550,8 @@ class SimplePdf
             $stream .= "ET\n";
 
             // Footer
-            $footY1 = 120 - $extraShift;
-            $footY2 = 100 - $extraShift;
+            $footY1 = max(75, 120 - $extraShift);
+            $footY2 = max(55, 100 - $extraShift);
             $stream .= "0.5 0.5 0.5 rg\n";
             $stream .= "/F1 8.5 Tf\n";
             
@@ -1255,5 +1252,63 @@ class SimplePdf
         // Escape backslash FIRST so that escaped parentheses do not get doubled
         $str = str_replace('\\', '\\\\', $str);
         return str_replace(['(', ')'], ['\\(', '\\)'], $str);
+    }
+
+    private function wrapText(string $text, float $fontSize, float $maxWidth): array
+    {
+        $text = trim($text);
+        if ($text === '') {
+            return [];
+        }
+
+        // Ensure space after commas so comma-separated items can wrap cleanly
+        $text = preg_replace('/,(\S)/', ', $1', $text);
+        $words = preg_split('/\s+/', $text);
+        $lines = [];
+        $currentLine = '';
+
+        foreach ($words as $word) {
+            if ($word === '') continue;
+
+            // If a single token itself exceeds maxWidth, chop it cleanly
+            if ($this->getStringWidth($word, $fontSize) > $maxWidth) {
+                if ($currentLine !== '') {
+                    $lines[] = $currentLine;
+                    $currentLine = '';
+                }
+                $chars = str_split($word);
+                $chunk = '';
+                foreach ($chars as $ch) {
+                    if ($this->getStringWidth($chunk . $ch, $fontSize) <= $maxWidth) {
+                        $chunk .= $ch;
+                    } else {
+                        if ($chunk !== '') {
+                            $lines[] = $chunk;
+                        }
+                        $chunk = $ch;
+                    }
+                }
+                if ($chunk !== '') {
+                    $currentLine = $chunk;
+                }
+                continue;
+            }
+
+            $testLine = ($currentLine === '') ? $word : ($currentLine . ' ' . $word);
+            if ($this->getStringWidth($testLine, $fontSize) <= $maxWidth) {
+                $currentLine = $testLine;
+            } else {
+                if ($currentLine !== '') {
+                    $lines[] = $currentLine;
+                }
+                $currentLine = $word;
+            }
+        }
+
+        if ($currentLine !== '') {
+            $lines[] = $currentLine;
+        }
+
+        return $lines;
     }
 }

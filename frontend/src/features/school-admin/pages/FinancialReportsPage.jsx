@@ -107,6 +107,7 @@ export default function FinancialReportsPage() {
   const { isReadOnly, currentYear } = useAcademicYear();
   const [reports, setReports] = useState([]);
   const [nextSuggestedStartDate, setNextSuggestedStartDate] = useState('');
+  const [fromTime, setFromTime] = useState('12:00 AM');
   const [hasPreviousReport, setHasPreviousReport] = useState(false);
   const [loading, setLoading] = useState(true);
   
@@ -226,14 +227,13 @@ export default function FinancialReportsPage() {
       setReports(res.reports || []);
       
       const suggestedStart = res.next_suggested_start_date || '';
+      const serverFromTime = res.from_time || '12:00 AM';
+      setFromTime(serverFromTime);
       setNextSuggestedStartDate(suggestedStart);
       setHasPreviousReport(!!res.has_previous_report);
 
-      let effectiveFrom = initialFrom;
-      if (res.has_previous_report && suggestedStart) {
-        effectiveFrom = suggestedStart;
-        setFromDate(suggestedStart);
-      }
+      let effectiveFrom = res.next_suggested_start_date || res.academic_year_start_date || initialFrom;
+      setFromDate(effectiveFrom);
 
       // Auto load preview for current ongoing month or suggested period
       fetchPreview(effectiveFrom, initialTo);
@@ -413,9 +413,10 @@ export default function FinancialReportsPage() {
                   <label htmlFor="from_date" className="text-xs font-bold text-text-secondary uppercase">From Date</label>
                   <Input 
                     id="from_date" 
-                    type="date" 
-                    value={fromDate} 
-                    onChange={(e) => setFromDate(e.target.value)} 
+                    type="text" 
+                    readOnly
+                    value={fromDate ? `${fromDate} (${fromTime})` : ''} 
+                    className="cursor-default bg-surface-sunken select-none pointer-events-none"
                   />
                 </div>
 
@@ -423,9 +424,10 @@ export default function FinancialReportsPage() {
                   <label htmlFor="to_date" className="text-xs font-bold text-text-secondary uppercase">To Date</label>
                   <Input 
                     id="to_date" 
-                    type="date" 
-                    value={toDate} 
-                    onChange={(e) => setToDate(e.target.value)} 
+                    type="text" 
+                    readOnly
+                    value={toDate ? `${toDate} (Till now)` : ''} 
+                    className="cursor-default bg-surface-sunken select-none pointer-events-none"
                   />
                 </div>
               </div>
@@ -691,7 +693,7 @@ export default function FinancialReportsPage() {
         >
           <div className="space-y-3 text-sm mt-2">
             <p className="text-zinc-600 dark:text-zinc-400">
-              Are you sure you want to generate a financial report for the period <strong className="text-text-primary">{formatDateDisplay(fromDate)}</strong> to <strong className="text-text-primary">{formatDateDisplay(toDate)}</strong>?
+              Are you sure you want to generate a financial report for the period <strong className="text-text-primary">{formatDateDisplay(fromDate)} ({fromTime})</strong> to <strong className="text-text-primary">{formatDateDisplay(toDate)} (Till now)</strong>?
             </p>
             <p className="text-xs text-zinc-500 leading-normal">
               This will freeze transactions for this period into your history with status <span className="font-bold text-amber-600">Hand Over</span>.

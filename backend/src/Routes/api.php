@@ -186,6 +186,7 @@ return function (App $app) {
     $app->post('/api/school/exams-new/{id}/publish-admit-card', [SchoolAdminController::class, 'publishExamAdmitCards']);
     $app->post('/api/school/exams-new/{id}/unpublish-admit-card', [SchoolAdminController::class, 'unpublishExamAdmitCards']);
     $app->get('/api/school/exams-new/{id}/report-cards', [SchoolAdminController::class, 'getReportCards']);
+    $app->get('/api/school/exams-new/{id}/report-cards-print', [SchoolAdminController::class, 'getExamReportCardsPrintHtml']);
     $app->get('/api/school/exams-new/{id}/class-status', [SchoolAdminController::class, 'getExamClassStatuses']);
     $app->get('/api/school/exams-new/{id}/instructions', [SchoolAdminController::class, 'getExamInstructions']);
     $app->post('/api/school/exams-new/{id}/instructions', [SchoolAdminController::class, 'saveExamInstructions']);
@@ -197,6 +198,11 @@ return function (App $app) {
     // Grade configurations
     $app->get('/api/school/grade-configurations', [SchoolAdminController::class, 'getGradeConfigurations']);
     $app->post('/api/school/grade-configurations', [SchoolAdminController::class, 'saveGradeConfigurations']);
+
+    // Report Card Templates
+    $app->get('/api/school/report-card-templates', [SchoolAdminController::class, 'getReportCardTemplates']);
+    $app->get('/api/school/report-card-templates/{theme}/preview-html', [SchoolAdminController::class, 'getReportCardTemplatePreviewHtml']);
+    $app->post('/api/school/report-card-templates/select', [SchoolAdminController::class, 'selectReportCardTemplate']);
     $app->get('/api/school/fee-structures', [SchoolAdminController::class, 'getFeeStructures']);
     $app->post('/api/school/fee-structures', [SchoolAdminController::class, 'createFeeStructure']);
     $app->get('/api/school/fee-payments', [SchoolAdminController::class, 'getFeePayments']);
