@@ -63,6 +63,7 @@ class _ManageFinanceFeesScreenState extends State<ManageFinanceFeesScreen> with 
 
   // Search & Filters
   String _additionalFeeSearch = '';
+  final TextEditingController _transportSearchController = TextEditingController();
   String _transportSearch = '';
   String _transportStatusFilter = 'All'; // 'All' | 'Active' | 'Inactive'
 
@@ -78,6 +79,7 @@ class _ManageFinanceFeesScreenState extends State<ManageFinanceFeesScreen> with 
     _tabController.dispose();
     _monthlyAmountController.dispose();
     _courseAmountController.dispose();
+    _transportSearchController.dispose();
     super.dispose();
   }
 
@@ -1076,97 +1078,107 @@ class _ManageFinanceFeesScreenState extends State<ManageFinanceFeesScreen> with 
           // Filter Row & Action
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Column(
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.03),
-                              blurRadius: 4,
-                              offset: const Offset(0, 1),
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(30),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.02),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: TextField(
+                      controller: _transportSearchController,
+                      onChanged: (val) {
+                        setState(() {
+                          _transportSearch = val;
+                        });
+                      },
+                      style: const TextStyle(fontSize: 13),
+                      decoration: InputDecoration(
+                        hintText: 'Search by Student Name or SR ...',
+                        hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                        prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF64748B), size: 20),
+                        suffixIcon: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_transportSearch.isNotEmpty)
+                              IconButton(
+                                icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF64748B)),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                onPressed: () {
+                                  _transportSearchController.clear();
+                                  setState(() => _transportSearch = '');
+                                },
+                              ),
+                            if (_transportSearch.isNotEmpty) const SizedBox(width: 4),
+                            Container(
+                              height: 20,
+                              width: 1,
+                              color: const Color(0xFFCBD5E1),
+                              margin: const EdgeInsets.symmetric(horizontal: 4),
+                            ),
+                            InkWell(
+                              onTap: _openTransportStatusFilterBottomSheet,
+                              borderRadius: BorderRadius.circular(20),
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(6, 6, 14, 6),
+                                child: Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    Icon(
+                                      Icons.tune_rounded,
+                                      size: 20,
+                                      color: _transportStatusFilter != 'All'
+                                          ? const Color(0xFFD97706)
+                                          : const Color(0xFF0F172A),
+                                    ),
+                                    if (_transportStatusFilter != 'All')
+                                      Positioned(
+                                        top: -2,
+                                        right: -2,
+                                        child: Container(
+                                          width: 7,
+                                          height: 7,
+                                          decoration: const BoxDecoration(
+                                            color: Color(0xFFD97706),
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ],
                         ),
-                        child: TextField(
-                          onChanged: (val) {
-                            setState(() {
-                              _transportSearch = val;
-                            });
-                          },
-                          style: const TextStyle(fontSize: 13),
-                          decoration: const InputDecoration(
-                            hintText: 'Search by Student Name or SR No...',
-                            hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                            prefixIcon: Icon(Icons.search_rounded, color: Color(0xFF94A3B8), size: 20),
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                          ),
-                        ),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    ElevatedButton.icon(
-                      onPressed: () => _openAssignTransportFeeModal(null),
-                      icon: const Icon(Icons.add_rounded, size: 18),
-                      label: const Text('Assign Fee'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFD97706),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-                        elevation: 1,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-                const SizedBox(height: 10),
-                // Curved Dropdown for Status Filter
-                Row(
-                  children: [
-                    const Text(
-                      'Filter Status: ',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFCBD5E1)),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: _transportStatusFilter,
-                          borderRadius: BorderRadius.circular(16),
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
-                          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B), size: 18),
-                          isDense: true,
-                          items: const [
-                            DropdownMenuItem(value: 'All', child: Text('All Statuses')),
-                            DropdownMenuItem(value: 'Active', child: Text('Active Only')),
-                            DropdownMenuItem(value: 'Inactive', child: Text('Inactive Only')),
-                          ],
-                          onChanged: (val) {
-                            if (val != null) {
-                              setState(() {
-                                _transportStatusFilter = val;
-                              });
-                              _reloadTransportFees();
-                            }
-                          },
-                        ),
-                      ),
-                    ),
-                  ],
+                const SizedBox(width: 10),
+                ElevatedButton.icon(
+                  onPressed: () => _openAssignTransportFeeModal(null),
+                  icon: const Icon(Icons.add_rounded, size: 18),
+                  label: const Text('Assign Fee'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFD97706),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                    elevation: 1,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
                 ),
               ],
             ),
@@ -2593,6 +2605,166 @@ class _ManageFinanceFeesScreenState extends State<ManageFinanceFeesScreen> with 
               child: isSubmitting
                   ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(Colors.white)))
                   : const Text('Confirm & Apply', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // TRANSPORT STATUS FILTER BOTTOM SHEET
+  void _openTransportStatusFilterBottomSheet() {
+    String tempStatus = _transportStatusFilter;
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      backgroundColor: Colors.white,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Filter Transport Status',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        if (tempStatus != 'All')
+                          TextButton(
+                            onPressed: () {
+                              setModalState(() => tempStatus = 'All');
+                            },
+                            child: const Text(
+                              'Reset',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFDC2626),
+                              ),
+                            ),
+                          )
+                        else
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                            onPressed: () => Navigator.pop(ctx),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'STATUS',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF64748B),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildTransportFilterOption(
+                      label: 'All Statuses',
+                      subtitle: 'Show all active and inactive transport records',
+                      selected: tempStatus == 'All',
+                      onTap: () => setModalState(() => tempStatus = 'All'),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildTransportFilterOption(
+                      label: 'Active Only',
+                      subtitle: 'Show only active transport fee records',
+                      selected: tempStatus == 'Active',
+                      onTap: () => setModalState(() => tempStatus = 'Active'),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildTransportFilterOption(
+                      label: 'Inactive Only',
+                      subtitle: 'Show only inactive transport records',
+                      selected: tempStatus == 'Inactive',
+                      onTap: () => setModalState(() => tempStatus = 'Inactive'),
+                    ),
+                    const SizedBox(height: 20),
+                    ElevatedButton(
+                      onPressed: () {
+                        setState(() => _transportStatusFilter = tempStatus);
+                        Navigator.pop(ctx);
+                        _reloadTransportFees();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD97706),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: const Text('Apply Filter', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildTransportFilterOption({
+    required String label,
+    required String subtitle,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFFFEF3C7).withValues(alpha: 0.5) : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected ? const Color(0xFFD97706) : const Color(0xFFE2E8F0),
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                      color: selected ? const Color(0xFFB45309) : const Color(0xFF0F172A),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              selected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
+              color: selected ? const Color(0xFFD97706) : const Color(0xFF94A3B8),
+              size: 20,
             ),
           ],
         ),

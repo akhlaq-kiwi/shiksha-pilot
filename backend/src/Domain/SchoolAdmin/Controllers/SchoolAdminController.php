@@ -2125,6 +2125,34 @@ class SchoolAdminController extends BaseController
         return $this->success($response, $data, 'School expense approved successfully');
     }
 
+    public function rejectSchoolExpense(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int)$args['id'];
+        $data = $this->service->rejectSchoolExpense($user, $id);
+        return $this->success($response, $data, 'School expense rejected successfully');
+    }
+
+    public function getPendingFinancialReportCount(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'SUPER_ADMIN']);
+
+        $count = $this->service->getPendingFinancialReportCount($user);
+        return $this->success($response, ['pending_count' => $count]);
+    }
+
+    public function getPendingExpenseCount(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $count = $this->service->getPendingExpenseCount($user);
+        return $this->success($response, ['pending_count' => $count]);
+    }
+
     public function getAdditionalFeeTypes(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);

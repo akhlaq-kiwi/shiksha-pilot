@@ -13,9 +13,10 @@ class ChangePasswordDialog extends StatefulWidget {
   }) : super(key: key);
 
   static Future<void> show(BuildContext context, {required String baseUrl, String? token}) async {
-    return showDialog<void>(
+    return showModalBottomSheet<void>(
       context: context,
-      barrierDismissible: false,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (BuildContext context) {
         return ChangePasswordDialog(baseUrl: baseUrl, token: token);
       },
@@ -85,7 +86,7 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
 
     if (hasEmpty) {
       setState(() {});
-      return; // Do not continue to next validation until all fields are filled
+      return;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -153,9 +154,15 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Password updated successfully!'),
+            content: Row(
+              children: [
+                Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+                SizedBox(width: 8),
+                Text('Password updated successfully!'),
+              ],
+            ),
             behavior: SnackBarBehavior.floating,
-            backgroundColor: Colors.green,
+            backgroundColor: Color(0xFF059669),
           ),
         );
       }
@@ -207,135 +214,311 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
     }
   }
 
+  Widget _buildFieldLabel(String label) {
+    return Text(
+      label,
+      style: const TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w800,
+        color: Color(0xFF475569),
+        letterSpacing: 0.5,
+      ),
+    );
+  }
+
+  Widget _buildPasswordField({
+    required TextEditingController controller,
+    required String hint,
+    required bool obscure,
+    required VoidCallback onToggle,
+    String? errorText,
+    required ValueChanged<String> onChanged,
+  }) {
+    return TextField(
+      controller: controller,
+      obscureText: obscure,
+      onChanged: onChanged,
+      style: const TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        color: Color(0xFF0F172A),
+      ),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+        filled: true,
+        fillColor: const Color(0xFFF8FAFC),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFD97706), width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFEF4444)),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+        ),
+        errorText: errorText,
+        errorMaxLines: 3,
+        errorStyle: const TextStyle(fontSize: 11.5, color: Color(0xFFEF4444), height: 1.2),
+        suffixIcon: IconButton(
+          icon: Icon(
+            obscure ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+            color: const Color(0xFF94A3B8),
+            size: 20,
+          ),
+          onPressed: onToggle,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: const Text(
-        'Change Password',
-        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // 1. Current Password Field
-            TextField(
-              controller: _currentPasswordController,
-              obscureText: _obscureCurrent,
-              onChanged: (_) {
-                if (_currentPasswordError != null) {
-                  setState(() => _currentPasswordError = null);
-                }
-              },
-              decoration: InputDecoration(
-                labelText: 'Current Password',
-                border: const OutlineInputBorder(),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + bottomInset),
+      child: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Handle bar
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE2E8F0),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+
+              // Header: Icon, Title, Subtitle, Close Button
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.lock_reset_rounded,
+                      color: Color(0xFFD97706),
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          'Change Password',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0F172A),
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                        SizedBox(height: 3),
+                        Text(
+                          'Update your account password securely',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B), size: 22),
+                    onPressed: () => Navigator.pop(context),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 18),
+
+              // Policy / Tip Card
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  children: const [
+                    Icon(Icons.shield_outlined, size: 18, color: Color(0xFF0D9488)),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Password must be at least 6 characters with 1 uppercase letter and 1 number.',
+                        style: TextStyle(fontSize: 11.5, color: Color(0xFF475569), height: 1.3),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 18),
+
+              // 1. Current Password Label & Field
+              _buildFieldLabel('CURRENT PASSWORD *'),
+              const SizedBox(height: 6),
+              _buildPasswordField(
+                controller: _currentPasswordController,
+                hint: 'Enter your current password',
+                obscure: _obscureCurrent,
+                onToggle: () => setState(() => _obscureCurrent = !_obscureCurrent),
                 errorText: _currentPasswordError,
-                errorMaxLines: 4,
-                errorStyle: const TextStyle(fontSize: 12, height: 1.25),
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscureCurrent ? Icons.visibility_off : Icons.visibility,
-                    color: Colors.grey.shade600,
-                  ),
-                  onPressed: () => setState(() => _obscureCurrent = !_obscureCurrent),
-                ),
+                onChanged: (_) {
+                  if (_currentPasswordError != null) setState(() => _currentPasswordError = null);
+                },
               ),
-            ),
-            const SizedBox(height: 12),
 
-            // 2. New Password Field
-            TextField(
-              controller: _newPasswordController,
-              obscureText: _obscureNew,
-              onChanged: (_) {
-                if (_newPasswordError != null) {
-                  setState(() => _newPasswordError = null);
-                }
-              },
-              decoration: InputDecoration(
-                labelText: 'New Password',
-                hintText: 'Min 6 chars, 1 uppercase, 1 digit',
-                hintStyle: const TextStyle(fontSize: 11),
-                border: const OutlineInputBorder(),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              const SizedBox(height: 14),
+
+              // 2. New Password Label & Field
+              _buildFieldLabel('NEW PASSWORD *'),
+              const SizedBox(height: 6),
+              _buildPasswordField(
+                controller: _newPasswordController,
+                hint: 'Enter new secure password',
+                obscure: _obscureNew,
+                onToggle: () => setState(() => _obscureNew = !_obscureNew),
                 errorText: _newPasswordError,
-                errorMaxLines: 4,
-                errorStyle: const TextStyle(fontSize: 12, height: 1.25),
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscureNew ? Icons.visibility_off : Icons.visibility,
-                    color: Colors.grey.shade600,
-                  ),
-                  onPressed: () => setState(() => _obscureNew = !_obscureNew),
-                ),
+                onChanged: (_) {
+                  if (_newPasswordError != null) setState(() => _newPasswordError = null);
+                },
               ),
-            ),
-            const SizedBox(height: 12),
 
-            // 3. Confirm Password Field
-            TextField(
-              controller: _confirmPasswordController,
-              obscureText: _obscureConfirm,
-              onChanged: (_) {
-                if (_confirmPasswordError != null) {
-                  setState(() => _confirmPasswordError = null);
-                }
-              },
-              decoration: InputDecoration(
-                labelText: 'Confirm Password',
-                border: const OutlineInputBorder(),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              const SizedBox(height: 14),
+
+              // 3. Confirm Password Label & Field
+              _buildFieldLabel('CONFIRM PASSWORD *'),
+              const SizedBox(height: 6),
+              _buildPasswordField(
+                controller: _confirmPasswordController,
+                hint: 'Re-enter new password to confirm',
+                obscure: _obscureConfirm,
+                onToggle: () => setState(() => _obscureConfirm = !_obscureConfirm),
                 errorText: _confirmPasswordError,
-                errorMaxLines: 4,
-                errorStyle: const TextStyle(fontSize: 12, height: 1.25),
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscureConfirm ? Icons.visibility_off : Icons.visibility,
-                    color: Colors.grey.shade600,
-                  ),
-                  onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
-                ),
+                onChanged: (_) {
+                  if (_confirmPasswordError != null) setState(() => _confirmPasswordError = null);
+                },
               ),
-            ),
 
-            if (_generalError != null && _generalError!.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              Text(
-                _generalError!,
-                style: const TextStyle(color: Colors.red, fontSize: 12, fontWeight: FontWeight.bold),
+              if (_generalError != null && _generalError!.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF2F2),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFFECACA)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.error_outline_rounded, color: Color(0xFFDC2626), size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _generalError!,
+                          style: const TextStyle(color: Color(0xFFDC2626), fontSize: 12, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 22),
+
+              // Action Buttons
+              Row(
+                children: [
+                  Expanded(
+                    flex: 1,
+                    child: SizedBox(
+                      height: 48,
+                      child: OutlinedButton(
+                        onPressed: _isUpdating ? null : () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFFCBD5E1)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF475569),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: SizedBox(
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: _isUpdating ? null : _submitPasswordChange,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFD97706),
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor: const Color(0xFFD97706).withOpacity(0.6),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: _isUpdating
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.2),
+                              )
+                            : const Text(
+                                'UPDATE PASSWORD',
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 0.5),
+                              ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
-          ],
+          ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: _isUpdating ? null : () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: _isUpdating ? null : _submitPasswordChange,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.indigo,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          ),
-          child: _isUpdating
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
-                )
-              : const Text('Update'),
-        ),
-      ],
     );
   }
 }

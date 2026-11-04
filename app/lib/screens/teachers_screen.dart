@@ -46,6 +46,11 @@ class _TeachersScreenState extends State<TeachersScreen> {
   String _searchQuery = '';
   String _statusFilter = 'ALL'; // 'ALL', 'ACTIVE', 'INACTIVE'
 
+  bool get _isSchoolAdmin {
+    final role = widget.userRole.toUpperCase();
+    return role == 'SCHOOL_ADMIN' || role == 'SUPER_ADMIN' || role.contains('ADMIN');
+  }
+
   final TextEditingController _searchController = TextEditingController();
 
   @override
@@ -533,7 +538,13 @@ class _TeachersScreenState extends State<TeachersScreen> {
                     icon: const Icon(Icons.more_vert_rounded, size: 18, color: Color(0xFF64748B)),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    color: Colors.white,
+                    surfaceTintColor: Colors.transparent,
+                    elevation: 6,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      side: const BorderSide(color: Color(0xFFF1F5F9)),
+                    ),
                     onSelected: (action) => _handleCardMenuAction(action, t),
                     itemBuilder: (context) => [
                       const PopupMenuItem(
@@ -542,17 +553,45 @@ class _TeachersScreenState extends State<TeachersScreen> {
                           children: [
                             Icon(Icons.edit_outlined, size: 16, color: Color(0xFFD97706)),
                             SizedBox(width: 8),
-                            Text('Edit Profile', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                            Text('Edit Profile', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
                           ],
                         ),
                       ),
+                      if (_isSchoolAdmin) ...[
+                        PopupMenuItem(
+                          value: 'principal_role',
+                          child: Row(
+                            children: [
+                              const Icon(Icons.school_outlined, size: 16, color: Color(0xFFF59E0B)),
+                              const SizedBox(width: 8),
+                              Text(
+                                isPrincipal ? 'Unassign Principal' : 'Principal',
+                                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                              ),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'fee_collector_role',
+                          child: Row(
+                            children: [
+                              const Icon(Icons.account_balance_wallet_outlined, size: 16, color: Color(0xFF059669)),
+                              const SizedBox(width: 8),
+                              Text(
+                                isFeeCollector ? 'Unassign Fee Collector' : 'Fee Collector',
+                                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       const PopupMenuItem(
                         value: 'credentials',
                         child: Row(
                           children: [
                             Icon(Icons.lock_reset_rounded, size: 16, color: Color(0xFF4F46E5)),
                             SizedBox(width: 8),
-                            Text('Credentials', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                            Text('Credentials', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
                           ],
                         ),
                       ),
@@ -701,10 +740,45 @@ class _TeachersScreenState extends State<TeachersScreen> {
       case 'edit_profile':
         _openAddEditTeacherDialog(t);
         break;
+      case 'principal_role':
+        final isPrincipal = (t['role']?.toString().toUpperCase() == 'PRINCIPAL') ||
+            t['is_principal'] == 1 ||
+            t['is_principal'] == true ||
+            t['is_principal'] == '1';
+        _openRoleAssignmentDialog(t, 'Principal', isPrincipal ? 'unassign' : 'assign');
+        break;
+      case 'fee_collector_role':
+        final isFeeCollector = t['is_fee_collector'] == 1 ||
+            t['is_fee_collector'] == true ||
+            t['is_fee_collector'] == '1';
+        _openRoleAssignmentDialog(t, 'Fee Collector', isFeeCollector ? 'unassign' : 'assign');
+        break;
       case 'credentials':
         _openCredentialsDialog(t);
         break;
     }
+  }
+
+  // --------------------------------------------------------------------------
+  // ROLE ASSIGNMENT / UNASSIGNMENT DIALOG (PRINCIPAL & FEE COLLECTOR)
+  // --------------------------------------------------------------------------
+  void _openRoleAssignmentDialog(Map<String, dynamic> teacher, String role, String action) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _TeacherRoleAssignmentModal(
+        teacher: teacher,
+        role: role,
+        action: action,
+        teacherService: widget.teacherService,
+        onSuccess: (msg) {
+          Navigator.pop(context);
+          _showSuccess(msg);
+          _loadAllData();
+        },
+      ),
+    );
   }
 
   // --------------------------------------------------------------------------
@@ -3632,3 +3706,433 @@ class _TeacherIdCardsPreviewScreenState extends State<_TeacherIdCardsPreviewScre
   }
 }
 
+
+// ==============================================================================
+// TEACHER ROLE ASSIGNMENT / UNASSIGNMENT MODAL (PRINCIPAL & FEE COLLECTOR)
+// ==============================================================================
+class _TeacherRoleAssignmentModal extends StatefulWidget {
+  final Map<String, dynamic> teacher;
+  final String role; // 'Principal' or 'Fee Collector'
+  final String action; // 'assign' or 'unassign'
+  final TeacherManagementService teacherService;
+  final ValueChanged<String> onSuccess;
+
+  const _TeacherRoleAssignmentModal({
+    required this.teacher,
+    required this.role,
+    required this.action,
+    required this.teacherService,
+    required this.onSuccess,
+  });
+
+  @override
+  State<_TeacherRoleAssignmentModal> createState() => _TeacherRoleAssignmentModalState();
+}
+
+class _TeacherRoleAssignmentModalState extends State<_TeacherRoleAssignmentModal> {
+  String _step = 'confirm'; // 'confirm' | 'otp'
+  bool _isLoading = false;
+  String _error = '';
+  String _maskedEmail = '';
+  final TextEditingController _otpCtrl = TextEditingController();
+
+  bool get _isPrincipal => widget.role.toLowerCase().contains('principal');
+  Color get _primaryColor => _isPrincipal ? const Color(0xFFD97706) : const Color(0xFF059669);
+  Color get _lightBgColor => _isPrincipal ? const Color(0xFFFEF3C7) : const Color(0xFFD1FAE5);
+  Color get _borderColor => _isPrincipal ? const Color(0xFFFDE68A) : const Color(0xFFA7F3D0);
+  String get _badgeText => _isPrincipal ? 'P' : 'FC';
+  int get _teacherId => int.tryParse(widget.teacher['id']?.toString() ?? '0') ?? 0;
+  String get _teacherName => widget.teacher['name']?.toString() ?? 'Teacher';
+
+  @override
+  void dispose() {
+    _otpCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleSendOtp() async {
+    setState(() {
+      _isLoading = true;
+      _error = '';
+    });
+    try {
+      final res = _isPrincipal
+          ? await widget.teacherService.requestPrincipalOtp(_teacherId, widget.action)
+          : await widget.teacherService.requestFeeCollectorOtp(_teacherId, widget.action);
+
+      if (mounted) {
+        setState(() {
+          _maskedEmail = res['email_masked']?.toString() ?? res['email']?.toString() ?? '';
+          _step = 'otp';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _error = e.toString().replaceAll('Exception:', '').trim();
+        });
+      }
+    }
+  }
+
+  Future<void> _handleVerifyAndAssign() async {
+    final code = _otpCtrl.text.trim();
+    if (code.isEmpty) {
+      setState(() {
+        _error = 'Please enter the verification OTP code.';
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _error = '';
+    });
+
+    try {
+      if (_isPrincipal) {
+        await widget.teacherService.assignPrincipalRole(_teacherId, code, widget.action);
+      } else {
+        await widget.teacherService.assignFeeCollectorRole(_teacherId, code, widget.action);
+      }
+
+      if (mounted) {
+        final successMsg = widget.action == 'unassign'
+            ? '${widget.role} role unassigned successfully from $_teacherName.'
+            : '${widget.role} role assigned successfully to $_teacherName.';
+        widget.onSuccess(successMsg);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _error = e.toString().replaceAll('Exception:', '').trim();
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Header
+          Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: _lightBgColor,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: _borderColor, width: 1.5),
+                ),
+                child: Text(
+                  _badgeText,
+                  style: TextStyle(
+                    color: _primaryColor,
+                    fontSize: _isPrincipal ? 15 : 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _step == 'confirm'
+                          ? (widget.action == 'unassign'
+                              ? 'Unassign ${widget.role} Role'
+                              : 'Assign ${widget.role} Role')
+                          : 'Verify Email OTP',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F172A),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      'Security Verification',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B), size: 20),
+                onPressed: _isLoading ? null : () => Navigator.pop(context),
+              ),
+            ],
+          ),
+          const Divider(height: 20, color: Color(0xFFE2E8F0)),
+
+          // Error display if any
+          if (_error.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.only(bottom: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFECACA)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.error_outline_rounded, size: 16, color: Color(0xFFDC2626)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _error,
+                      style: const TextStyle(fontSize: 12, color: Color(0xFFDC2626), fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          if (_step == 'confirm') ...[
+            RichText(
+              text: TextSpan(
+                style: const TextStyle(fontSize: 14, color: Color(0xFF334155), height: 1.4),
+                children: [
+                  TextSpan(
+                    text: widget.action == 'unassign'
+                        ? 'Are you sure you want to unassign the ${widget.role} role from '
+                        : 'Are you sure you want to assign the ${widget.role} role to ',
+                  ),
+                  TextSpan(
+                    text: _teacherName,
+                    style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                  ),
+                  const TextSpan(text: '?'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _lightBgColor,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: _borderColor),
+              ),
+              child: Text(
+                'To proceed, click Send OTP below. A 4-digit verification code will be sent to your registered school admin email address.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: _isPrincipal ? const Color(0xFF78350F) : const Color(0xFF065F46),
+                  height: 1.4,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _isLoading ? null : () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      side: const BorderSide(color: Color(0xFFCBD5E1)),
+                    ),
+                    child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF475569))),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _handleSendOtp,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _primaryColor,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: _isLoading
+                        ? Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: const [
+                              SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              ),
+                              SizedBox(width: 8),
+                              Text('Sending OTP...', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                            ],
+                          )
+                        : const Text('Send OTP', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                  ),
+                ),
+              ],
+            ),
+          ] else ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFECFDF5),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFA7F3D0)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle_rounded, size: 16, color: Color(0xFF059669)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: RichText(
+                      text: TextSpan(
+                        style: const TextStyle(fontSize: 12, color: Color(0xFF065F46), height: 1.4),
+                        children: [
+                          const TextSpan(text: 'OTP code sent to '),
+                          TextSpan(
+                            text: _maskedEmail.isNotEmpty ? _maskedEmail : 'your registered email',
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                          const TextSpan(text: '. Please check your inbox or spam folder.'),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'VERIFICATION OTP CODE',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF64748B),
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _otpCtrl,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              textAlign: TextAlign.center,
+              autofocus: true,
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 8,
+                fontFamily: 'monospace',
+                color: Color(0xFF0F172A),
+              ),
+              decoration: InputDecoration(
+                counterText: '',
+                hintText: '----',
+                hintStyle: const TextStyle(letterSpacing: 8, color: Color(0xFFCBD5E1)),
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                filled: true,
+                fillColor: const Color(0xFFF8FAFC),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: _primaryColor, width: 2),
+                ),
+              ),
+              onChanged: (_) {
+                if (_error.isNotEmpty) {
+                  setState(() => _error = '');
+                } else {
+                  setState(() {});
+                }
+              },
+            ),
+            const SizedBox(height: 6),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: _isLoading ? null : _handleSendOtp,
+                icon: const Icon(Icons.refresh_rounded, size: 14),
+                label: const Text('Resend OTP', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                style: TextButton.styleFrom(
+                  foregroundColor: _primaryColor,
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _isLoading ? null : () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      side: const BorderSide(color: Color(0xFFCBD5E1)),
+                    ),
+                    child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF475569))),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: (_isLoading || _otpCtrl.text.trim().isEmpty) ? null : _handleVerifyAndAssign,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _primaryColor,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      disabledBackgroundColor: const Color(0xFFE2E8F0),
+                      disabledForegroundColor: const Color(0xFF94A3B8),
+                    ),
+                    child: _isLoading
+                        ? Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: const [
+                              SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              ),
+                              SizedBox(width: 8),
+                              Text('Verifying...', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                            ],
+                          )
+                        : Text(
+                            widget.action == 'unassign' ? 'Verify & Unassign' : 'Verify & Assign',
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                          ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}

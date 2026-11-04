@@ -51,14 +51,14 @@ class HomeworkService {
   Future<Map<String, dynamic>> uploadAttachment(File file) async {
     final fileName = file.path.split(Platform.pathSeparator).last;
     final ext = fileName.contains('.') ? fileName.split('.').last.toLowerCase() : '';
-    final allowedExts = ['pdf', 'jpg', 'jpeg', 'png', 'webp'];
+    final allowedExts = ['pdf', 'jpg', 'jpeg', 'png', 'webp', 'm4a', 'mp3', 'aac', 'wav'];
 
     if (!allowedExts.contains(ext)) {
       throw Exception('Unsupported file format.');
     }
 
     final fileSize = await file.length();
-    if (fileSize > 10 * 1024 * 1024) {
+    if (fileSize > 25 * 1024 * 1024) {
       throw Exception('File size exceeds the allowed limit.');
     }
 

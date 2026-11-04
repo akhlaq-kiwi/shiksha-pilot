@@ -95,7 +95,7 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
   Future<void> _checkPrincipalRole() async {
     final prefs = await SharedPreferences.getInstance();
     final roleUpper = widget.userRole.toUpperCase();
-    final isPrinc = (roleUpper == 'PRINCIPAL' || (prefs.getBool('is_principal') == true));
+    final isPrinc = (roleUpper == 'PRINCIPAL' || roleUpper == 'SCHOOL_ADMIN' || roleUpper == 'ADMIN' || (prefs.getBool('is_principal') == true));
     if (mounted) {
       setState(() {
         _isPrincipal = isPrinc;
@@ -843,270 +843,292 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
       }
     }
 
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      barrierDismissible: true,
-      builder: (dialogCtx) {
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (modalCtx) {
         return StatefulBuilder(
-          builder: (modalCtx, setModalState) {
-            return Dialog(
-              backgroundColor: _kCanvasBg,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-              insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 500),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 22),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
+          builder: (ctx, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 14,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Drag pill indicator
+                    Center(
+                      child: Container(
+                        width: 38,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE2E8F0),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    // Header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        // Header
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Create Announcement',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w900,
-                                color: _kDarkSlate,
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.close_rounded, color: _kMutedSlate, size: 22),
-                              onPressed: () => Navigator.pop(modalCtx),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 18),
-
-                        // Subject Label & Input (Matching Image 2 pill shape)
                         const Text(
-                          'SUBJECT',
+                          'Create Announcement',
                           style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: _kMutedSlate,
-                            letterSpacing: 0.5,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF0F172A),
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        TextField(
-                          controller: subjectCtrl,
-                          style: const TextStyle(fontSize: 14, color: _kDarkSlate, fontWeight: FontWeight.w500),
-                          decoration: InputDecoration(
-                            hintText: 'e.g. School Reopens from 15 July',
-                            hintStyle: const TextStyle(fontSize: 13, color: _kSubtleSlate),
-                            filled: false,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(24),
-                              borderSide: const BorderSide(color: Color(0xFF64748B)),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(24),
-                              borderSide: const BorderSide(color: Color(0xFF64748B)),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(24),
-                              borderSide: const BorderSide(color: _kDarkSlate, width: 1.5),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-
-                        // Description Label & Box with Bold, Italic, Underline Toolbar
-                        const Text(
-                          'DESCRIPTION *',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: _kMutedSlate,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: const Color(0xFF64748B)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Toolbar with B, I, U
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                child: Row(
-                                  children: [
-                                    InkWell(
-                                      onTap: () => insertHtmlTag('<b>', '</b>'),
-                                      borderRadius: BorderRadius.circular(6),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                        child: const Text(
-                                          'B',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w900,
-                                            fontSize: 15,
-                                            color: _kDarkSlate,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    InkWell(
-                                      onTap: () => insertHtmlTag('<i>', '</i>'),
-                                      borderRadius: BorderRadius.circular(6),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                        child: const Text(
-                                          'I',
-                                          style: TextStyle(
-                                            fontStyle: FontStyle.italic,
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 15,
-                                            color: _kDarkSlate,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    InkWell(
-                                      onTap: () => insertHtmlTag('<u>', '</u>'),
-                                      borderRadius: BorderRadius.circular(6),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                        child: const Text(
-                                          'U',
-                                          style: TextStyle(
-                                            decoration: TextDecoration.underline,
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 15,
-                                            color: _kDarkSlate,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const Divider(height: 1, thickness: 1, color: Color(0xFF64748B)),
-                              // Multiline input
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                child: TextField(
-                                  controller: descCtrl,
-                                  maxLines: 6,
-                                  minLines: 4,
-                                  style: const TextStyle(fontSize: 14, color: _kDarkSlate),
-                                  decoration: const InputDecoration(
-                                    border: InputBorder.none,
-                                    hintText: 'Enter announcement details...',
-                                    hintStyle: TextStyle(fontSize: 13, color: _kSubtleSlate),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-
-                        // Audience Label
-                        const Text(
-                          'AUDIENCE *',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: _kMutedSlate,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 12,
-                          runSpacing: 4,
-                          children: [
-                            _buildAudienceRadioOption(
-                              title: 'For Teachers Only',
-                              value: 'Teachers',
-                              groupValue: selectedAudience,
-                              onChanged: (val) => setModalState(() => selectedAudience = val!),
-                            ),
-                            _buildAudienceRadioOption(
-                              title: 'For Students Only',
-                              value: 'Students',
-                              groupValue: selectedAudience,
-                              onChanged: (val) => setModalState(() => selectedAudience = val!),
-                            ),
-                            _buildAudienceRadioOption(
-                              title: 'For Teachers & Students',
-                              value: 'Both',
-                              groupValue: selectedAudience,
-                              onChanged: (val) => setModalState(() => selectedAudience = val!),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 18),
-                        const Divider(thickness: 1, color: Color(0xFFCBD5E1)),
-                        const SizedBox(height: 18),
-
-                        // Bottom Actions: CANCEL, PUBLISH
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            OutlinedButton(
-                              onPressed: isSubmitting ? null : () => Navigator.pop(modalCtx),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: _kDarkSlate,
-                                side: const BorderSide(color: Color(0xFF64748B)),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
-                              ),
-                              child: const Text('CANCEL', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
-                            ),
-                            const SizedBox(width: 12),
-                            ElevatedButton(
-                              onPressed: isSubmitting
-                                  ? null
-                                  : () async {
-                                      final subj = subjectCtrl.text.trim();
-                                      final desc = descCtrl.text.trim();
-                                      if (subj.isEmpty || desc.isEmpty) {
-                                        _showSnackBar('Subject and description are required', isError: true);
-                                        return;
-                                      }
-                                      setModalState(() => isSubmitting = true);
-                                      final ok = await _submitTextAnnouncement(
-                                        subject: subj,
-                                        description: desc,
-                                        audience: selectedAudience,
-                                        status: 'Published',
-                                      );
-                                      if (modalCtx.mounted) Navigator.pop(modalCtx);
-                                      if (ok) {
-                                        _showSnackBar('Announcement published successfully');
-                                        _fetchNotices();
-                                      } else {
-                                        _showSnackBar('Failed to publish announcement', isError: true);
-                                      }
-                                    },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF635E54), // matching Image 2 brownish-slate
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
-                              ),
-                              child: const Text('PUBLISH', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
-                            ),
-                          ],
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B), size: 22),
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () => Navigator.pop(modalCtx),
                         ),
                       ],
                     ),
-                  ),
+                    const SizedBox(height: 16),
+
+                    // Subject Label & Input
+                    const Text(
+                      'SUBJECT',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF64748B),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      height: 48,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Center(
+                        child: TextField(
+                          controller: subjectCtrl,
+                          style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
+                          decoration: const InputDecoration(
+                            hintText: 'e.g. School Reopens from 15 July',
+                            hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                            border: InputBorder.none,
+                            isDense: true,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+
+                    // Description Label & Box with Bold, Italic, Underline Toolbar
+                    const Text(
+                      'DESCRIPTION *',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF64748B),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Toolbar with B, I, U
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.vertical(top: Radius.circular(13)),
+                              border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+                            ),
+                            child: Row(
+                              children: [
+                                InkWell(
+                                  onTap: () => insertHtmlTag('<b>', '</b>'),
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    child: const Text(
+                                      'B',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 15,
+                                        color: Color(0xFF0F172A),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                InkWell(
+                                  onTap: () => insertHtmlTag('<i>', '</i>'),
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    child: const Text(
+                                      'I',
+                                      style: TextStyle(
+                                        fontStyle: FontStyle.italic,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 15,
+                                        color: Color(0xFF0F172A),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                InkWell(
+                                  onTap: () => insertHtmlTag('<u>', '</u>'),
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    child: const Text(
+                                      'U',
+                                      style: TextStyle(
+                                        decoration: TextDecoration.underline,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 15,
+                                        color: Color(0xFF0F172A),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          // Multiline input
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            child: TextField(
+                              controller: descCtrl,
+                              maxLines: 5,
+                              minLines: 3,
+                              style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A), height: 1.4),
+                              decoration: const InputDecoration(
+                                border: InputBorder.none,
+                                hintText: 'Enter announcement details...',
+                                hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                                isDense: true,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+
+                    // Audience Label
+                    const Text(
+                      'AUDIENCE *',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF64748B),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 6,
+                      children: [
+                        _buildAudienceRadioOption(
+                          title: 'For Teachers Only',
+                          value: 'Teachers',
+                          groupValue: selectedAudience,
+                          onChanged: (val) => setModalState(() => selectedAudience = val!),
+                        ),
+                        _buildAudienceRadioOption(
+                          title: 'For Students Only',
+                          value: 'Students',
+                          groupValue: selectedAudience,
+                          onChanged: (val) => setModalState(() => selectedAudience = val!),
+                        ),
+                        _buildAudienceRadioOption(
+                          title: 'For Teachers & Students',
+                          value: 'Both',
+                          groupValue: selectedAudience,
+                          onChanged: (val) => setModalState(() => selectedAudience = val!),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 22),
+
+                    // Bottom Actions: CANCEL, PUBLISH
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: isSubmitting ? null : () => Navigator.pop(modalCtx),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF475569),
+                              side: const BorderSide(color: Color(0xFFCBD5E1)),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              padding: const EdgeInsets.symmetric(vertical: 13),
+                            ),
+                            child: const Text('CANCEL', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, letterSpacing: 0.4)),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: isSubmitting
+                                ? null
+                                : () async {
+                                    final subj = subjectCtrl.text.trim();
+                                    final desc = descCtrl.text.trim();
+                                    if (subj.isEmpty || desc.isEmpty) {
+                                      _showSnackBar('Subject and description are required', isError: true);
+                                      return;
+                                    }
+                                    setModalState(() => isSubmitting = true);
+                                    final ok = await _submitTextAnnouncement(
+                                      subject: subj,
+                                      description: desc,
+                                      audience: selectedAudience,
+                                      status: 'Published',
+                                    );
+                                    if (modalCtx.mounted) Navigator.pop(modalCtx);
+                                    if (ok) {
+                                      _showSnackBar('Announcement published successfully');
+                                      _fetchNotices();
+                                    } else {
+                                      _showSnackBar('Failed to publish announcement', isError: true);
+                                    }
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _kTealPrimary,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              padding: const EdgeInsets.symmetric(vertical: 13),
+                            ),
+                            child: isSubmitting
+                                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                : const Text('PUBLISH', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, letterSpacing: 0.4)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             );
@@ -1149,6 +1171,515 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
     } catch (_) {
       return false;
     }
+  }
+
+  bool _isWithinOneHour(dynamic notice) {
+    try {
+      final raw = (notice['created_at'] ?? notice['published_at'] ?? '').toString();
+      if (raw.isEmpty) return false;
+      final dt = DateTime.parse(raw).toLocal();
+      final diff = DateTime.now().difference(dt);
+      return diff.inSeconds >= 0 && diff.inMinutes <= 60;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<String?> _updateTextAnnouncement({
+    required int id,
+    required String subject,
+    required String description,
+    required String audience,
+    required String status,
+  }) async {
+    try {
+      final formattedDesc = description.contains('<p>') || description.contains('<br>')
+          ? description
+          : '<p>${description.replaceAll('\n', '<br>')}</p>';
+
+      final uri = Uri.parse('${widget.baseUrl}/api/school/announcements/$id');
+      final body = json.encode({
+        'subject': subject,
+        'description': formattedDesc,
+        'audience': audience,
+        'status': status,
+      });
+
+      final res = await http.put(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${widget.token}',
+          'Accept': 'application/json',
+        },
+        body: body,
+      );
+
+      final data = json.decode(res.body);
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        return null;
+      } else {
+        return data['message'] ?? 'Failed to update announcement';
+      }
+    } catch (e) {
+      return 'An error occurred while updating announcement: $e';
+    }
+  }
+
+  Future<String?> _deleteAnnouncement(int id) async {
+    try {
+      final uri = Uri.parse('${widget.baseUrl}/api/school/announcements/$id');
+      final res = await http.delete(
+        uri,
+        headers: {
+          'Authorization': 'Bearer ${widget.token}',
+          'Accept': 'application/json',
+        },
+      );
+
+      final data = json.decode(res.body);
+      if (res.statusCode == 200 || res.statusCode == 204) {
+        return null;
+      } else {
+        return data['message'] ?? 'Failed to delete announcement';
+      }
+    } catch (e) {
+      return 'An error occurred while deleting announcement: $e';
+    }
+  }
+
+  Future<void> _confirmDeleteNotice(int noticeId) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogCtx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: Colors.white,
+        elevation: 8,
+        child: Padding(
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEE2E2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFDC2626), size: 24),
+                  ),
+                  const SizedBox(width: 14),
+                  const Expanded(
+                    child: Text(
+                      'Delete Notice',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Are you sure you want to delete this notice? This action cannot be undone.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF475569),
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Divider(color: Color(0xFFE2E8F0), height: 1),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 44,
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFFCBD5E1)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          foregroundColor: const Color(0xFF475569),
+                        ),
+                        onPressed: () => Navigator.pop(dialogCtx, false),
+                        child: const Text('Cancel', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: SizedBox(
+                      height: 44,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFDC2626),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () => Navigator.pop(dialogCtx, true),
+                        child: const Text('Delete', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (confirm == true) {
+      final err = await _deleteAnnouncement(noticeId);
+      if (err == null) {
+        _showSnackBar('Notice deleted successfully');
+        _fetchNotices();
+      } else {
+        _showSnackBar(err, isError: true);
+      }
+    }
+  }
+
+  void _showEditAnnouncementModal(dynamic notice) {
+    final int noticeId = (notice['id'] as num).toInt();
+    final bool isAudio = notice['audio_url'] != null && (notice['audio_url'] as String).isNotEmpty;
+    final TextEditingController subjectCtrl = TextEditingController(text: notice['subject'] ?? '');
+
+    String rawDesc = (notice['description'] ?? '').toString();
+    rawDesc = rawDesc
+        .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
+        .replaceAll(RegExp(r'</?p>', caseSensitive: false), '')
+        .trim();
+    final TextEditingController descCtrl = TextEditingController(text: rawDesc);
+    String selectedAudience = (notice['audience'] ?? 'Both').toString();
+    bool isSubmitting = false;
+
+    void insertHtmlTag(String openTag, String closeTag) {
+      final text = descCtrl.text;
+      final selection = descCtrl.selection;
+      if (selection.start >= 0 && selection.end >= 0 && selection.start != selection.end) {
+        final selectedText = text.substring(selection.start, selection.end);
+        final newText = text.replaceRange(selection.start, selection.end, '$openTag$selectedText$closeTag');
+        descCtrl.value = TextEditingValue(
+          text: newText,
+          selection: TextSelection(
+            baseOffset: selection.start,
+            extentOffset: selection.start + openTag.length + selectedText.length + closeTag.length,
+          ),
+        );
+      } else {
+        final pos = selection.start >= 0 ? selection.start : text.length;
+        final newText = text.replaceRange(pos, pos, '$openTag$closeTag');
+        descCtrl.value = TextEditingValue(
+          text: newText,
+          selection: TextSelection.collapsed(offset: pos + openTag.length),
+        );
+      }
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (modalCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 14,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Drag pill indicator
+                    Center(
+                      child: Container(
+                        width: 38,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE2E8F0),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    // Header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Edit Announcement',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B), size: 22),
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () => Navigator.pop(modalCtx),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Subject Label & Input
+                    const Text(
+                      'SUBJECT',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF64748B),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      height: 48,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Center(
+                        child: TextField(
+                          controller: subjectCtrl,
+                          style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
+                          decoration: const InputDecoration(
+                            hintText: 'e.g. School Reopens from 15 July',
+                            hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                            border: InputBorder.none,
+                            isDense: true,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+
+                    // Description Label & Box with Bold, Italic, Underline Toolbar
+                    const Text(
+                      'DESCRIPTION *',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF64748B),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Toolbar with B, I, U
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.vertical(top: Radius.circular(13)),
+                              border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+                            ),
+                            child: Row(
+                              children: [
+                                InkWell(
+                                  onTap: () => insertHtmlTag('<b>', '</b>'),
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    child: const Text(
+                                      'B',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 15,
+                                        color: Color(0xFF0F172A),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                InkWell(
+                                  onTap: () => insertHtmlTag('<i>', '</i>'),
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    child: const Text(
+                                      'I',
+                                      style: TextStyle(
+                                        fontStyle: FontStyle.italic,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 15,
+                                        color: Color(0xFF0F172A),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                InkWell(
+                                  onTap: () => insertHtmlTag('<u>', '</u>'),
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    child: const Text(
+                                      'U',
+                                      style: TextStyle(
+                                        decoration: TextDecoration.underline,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 15,
+                                        color: Color(0xFF0F172A),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          // Multiline input
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            child: TextField(
+                              controller: descCtrl,
+                              maxLines: 5,
+                              minLines: 3,
+                              style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A), height: 1.4),
+                              decoration: const InputDecoration(
+                                border: InputBorder.none,
+                                hintText: 'Enter announcement details...',
+                                hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                                isDense: true,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+
+                    // Audience Label
+                    const Text(
+                      'AUDIENCE *',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF64748B),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 6,
+                      children: [
+                        _buildAudienceRadioOption(
+                          title: 'For Teachers Only',
+                          value: 'Teachers',
+                          groupValue: selectedAudience,
+                          onChanged: (val) => setModalState(() => selectedAudience = val!),
+                        ),
+                        _buildAudienceRadioOption(
+                          title: 'For Students Only',
+                          value: 'Students',
+                          groupValue: selectedAudience,
+                          onChanged: (val) => setModalState(() => selectedAudience = val!),
+                        ),
+                        _buildAudienceRadioOption(
+                          title: 'For Teachers & Students',
+                          value: 'Both',
+                          groupValue: selectedAudience,
+                          onChanged: (val) => setModalState(() => selectedAudience = val!),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 22),
+
+                    // Bottom Actions: CANCEL, UPDATE
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: isSubmitting ? null : () => Navigator.pop(modalCtx),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF475569),
+                              side: const BorderSide(color: Color(0xFFCBD5E1)),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              padding: const EdgeInsets.symmetric(vertical: 13),
+                            ),
+                            child: const Text('CANCEL', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, letterSpacing: 0.4)),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: isSubmitting
+                                ? null
+                                : () async {
+                                    final subj = subjectCtrl.text.trim();
+                                    final desc = descCtrl.text.trim();
+                                    if (!isAudio && (subj.isEmpty || desc.isEmpty)) {
+                                      _showSnackBar('Subject and description are required', isError: true);
+                                      return;
+                                    }
+                                    setModalState(() => isSubmitting = true);
+                                    final err = await _updateTextAnnouncement(
+                                      id: noticeId,
+                                      subject: subj.isNotEmpty ? subj : (notice['subject'] ?? 'Voice Note'),
+                                      description: desc.isNotEmpty ? desc : (notice['description'] ?? 'Voice Announcement'),
+                                      audience: selectedAudience,
+                                      status: notice['status'] ?? 'Published',
+                                    );
+                                    if (modalCtx.mounted) Navigator.pop(modalCtx);
+                                    if (err == null) {
+                                      _showSnackBar('Announcement updated successfully');
+                                      _fetchNotices();
+                                    } else {
+                                      _showSnackBar(err, isError: true);
+                                    }
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _kTealPrimary,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              padding: const EdgeInsets.symmetric(vertical: 13),
+                            ),
+                            child: isSubmitting
+                                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                : const Text('UPDATE', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, letterSpacing: 0.4)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Widget _buildAudienceRadioItem({
@@ -1224,7 +1755,7 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: isSelected ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+                  color: isSelected ? _kTealPrimary : const Color(0xFF94A3B8),
                   width: 2,
                 ),
               ),
@@ -1235,7 +1766,7 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
                         height: 9,
                         decoration: const BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Color(0xFF2563EB),
+                          color: _kTealPrimary,
                         ),
                       ),
                     )
@@ -1644,6 +2175,70 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
                       fontWeight: FontWeight.w600,
                     ),
                   ),
+                  if (_isPrincipal && _isWithinOneHour(notice)) ...[
+                    const SizedBox(width: 4),
+                    Theme(
+                      data: Theme.of(context).copyWith(
+                        splashColor: Colors.transparent,
+                        highlightColor: Colors.transparent,
+                      ),
+                      child: PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_vert_rounded, color: _kMutedSlate, size: 18),
+                        padding: EdgeInsets.zero,
+                        elevation: 6,
+                        color: Colors.white,
+                        surfaceTintColor: Colors.transparent,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        constraints: const BoxConstraints(minWidth: 140),
+                        onSelected: (val) {
+                          if (val == 'edit') {
+                            _showEditAnnouncementModal(notice);
+                          } else if (val == 'delete') {
+                            _confirmDeleteNotice(noticeId);
+                          }
+                        },
+                        itemBuilder: (ctx) => [
+                          const PopupMenuItem<String>(
+                            value: 'edit',
+                            height: 38,
+                            child: Row(
+                              children: [
+                                Icon(Icons.edit_outlined, size: 16, color: Color(0xFF0F172A)),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Edit Notice',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuDivider(height: 1),
+                          const PopupMenuItem<String>(
+                            value: 'delete',
+                            height: 38,
+                            child: Row(
+                              children: [
+                                Icon(Icons.delete_outline_rounded, size: 16, color: Color(0xFFDC2626)),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Delete Notice',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFFDC2626),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
 

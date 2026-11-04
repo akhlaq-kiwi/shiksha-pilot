@@ -20,6 +20,9 @@ import '../screens/achievements_screen.dart';
 import '../screens/attendance_screen.dart';
 import '../screens/principal_tar_screen.dart';
 import '../screens/notice_screen.dart';
+import '../screens/expense_screen.dart';
+import '../screens/revenue_screen.dart';
+import '../services/financial_report_service.dart';
 import '../services/attendance_service.dart';
 import '../services/leave_service.dart';
 import '../services/exam_service.dart';
@@ -316,6 +319,20 @@ class NotificationHelper {
         baseUrl: baseUrl,
         token: token,
         studentId: notifStudentId ?? studentId,
+      );
+    } else if (link.contains('financial-report') || link.contains('financial_report') || link.contains('revenue') || title.contains('financial report') || message.contains('financial report') || eventKey == 'FINANCIAL_REPORT_APPROVAL_REQUEST') {
+      targetScreen = RevenueScreen(
+        reportService: FinancialReportService(
+          baseUrl: baseUrl,
+          token: token,
+        ),
+        userRole: userRole,
+      );
+    } else if (link.contains('expense') || title.contains('expense') || message.contains('expense') || eventKey == 'EXPENSE_APPROVAL_REQUEST') {
+      targetScreen = ExpenseScreen(
+        baseUrl: baseUrl,
+        token: token,
+        userRole: userRole,
       );
     } else if (link.contains('leaves') || title.contains('leave') || message.contains('leave') || title.contains('holiday') || message.contains('holiday')) {
       final isLeaveReqNotif = title.contains('approve') || title.contains('reject') || message.contains('approve') || message.contains('reject') || title.contains('request') || message.contains('request');

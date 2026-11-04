@@ -174,7 +174,7 @@ final class PushDispatcher
                 $dispatcher->fcm->sendToTopic(self::topicFor($schoolId, $role), $notification, $data, $priority);
 
                 // Also fan out to any active tokens registered for this role
-                $stmt = $pdo->prepare("SELECT token FROM device_tokens WHERE school_id = :sid AND UPPER(user_role) = :role AND is_active = 1 LIMIT 200");
+                $stmt = $pdo->prepare("SELECT DISTINCT dt.token FROM device_tokens dt LEFT JOIN users u ON u.id = dt.user_id WHERE dt.school_id = :sid AND (UPPER(dt.user_role) = :role OR UPPER(COALESCE(u.role, '')) = :role) AND dt.is_active = 1 LIMIT 200");
                 $stmt->execute([':sid' => $schoolId, ':role' => strtoupper($role)]);
                 $tokens = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
                 if (!empty($tokens)) {

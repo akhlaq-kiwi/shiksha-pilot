@@ -6797,8 +6797,16 @@ class SchoolAdminService extends BaseService
             throw new ValidationException(['fields' => 'All fields (timetable ID, date, backup teacher) are required.']);
         }
 
-        if ($this->isDateHoliday($schoolId, $data['date'])) {
-            throw new ValidationException(['date' => 'Cannot create or publish timetable on a school holiday.']);
+        $targetDate = !empty($data['date']) ? $data['date'] : date('Y-m-d');
+        $targetDt = new \DateTime($targetDate);
+        $dayOfWeek = $targetDt->format('l');
+
+        if ($dayOfWeek === 'Sunday' || (int)$targetDt->format('N') === 7) {
+            throw new ValidationException(['date' => 'Cannot assign backup teacher on Sunday.']);
+        }
+
+        if ($this->isDateHoliday($schoolId, $targetDate)) {
+            throw new ValidationException(['date' => 'Cannot assign backup teacher on a school holiday.']);
         }
 
         if ($this->isPastWeek($data['date'])) {
@@ -6818,6 +6826,29 @@ class SchoolAdminService extends BaseService
 
         $targetDate = !empty($data['date']) ? $data['date'] : date('Y-m-d');
         $dayOfWeek = (new \DateTime($targetDate))->format('l');
+
+        // If the date's day of week differs from the timetable entry's day of week, map to that day's period
+        if ($dayOfWeek !== $entry['day_of_week']) {
+            $stmtMatching = $pdo->prepare("
+                SELECT id FROM timetable 
+                WHERE class_id = :cid AND day_of_week = :day AND period_number = :pnum AND school_id = :sid
+                LIMIT 1
+            ");
+            $stmtMatching->execute([
+                ':cid' => $entry['class_id'],
+                ':day' => $dayOfWeek,
+                ':pnum' => $entry['period_number'],
+                ':sid' => $schoolId
+            ]);
+            $matchedId = $stmtMatching->fetchColumn();
+            if ($matchedId) {
+                $data['timetable_id'] = $matchedId;
+                $stmtEntry = $pdo->prepare("SELECT * FROM timetable WHERE id = :id AND school_id = :sid");
+                $stmtEntry->execute([':id' => $matchedId, ':sid' => $schoolId]);
+                $entry = $stmtEntry->fetch(\PDO::FETCH_ASSOC);
+            }
+        }
+
         $stmtConflict = $pdo->prepare("
             SELECT t.id, c.name AS class_name FROM timetable t
             JOIN classes c ON t.class_id = c.id
@@ -8338,6 +8369,12 @@ class SchoolAdminService extends BaseService
         $selectedPeriod = !empty($params['period']) ? trim($params['period']) : (!empty($params['month']) ? trim($params['month']) : 'ALL TIME');
         $selectedCollector = !empty($params['deposit_by']) ? trim($params['deposit_by']) : (!empty($params['collected_by']) ? trim($params['collected_by']) : 'All Users');
         $search = !empty($params['search']) ? trim($params['search']) : '';
+        $isDiscounted = !empty($params['discounted']) && (
+            $params['discounted'] === 'true' || 
+            $params['discounted'] === '1' || 
+            $params['discounted'] === 1 || 
+            $params['discounted'] === true
+        );
         
         // Fetch timestamp of last generated financial report for this school & academic year
         $lastReportTimestamp = null;
@@ -8356,7 +8393,7 @@ class SchoolAdminService extends BaseService
         }
 
         // Strict AND Filtering: Only transactions matching ALL selected filter criteria are included
-        $filtered = array_filter($withBalance, function($t) use ($selectedPeriod, $lastReportTimestamp, $selectedCollector, $search) {
+        $filtered = array_filter($withBalance, function($t) use ($selectedPeriod, $lastReportTimestamp, $selectedCollector, $search, $isDiscounted) {
             // 1. Filter Period check (AND condition)
             if (strcasecmp($selectedPeriod, 'SINCE LAST REPORT') === 0) {
                 if ($lastReportTimestamp !== null) {
@@ -8417,6 +8454,15 @@ class SchoolAdminService extends BaseService
                     if (!$allTokensMatched) {
                         return false;
                     }
+                }
+            }
+
+            // 4. Discounted check (AND condition):
+            // Only transactions that have a discount applied are included
+            if ($isDiscounted) {
+                $discount = (float)($t['discount_amount'] ?? 0.0);
+                if ($discount <= 0.0) {
+                    return false;
                 }
             }
 
@@ -10971,7 +11017,7 @@ class SchoolAdminService extends BaseService
         }
 
         $status = $data['status'] ?? 'Pending';
-        if (!in_array($status, ['Pending', 'Request Sent', 'Settled'])) {
+        if (!in_array($status, ['Pending', 'Request Sent', 'Settled', 'Rejected'])) {
             throw new ValidationException(['status' => 'Invalid status value.']);
         }
 
@@ -11050,6 +11096,32 @@ class SchoolAdminService extends BaseService
 
         if (!$bgLaunched) {
             $this->dispatchSettlementEmail($user, $id, $baseUrl);
+        }
+
+        // Dispatch in-app notification & push notification to School Admin
+        try {
+            $creatorName = trim($user['name'] ?? 'Fee Collector');
+            $repId = $report['report_id'] ?? "REP-{$id}";
+            $notifTitle = 'Financial Report Settlement Request';
+            $notifMessage = "Fee Collector ({$creatorName}) has submitted financial report {$repId} requiring your approval.";
+            $notifLink = '/financial-reports';
+            $notifEventKey = 'FINANCIAL_REPORT_APPROVAL_REQUEST';
+
+            $stmtNotif = $pdo->prepare("
+                INSERT INTO dashboard_notifications (school_id, user_role, title, message, link, category, event_key, is_read, created_at)
+                VALUES (:sid, 'SCHOOL_ADMIN', :title, :msg, :link, 'FEES', :event_key, 0, NOW())
+            ");
+            $stmtNotif->execute([
+                ':sid' => $schoolId,
+                ':title' => $notifTitle,
+                ':msg' => $notifMessage,
+                ':link' => $notifLink,
+                ':event_key' => $notifEventKey,
+            ]);
+
+            \App\Shared\Notifications\PushDispatcher::pushOnly($pdo, $schoolId, 'SCHOOL_ADMIN', null, $notifEventKey, $notifTitle, $notifMessage, $notifLink);
+        } catch (\Throwable $e) {
+            // Best-effort notification & push
         }
 
         return $this->financialReportRepo->findById($id);
@@ -12139,7 +12211,7 @@ Only approve the settlement after reviewing all financial records.
         }
 
         $stmt = $pdo->prepare("
-            SELECT se.*, u.name as creator_name, app_u.name as approver_name 
+            SELECT se.*, CASE WHEN UPPER(u.role) = 'SCHOOL_ADMIN' THEN 'Admin' ELSE u.name END as creator_name, app_u.name as approver_name 
             FROM school_expenses se
             JOIN users u ON u.id = se.created_by
             LEFT JOIN users app_u ON app_u.id = se.approved_by
@@ -12149,22 +12221,12 @@ Only approve the settlement after reviewing all financial records.
         $stmt->execute($params);
         $expenses = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // Pre-prepare locking validation query
-        $stmtReports = $pdo->prepare("
-            SELECT COUNT(*) FROM financial_reports 
-            WHERE school_id = :sid AND :expense_date BETWEEN `from_date` AND `to_date`
-        ");
-
-        return array_map(function($e) use ($stmtReports, $schoolId) {
+        return array_map(function($e) use ($pdo, $schoolId) {
             $e['id'] = (int)$e['id'];
             $e['amount'] = (float)$e['amount'];
             $e['created_by'] = (int)$e['created_by'];
             $e['approval_status'] = $e['approval_status'] ?? 'Approved';
-            
-            // Check if expense is locked by an existing financial report
-            $stmtReports->execute([':sid' => $schoolId, ':expense_date' => $e['expense_date']]);
-            $e['is_locked'] = ((int)$stmtReports->fetchColumn() > 0);
-            
+            $e['is_locked'] = $this->isExpenseLockedInReport($pdo, $schoolId, $e);
             return $e;
         }, $expenses);
     }
@@ -12240,6 +12302,32 @@ Only approve the settlement after reviewing all financial records.
 
         $id = (int)$pdo->lastInsertId();
 
+        if ($approvalStatus === 'Pending') {
+            try {
+                $creatorName = trim($user['name'] ?? 'Fee Collector');
+                $title = 'Expense Approval Request';
+                $message = "{$creatorName} submitted an expense of ₹" . number_format($amount, 2) . " for '{$desc}' requiring your approval.";
+                $link = '/expenses';
+                $eventKey = 'EXPENSE_APPROVAL_REQUEST';
+
+                $stmtNotif = $pdo->prepare("
+                    INSERT INTO dashboard_notifications (school_id, user_role, title, message, link, category, event_key, is_read, created_at)
+                    VALUES (:sid, 'SCHOOL_ADMIN', :title, :msg, :link, 'FEES', :event_key, 0, NOW())
+                ");
+                $stmtNotif->execute([
+                    ':sid' => $schoolId,
+                    ':title' => $title,
+                    ':msg' => $message,
+                    ':link' => $link,
+                    ':event_key' => $eventKey,
+                ]);
+
+                PushDispatcher::pushOnly($pdo, $schoolId, 'SCHOOL_ADMIN', null, $eventKey, $title, $message, $link);
+            } catch (\Throwable $e) {
+                // Best-effort push notification
+            }
+        }
+
         return $this->getExpenseById($schoolId, $id);
     }
 
@@ -12247,7 +12335,7 @@ Only approve the settlement after reviewing all financial records.
     {
         $pdo = $this->staffRepo->getPdo();
         $stmtGet = $pdo->prepare("
-            SELECT se.*, u.name as creator_name, app_u.name as approver_name 
+            SELECT se.*, CASE WHEN UPPER(u.role) = 'SCHOOL_ADMIN' THEN 'Admin' ELSE u.name END as creator_name, app_u.name as approver_name 
             FROM school_expenses se
             JOIN users u ON u.id = se.created_by
             LEFT JOIN users app_u ON app_u.id = se.approved_by
@@ -12265,6 +12353,50 @@ Only approve the settlement after reviewing all financial records.
         }
 
         return $expense ?: [];
+    }
+
+    private function isExpenseLockedInReport(\PDO $pdo, int $schoolId, array $expense): bool
+    {
+        $isApproved = strtolower($expense['approval_status'] ?? 'approved') === 'approved';
+        if (!$isApproved) {
+            return false;
+        }
+
+        $createdAt = $expense['created_at'] ?? null;
+        if (empty($createdAt)) {
+            return false;
+        }
+
+        $ayid = !empty($expense['academic_year_id']) ? (int)$expense['academic_year_id'] : null;
+        if ($ayid !== null) {
+            $sql = "
+                SELECT COUNT(*) FROM financial_reports 
+                WHERE school_id = :sid 
+                  AND academic_year_id = :ayid
+                  AND :expense_created <= created_at
+            ";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([
+                ':sid' => $schoolId,
+                ':ayid' => $ayid,
+                ':expense_created' => $createdAt,
+            ]);
+        } else {
+            $sql = "
+                SELECT COUNT(*) FROM financial_reports 
+                WHERE school_id = :sid 
+                  AND :expense_created <= created_at
+                  AND :expense_date BETWEEN `from_date` AND `to_date`
+            ";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([
+                ':sid' => $schoolId,
+                ':expense_created' => $createdAt,
+                ':expense_date' => $expense['expense_date'] ?? date('Y-m-d', strtotime($createdAt)),
+            ]);
+        }
+
+        return (int)$stmt->fetchColumn() > 0;
     }
 
     public function getExpenseSettings(array $user): array
@@ -12315,6 +12447,56 @@ Only approve the settlement after reviewing all financial records.
         return $this->getExpenseById($schoolId, $id);
     }
 
+    public function rejectSchoolExpense(array $user, int $id): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->staffRepo->getPdo();
+        $userId = (int)$user['id'];
+
+        $stmtCheck = $pdo->prepare("SELECT * FROM school_expenses WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmtCheck->execute([':id' => $id, ':sid' => $schoolId]);
+        $expense = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+
+        if (!$expense) {
+            throw new NotFoundException('Expense not found.');
+        }
+
+        $stmt = $pdo->prepare("
+            UPDATE school_expenses 
+            SET approval_status = 'Rejected', approved_by = :uid, approved_at = NOW() 
+            WHERE id = :id AND school_id = :sid
+        ");
+        $stmt->execute([':uid' => $userId, ':id' => $id, ':sid' => $schoolId]);
+
+        return $this->getExpenseById($schoolId, $id);
+    }
+
+    public function getPendingFinancialReportCount(array $user): int
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->staffRepo->getPdo();
+        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+        $academicYearId = $workingYear ? (int)$workingYear['id'] : 0;
+
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*) FROM financial_reports 
+            WHERE school_id = :sid 
+              AND (academic_year_id = :ayid OR academic_year_id IS NULL)
+              AND (status = 'Pending' OR status = 'Request Sent')
+        ");
+        $stmt->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+        return (int)$stmt->fetchColumn();
+    }
+
+    public function getPendingExpenseCount(array $user): int
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->staffRepo->getPdo();
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM school_expenses WHERE school_id = :sid AND approval_status = 'Pending'");
+        $stmt->execute([':sid' => $schoolId]);
+        return (int)$stmt->fetchColumn();
+    }
+
     public function updateSchoolExpense(array $user, int $id, array $data): array
     {
         $schoolId = $this->getSchoolId($user);
@@ -12326,13 +12508,8 @@ Only approve the settlement after reviewing all financial records.
             throw new NotFoundException('Expense not found.');
         }
 
-        // Enforce lock verification
-        $stmtCheckReport = $pdo->prepare("
-            SELECT COUNT(*) FROM financial_reports 
-            WHERE school_id = :sid AND :expense_date BETWEEN `from_date` AND `to_date`
-        ");
-        $stmtCheckReport->execute([':sid' => $schoolId, ':expense_date' => $expense['expense_date']]);
-        if ((int)$stmtCheckReport->fetchColumn() > 0) {
+        // Enforce lock verification: Only approved expenses in generated financial reports are locked
+        if ($this->isExpenseLockedInReport($pdo, $schoolId, $expense)) {
             throw new ValidationException(['locked' => 'This expense has already been included in a generated financial report and can no longer be modified.']);
         }
 
@@ -12340,14 +12517,6 @@ Only approve the settlement after reviewing all financial records.
         $year = $this->getWorkingAcademicYear($pdo, $schoolId);
         if ($year === null) {
             throw new ValidationException(['academic_year' => 'No active or draft academic year found.']);
-        }
-
-        $expTimestamp = strtotime($expense['expense_date']);
-        $startY = strtotime($year['start_date']);
-        $endY = strtotime($year['end_date']);
-
-        if ($expTimestamp < $startY || $expTimestamp > $endY) {
-            throw new ValidationException(['academic_year' => 'Cannot edit expenses from historical or inactive academic years.']);
         }
 
         // Perform validation
@@ -12402,35 +12571,31 @@ Only approve the settlement after reviewing all financial records.
             throw new NotFoundException('Expense not found.');
         }
 
-        // Enforce lock verification
-        $stmtCheckReport = $pdo->prepare("
-            SELECT COUNT(*) FROM financial_reports 
-            WHERE school_id = :sid AND :expense_date BETWEEN `from_date` AND `to_date`
-        ");
-        $stmtCheckReport->execute([':sid' => $schoolId, ':expense_date' => $expense['expense_date']]);
-        if ((int)$stmtCheckReport->fetchColumn() > 0) {
-            throw new ValidationException(['locked' => 'This expense has already been included in a generated financial report and can no longer be modified.']);
+        // Enforce creator-only deletion rule:
+        // Agar koi expense kisi user A ne add kiya ab ye expense koi aur user delete nhi kr pana chahiye only User A hi delete kr skta hai even school admin bhi delete nhi kr skta.
+        if ((int)$expense['created_by'] !== (int)$user['id']) {
+            throw new ValidationException(
+                ['forbidden' => 'You can only delete expenses that were created by you.'],
+                'You can only delete expenses that were created by you.'
+            );
+        }
+
+        if (strtolower($expense['approval_status'] ?? '') === 'rejected') {
+            throw new ValidationException(
+                ['locked' => 'Rejected expenses cannot be deleted.'],
+                'Rejected expenses cannot be deleted.'
+            );
+        }
+
+        // Enforce lock verification: Only approved expenses in generated financial reports are locked
+        if ($this->isExpenseLockedInReport($pdo, $schoolId, $expense)) {
+            throw new ValidationException(['locked' => 'This expense has already been included in a generated financial report and can no longer be deleted.']);
         }
 
         // Check active year constraints
         $year = $this->getWorkingAcademicYear($pdo, $schoolId);
         if ($year === null) {
             throw new ValidationException(['academic_year' => 'No active or draft academic year found.']);
-        }
-
-        $expTimestamp = strtotime($expense['expense_date']);
-        $startY = strtotime($year['start_date']);
-        $endY = strtotime($year['end_date']);
-
-        if ($expTimestamp < $startY || $expTimestamp > $endY) {
-            throw new ValidationException(['academic_year' => 'Cannot delete expenses from historical or inactive academic years.']);
-        }
-
-        if ($this->isTransactionInReport($pdo, $schoolId, $expense['created_at'] ?? $expense['expense_date']) || $this->isTransactionInReport($pdo, $schoolId, $expense['expense_date'])) {
-            throw new ValidationException(
-                ['locked' => 'This action can not be done, This is already included in financial report'],
-                'This action can not be done, This is already included in financial report'
-            );
         }
 
         $stmt = $pdo->prepare("DELETE FROM school_expenses WHERE id = :id AND school_id = :sid");
@@ -19202,6 +19367,10 @@ Only approve the settlement after reviewing all financial records.
                     $query .= " AND (event_key = 'SALARY_DISBURSED' OR link LIKE '%salary%' OR title LIKE '%Salary%' OR category = 'Finance' OR category = 'SALARY')";
                 } elseif ($module === 'exams' || $module === 'exam') {
                     $query .= " AND (event_key LIKE '%EXAM%' OR category = 'EXAM' OR link LIKE '%exam%' OR title LIKE '%exam%' OR title LIKE '%examination%' OR title LIKE '%admit card%' OR title LIKE '%report card%' OR title LIKE '%scheme%' OR title LIKE '%datesheet%')";
+                } elseif ($module === 'expense' || $module === 'expenses') {
+                    $query .= " AND (event_key = 'EXPENSE_APPROVAL_REQUEST' OR link LIKE '%expense%' OR title LIKE '%Expense%' OR title LIKE '%expense%')";
+                } elseif ($module === 'financial_report' || $module === 'financial-report' || $module === 'financial-reports' || $module === 'revenue') {
+                    $query .= " AND (event_key = 'FINANCIAL_REPORT_APPROVAL_REQUEST' OR link LIKE '%financial-report%' OR link LIKE '%revenue%' OR title LIKE '%Financial Report%' OR title LIKE '%Settlement%')";
                 } elseif (!empty($eventKey)) {
                     $query .= " AND event_key = :ekey";
                     $params[':ekey'] = $eventKey;
@@ -20330,10 +20499,28 @@ Only approve the settlement after reviewing all financial records.
             throw new NotFoundException('Announcement not found.');
         }
 
+        // 1-hour notice edit/delete restriction
+        $annCreatedAt = strtotime($ann['created_at'] ?? $ann['published_at'] ?? 'now');
+        if ((time() - $annCreatedAt) > 3600) {
+            throw new ValidationException(
+                ['time_limit' => 'Notice can only be edited or deleted within 1 hour of sending.'],
+                'Notice can only be edited or deleted within 1 hour of sending.'
+            );
+        }
+
         $subject = isset($data['subject']) ? trim((string)$data['subject']) : '';
         $description = isset($data['description']) ? trim((string)$data['description']) : '';
         $audience = isset($data['audience']) ? trim((string)$data['audience']) : '';
         $status = isset($data['status']) ? trim((string)$data['status']) : $ann['status'];
+
+        if (!empty($ann['audio_url'])) {
+            if ($subject === '') {
+                $subject = !empty($ann['subject']) ? $ann['subject'] : 'Voice Note';
+            }
+            if ($description === '') {
+                $description = !empty($ann['description']) ? $ann['description'] : '<p>Voice Announcement</p>';
+            }
+        }
 
         // Validation
         if ($subject === '') {
@@ -20402,6 +20589,15 @@ Only approve the settlement after reviewing all financial records.
         $ann = $stmtCheck->fetch(PDO::FETCH_ASSOC);
         if (!$ann) {
             throw new NotFoundException('Announcement not found.');
+        }
+
+        // 1-hour notice edit/delete restriction
+        $annCreatedAt = strtotime($ann['created_at'] ?? $ann['published_at'] ?? 'now');
+        if ((time() - $annCreatedAt) > 3600) {
+            throw new ValidationException(
+                ['time_limit' => 'Notice can only be edited or deleted within 1 hour of sending.'],
+                'Notice can only be edited or deleted within 1 hour of sending.'
+            );
         }
 
         // Delete

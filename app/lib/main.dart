@@ -6,11 +6,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
 import 'constants/app_colors.dart';
 import 'package:http/http.dart' as http;
-import 'screens/leave_list_screen.dart';
 import 'screens/home_screen.dart';
 import 'services/leave_service.dart';
 import 'services/auth_service.dart';
 import 'services/notification_helper.dart';
+import 'services/push_notification_service.dart';
 import 'config.dart';
 
 const String fetchNotificationsTask = "com.shikshapilot.schoolhub.fetchNotifications";
@@ -99,13 +99,31 @@ void callbackDispatcher() {
   });
 }
 
+final ValueNotifier<ThemeMode> appThemeNotifier = ValueNotifier<ThemeMode>(ThemeMode.light);
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final savedTheme = prefs.getString('theme_mode') ?? 'Light Mode';
+    if (savedTheme == 'Dark Mode') {
+      appThemeNotifier.value = ThemeMode.dark;
+    } else if (savedTheme == 'System Defaults' || savedTheme == 'System') {
+      appThemeNotifier.value = ThemeMode.system;
+    } else {
+      appThemeNotifier.value = ThemeMode.light;
+    }
+  } catch (_) {}
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
   await NotificationHelper.init();
+  try {
+    await PushNotificationService.init();
+  } catch (e) {
+    debugPrint('PushNotificationService.init error: $e');
+  }
   await Workmanager().initialize(
     callbackDispatcher,
     isInDebugMode: false,
@@ -126,35 +144,37 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      navigatorKey: navigatorKey,
-      title: 'Shiksha Pilot',
-      debugShowCheckedModeBanner: false,
-      // Scholar Indigo — the same brand values as the web app's --brand-*
-      // tokens, not Flutter's generic Colors.indigo swatch, so the two
-      // clients render the same primary colour rather than two similar ones.
-      theme: ThemeData(
-        useMaterial3: true,
-        fontFamily: 'Roboto',
-        scaffoldBackgroundColor: AppColors.surfaceCanvas,
-        colorScheme: AppColors.lightColorScheme,
-        tabBarTheme: const TabBarThemeData(
-          splashFactory: NoSplash.splashFactory,
-          overlayColor: WidgetStatePropertyAll(Colors.transparent),
-        ),
-      ),
-      darkTheme: ThemeData(
-        useMaterial3: true,
-        fontFamily: 'Roboto',
-        scaffoldBackgroundColor: AppColors.darkSurfaceCanvas,
-        colorScheme: AppColors.darkColorScheme,
-        tabBarTheme: const TabBarThemeData(
-          splashFactory: NoSplash.splashFactory,
-          overlayColor: WidgetStatePropertyAll(Colors.transparent),
-        ),
-      ),
-      themeMode: ThemeMode.light,
-      home: const SplashScreen(),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: appThemeNotifier,
+      builder: (context, currentThemeMode, _) {
+        return MaterialApp(
+          navigatorKey: navigatorKey,
+          title: 'Shiksha Pilot',
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData(
+            useMaterial3: true,
+            fontFamily: 'Roboto',
+            scaffoldBackgroundColor: AppColors.surfaceCanvas,
+            colorScheme: AppColors.lightColorScheme,
+            tabBarTheme: const TabBarThemeData(
+              splashFactory: NoSplash.splashFactory,
+              overlayColor: WidgetStatePropertyAll(Colors.transparent),
+            ),
+          ),
+          darkTheme: ThemeData(
+            useMaterial3: true,
+            fontFamily: 'Roboto',
+            scaffoldBackgroundColor: AppColors.darkSurfaceCanvas,
+            colorScheme: AppColors.darkColorScheme,
+            tabBarTheme: const TabBarThemeData(
+              splashFactory: NoSplash.splashFactory,
+              overlayColor: WidgetStatePropertyAll(Colors.transparent),
+            ),
+          ),
+          themeMode: currentThemeMode,
+          home: const SplashScreen(),
+        );
+      },
     );
   }
 }
@@ -419,6 +439,9 @@ class _LoginScreenState extends State<LoginScreen> {
       await prefs.setString('user_role', role);
       await prefs.setString('user_name', name);
       await prefs.setString('user_phone', (user['phone'] as String?) ?? '');
+      if (user['id'] != null) {
+        await prefs.setInt('user_id', int.tryParse(user['id'].toString()) ?? 0);
+      }
       await prefs.setString('school_name', ((user['school_name'] as String?) ?? 'Shiksha Pilot Academy').toUpperCase());
       final String userPhoto = (user['staff_photo_path'] as String?) ?? (user['photo_path'] as String?) ?? (user['photo'] as String?) ?? '';
       await prefs.setString('user_photo', userPhoto);
@@ -435,6 +458,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
       final workingBaseUrl = prefs.getString('base_url') ?? activeBaseUrl;
       final leaveService = LeaveService(baseUrl: workingBaseUrl, token: token);
+      try {
+        await PushNotificationService.init();
+        await PushNotificationService.registerDevice();
+      } catch (e) {
+        debugPrint('registerDevice error on login: $e');
+      }
 
       final pendingPayload = prefs.getString('pending_notification_payload');
       if (pendingPayload != null && pendingPayload.isNotEmpty) {
@@ -643,11 +672,17 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final isKeyboardOpen = bottomInset > 0;
+
     return Scaffold(
-      body: SingleChildScrollView(
+      resizeToAvoidBottomInset: true,
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        behavior: HitTestBehavior.opaque,
         child: Container(
-          height: MediaQuery.of(context).size.height,
-          padding: const EdgeInsets.symmetric(horizontal: 28),
+          width: double.infinity,
+          height: double.infinity,
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [Colors.indigo.shade900, Colors.indigo.shade700],
@@ -655,185 +690,219 @@ class _LoginScreenState extends State<LoginScreen> {
               end: Alignment.bottomRight,
             ),
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // The brand mark, replacing the generic graduation-cap icon that
-              // stood in for it before.
-              Image.asset(
-                'assets/images/logo_mark.png',
-                height: 96,
-                fit: BoxFit.contain,
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Shiksha Pilot',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                  letterSpacing: 1,
-                ),
-              ),
-              const SizedBox(height: 36),
+          child: SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final availHeight = constraints.maxHeight;
 
-              // Form Card
-              Card(
-                elevation: 12,
-                shadowColor: Colors.black45,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (_errorMessage.isNotEmpty) ...[
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.red.shade50,
-                              border: Border.all(color: Colors.red.shade200),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Icon(Icons.error_outline, color: Colors.red.shade800, size: 18),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    _errorMessage,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.red.shade900,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                        ],
+                // When keyboard is open:
+                // 1. Container (Card), inputs, and button KEEP THEIR EXACT SAME FULL SIZE (no shrinking!).
+                // 2. The gap between keypad and card/button is reduced to half (~12dp).
+                // 3. Header spacing and logo adapt smoothly so the card never has to shrink.
+                final double logoHeight = isKeyboardOpen
+                    ? ((availHeight - 340).clamp(40.0, 75.0))
+                    : 96.0;
+                final double logoToTitleSpace = isKeyboardOpen ? 8.0 : 16.0;
+                final double titleFontSize = isKeyboardOpen ? 24.0 : 32.0;
+                final double titleToCardSpace = isKeyboardOpen ? 14.0 : 34.0;
+                final double bottomGap = isKeyboardOpen ? 12.0 : 12.0;
 
-                        // Phone Field
-                        TextFormField(
-                          controller: _phoneController,
-                          keyboardType: TextInputType.phone,
-                          onChanged: (val) {
-                            if (_phoneValidationError != null) {
-                              setState(() {
-                                _phoneValidationError = null;
-                              });
-                            }
-                          },
-                          decoration: InputDecoration(
-                            labelText: 'Mobile Number',
-                            prefixIcon: const Icon(Icons.phone_android),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
+                return SizedBox(
+                  width: constraints.maxWidth,
+                  height: constraints.maxHeight,
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(28, 8, 28, bottomGap),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: isKeyboardOpen ? Alignment.bottomCenter : Alignment.center,
+                      child: SizedBox(
+                        width: constraints.maxWidth - 56,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: isKeyboardOpen ? MainAxisAlignment.end : MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // The brand mark
+                            Image.asset(
+                              'assets/images/logo_mark.png',
+                              height: logoHeight,
+                              fit: BoxFit.contain,
                             ),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Please enter mobile number';
-                            }
-                            if (!RegExp(r'^\d{10}$').hasMatch(value.trim())) {
-                              return 'Mobile number must be exactly 10 digits';
-                            }
-                            if (_phoneValidationError != null) {
-                              return _phoneValidationError;
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 18),
-
-                        // Password Field
-                        TextFormField(
-                          controller: _passwordController,
-                          obscureText: _obscurePassword,
-                          onChanged: (val) {
-                            if (_passwordValidationError != null) {
-                              setState(() {
-                                _passwordValidationError = null;
-                              });
-                            }
-                          },
-                          decoration: InputDecoration(
-                            labelText: 'Password',
-                            prefixIcon: const Icon(Icons.lock_outline),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscurePassword
-                                    ? Icons.visibility_off_outlined
-                                    : Icons.visibility_outlined,
+                            SizedBox(height: logoToTitleSpace),
+                            Text(
+                              'Shiksha Pilot',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: titleFontSize,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                                letterSpacing: 1,
                               ),
-                              onPressed: () {
-                                setState(() {
-                                  _obscurePassword = !_obscurePassword;
-                                });
-                              },
                             ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter password';
-                            }
-                            if (_passwordValidationError != null) {
-                              return _passwordValidationError;
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
+                            SizedBox(height: titleToCardSpace),
 
-                        // Login Button
-                        ElevatedButton(
-                          onPressed: _isLoading ? null : _handleLogin,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.indigo.shade800,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            elevation: 3,
-                          ),
-                          child: _isLoading
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.5,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                  ),
-                                )
-                              : const Text(
-                                  'SIGN IN',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15,
-                                    letterSpacing: 1,
+                            // Form Card - keeps exact original size, padding, inputs and button
+                            Card(
+                              elevation: 12,
+                              shadowColor: Colors.black45,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(24),
+                                child: Form(
+                                  key: _formKey,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (_errorMessage.isNotEmpty) ...[
+                                        Container(
+                                          padding: const EdgeInsets.all(12),
+                                          decoration: BoxDecoration(
+                                            color: Colors.red.shade50,
+                                            border: Border.all(color: Colors.red.shade200),
+                                            borderRadius: BorderRadius.circular(10),
+                                          ),
+                                          child: Row(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Icon(Icons.error_outline, color: Colors.red.shade800, size: 18),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Text(
+                                                  _errorMessage,
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: Colors.red.shade900,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 16),
+                                      ],
+
+                                      // Phone Field - exact standard size
+                                      TextFormField(
+                                        controller: _phoneController,
+                                        keyboardType: TextInputType.phone,
+                                        onChanged: (val) {
+                                          if (_phoneValidationError != null) {
+                                            setState(() {
+                                              _phoneValidationError = null;
+                                            });
+                                          }
+                                        },
+                                        decoration: InputDecoration(
+                                          labelText: 'Mobile Number',
+                                          prefixIcon: const Icon(Icons.phone_android),
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                        ),
+                                        validator: (value) {
+                                          if (value == null || value.trim().isEmpty) {
+                                            return 'Please enter mobile number';
+                                          }
+                                          if (!RegExp(r'^\d{10}$').hasMatch(value.trim())) {
+                                            return 'Mobile number must be exactly 10 digits';
+                                          }
+                                          if (_phoneValidationError != null) {
+                                            return _phoneValidationError;
+                                          }
+                                          return null;
+                                        },
+                                      ),
+                                      const SizedBox(height: 18),
+
+                                      // Password Field - exact standard size
+                                      TextFormField(
+                                        controller: _passwordController,
+                                        obscureText: _obscurePassword,
+                                        onChanged: (val) {
+                                          if (_passwordValidationError != null) {
+                                            setState(() {
+                                              _passwordValidationError = null;
+                                            });
+                                          }
+                                        },
+                                        decoration: InputDecoration(
+                                          labelText: 'Password',
+                                          prefixIcon: const Icon(Icons.lock_outline),
+                                          suffixIcon: IconButton(
+                                            icon: Icon(
+                                              _obscurePassword
+                                                  ? Icons.visibility_off_outlined
+                                                  : Icons.visibility_outlined,
+                                            ),
+                                            onPressed: () {
+                                              setState(() {
+                                                _obscurePassword = !_obscurePassword;
+                                              });
+                                            },
+                                          ),
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                        ),
+                                        validator: (value) {
+                                          if (value == null || value.isEmpty) {
+                                            return 'Please enter password';
+                                          }
+                                          if (_passwordValidationError != null) {
+                                            return _passwordValidationError;
+                                          }
+                                          return null;
+                                        },
+                                      ),
+                                      const SizedBox(height: 16),
+
+                                      // Login Button - exact standard size
+                                      ElevatedButton(
+                                        onPressed: _isLoading ? null : _handleLogin,
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.indigo.shade800,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(vertical: 16),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          elevation: 3,
+                                        ),
+                                        child: _isLoading
+                                            ? const SizedBox(
+                                                height: 20,
+                                                width: 20,
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2.5,
+                                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                                ),
+                                              )
+                                            : const Text(
+                                                'SIGN IN',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 15,
+                                                  letterSpacing: 1,
+                                                ),
+                                              ),
+                                      ),
+                                    ],
                                   ),
                                 ),
+                              ),
+                            ),
+                          ],
                         ),
-
-                      ],
+                      ),
                     ),
                   ),
-                ),
-              ),
-            ],
+                );
+              },
+            ),
           ),
         ),
       ),

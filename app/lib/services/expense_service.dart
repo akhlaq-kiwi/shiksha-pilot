@@ -125,49 +125,59 @@ class ExpenseService {
 
   /// Upload bill attachment file
   Future<String> uploadBillAttachment(File file) async {
-    final uri = Uri.parse('$baseUrl/api/school/upload');
-    final request = raw_http.MultipartRequest('POST', uri);
-
-    request.headers.addAll({
-      'Authorization': 'Bearer $token',
-    });
-    request.fields['category'] = 'finance';
-
-    final stream = raw_http.ByteStream(file.openRead());
-    final length = await file.length();
-
-    final multipartFile = raw_http.MultipartFile(
-      'document',
-      stream,
-      length,
-      filename: path.basename(file.path),
-    );
-
-    request.files.add(multipartFile);
-
-    final streamedResponse = await request.send();
-    final response = await raw_http.Response.fromStream(streamedResponse);
-
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      final decoded = json.decode(response.body);
-      final resData = decoded['data'];
-      if (resData is Map && resData['url'] != null) {
-        return resData['url'].toString();
-      } else if (decoded['url'] != null) {
-        return decoded['url'].toString();
-      }
-      return '';
-    } else {
+    int attempts = 0;
+    while (attempts < 2) {
+      attempts++;
       try {
-        final decoded = json.decode(response.body);
-        throw Exception(decoded['message'] ?? 'Failed to upload bill receipt.');
-      } catch (e) {
-        if (e is Exception && !e.toString().contains('FormatException')) {
-          rethrow;
+        final uri = Uri.parse('$baseUrl/api/school/upload');
+        final request = raw_http.MultipartRequest('POST', uri);
+
+        request.headers.addAll({
+          'Authorization': 'Bearer $token',
+        });
+        request.fields['category'] = 'finance';
+
+        final stream = raw_http.ByteStream(file.openRead());
+        final length = await file.length();
+
+        final multipartFile = raw_http.MultipartFile(
+          'document',
+          stream,
+          length,
+          filename: path.basename(file.path),
+        );
+
+        request.files.add(multipartFile);
+
+        final streamedResponse = await request.send();
+        final response = await raw_http.Response.fromStream(streamedResponse);
+
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          final decoded = json.decode(response.body);
+          final resData = decoded['data'];
+          if (resData is Map && resData['url'] != null) {
+            return resData['url'].toString();
+          } else if (decoded['url'] != null) {
+            return decoded['url'].toString();
+          }
+          return '';
+        } else {
+          try {
+            final decoded = json.decode(response.body);
+            throw Exception(decoded['message'] ?? 'Failed to upload bill receipt.');
+          } catch (e) {
+            if (e is Exception && !e.toString().contains('FormatException')) {
+              rethrow;
+            }
+            throw Exception('Failed to upload bill receipt.');
+          }
         }
-        throw Exception('Failed to upload bill receipt.');
+      } catch (e) {
+        if (attempts >= 2) rethrow;
+        await Future.delayed(const Duration(milliseconds: 600));
       }
     }
+    throw Exception('Failed to upload bill receipt.');
   }
 
   /// Get academic years to display current academic year if needed
@@ -240,5 +250,36 @@ class ExpenseService {
       if (e is Exception && !e.toString().contains('FormatException')) rethrow;
       throw Exception('Failed to approve expense');
     }
+  }
+
+  /// Reject a pending expense (School Admin only)
+  Future<Map<String, dynamic>> rejectExpense(int id) async {
+    final uri = Uri.parse('$baseUrl/api/school/expenses/$id/reject');
+    final response = await http.post(uri, headers: _headers, body: '{}');
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final decoded = json.decode(response.body);
+      return Map<String, dynamic>.from(decoded['data'] ?? decoded);
+    }
+    try {
+      final decoded = json.decode(response.body);
+      throw Exception(decoded['message'] ?? 'Failed to reject expense');
+    } catch (e) {
+      if (e is Exception && !e.toString().contains('FormatException')) rethrow;
+      throw Exception('Failed to reject expense');
+    }
+  }
+
+  /// Get count of pending expenses waiting for approval (School Admin only)
+  Future<int> getPendingExpenseCount() async {
+    try {
+      final uri = Uri.parse('$baseUrl/api/school/expenses/pending-count');
+      final response = await http.get(uri, headers: _headers);
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+        final data = decoded['data'] ?? decoded;
+        return (data['pending_count'] as num?)?.toInt() ?? 0;
+      }
+    } catch (_) {}
+    return 0;
   }
 }

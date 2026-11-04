@@ -100,9 +100,12 @@ return function (App $app) {
     $app->get('/api/school/financial-reports/{id}/export', [SchoolAdminController::class, 'exportFinancialReport']);
     $app->get('/api/public/financial-reports/{id}/settlement/approve', [SchoolAdminController::class, 'ownerApproveSettlement']);
     $app->get('/api/public/financial-reports/{id}/settlement/reject', [SchoolAdminController::class, 'ownerRejectSettlement']);
+    $app->get('/api/school/financial-reports/pending-count', [SchoolAdminController::class, 'getPendingFinancialReportCount']);
+    $app->get('/api/school/expenses/pending-count', [SchoolAdminController::class, 'getPendingExpenseCount']);
     $app->get('/api/school/expenses/settings', [SchoolAdminController::class, 'getExpenseSettings']);
     $app->post('/api/school/expenses/settings', [SchoolAdminController::class, 'updateExpenseSettings']);
     $app->post('/api/school/expenses/{id}/approve', [SchoolAdminController::class, 'approveSchoolExpense']);
+    $app->post('/api/school/expenses/{id}/reject', [SchoolAdminController::class, 'rejectSchoolExpense']);
     $app->get('/api/school/expenses', [SchoolAdminController::class, 'getSchoolExpenses']);
     $app->post('/api/school/expenses', [SchoolAdminController::class, 'createSchoolExpense']);
     $app->put('/api/school/expenses/{id}', [SchoolAdminController::class, 'updateSchoolExpense']);

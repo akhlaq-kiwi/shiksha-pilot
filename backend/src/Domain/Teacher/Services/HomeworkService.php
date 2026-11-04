@@ -33,20 +33,21 @@ class HomeworkService extends BaseService
 
         $originalFilename = $uploadedFile->getClientFilename();
         $extension = strtolower(pathinfo($originalFilename, PATHINFO_EXTENSION));
-        $allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png', 'webp'];
+        $allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png', 'webp', 'm4a', 'mp3', 'aac', 'wav'];
 
         if (!in_array($extension, $allowedExtensions, true)) {
             throw new ValidationException(['file' => 'Unsupported file format.'], 'Unsupported file format.');
         }
 
         $size = $uploadedFile->getSize();
-        if ($size > 10 * 1024 * 1024) { // 10MB limit
+        if ($size > 25 * 1024 * 1024) { // 10MB limit
             throw new ValidationException(['file' => 'File size exceeds the allowed limit.'], 'File size exceeds the allowed limit.');
         }
 
         $stored = $this->storage->storeUploadedFile($uploadedFile, StorageService::CATEGORY_HOMEWORK, 'hw');
 
-        $fileType = ($extension === 'pdf') ? 'pdf' : 'image';
+        $isAudio = in_array($extension, ['m4a', 'mp3', 'aac', 'wav'], true);
+        $fileType = ($extension === 'pdf') ? 'pdf' : ($isAudio ? 'audio' : 'image');
 
         return [
             'file_name' => $originalFilename,
@@ -181,6 +182,15 @@ class HomeworkService extends BaseService
             throw new NotFoundException('Homework not found');
         }
 
+        // 1-hour modification window rule
+        $createdAt = !empty($existing['created_at']) ? strtotime($existing['created_at']) : time();
+        if ((time() - $createdAt) > 3600) {
+            throw new ValidationException(
+                ['time_limit' => 'Homework can only be edited within 1 hour of creation.'],
+                'Homework can only be edited within 1 hour of creation.'
+            );
+        }
+
         $title = trim((string)($data['title'] ?? ''));
         $description = trim((string)($data['description'] ?? ''));
         $classId = !empty($data['class_id']) ? (int)$data['class_id'] : ($existing['class_id'] ?? null);
@@ -218,6 +228,15 @@ class HomeworkService extends BaseService
         $existing = $this->getHomeworkById($schoolId, $id);
         if (!$existing) {
             throw new NotFoundException('Homework not found');
+        }
+
+        // 1-hour deletion window rule
+        $createdAt = !empty($existing['created_at']) ? strtotime($existing['created_at']) : time();
+        if ((time() - $createdAt) > 3600) {
+            throw new ValidationException(
+                ['time_limit' => 'Homework can only be deleted within 1 hour of creation.'],
+                'Homework can only be deleted within 1 hour of creation.'
+            );
         }
 
         // Remove the stored attachments (S3 objects or local files).

@@ -39,6 +39,7 @@ import 'package:school_hub/screens/fees_portal_screen.dart';
 import 'package:school_hub/screens/teacher_salary_disbursement_screen.dart';
 import 'package:school_hub/screens/class_teacher_assignment_screen.dart';
 import 'package:school_hub/screens/expense_screen.dart';
+import 'package:school_hub/services/expense_service.dart';
 import 'package:school_hub/screens/teachers_screen.dart';
 import 'package:school_hub/services/teacher_management_service.dart';
 import 'package:school_hub/screens/classes_screen.dart';
@@ -108,6 +109,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _unreadNotificationCount = 0;
   bool _isFetchingNotifications = false;
   int _unreadNoticeCount = 0;
+  int _unreadExpenseCount = 0;
+  int _unreadFinancialReportCount = 0;
   bool _isFetchingNotices = false;
   int _unreadTimetableCount = 0;
   int _unreadSalaryCount = 0;
@@ -265,7 +268,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       isAvailable: true,
     ),
     LauncherFeature(
-      name: 'Revenue',
+      name: 'Financial report',
       icon: Icons.trending_up_rounded,
       color: const Color(0xFFD97706),
       allowedRoles: ['TEACHER', 'FEE_COLLECTOR'],
@@ -338,6 +341,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final roleUpper = widget.userRole.toUpperCase();
     final savedId = prefs.getInt('selected_student_id');
 
+    try {
+      await PushNotificationService.init();
+      await PushNotificationService.registerDevice();
+    } catch (_) {}
+
     setState(() {
       _userName = (widget.userName != null && widget.userName!.isNotEmpty)
           ? widget.userName!
@@ -386,6 +394,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
     _fetchUnreadNotificationsCount();
     _fetchUnreadNoticesCount();
+    _fetchPendingExpenseCount();
+    _fetchPendingFinancialReportCount();
   }
 
   Future<void> _syncProfileDetails(String token) async {
@@ -697,6 +707,66 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _fetchPendingExpenseCount() async {
+    final roleUpper = widget.userRole.toUpperCase();
+    if (roleUpper != 'SCHOOL_ADMIN') return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token') ?? widget.leaveService.token;
+      if (token.isEmpty) return;
+      final baseUrl = resolveBaseUrlFrom(prefs);
+      final expService = ExpenseService(baseUrl: baseUrl, token: token);
+      final pendingCount = await expService.getPendingExpenseCount();
+      final lastViewed = prefs.getInt('last_viewed_expense_pending_count') ?? 0;
+      final badgeCleared = prefs.getBool('expense_badge_cleared') ?? false;
+
+      int unread = 0;
+      if (!badgeCleared) {
+        unread = pendingCount;
+      } else if (pendingCount > lastViewed) {
+        unread = pendingCount - lastViewed;
+      }
+
+      if (mounted) {
+        setState(() {
+          _unreadExpenseCount = unread;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching pending expense count: $e');
+    }
+  }
+
+  Future<void> _fetchPendingFinancialReportCount() async {
+    final roleUpper = widget.userRole.toUpperCase();
+    if (roleUpper != 'SCHOOL_ADMIN' && roleUpper != 'SUPER_ADMIN') return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token') ?? widget.leaveService.token;
+      if (token.isEmpty) return;
+      final baseUrl = resolveBaseUrlFrom(prefs);
+      final repService = FinancialReportService(baseUrl: baseUrl, token: token);
+      final pendingCount = await repService.getPendingFinancialReportCount();
+      final lastViewed = prefs.getInt('last_viewed_financial_report_pending_count') ?? 0;
+      final badgeCleared = prefs.getBool('financial_report_badge_cleared') ?? false;
+
+      int unread = 0;
+      if (!badgeCleared) {
+        unread = pendingCount;
+      } else if (pendingCount > lastViewed) {
+        unread = pendingCount - lastViewed;
+      }
+
+      if (mounted) {
+        setState(() {
+          _unreadFinancialReportCount = unread;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching pending financial report count: $e');
+    }
+  }
+
   void _showPushNotificationToast(dynamic notif) {
     final title = notif['title'] ?? 'New Notification';
     final message = notif['message'] ?? '';
@@ -823,6 +893,26 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ),
                   ),
                 );
+              } else if (titleLower.contains('financial report') || msgLower.contains('financial report') || titleLower.contains('settlement') || msgLower.contains('settlement')) {
+                setState(() {
+                  _unreadFinancialReportCount = 0;
+                });
+                _markFeatureNotificationsRead('financial_report');
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => RevenueScreen(
+                      reportService: FinancialReportService(
+                        baseUrl: widget.leaveService.baseUrl,
+                        token: widget.leaveService.token,
+                      ),
+                      userRole: widget.userRole,
+                      isFeeCollector: _isFeeCollector,
+                    ),
+                  ),
+                ).then((_) {
+                  _fetchPendingFinancialReportCount();
+                });
               } else if (titleLower.contains('achievement') || msgLower.contains('achievement')) {
                 Navigator.push(
                   context,
@@ -945,23 +1035,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       // 6 - TAR
       // 7 - TSD
       // 8 - Fees Portal
-      // 9 - Revenue
+      // 9 - Financial report
       // 10 - Teachers
       // 11 - Classes
       // 12 - Expense
       const orderedFeatureNames = [
-        'Timetable',
-        'Examinations',
-        'Notifications',
-        'Settings',
-        'Achievements',
+        'Fees Portal',
+        'Expense',
+        'Financial report',
         'TAR',
         'TSD',
-        'Fees Portal',
-        'Revenue',
         'Teachers',
         'Classes',
-        'Expense',
+        'Timetable',
+        'Examinations',
+        'Achievements',
+        'Notifications',
+        'Settings',
       ];
       final Map<String, LauncherFeature> featureMap = {
         for (var f in _allFeatures) f.name: f
@@ -980,35 +1070,73 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       return schoolAdminFeatures.where((f) => f.name.toLowerCase().contains(query)).toList();
     }
     
-    // Filter by allowed role first
+    // Filter and order for Teachers & Staff
+    if (isStaffTeacher) {
+      const teacherOrderedFeatureNames = [
+        'Scanner',
+        'Attendance',
+        'Fees Portal',
+        'Expense',
+        'Financial report',
+        'Notice',
+        'TAR',
+        'TSD',
+        'Timetable',
+        'Homework',
+        'Examinations',
+        'Leaves',
+        'Notifications',
+        'Salary',
+        'Class Teacher',
+        'Outstanding',
+        'Classes',
+        'Teachers',
+        'Paper Designer',
+        'Achievements',
+        'Settings',
+      ];
+
+      final Map<String, LauncherFeature> featureMap = {
+        for (var f in _allFeatures) f.name: f
+      };
+      final List<LauncherFeature> teacherFeatures = [];
+      for (final name in teacherOrderedFeatureNames) {
+        if (!featureMap.containsKey(name)) continue;
+        final f = featureMap[name]!;
+
+        // Permission check
+        if (f.name == 'TAR') {
+          if (!(_isPrincipal == true || role == 'PRINCIPAL')) continue;
+        } else if (f.name == 'Fees Portal') {
+          if (!(_isFeeCollector == true)) continue;
+        } else if (f.name == 'TSD') {
+          if (!(_isFeeCollector == true)) continue;
+        } else if (f.name == 'Expense') {
+          if (!(_isFeeCollector == true)) continue;
+        } else if (f.name == 'Financial report' || f.name == 'Revenue') {
+          if (!(_isFeeCollector == true)) continue;
+        } else if (f.name == 'Class Teacher') {
+          if (!(_isPrincipal == true || role == 'PRINCIPAL')) continue;
+        } else if (f.name == 'Teachers') {
+          if (!(_isPrincipal == true || role == 'PRINCIPAL' || _isFeeCollector == true)) continue;
+        } else if (f.name == 'Classes') {
+          if (!(_isPrincipal == true || role == 'PRINCIPAL' || _isFeeCollector == true)) continue;
+        } else {
+          if (!(f.allowedRoles.contains('TEACHER') || f.allowedRoles.contains('PRINCIPAL'))) continue;
+        }
+
+        teacherFeatures.add(f);
+      }
+
+      if (_searchQuery.trim().isEmpty) {
+        return teacherFeatures;
+      }
+      final query = _searchQuery.toLowerCase().trim();
+      return teacherFeatures.where((f) => f.name.toLowerCase().contains(query)).toList();
+    }
+
+    // Role-scoped for Parents / Students
     final List<LauncherFeature> roleScoped = _allFeatures.where((f) {
-      if (f.name == 'TAR') {
-        return (_isPrincipal == true || role == 'PRINCIPAL');
-      }
-      if (f.name == 'Fees Portal') {
-        return _isFeeCollector == true;
-      }
-      if (f.name == 'TSD') {
-        return _isFeeCollector == true;
-      }
-      if (f.name == 'Expense') {
-        return _isFeeCollector == true;
-      }
-      if (f.name == 'Class Teacher') {
-        return (_isPrincipal == true || role == 'PRINCIPAL');
-      }
-      if (f.name == 'Teachers') {
-        return (_isPrincipal == true || role == 'PRINCIPAL' || _isFeeCollector == true);
-      }
-      if (f.name == 'Classes') {
-        return (_isPrincipal == true || role == 'PRINCIPAL' || _isFeeCollector == true);
-      }
-      if (f.name == 'Revenue') {
-        return _isFeeCollector == true;
-      }
-      if (isStaffTeacher) {
-        return f.allowedRoles.contains('TEACHER') || f.allowedRoles.contains('PRINCIPAL');
-      }
       return f.allowedRoles.contains(role);
     }).toList();
 
@@ -1447,6 +1575,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         if (effectiveBase.isEmpty || effectiveBase.contains('10.22.6.71') || effectiveBase.contains('10.155.82.71')) {
           effectiveBase = resolveBaseUrlFrom(prefs);
         }
+
+        // Immediately clear badge count on tap per user requirement
+        setState(() {
+          _unreadExpenseCount = 0;
+        });
+        await prefs.setBool('expense_badge_cleared', true);
+        _markFeatureNotificationsRead('expense');
+        try {
+          final expService = ExpenseService(baseUrl: effectiveBase, token: token);
+          final currentPending = await expService.getPendingExpenseCount();
+          await prefs.setInt('last_viewed_expense_pending_count', currentPending);
+        } catch (_) {}
+
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -1456,7 +1597,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               userRole: widget.userRole,
             ),
           ),
-        );
+        ).then((_) {
+          _fetchPendingExpenseCount();
+          _fetchUnreadNotificationsCount();
+        });
       } else if (feature.name == 'Class Teacher') {
         final prefs = await SharedPreferences.getInstance();
         final token = prefs.getString('auth_token') ?? widget.leaveService.token;
@@ -1515,14 +1659,29 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
         );
-      } else if (feature.name == 'Revenue') {
+      } else if (feature.name == 'Financial report' || feature.name == 'Revenue') {
         final prefs = await SharedPreferences.getInstance();
+        if (mounted) {
+          setState(() {
+            _unreadFinancialReportCount = 0;
+          });
+        }
+        await prefs.setBool('financial_report_badge_cleared', true);
+        _markFeatureNotificationsRead('financial_report');
+
+        try {
+          final effectiveBase = resolveBaseUrlFrom(prefs);
+          final repService = FinancialReportService(baseUrl: effectiveBase, token: prefs.getString('auth_token') ?? widget.leaveService.token);
+          final currentPending = await repService.getPendingFinancialReportCount();
+          await prefs.setInt('last_viewed_financial_report_pending_count', currentPending);
+        } catch (_) {}
+
         final token = prefs.getString('auth_token') ?? widget.leaveService.token;
         String effectiveBase = widget.leaveService.baseUrl;
         if (effectiveBase.isEmpty || effectiveBase.contains('10.22.6.71') || effectiveBase.contains('10.155.82.71')) {
           effectiveBase = resolveBaseUrlFrom(prefs);
         }
-        Navigator.push(
+        await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => RevenueScreen(
@@ -1535,6 +1694,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
         );
+        if (mounted) {
+          _fetchPendingFinancialReportCount();
+        }
       }
     } else {
 
@@ -1726,21 +1888,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       ),
                     )
                   : SliverGrid(
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: (widget.userRole.toUpperCase() == 'SCHOOL_ADMIN') ? 3 : 4,
-                        crossAxisSpacing: (widget.userRole.toUpperCase() == 'SCHOOL_ADMIN') ? 18 : 14,
-                        mainAxisSpacing: (widget.userRole.toUpperCase() == 'SCHOOL_ADMIN') ? 22 : 24,
-                        childAspectRatio: (widget.userRole.toUpperCase() == 'SCHOOL_ADMIN') ? 0.80 : 0.75,
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        crossAxisSpacing: 18,
+                        mainAxisSpacing: 22,
+                        childAspectRatio: 0.80,
                       ),
                       delegate: SliverChildBuilderDelegate(
                         (BuildContext context, int index) {
-                          final isSchoolAdmin = (widget.userRole.toUpperCase() == 'SCHOOL_ADMIN');
                           final feature = filteredFeatures[index];
                           final bool isNotice = feature.name == 'Notice' || feature.name == 'Notice Board' || feature.name == 'Notices';
                           final bool isNotification = feature.name == 'Notifications' || feature.name == 'Messages';
                           final bool isTimetable = feature.name == 'Timetable' || feature.name == 'Time Table';
                           final bool isSalary = feature.name == 'Salary' || feature.name == 'Staff Salary' || feature.name == 'Salaries';
                           final bool isExams = feature.name == 'Examinations' || feature.name == 'Exams' || feature.name == 'Exam';
+                          final bool isExpense = feature.name == 'Expense' || feature.name == 'Expenses';
+                          final bool isFinancialReport = feature.name == 'Financial report' || feature.name == 'Revenue';
                           final int badgeCount = isNotice 
                               ? _unreadNoticeCount 
                               : (isNotification 
@@ -1749,7 +1912,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                       ? _unreadTimetableCount 
                                       : (isSalary 
                                           ? _unreadSalaryCount 
-                                          : (isExams ? _unreadExamsCount : 0))));
+                                          : (isExams 
+                                              ? _unreadExamsCount 
+                                              : (isExpense 
+                                                  ? _unreadExpenseCount 
+                                                  : (isFinancialReport ? _unreadFinancialReportCount : 0))))));
 
                           return GestureDetector(
                             onTap: () => _onFeatureTap(feature),
@@ -1766,17 +1933,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                         width: double.infinity,
                                         height: double.infinity,
                                         decoration: BoxDecoration(
-                                          color: feature.color.withOpacity(0.08),
-                                          borderRadius: BorderRadius.circular(isSchoolAdmin ? 20 : 16),
+                                          color: feature.color.withValues(alpha: 0.08),
+                                          borderRadius: BorderRadius.circular(20),
                                           border: Border.all(
-                                            color: feature.color.withOpacity(0.25),
-                                            width: isSchoolAdmin ? 1.8 : 1.5,
+                                            color: feature.color.withValues(alpha: 0.25),
+                                            width: 1.8,
                                           ),
                                         ),
                                         child: Center(
                                           child: Icon(
                                             feature.icon,
-                                            size: isSchoolAdmin ? 38 : 28,
+                                            size: 38,
                                             color: feature.color,
                                           ),
                                         ),
@@ -1824,7 +1991,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                   overflow: TextOverflow.ellipsis,
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
-                                    fontSize: isSchoolAdmin ? 13 : 12,
+                                    fontSize: 13,
                                     fontWeight: FontWeight.w700,
                                     color: Colors.grey.shade800,
                                   ),

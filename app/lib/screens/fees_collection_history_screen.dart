@@ -39,6 +39,7 @@ class _FeesCollectionHistoryScreenState extends State<FeesCollectionHistoryScree
 
   String _selectedPeriod = 'ALL TIME';
   String _selectedCollector = 'All Users';
+  bool _isDiscountedOnly = false;
   String _searchQuery = '';
 
   final TextEditingController _searchController = TextEditingController();
@@ -104,6 +105,7 @@ class _FeesCollectionHistoryScreenState extends State<FeesCollectionHistoryScree
         period: _selectedPeriod,
         depositBy: _selectedCollector,
         search: _searchQuery,
+        discounted: _isDiscountedOnly,
         page: nextPage,
         limit: _pageSize,
       );
@@ -254,7 +256,7 @@ class _FeesCollectionHistoryScreenState extends State<FeesCollectionHistoryScree
                     Icon(Icons.person_outline_rounded, size: 20, color: Color(0xFFB45309)),
                     SizedBox(width: 8),
                     Text(
-                      'Filter by Deposit By',
+                      'Filter by DEPOSIT BY',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
@@ -418,6 +420,126 @@ class _FeesCollectionHistoryScreenState extends State<FeesCollectionHistoryScree
     );
   }
 
+  void _showDiscountSelector() {
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 10),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: Row(
+                  children: const [
+                    Icon(Icons.percent_rounded, size: 20, color: Color(0xFFB45309)),
+                    SizedBox(width: 8),
+                    Text(
+                      'Filter by Discount',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                leading: CircleAvatar(
+                  radius: 18,
+                  backgroundColor: !_isDiscountedOnly ? const Color(0xFFFEF3C7) : const Color(0xFFF1F5F9),
+                  child: Icon(
+                    Icons.receipt_long_rounded,
+                    size: 18,
+                    color: !_isDiscountedOnly ? const Color(0xFFD97706) : const Color(0xFF64748B),
+                  ),
+                ),
+                title: Text(
+                  'All Transactions',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: !_isDiscountedOnly ? FontWeight.w700 : FontWeight.w600,
+                    color: !_isDiscountedOnly ? const Color(0xFFB45309) : const Color(0xFF0F172A),
+                  ),
+                ),
+                subtitle: const Text(
+                  'Show all collected transactions',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                ),
+                trailing: !_isDiscountedOnly
+                    ? const Icon(Icons.check_circle_rounded, color: Color(0xFFD97706), size: 20)
+                    : null,
+                onTap: () {
+                  Navigator.pop(ctx);
+                  if (_isDiscountedOnly) {
+                    setState(() {
+                      _isDiscountedOnly = false;
+                    });
+                    _loadHistory(reset: true);
+                  }
+                },
+              ),
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                leading: CircleAvatar(
+                  radius: 18,
+                  backgroundColor: _isDiscountedOnly ? const Color(0xFFFEF3C7) : const Color(0xFFF1F5F9),
+                  child: Icon(
+                    Icons.percent_rounded,
+                    size: 18,
+                    color: _isDiscountedOnly ? const Color(0xFFD97706) : const Color(0xFF64748B),
+                  ),
+                ),
+                title: Text(
+                  'Discounted Only',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: _isDiscountedOnly ? FontWeight.w700 : FontWeight.w600,
+                    color: _isDiscountedOnly ? const Color(0xFFB45309) : const Color(0xFF0F172A),
+                  ),
+                ),
+                subtitle: const Text(
+                  'Show only transactions with discount applied',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                ),
+                trailing: _isDiscountedOnly
+                    ? const Icon(Icons.check_circle_rounded, color: Color(0xFFD97706), size: 20)
+                    : null,
+                onTap: () {
+                  Navigator.pop(ctx);
+                  if (!_isDiscountedOnly) {
+                    setState(() {
+                      _isDiscountedOnly = true;
+                    });
+                    _loadHistory(reset: true);
+                  }
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final num totalCollected = _stats['total_collected'] ?? 0;
@@ -552,7 +674,9 @@ class _FeesCollectionHistoryScreenState extends State<FeesCollectionHistoryScree
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  _selectedPeriod == 'ALL TIME' ? 'TOTAL COLLECTION' : 'PERIOD COLLECTION',
+                  _isDiscountedOnly
+                      ? 'DISCOUNTED COLLECTION'
+                      : (_selectedPeriod == 'ALL TIME' ? 'TOTAL COLLECTION' : 'PERIOD COLLECTION'),
                   style: const TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
@@ -565,7 +689,7 @@ class _FeesCollectionHistoryScreenState extends State<FeesCollectionHistoryScree
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    _formatCurrency(_selectedPeriod == 'ALL TIME' ? totalCollected : periodCollection),
+                    _formatCurrency(_isDiscountedOnly || _selectedPeriod != 'ALL TIME' ? periodCollection : totalCollected),
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
@@ -653,17 +777,18 @@ class _FeesCollectionHistoryScreenState extends State<FeesCollectionHistoryScree
 
           const SizedBox(height: 10),
 
-          // Filter Dropdowns Row (Deposit By & Filter Period)
+          // Filter Dropdowns Row (Deposit By, Discounted, Filter Period)
           Row(
             children: [
-              // 1. Deposit By Filter Pill
+              // 1. DEPOSIT BY Filter Pill
               Expanded(
+                flex: 11,
                 child: InkWell(
                   onTap: _showCollectorSelector,
                   borderRadius: BorderRadius.circular(10),
                   child: Container(
                     height: 38,
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 7),
                     decoration: BoxDecoration(
                       color: _selectedCollector != 'All Users' ? const Color(0xFFFEF3C7) : Colors.white,
                       borderRadius: BorderRadius.circular(10),
@@ -677,22 +802,22 @@ class _FeesCollectionHistoryScreenState extends State<FeesCollectionHistoryScree
                       children: [
                         Icon(
                           Icons.person_rounded,
-                          size: 15,
+                          size: 14,
                           color: _selectedCollector != 'All Users'
                               ? const Color(0xFFB45309)
                               : const Color(0xFF64748B),
                         ),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 4),
                         Expanded(
                           child: Text(
                             _selectedCollector == 'All Users'
-                                ? 'Deposit By'
-                                : _selectedCollector,
+                                ? 'DEPOSIT BY'
+                                : _selectedCollector.toUpperCase(),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w700,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
                               color: _selectedCollector != 'All Users'
                                   ? const Color(0xFFB45309)
                                   : const Color(0xFF334155),
@@ -701,7 +826,7 @@ class _FeesCollectionHistoryScreenState extends State<FeesCollectionHistoryScree
                         ),
                         Icon(
                           Icons.keyboard_arrow_down_rounded,
-                          size: 17,
+                          size: 15,
                           color: _selectedCollector != 'All Users'
                               ? const Color(0xFFB45309)
                               : const Color(0xFF94A3B8),
@@ -712,16 +837,74 @@ class _FeesCollectionHistoryScreenState extends State<FeesCollectionHistoryScree
                 ),
               ),
 
-              const SizedBox(width: 10),
+              const SizedBox(width: 6),
 
-              // 2. Filter Period Pill
+              // 2. DISCOUNTED Filter Pill (Second Position)
               Expanded(
+                flex: 11,
+                child: InkWell(
+                  onTap: _showDiscountSelector,
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    height: 38,
+                    padding: const EdgeInsets.symmetric(horizontal: 7),
+                    decoration: BoxDecoration(
+                      color: _isDiscountedOnly ? const Color(0xFFFEF3C7) : Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: _isDiscountedOnly
+                            ? const Color(0xFFFCD34D)
+                            : const Color(0xFFE2E8F0),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.percent_rounded,
+                          size: 13,
+                          color: _isDiscountedOnly
+                              ? const Color(0xFFB45309)
+                              : const Color(0xFF64748B),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            'DISCOUNTED',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                              color: _isDiscountedOnly
+                                  ? const Color(0xFFB45309)
+                                  : const Color(0xFF334155),
+                            ),
+                          ),
+                        ),
+                        Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          size: 15,
+                          color: _isDiscountedOnly
+                              ? const Color(0xFFB45309)
+                              : const Color(0xFF94A3B8),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(width: 6),
+
+              // 3. Filter Period Pill
+              Expanded(
+                flex: 10,
                 child: InkWell(
                   onTap: _showPeriodSelector,
                   borderRadius: BorderRadius.circular(10),
                   child: Container(
                     height: 38,
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 7),
                     decoration: BoxDecoration(
                       color: _selectedPeriod != 'ALL TIME' ? const Color(0xFFFEF3C7) : Colors.white,
                       borderRadius: BorderRadius.circular(10),
@@ -735,20 +918,20 @@ class _FeesCollectionHistoryScreenState extends State<FeesCollectionHistoryScree
                       children: [
                         Icon(
                           Icons.calendar_month_rounded,
-                          size: 15,
+                          size: 14,
                           color: _selectedPeriod != 'ALL TIME'
                               ? const Color(0xFFB45309)
                               : const Color(0xFF64748B),
                         ),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 4),
                         Expanded(
                           child: Text(
                             _selectedPeriod,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w700,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
                               color: _selectedPeriod != 'ALL TIME'
                                   ? const Color(0xFFB45309)
                                   : const Color(0xFF334155),
@@ -757,7 +940,7 @@ class _FeesCollectionHistoryScreenState extends State<FeesCollectionHistoryScree
                         ),
                         Icon(
                           Icons.keyboard_arrow_down_rounded,
-                          size: 17,
+                          size: 15,
                           color: _selectedPeriod != 'ALL TIME'
                               ? const Color(0xFFB45309)
                               : const Color(0xFF94A3B8),
@@ -882,6 +1065,27 @@ class _FeesCollectionHistoryScreenState extends State<FeesCollectionHistoryScree
                 _buildDetailRow('Class', className),
                 _buildDetailRow('Roll No', displayRollNo),
                 _buildDetailRow('Description', description),
+                if ((tx['discount_amount'] != null) && (double.tryParse(tx['discount_amount'].toString()) ?? 0) > 0)
+                  _buildDetailRow(
+                    'Discount',
+                    '- ${_formatCurrency(double.tryParse(tx['discount_amount'].toString()) ?? 0)}',
+                    customValue: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(5),
+                        border: Border.all(color: const Color(0xFFFDE68A)),
+                      ),
+                      child: Text(
+                        '₹${(double.tryParse(tx['discount_amount'].toString()) ?? 0).toStringAsFixed((double.tryParse(tx['discount_amount'].toString()) ?? 0).truncateToDouble() == (double.tryParse(tx['discount_amount'].toString()) ?? 0) ? 0 : 2)} OFF',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFFB45309),
+                        ),
+                      ),
+                    ),
+                  ),
                 _buildDetailRow('Date & Time', formattedDateTime),
                 _buildDetailRow('Ref No.', receiptNo, isMonospace: true),
                 _buildDetailRow('Deposit By', displayDepositBy),

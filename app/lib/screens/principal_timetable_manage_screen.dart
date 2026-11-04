@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import '../services/timetable_service.dart';
 import '../utils/class_formatter.dart';
 
@@ -283,7 +286,7 @@ class _PrincipalTimetableManageScreenState
         final start = _formatTime12Hr(cfg['start_time']);
         final end = _formatTime12Hr(cfg['end_time']);
         if (start.isNotEmpty && end.isNotEmpty) {
-          return '$start – $end';
+          return '$start - $end'.replaceAll('–', '-').replaceAll('—', '-').replaceAll('−', '-');
         }
       }
     }
@@ -533,6 +536,283 @@ class _PrincipalTimetableManageScreenState
     }
   }
 
+
+  Future<void> _downloadTimetableSchedule() async {
+    final activeDays = _days.where((day) {
+      final dayData = _timetableData[day] as Map<String, dynamic>? ?? {};
+      final periods = (dayData['periods'] as List<dynamic>?) ?? [];
+      final isPub = (dayData['status']?.toString().toUpperCase() == 'PUBLISHED') ||
+          (periods.isNotEmpty && periods.every((p) => p['is_published'] == 1 || p['is_published'] == true));
+      return isPub;
+    }).toList();
+
+    if (activeDays.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No published schedule available to download.')),
+      );
+      return;
+    }
+
+    String getDayKey(String day) {
+      final dayData = _timetableData[day] as Map<String, dynamic>? ?? {};
+      final periods = (dayData['periods'] as List<dynamic>?) ?? [];
+      return periods.map((p) =>
+        '${p['period_number']}-${p['subject_id']}-${p['teacher_id']}-${p['is_backup'] ?? 0}-${p['backup_teacher_id'] ?? 0}'
+      ).join('|');
+    }
+
+    final areIdentical = activeDays.length <= 1 ||
+        activeDays.every((day) => getDayKey(day) == getDayKey(activeDays.first));
+
+    final selectedClass = _classes.firstWhere(
+      (c) => c['id'] == _selectedClassId,
+      orElse: () => null,
+    );
+    final className = selectedClass != null ? (selectedClass['name'] ?? 'Class').toString() : 'Class';
+    final section = selectedClass != null && selectedClass['section'] != null && selectedClass['section'].toString().isNotEmpty
+        ? ' - ${selectedClass['section']}'
+        : '';
+
+    final pdf = pw.Document();
+
+    final afterNum = _timetableSettings != null
+        ? int.tryParse((_timetableSettings!['interval_after_period'] ?? 0).toString()) ?? 0
+        : 0;
+    final intervalDur = _timetableSettings != null
+        ? int.tryParse((_timetableSettings!['interval_duration'] ?? 0).toString()) ?? 0
+        : 0;
+    final hasInterval = afterNum > 0 && intervalDur > 0;
+
+    String intervalTiming = '';
+    if (hasInterval && _periodConfigs.isNotEmpty) {
+      dynamic afterConf;
+      dynamic beforeConf;
+      for (var c in _periodConfigs) {
+        if (c['period_number'] == afterNum) afterConf = c;
+        if (c['period_number'] == afterNum + 1) beforeConf = c;
+      }
+      if (afterConf != null && beforeConf != null) {
+        final st = _formatTime12Hr(afterConf['end_time']);
+        final et = _formatTime12Hr(beforeConf['start_time']);
+        if (st.isNotEmpty && et.isNotEmpty) {
+          intervalTiming = '$st - $et'.replaceAll('–', '-').replaceAll('—', '-').replaceAll('−', '-');
+        }
+      }
+    }
+
+    pw.Widget buildDayContent(String dayName, bool showHeading) {
+      final dayData = _timetableData[dayName] as Map<String, dynamic>? ?? {};
+      final periodsList = (dayData['periods'] as List<dynamic>?) ?? [];
+
+      final renderList = <Map<String, dynamic>>[];
+      bool breakRendered = false;
+
+      for (var p in periodsList) {
+        renderList.add({'type': 'period', 'data': p});
+        if (hasInterval && p['period_number'] == afterNum) {
+          renderList.add({'type': 'interval'});
+          breakRendered = true;
+        }
+      }
+
+      if (hasInterval && !breakRendered) {
+        final insertIdx = renderList.indexWhere(
+          (item) => item['type'] == 'period' && (item['data']['period_number'] as int? ?? 0) > afterNum,
+        );
+        if (insertIdx != -1) {
+          renderList.insert(insertIdx, {'type': 'interval'});
+        }
+      }
+
+      final totalRows = renderList.length;
+      final bool isTenOrMore = totalRows >= 10;
+      final bool isSevenToNine = totalRows >= 7 && totalRows <= 9;
+
+      // Dynamic sizing:
+      // If 10 or more: compact sizing so 10+ subjects fit cleanly on 1 page
+      // If 7 to 9 (standard 8-9 periods + interval break): generous font sizes & padding for clear visibility
+      // If <= 6: very generous padding & large fonts filling the page nicely
+      final double rowPaddingV = isTenOrMore ? 8.0 : (isSevenToNine ? 11.0 : 16.0);
+      final double periodFont = isTenOrMore ? 11.5 : (isSevenToNine ? 14.0 : 16.0);
+      final double teacherFont = isTenOrMore ? 9.5 : (isSevenToNine ? 11.0 : 13.0);
+      final double timeFont = isTenOrMore ? 9.5 : (isSevenToNine ? 11.0 : 13.0);
+      final double timePadH = isTenOrMore ? 8.0 : (isSevenToNine ? 10.0 : 12.0);
+      final double timePadV = isTenOrMore ? 4.0 : (isSevenToNine ? 5.5 : 6.5);
+      final double breakMarginV = isTenOrMore ? 5.0 : (isSevenToNine ? 7.0 : 9.0);
+      final double breakPadV = isTenOrMore ? 7.0 : (isSevenToNine ? 9.0 : 12.0);
+      final double breakFont = isTenOrMore ? 10.5 : (isSevenToNine ? 12.5 : 14.0);
+
+      final cleanIntervalTiming = intervalTiming.replaceAll('–', '-').replaceAll('—', '-').replaceAll('−', '-');
+
+      return pw.Container(
+        margin: const pw.EdgeInsets.only(bottom: 12),
+        padding: const pw.EdgeInsets.all(12),
+        decoration: pw.BoxDecoration(
+          border: pw.Border.all(color: PdfColors.grey300, width: 1),
+          borderRadius: pw.BorderRadius.circular(8),
+        ),
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            if (showHeading) ...[
+              pw.Container(
+                padding: const pw.EdgeInsets.only(bottom: 6),
+                decoration: const pw.BoxDecoration(
+                  border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey200, width: 1)),
+                ),
+                child: pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text(dayName, style: pw.TextStyle(fontSize: 14.5, fontWeight: pw.FontWeight.bold, color: PdfColors.grey900)),
+                  ],
+                ),
+              ),
+              pw.SizedBox(height: 8),
+            ],
+            if (periodsList.isEmpty)
+              pw.Padding(
+                padding: const pw.EdgeInsets.symmetric(vertical: 8),
+                child: pw.Text('No periods assigned for this day.', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey500)),
+              )
+            else
+              ...renderList.map((item) {
+                if (item['type'] == 'interval') {
+                  return pw.Container(
+                    margin: pw.EdgeInsets.symmetric(vertical: breakMarginV),
+                    padding: pw.EdgeInsets.symmetric(vertical: breakPadV, horizontal: 10),
+                    decoration: pw.BoxDecoration(
+                      color: PdfColors.amber50,
+                      border: pw.Border.all(color: PdfColors.amber200, width: 0.8),
+                      borderRadius: pw.BorderRadius.circular(6),
+                    ),
+                    child: pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                      children: [
+                        pw.Text(
+                          'INTERVAL BREAK',
+                          style: pw.TextStyle(fontSize: breakFont, fontWeight: pw.FontWeight.bold, color: PdfColors.amber900),
+                        ),
+                        if (cleanIntervalTiming.isNotEmpty)
+                          pw.Text(
+                            cleanIntervalTiming,
+                            style: pw.TextStyle(fontSize: breakFont, fontWeight: pw.FontWeight.bold, color: PdfColors.amber900),
+                          ),
+                      ],
+                    ),
+                  );
+                }
+
+                final p = item['data'];
+                final periodNum = p['period_number'] ?? '';
+                final subName = p['subject_name'] ?? 'Subject';
+                final isBackup = p['is_backup'] == true || p['is_backup'] == 1;
+                final teacherName = isBackup
+                    ? '${p['backup_teacher_name'] ?? 'Backup'} (Backup)'
+                    : (p['teacher_name'] ?? 'Teacher');
+                final rawTimingStr = _getTimingStr(periodNum is int ? periodNum : int.tryParse(periodNum.toString()) ?? 0);
+                final cleanTimingStr = rawTimingStr.replaceAll('–', '-').replaceAll('—', '-').replaceAll('−', '-');
+
+                return pw.Container(
+                  padding: pw.EdgeInsets.symmetric(vertical: rowPaddingV),
+                  decoration: const pw.BoxDecoration(
+                    border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey100, width: 0.5)),
+                  ),
+                  child: pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Expanded(
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Text('Period $periodNum: $subName', style: pw.TextStyle(fontSize: periodFont, fontWeight: pw.FontWeight.bold, color: PdfColors.grey900)),
+                            pw.SizedBox(height: 2),
+                            pw.Text('Teacher: $teacherName', style: pw.TextStyle(fontSize: teacherFont, color: isBackup ? PdfColors.amber800 : PdfColors.grey700)),
+                          ],
+                        ),
+                      ),
+                      if (cleanTimingStr.isNotEmpty)
+                        pw.Container(
+                          padding: pw.EdgeInsets.symmetric(horizontal: timePadH, vertical: timePadV),
+                          decoration: pw.BoxDecoration(
+                            color: PdfColors.grey100,
+                            borderRadius: pw.BorderRadius.circular(4),
+                            border: pw.Border.all(color: PdfColors.grey300, width: 0.5),
+                          ),
+                          child: pw.Text(
+                            cleanTimingStr,
+                            style: pw.TextStyle(fontSize: timeFont, fontWeight: pw.FontWeight.bold, color: PdfColors.grey800),
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              }),
+          ],
+        ),
+      );
+    }
+
+    pw.Widget buildPdfHeader() {
+      return pw.Container(
+        margin: const pw.EdgeInsets.only(bottom: 16),
+        padding: const pw.EdgeInsets.only(bottom: 10),
+        decoration: const pw.BoxDecoration(
+          border: pw.Border(bottom: pw.BorderSide(color: PdfColors.black, width: 1.5)),
+        ),
+        child: pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: pw.CrossAxisAlignment.center,
+          children: [
+            pw.Text(
+              'ACADEMIC TIMETABLE SCHEDULE',
+              style: pw.TextStyle(
+                fontSize: 14.5,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.grey900,
+              ),
+            ),
+            pw.Text(
+              'Class: $className$section',
+              style: pw.TextStyle(
+                fontSize: 14.5,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.grey900,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (areIdentical) {
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(32),
+          header: (context) => buildPdfHeader(),
+          build: (context) => [buildDayContent(activeDays.first, false)],
+        ),
+      );
+    } else {
+      for (final dayName in activeDays) {
+        pdf.addPage(
+          pw.MultiPage(
+            pageFormat: PdfPageFormat.a4,
+            margin: const pw.EdgeInsets.all(32),
+            header: (context) => buildPdfHeader(),
+            build: (context) => [buildDayContent(dayName, true)],
+          ),
+        );
+      }
+    }
+
+    final filename = 'Timetable_Schedule_${className.replaceAll(' ', '_')}.pdf';
+    await Printing.layoutPdf(
+      onLayout: (format) async => pdf.save(),
+      name: filename,
+    );
+  }
+
   // Copy Schedule
   void _handleCopySchedule(String dayName) {
     final dayData = _timetableData[dayName] as Map<String, dynamic>? ?? {};
@@ -669,9 +949,14 @@ class _PrincipalTimetableManageScreenState
     }
   }
 
-  // Assign Backup Teacher Dialog
+  // Assign Backup Teacher Dialog (Supports assigning for current or any future date)
   Future<void> _showBackupTeacherDialog(dynamic period, String date) async {
     int? selectedBackupId;
+    DateTime selectedDate = DateTime.tryParse(date) ?? DateTime.now();
+    final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    if (selectedDate.isBefore(today)) {
+      selectedDate = today;
+    }
 
     final availableTeachers = _staff.where((t) {
       final role = (t['role'] ?? '').toString().toUpperCase();
@@ -682,6 +967,7 @@ class _PrincipalTimetableManageScreenState
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -704,65 +990,226 @@ class _PrincipalTimetableManageScreenState
                     children: [
                       const Text(
                         'Assign Backup Teacher',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF0F172A),
+                        ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.close),
+                        icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
                         onPressed: () => Navigator.pop(ctx),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Period ${period['period_number']}: ${period['subject_name']} ($date)',
-                    style: TextStyle(fontSize: 13, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text('Select Backup Teacher:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<int>(
-                    initialValue: selectedBackupId,
-                    borderRadius: BorderRadius.circular(16),
-                    decoration: InputDecoration(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      filled: true,
-                      fillColor: Colors.grey.shade50,
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFFDE68A)),
                     ),
-                    hint: const Text('Choose teacher'),
-                    items: availableTeachers.map((t) {
-                      return DropdownMenuItem<int>(
-                        value: t['id'] as int,
-                        child: Text(t['name'] ?? 'Teacher #${t['id']}'),
+                    child: Text(
+                      'Period ${period['period_number']}: ${period['subject_name']}${period['teacher_name'] != null ? " • ${period['teacher_name']}" : ""}',
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFFB45309),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+
+                  // Assignment Date Picker Field (Supports any future date)
+                  const Text(
+                    'ASSIGNMENT DATE *',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF64748B),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Builder(
+                    builder: (bCtx) {
+                      final dayIdx = selectedDate.weekday - 1;
+                      final dayName = (dayIdx >= 0 && dayIdx < _days.length) ? _days[dayIdx] : 'Monday';
+                      return InkWell(
+                        onTap: () async {
+                          // Find initial valid date not on Sunday or holiday
+                          DateTime initDate = selectedDate;
+                          while (initDate.weekday == DateTime.sunday ||
+                              _holidays.any((h) => h['date'] == _formatYYYYMMDD(initDate))) {
+                            initDate = initDate.add(const Duration(days: 1));
+                          }
+
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: initDate,
+                            firstDate: DateTime.now(),
+                            lastDate: DateTime.now().add(const Duration(days: 365)),
+                            selectableDayPredicate: (d) {
+                              if (d.weekday == DateTime.sunday) return false;
+                              final dStr = _formatYYYYMMDD(d);
+                              if (_holidays.any((h) => h['date'] == dStr)) return false;
+                              return true;
+                            },
+                            builder: (dateCtx, child) {
+                              return Theme(
+                                data: Theme.of(dateCtx).copyWith(
+                                  colorScheme: const ColorScheme.light(
+                                    primary: Color(0xFFC26600),
+                                    onPrimary: Colors.white,
+                                    onSurface: Color(0xFF0F172A),
+                                  ),
+                                ),
+                                child: child!,
+                              );
+                            },
+                          );
+                          if (picked != null) {
+                            setModalState(() {
+                              selectedDate = picked;
+                            });
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(14),
+                        child: Container(
+                          height: 48,
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.calendar_month_rounded, size: 20, color: Color(0xFFC26600)),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  '$dayName, ${_formatShortMonthDay(selectedDate)}',
+                                  style: const TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFEF3C7),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Text(
+                                  'Change',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFFB45309),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       );
-                    }).toList(),
-                    onChanged: (val) {
-                      setModalState(() => selectedBackupId = val);
                     },
                   ),
-                  const SizedBox(height: 20),
+
+                  const SizedBox(height: 18),
+                  const Text(
+                    'SELECT BACKUP TEACHER *',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF64748B),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    height: 48,
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<int>(
+                        value: selectedBackupId,
+                        isExpanded: true,
+                        borderRadius: BorderRadius.circular(16),
+                        icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
+                        hint: const Text(
+                          'Choose teacher',
+                          style: TextStyle(fontSize: 13.5, color: Color(0xFF94A3B8), fontWeight: FontWeight.w500),
+                        ),
+                        items: availableTeachers.map((t) {
+                          return DropdownMenuItem<int>(
+                            value: t['id'] as int,
+                            child: Text(
+                              t['name'] ?? 'Teacher #${t['id']}',
+                              style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          setModalState(() => selectedBackupId = val);
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
                   SizedBox(
                     width: double.infinity,
                     height: 48,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFC26600),
+                        disabledBackgroundColor: const Color(0xFFE2E8F0),
+                        disabledForegroundColor: const Color(0xFF94A3B8),
+                        foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 0,
                       ),
                       onPressed: selectedBackupId == null
                           ? null
                           : () async {
+                              if (selectedDate.weekday == DateTime.sunday) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Cannot assign backup teacher on Sunday.'),
+                                    backgroundColor: Colors.redAccent,
+                                  ),
+                                );
+                                return;
+                              }
+                              final targetDateStr = _formatYYYYMMDD(selectedDate);
+                              if (_holidays.any((h) => h['date'] == targetDateStr)) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Cannot assign backup teacher on a school holiday.'),
+                                    backgroundColor: Colors.redAccent,
+                                  ),
+                                );
+                                return;
+                              }
                               Navigator.pop(ctx);
                               setState(() => _isActionLoading = true);
                               try {
                                 await _service.assignBackupTeacher(
                                   timetableId: period['id'] as int,
-                                  date: date,
+                                  date: targetDateStr,
                                   backupTeacherId: selectedBackupId!,
                                 );
                                 await _loadWeekTimetable(silent: true);
                                 if (mounted) {
-                                  _showSuccessToast('Backup teacher assigned successfully.');
+                                  _showSuccessToast('Backup teacher assigned successfully for $targetDateStr.');
                                 }
                               } catch (e) {
                                 if (mounted) {
@@ -777,7 +1224,7 @@ class _PrincipalTimetableManageScreenState
                                 if (mounted) setState(() => _isActionLoading = false);
                               }
                             },
-                      child: const Text('Confirm Backup Teacher', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                      child: const Text('Confirm Backup Teacher', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Colors.white)),
                     ),
                   ),
                 ],
@@ -1244,19 +1691,19 @@ class _PrincipalTimetableManageScreenState
     required ValueChanged<String> onChanged,
   }) {
     return Container(
-      height: 44,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      height: 48,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFCBD5E1)),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       alignment: Alignment.center,
       child: TextField(
         controller: controller,
         keyboardType: TextInputType.number,
         onChanged: onChanged,
-        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Color(0xFF1E293B)),
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
         decoration: const InputDecoration(
           isDense: true,
           border: InputBorder.none,
@@ -1305,6 +1752,7 @@ class _PrincipalTimetableManageScreenState
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -1453,18 +1901,18 @@ class _PrincipalTimetableManageScreenState
                           children: const [
                             Text(
                               'School Settings & Timetable Configuration',
-                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFF1E293B)),
+                              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
                             ),
-                            SizedBox(height: 3),
+                            SizedBox(height: 4),
                             Text(
                               'Define structural settings for classroom schedulers and faculty workload computation.',
-                              style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                              style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
                             ),
                           ],
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.close),
+                        icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
                         onPressed: () => Navigator.pop(ctx),
                       ),
                     ],
@@ -1509,21 +1957,21 @@ class _PrincipalTimetableManageScreenState
                             },
                             borderRadius: BorderRadius.circular(14),
                             child: Container(
-                              height: 44,
+                              height: 48,
                               padding: const EdgeInsets.symmetric(horizontal: 14),
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: const Color(0xFFCBD5E1)),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
                               ),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
                                     startTimeFormatted,
-                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Color(0xFF1E293B)),
+                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
                                   ),
-                                  const Icon(Icons.access_time, size: 18, color: Color(0xFF64748B)),
+                                  const Icon(Icons.access_time_rounded, size: 20, color: Color(0xFF64748B)),
                                 ],
                               ),
                             ),
@@ -1617,15 +2065,21 @@ class _PrincipalTimetableManageScreenState
                           // Save Configuration Button
                           SizedBox(
                             width: double.infinity,
-                            height: 44,
+                            height: 48,
                             child: ElevatedButton(
-                              onPressed: (isSaving || !isChanged) ? null : handleSave,
+                              onPressed: isSaving ? null : () {
+                                if (!isChanged) {
+                                  Navigator.pop(ctx);
+                                  _showSuccessToast('Configuration saved successfully.');
+                                  return;
+                                }
+                                handleSave();
+                              },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFFC26600),
-                                disabledBackgroundColor: const Color(0xFFE2E8F0),
-                                disabledForegroundColor: const Color(0xFF94A3B8),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                foregroundColor: Colors.white,
                                 elevation: 0,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                               ),
                               child: isSaving
                                   ? const SizedBox(
@@ -1635,7 +2089,7 @@ class _PrincipalTimetableManageScreenState
                                     )
                                   : const Text(
                                       'Save Configuration',
-                                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900),
+                                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Colors.white),
                                     ),
                             ),
                           ),
@@ -1667,7 +2121,7 @@ class _PrincipalTimetableManageScreenState
                                   if (isInterval) {
                                     return Container(
                                       margin: const EdgeInsets.only(bottom: 8),
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                                       decoration: BoxDecoration(
                                         color: const Color(0xFFFEF3C7),
                                         borderRadius: BorderRadius.circular(12),
@@ -1678,11 +2132,11 @@ class _PrincipalTimetableManageScreenState
                                         children: [
                                           const Text(
                                             'Interval Break',
-                                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFFD97706)),
+                                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFFB45309)),
                                           ),
                                           Text(
                                             '${slot['start_time']} – ${slot['end_time']}',
-                                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFFD97706)),
+                                            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Color(0xFFB45309)),
                                           ),
                                         ],
                                       ),
@@ -1691,7 +2145,7 @@ class _PrincipalTimetableManageScreenState
 
                                   return Container(
                                     margin: const EdgeInsets.only(bottom: 8),
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                                     decoration: BoxDecoration(
                                       color: Colors.white,
                                       borderRadius: BorderRadius.circular(12),
@@ -1702,11 +2156,11 @@ class _PrincipalTimetableManageScreenState
                                       children: [
                                         Text(
                                           'Period ${slot['period_number']}',
-                                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+                                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
                                         ),
                                         Text(
                                           '${slot['start_time']} – ${slot['end_time']}',
-                                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFF1E293B)),
+                                          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
                                         ),
                                       ],
                                     ),
@@ -2574,9 +3028,15 @@ class _PrincipalTimetableManageScreenState
                   // 3-dots menu for Day (Curved popup menu)
                   PopupMenuButton<String>(
                     icon: const Icon(Icons.more_vert_rounded, color: Color(0xFF64748B)),
+                    elevation: 6,
+                    color: Colors.white,
+                    surfaceTintColor: Colors.transparent,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    constraints: const BoxConstraints(minWidth: 175),
                     onSelected: (val) {
-                      if (val == 'copy') {
+                      if (val == 'download') {
+                        _downloadTimetableSchedule();
+                      } else if (val == 'copy') {
                         _handleCopySchedule(dayName);
                       } else if (val == 'paste') {
                         _handlePasteSchedule(dayName);
@@ -2585,36 +3045,82 @@ class _PrincipalTimetableManageScreenState
                       }
                     },
                     itemBuilder: (ctx) => [
-                      PopupMenuItem(
+                      if (isPublished) ...[
+                        const PopupMenuItem<String>(
+                          value: 'download',
+                          height: 40,
+                          child: Row(
+                            children: [
+                              Icon(Icons.download_rounded, size: 18, color: Color(0xFF0F172A)),
+                              SizedBox(width: 10),
+                              Text(
+                                'Download Schedule',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuDivider(height: 1),
+                      ],
+                      PopupMenuItem<String>(
                         value: 'copy',
+                        height: 40,
                         enabled: periodsList.isNotEmpty,
                         child: Row(
-                          children: const [
-                            Icon(Icons.copy_rounded, size: 18),
-                            SizedBox(width: 10),
-                            Text('Copy Schedule', style: TextStyle(fontWeight: FontWeight.bold)),
+                          children: [
+                            Icon(Icons.copy_rounded, size: 18, color: periodsList.isNotEmpty ? const Color(0xFF0F172A) : const Color(0xFF94A3B8)),
+                            const SizedBox(width: 10),
+                            Text(
+                              'Copy Schedule',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: periodsList.isNotEmpty ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                      PopupMenuItem(
+                      PopupMenuItem<String>(
                         value: 'paste',
+                        height: 40,
                         enabled: _copiedSchedule != null && !isPastDay,
                         child: Row(
-                          children: const [
-                            Icon(Icons.paste_rounded, size: 18),
-                            SizedBox(width: 10),
-                            Text('Paste Schedule', style: TextStyle(fontWeight: FontWeight.bold)),
+                          children: [
+                            Icon(Icons.paste_rounded, size: 18, color: (_copiedSchedule != null && !isPastDay) ? const Color(0xFF0F172A) : const Color(0xFF94A3B8)),
+                            const SizedBox(width: 10),
+                            Text(
+                              'Paste Schedule',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: (_copiedSchedule != null && !isPastDay) ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                      PopupMenuItem(
+                      const PopupMenuDivider(height: 1),
+                      PopupMenuItem<String>(
                         value: 'clear',
+                        height: 40,
                         enabled: periodsList.isNotEmpty && !isPastDay,
                         child: Row(
                           children: [
-                            Icon(Icons.delete_outline_rounded, size: 18, color: Colors.red.shade700),
+                            Icon(Icons.delete_outline_rounded, size: 18, color: (periodsList.isNotEmpty && !isPastDay) ? const Color(0xFFDC2626) : const Color(0xFF94A3B8)),
                             const SizedBox(width: 10),
-                            Text('Clear Schedule', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red.shade700)),
+                            Text(
+                              'Clear Schedule',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: (periodsList.isNotEmpty && !isPastDay) ? const Color(0xFFDC2626) : const Color(0xFF94A3B8),
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -2724,7 +3230,11 @@ class _PrincipalTimetableManageScreenState
                       if (!isPastDay)
                         PopupMenuButton<String>(
                           icon: const Icon(Icons.more_vert_rounded, color: Color(0xFF64748B), size: 20),
+                          elevation: 6,
+                          color: Colors.white,
+                          surfaceTintColor: Colors.transparent,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          constraints: const BoxConstraints(minWidth: 185),
                           onSelected: (val) {
                             if (val == 'backup') {
                               _showBackupTeacherDialog(p, dateStr);
@@ -2735,33 +3245,58 @@ class _PrincipalTimetableManageScreenState
                             }
                           },
                           itemBuilder: (ctx) => [
-                            PopupMenuItem(
+                            const PopupMenuItem<String>(
                               value: 'backup',
-                              child: Row(
-                                children: const [
-                                  Icon(Icons.person_add_alt_1_outlined, size: 18),
-                                  SizedBox(width: 10),
-                                  Text('Assign Backup Teacher', style: TextStyle(fontWeight: FontWeight.bold)),
-                                ],
-                              ),
-                            ),
-                            PopupMenuItem(
-                              value: 'replace',
-                              child: Row(
-                                children: const [
-                                  Icon(Icons.swap_horiz_rounded, size: 18),
-                                  SizedBox(width: 10),
-                                  Text('Replace Teacher', style: TextStyle(fontWeight: FontWeight.bold)),
-                                ],
-                              ),
-                            ),
-                            PopupMenuItem(
-                              value: 'delete',
+                              height: 40,
                               child: Row(
                                 children: [
-                                  Icon(Icons.delete_outline_rounded, size: 18, color: Colors.red.shade700),
-                                  const SizedBox(width: 10),
-                                  Text('Delete Period', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red.shade700)),
+                                  Icon(Icons.person_add_alt_1_outlined, size: 18, color: Color(0xFF0F172A)),
+                                  SizedBox(width: 10),
+                                  Text(
+                                    'Assign Backup Teacher',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const PopupMenuItem<String>(
+                              value: 'replace',
+                              height: 40,
+                              child: Row(
+                                children: [
+                                  Icon(Icons.swap_horiz_rounded, size: 18, color: Color(0xFF0F172A)),
+                                  SizedBox(width: 10),
+                                  Text(
+                                    'Replace Teacher',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const PopupMenuDivider(height: 1),
+                            const PopupMenuItem<String>(
+                              value: 'delete',
+                              height: 40,
+                              child: Row(
+                                children: [
+                                  Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFDC2626)),
+                                  SizedBox(width: 10),
+                                  Text(
+                                    'Delete Period',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFFDC2626),
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),

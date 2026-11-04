@@ -107,6 +107,7 @@ class FeeService {
     String? period,
     String? depositBy,
     String? search,
+    bool? discounted,
     int page = 1,
     int limit = 20,
   }) async {
@@ -123,6 +124,9 @@ class FeeService {
     }
     if (search != null && search.trim().isNotEmpty) {
       queryParams['search'] = search.trim();
+    }
+    if (discounted == true) {
+      queryParams['discounted'] = '1';
     }
 
     final baseUri = Uri.parse('$baseUrl/api/school/collection-history');

@@ -15,7 +15,7 @@ class CreateEditHomeworkModal extends StatefulWidget {
     Key? key,
     required this.homeworkService,
     this.initialHomework,
-  }) : super(key: key);
+  });
 
   static Future<bool?> show(
     BuildContext context, {
@@ -266,6 +266,132 @@ class _CreateEditHomeworkModalState extends State<CreateEditHomeworkModal> {
     }
   }
 
+  Widget _buildCurvedClassDropdown(BuildContext context) {
+    String currentLabel = 'Select Class';
+    for (var c in _classesList) {
+      final int id = c['id'] is int ? c['id'] : int.parse(c['id'].toString());
+      if (id == _selectedClassId) {
+        final String rawName = c['name']?.toString() ?? '';
+        final String sec = c['section']?.toString() ?? '';
+        currentLabel = formatShortClassName(rawName, section: sec);
+        break;
+      }
+    }
+
+    final sortedClasses = sortClassesAscending(_classesList);
+
+    return Builder(
+      builder: (btnContext) {
+        return InkWell(
+          onTap: sortedClasses.isEmpty
+              ? null
+              : () async {
+                  FocusScope.of(context).unfocus();
+                  final renderBox = btnContext.findRenderObject() as RenderBox?;
+                  if (renderBox == null) return;
+                  final offset = renderBox.localToGlobal(Offset.zero);
+                  final size = renderBox.size;
+                  final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
+                  if (overlay == null) return;
+
+                  final position = RelativeRect.fromRect(
+                    Rect.fromLTWH(offset.dx, offset.dy + size.height + 4, size.width < 160 ? 160 : size.width, size.height),
+                    Offset.zero & overlay.size,
+                  );
+
+                  final selected = await showMenu<int>(
+                    context: context,
+                    position: position,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    color: Colors.white,
+                    surfaceTintColor: Colors.transparent,
+                    elevation: 6,
+                    constraints: const BoxConstraints(
+                      minWidth: 160,
+                      maxWidth: 220,
+                      maxHeight: 280,
+                    ),
+                    items: sortedClasses.map((c) {
+                      final int id = c['id'] is int ? c['id'] : int.parse(c['id'].toString());
+                      final String rawName = c['name']?.toString() ?? '';
+                      final String sec = c['section']?.toString() ?? '';
+                      final String label = formatShortClassName(rawName, section: sec);
+                      final isSelected = id == _selectedClassId;
+
+                      return PopupMenuItem<int>(
+                        value: id,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: isSelected ? const Color(0xFFFEF3C7) : Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  label,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                                    color: isSelected ? const Color(0xFFB45309) : const Color(0xFF0F172A),
+                                  ),
+                                ),
+                              ),
+                              if (isSelected)
+                                const Icon(Icons.check_rounded, size: 16, color: Color(0xFFD97706)),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  );
+
+                  if (selected != null && selected != _selectedClassId) {
+                    setState(() {
+                      _selectedClassId = selected;
+                    });
+                  }
+                },
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFCBD5E1), width: 1.2),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    currentLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                const Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  size: 18,
+                  color: Color(0xFF475569),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isEdit = widget.initialHomework != null;
@@ -296,69 +422,25 @@ class _CreateEditHomeworkModalState extends State<CreateEditHomeworkModal> {
             ),
             const SizedBox(height: 16),
 
-            // Modal Header with Title & Class Dropdown
+            // Modal Header with Title & Class Dropdown (Curved dropdown, no X button)
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
                   isEdit ? 'Edit Homework' : 'Assign Homework',
                   style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF0F172A),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Flexible(
-                  fit: FlexFit.loose,
-                  child: _isLoadingClasses
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.indigo),
-                        )
-                      : Container(
-                          height: 34,
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                          decoration: BoxDecoration(
-                            color: Colors.indigo.shade50,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.indigo.shade200),
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<int>(
-                              value: _selectedClassId,
-                              isExpanded: false,
-                              isDense: true,
-                              icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.indigo, size: 18),
-                              hint: const Text(
-                                'Select Class',
-                                style: TextStyle(fontSize: 12, color: Colors.indigo, fontWeight: FontWeight.bold),
-                              ),
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.indigo),
-                              items: sortClassesAscending(_classesList).map((c) {
-                                final int id = c['id'] is int ? c['id'] : int.parse(c['id'].toString());
-                                final String rawName = c['name']?.toString() ?? '';
-                                final String sec = c['section']?.toString() ?? '';
-                                final String label = formatShortClassName(rawName, section: sec);
-                                return DropdownMenuItem<int>(
-                                  value: id,
-                                  child: Text(label, overflow: TextOverflow.ellipsis),
-                                );
-                              }).toList(),
-                              onChanged: (val) {
-                                setState(() {
-                                  _selectedClassId = val;
-                                });
-                              },
-                            ),
-                          ),
-                        ),
-                ),
-                const SizedBox(width: 4),
-                IconButton(
-                  icon: const Icon(Icons.close, color: Colors.grey),
-                  onPressed: () => Navigator.pop(context),
-                ),
+                _isLoadingClasses
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFC26600)),
+                      )
+                    : _buildCurvedClassDropdown(context),
               ],
             ),
 
@@ -414,7 +496,7 @@ class _CreateEditHomeworkModalState extends State<CreateEditHomeworkModal> {
                   icon: const Icon(Icons.attach_file_rounded, size: 18),
                   label: const Text('Add File'),
                   style: TextButton.styleFrom(
-                    foregroundColor: Colors.indigo,
+                    foregroundColor: const Color(0xFFC26600),
                   ),
                 ),
               ],
@@ -444,7 +526,7 @@ class _CreateEditHomeworkModalState extends State<CreateEditHomeworkModal> {
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: Colors.indigo,
+                          color: const Color(0xFFC26600),
                         ),
                       ),
                     ),
@@ -516,7 +598,7 @@ class _CreateEditHomeworkModalState extends State<CreateEditHomeworkModal> {
             ElevatedButton(
               onPressed: (_isUploading || _isSubmitting) ? null : _handleSubmit,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.indigo,
+                backgroundColor: const Color(0xFF0F766E),
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

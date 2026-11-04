@@ -1371,130 +1371,161 @@ class _LeaveListScreenState extends State<LeaveListScreen> {
     );
   }
 
+  // Custom Curved Dropdown Helper matching modern app design system
+  Widget _buildCurvedDropdown({
+    required BuildContext context,
+    required String value,
+    required Map<String, String> items,
+    required ValueChanged<String> onChanged,
+  }) {
+    final displayText = items[value] ?? value;
+    return Builder(
+      builder: (btnContext) {
+        return InkWell(
+          onTap: () async {
+            FocusScope.of(context).unfocus();
+            final renderBox = btnContext.findRenderObject() as RenderBox?;
+            if (renderBox == null) return;
+            final offset = renderBox.localToGlobal(Offset.zero);
+            final size = renderBox.size;
+            final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
+            if (overlay == null) return;
+
+            final position = RelativeRect.fromRect(
+              Rect.fromLTWH(offset.dx, offset.dy + size.height + 4, size.width, size.height),
+              Offset.zero & overlay.size,
+            );
+
+            final selected = await showMenu<String>(
+              context: context,
+              position: position,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              color: Colors.white,
+              surfaceTintColor: Colors.transparent,
+              elevation: 6,
+              constraints: BoxConstraints(
+                minWidth: size.width < 140 ? 140 : size.width,
+                maxWidth: size.width < 180 ? 180 : size.width,
+                maxHeight: 280,
+              ),
+              items: items.entries.map((entry) {
+                final isSelected = entry.key == value;
+                return PopupMenuItem<String>(
+                  value: entry.key,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: isSelected ? const Color(0xFFFEF3C7) : Colors.transparent,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          entry.value,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                            color: isSelected ? const Color(0xFFB45309) : const Color(0xFF0F172A),
+                          ),
+                        ),
+                        if (isSelected)
+                          const Icon(Icons.check_rounded, size: 16, color: Color(0xFFD97706)),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            );
+
+            if (selected != null && selected != value) {
+              onChanged(selected);
+            }
+          },
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  displayText,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+              ),
+              const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 20,
+                color: Color(0xFF475569),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildPrincipalHeaderFilters() {
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          // 1. Status Dropdown (Equal 50% width)
+          // 1. Status Dropdown (Equal 50% width, curved dropdown with no clipping)
           Expanded(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
                 color: const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color(0xFFCBD5E1), width: 1.2),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'STATUS',
-                    style: TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFF64748B),
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: _statusFilter,
-                      isExpanded: true,
-                      isDense: true,
-                      borderRadius: BorderRadius.circular(14),
-                      dropdownColor: Colors.white,
-                      elevation: 4,
-                      icon: const Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        size: 20,
-                        color: Color(0xFF475569),
-                      ),
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF0F172A),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'ALL', child: Text('All')),
-                        DropdownMenuItem(value: 'PENDING', child: Text('Pending')),
-                        DropdownMenuItem(value: 'APPROVED', child: Text('Approved')),
-                        DropdownMenuItem(value: 'REJECTED', child: Text('Rejected')),
-                      ],
-                      onChanged: (val) {
-                        if (val != null) {
-                          setState(() {
-                            _statusFilter = val;
-                          });
-                        }
-                      },
-                    ),
-                  ),
-                ],
+              child: _buildCurvedDropdown(
+                context: context,
+                value: _statusFilter,
+                items: const {
+                  'ALL': 'All',
+                  'PENDING': 'Pending',
+                  'APPROVED': 'Approved',
+                  'REJECTED': 'Rejected',
+                },
+                onChanged: (val) {
+                  setState(() {
+                    _statusFilter = val;
+                  });
+                },
               ),
             ),
           ),
           const SizedBox(width: 12),
 
-          // 2. Teacher/Student Dropdown (Equal 50% width)
+          // 2. Teacher/Student Dropdown (Equal 50% width, curved dropdown with no clipping)
           Expanded(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
                 color: const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color(0xFFCBD5E1), width: 1.2),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'TEACHER / STUDENT',
-                    style: TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFF64748B),
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: _roleFilter,
-                      isExpanded: true,
-                      isDense: true,
-                      borderRadius: BorderRadius.circular(14),
-                      dropdownColor: Colors.white,
-                      elevation: 4,
-                      icon: const Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        size: 20,
-                        color: Color(0xFF475569),
-                      ),
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF0F172A),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'TEACHER', child: Text('Teacher')),
-                        DropdownMenuItem(value: 'STUDENT', child: Text('Student')),
-                        DropdownMenuItem(value: 'ALL', child: Text('All')),
-                      ],
-                      onChanged: (val) {
-                        if (val != null) {
-                          setState(() {
-                            _roleFilter = val;
-                          });
-                        }
-                      },
-                    ),
-                  ),
-                ],
+              child: _buildCurvedDropdown(
+                context: context,
+                value: _roleFilter,
+                items: const {
+                  'ALL': 'All',
+                  'TEACHER': 'Teacher',
+                  'STUDENT': 'Student',
+                },
+                onChanged: (val) {
+                  setState(() {
+                    _roleFilter = val;
+                  });
+                },
               ),
             ),
           ),

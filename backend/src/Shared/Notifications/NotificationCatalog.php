@@ -295,6 +295,22 @@ final class NotificationCatalog
             'link'     => '/teacher/salary',
             'label'    => 'Salary has been disbursed',
         ],
+        'EXPENSE_APPROVAL_REQUEST' => [
+            'category' => self::CAT_FEES,
+            'delivery' => self::DELIVERY_PUSH,
+            'audience' => ['SCHOOL_ADMIN'],
+            'priority' => 'high',
+            'link'     => '/expenses',
+            'label'    => 'An expense was submitted for School Admin approval',
+        ],
+        'FINANCIAL_REPORT_APPROVAL_REQUEST' => [
+            'category' => self::CAT_FEES,
+            'delivery' => self::DELIVERY_PUSH,
+            'audience' => ['SCHOOL_ADMIN'],
+            'priority' => 'high',
+            'link'     => '/financial-reports',
+            'label'    => 'A financial report was submitted for School Admin approval',
+        ],
 
         // ---------------- ANNOUNCEMENT ----------------
         'ANNOUNCEMENT_PUBLISHED' => [

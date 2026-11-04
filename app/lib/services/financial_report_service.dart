@@ -80,6 +80,24 @@ class FinancialReportService {
     }
   }
 
+  /// Update settlement status of a financial report (e.g. 'Settled', 'Rejected')
+  Future<Map<String, dynamic>> updateReportStatus(int reportId, String status) async {
+    final uri = Uri.parse('$baseUrl/api/school/financial-reports/$reportId/settle');
+    final response = await http.put(
+      uri,
+      headers: _headers,
+      body: json.encode({'status': status}),
+    );
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      final decoded = json.decode(response.body);
+      return Map<String, dynamic>.from(decoded['data'] ?? decoded);
+    } else {
+      final err = json.decode(response.body);
+      throw Exception(err['message'] ?? 'Failed to update financial report status');
+    }
+  }
+
   /// Submit Hand Over / Settlement Request to School Admin / Owner
   Future<Map<String, dynamic>> submitSettlementRequest(int reportId) async {
     final uri = Uri.parse('$baseUrl/api/school/financial-reports/$reportId/settlement-request');
@@ -122,6 +140,20 @@ class FinancialReportService {
     } else {
       throw Exception('Failed to export financial report');
     }
+  }
+
+  /// Get count of pending financial reports awaiting settlement approval (School Admin only)
+  Future<int> getPendingFinancialReportCount() async {
+    try {
+      final uri = Uri.parse('$baseUrl/api/school/financial-reports/pending-count');
+      final response = await http.get(uri, headers: _headers);
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+        final data = decoded['data'] ?? decoded;
+        return (data['pending_count'] as num?)?.toInt() ?? 0;
+      }
+    } catch (_) {}
+    return 0;
   }
 
   /// Download Excel bytes of a preview report
