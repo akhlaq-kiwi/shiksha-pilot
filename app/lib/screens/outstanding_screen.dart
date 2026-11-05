@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../services/http_service.dart' as http;
 import '../utils/class_formatter.dart';
+import 'full_screen_image_screen.dart';
 
 class OutstandingScreen extends StatefulWidget {
   final String baseUrl;
@@ -12,7 +13,7 @@ class OutstandingScreen extends StatefulWidget {
     Key? key,
     required this.baseUrl,
     required this.token,
-  }) : super(key: key);
+  });
 
   @override
   State<OutstandingScreen> createState() => _OutstandingScreenState();
@@ -21,7 +22,7 @@ class OutstandingScreen extends StatefulWidget {
 class _OutstandingScreenState extends State<OutstandingScreen> {
   bool _isLoading = true;
   String _errorMessage = '';
-  
+
   bool _hasClass = false;
   String _fullClassName = '';
   int? _selectedClassId;
@@ -125,83 +126,126 @@ class _OutstandingScreenState extends State<OutstandingScreen> {
     }
   }
 
-  Widget _buildStudentAvatar(String photoPath, String name, bool hasDues) {
-    final String initialText = name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : 'S';
-    final Color bgColor = hasDues ? Colors.amber.shade50 : Colors.indigo.shade50;
-    final Color textColor = hasDues ? Colors.amber.shade900 : Colors.indigo;
+  String _resolvePhotoUrl(String photoPath) {
+    final trimmed = photoPath.trim();
+    if (trimmed.isEmpty || trimmed == 'null' || trimmed == '—') {
+      return '';
+    }
+    if (trimmed.startsWith('http')) {
+      return trimmed;
+    }
+    final cleanBase = widget.baseUrl.replaceAll(RegExp(r'/+$'), '');
+    final cleanPath = trimmed.startsWith('/') ? trimmed : '/$trimmed';
+    return '$cleanBase$cleanPath';
+  }
 
-    final Widget fallbackWidget = CircleAvatar(
-      radius: 22,
-      backgroundColor: bgColor,
+  Widget _buildStudentAvatar(Map<String, dynamic> student, bool hasDues) {
+    final String name = (student['name'] ?? 'Student').toString();
+    final String photoPath = (student['photo_path'] ?? '').toString();
+    final dynamic studentId = student['id'];
+    final String fullUrl = _resolvePhotoUrl(photoPath);
+    final String heroTag = 'outstanding_avatar_${studentId ?? name}';
+
+    final initials = name.trim().split(' ').where((w) => w.isNotEmpty).map((w) => w[0]).take(2).join('').toUpperCase();
+    final String displayInitials = initials.isNotEmpty ? initials : 'S';
+
+    final Color bgColor = hasDues ? const Color(0xFFFEF3C7) : const Color(0xFFE0F2FE);
+    final Color borderColor = hasDues ? const Color(0xFFFDE68A) : const Color(0xFFBAE6FD);
+    final Color textColor = hasDues ? const Color(0xFFB45309) : const Color(0xFF0369A1);
+
+    final Widget placeholderWidget = Container(
+      width: 56,
+      height: 56,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: bgColor,
+        border: Border.all(color: borderColor, width: 1.5),
+      ),
+      alignment: Alignment.center,
       child: Text(
-        initialText,
+        displayInitials,
         style: TextStyle(
-          fontWeight: FontWeight.bold,
+          fontWeight: FontWeight.w800,
           color: textColor,
-          fontSize: 16,
+          fontSize: displayInitials.length > 1 ? 17 : 20,
         ),
       ),
     );
 
-    final String trimmedPath = photoPath.trim();
-    if (trimmedPath.isEmpty) {
-      return fallbackWidget;
-    }
-
-    String fullUrl = trimmedPath;
-    if (!trimmedPath.startsWith('http')) {
-      final String cleanPath = trimmedPath.startsWith('/') ? trimmedPath : '/$trimmedPath';
-      fullUrl = '${widget.baseUrl}$cleanPath';
-    }
-
-    return ClipOval(
-      child: CachedNetworkImage(
-        imageUrl: fullUrl,
-        width: 44,
-        height: 44,
-        fit: BoxFit.cover,
-        placeholder: (context, url) => Container(
-          width: 44,
-          height: 44,
-          color: bgColor,
-          alignment: Alignment.center,
-          child: Text(
-            initialText,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: textColor,
-              fontSize: 16,
+    return GestureDetector(
+      onTap: () {
+        if (fullUrl.isNotEmpty) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => FullScreenImageScreen(
+                imageUrl: fullUrl,
+                title: name,
+                heroTag: heroTag,
+              ),
             ),
-          ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No profile photo uploaded for this student.'),
+              behavior: SnackBarBehavior.floating,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      },
+      child: Container(
+        width: 56,
+        height: 56,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: bgColor,
+          border: Border.all(color: borderColor, width: 1.5),
         ),
-        errorWidget: (context, url, error) => fallbackWidget,
+        child: ClipOval(
+          child: fullUrl.isNotEmpty
+              ? Hero(
+                  tag: heroTag,
+                  child: CachedNetworkImage(
+                    imageUrl: fullUrl,
+                    width: 56,
+                    height: 56,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => placeholderWidget,
+                    errorWidget: (context, url, error) => placeholderWidget,
+                  ),
+                )
+              : placeholderWidget,
+        ),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    // Top center title logic
-    final String titleText = _hasClass && _fullClassName.isNotEmpty
+    final String rawTitle = _hasClass && _fullClassName.isNotEmpty
         ? 'Outstanding for $_fullClassName'
         : 'Outstanding';
+    final String titleText = rawTitle.toUpperCase();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFFAF9F6),
       appBar: AppBar(
-        elevation: 0,
+        elevation: 0.5,
         backgroundColor: Colors.white,
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.indigo),
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF0F172A)),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           titleText,
           style: const TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
+            color: Color(0xFF0F172A),
+            fontWeight: FontWeight.w800,
+            fontSize: 16.5,
+            letterSpacing: 0.5,
           ),
         ),
       ),
@@ -212,7 +256,7 @@ class _OutstandingScreenState extends State<OutstandingScreen> {
   Widget _buildBody() {
     if (_isLoading) {
       return const Center(
-        child: CircularProgressIndicator(color: Colors.indigo),
+        child: CircularProgressIndicator(color: Color(0xFFD97706)),
       );
     }
 
@@ -223,20 +267,20 @@ class _OutstandingScreenState extends State<OutstandingScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.error_outline_rounded, size: 48, color: Colors.red.shade400),
+              const Icon(Icons.error_outline_rounded, size: 48, color: Color(0xFFDC2626)),
               const SizedBox(height: 12),
               Text(
                 _errorMessage,
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 15, color: Colors.black87),
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
               ),
               const SizedBox(height: 16),
               ElevatedButton.icon(
                 onPressed: _fetchOutstandingData,
                 icon: const Icon(Icons.refresh_rounded),
-                label: const Text('Retry'),
+                label: const Text('Retry', style: TextStyle(fontWeight: FontWeight.w800)),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.indigo,
+                  backgroundColor: const Color(0xFFD97706),
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
@@ -250,6 +294,7 @@ class _OutstandingScreenState extends State<OutstandingScreen> {
     if (!_hasClass) {
       return RefreshIndicator(
         onRefresh: _fetchOutstandingData,
+        color: const Color(0xFFD97706),
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           child: Container(
@@ -261,22 +306,22 @@ class _OutstandingScreenState extends State<OutstandingScreen> {
               children: [
                 Container(
                   padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.indigo.shade50,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFEF3C7),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Icons.class_outlined, size: 56, color: Colors.indigo.shade400),
+                  child: const Icon(Icons.class_outlined, size: 56, color: Color(0xFFD97706)),
                 ),
                 const SizedBox(height: 20),
                 const Text(
                   'No Class Assigned',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
                 ),
                 const SizedBox(height: 8),
-                Text(
+                const Text(
                   'You are currently not assigned as a class teacher to any class.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                  style: TextStyle(fontSize: 13.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
                 ),
               ],
             ),
@@ -295,17 +340,17 @@ class _OutstandingScreenState extends State<OutstandingScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
               decoration: BoxDecoration(
-                color: Colors.indigo.shade50.withOpacity(0.6),
+                color: const Color(0xFFFFFBEB),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.indigo.shade100, width: 1.2),
+                border: Border.all(color: const Color(0xFFFDE68A), width: 1.2),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.class_rounded, color: Colors.indigo, size: 20),
+                  const Icon(Icons.school_outlined, color: Color(0xFFD97706), size: 20),
                   const SizedBox(width: 10),
                   const Text(
                     'Class:',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.indigo),
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Color(0xFFB45309)),
                   ),
                   const SizedBox(width: 12),
                   Flexible(
@@ -314,8 +359,8 @@ class _OutstandingScreenState extends State<OutstandingScreen> {
                       child: DropdownButton<int>(
                         value: _selectedClassId,
                         isExpanded: false,
-                        icon: const Icon(Icons.arrow_drop_down_rounded, color: Colors.indigo),
-                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87, fontSize: 14),
+                        icon: const Icon(Icons.arrow_drop_down_rounded, color: Color(0xFFD97706)),
+                        style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF0F172A), fontSize: 13.5),
                         items: sortClassesAscending(_assignedClasses).map((cls) {
                           final int id = cls['id'] is int ? cls['id'] : int.parse(cls['id'].toString());
                           final String rawName = (cls['full_class_name'] ?? cls['name'] ?? 'Class').toString();
@@ -342,25 +387,28 @@ class _OutstandingScreenState extends State<OutstandingScreen> {
         // Search Box Container
         Container(
           color: Colors.white,
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          child: TextField(
-            controller: _searchController,
-            decoration: InputDecoration(
-              hintText: 'Search student by name or roll no...',
-              hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
-              prefixIcon: const Icon(Icons.search_rounded, color: Colors.indigo),
-              suffixIcon: _searchController.text.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear_rounded, color: Colors.grey),
-                      onPressed: () => _searchController.clear(),
-                    )
-                  : null,
-              filled: true,
-              fillColor: const Color(0xFFF1F5F9),
-              contentPadding: const EdgeInsets.symmetric(vertical: 12),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: TextField(
+              controller: _searchController,
+              style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+              decoration: InputDecoration(
+                hintText: 'Search by student name or roll no...',
+                hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontWeight: FontWeight.w500),
+                prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF64748B), size: 20),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear_rounded, color: Color(0xFF64748B), size: 18),
+                        onPressed: () => _searchController.clear(),
+                      )
+                    : null,
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
               ),
             ),
           ),
@@ -370,7 +418,7 @@ class _OutstandingScreenState extends State<OutstandingScreen> {
         Expanded(
           child: RefreshIndicator(
             onRefresh: _fetchOutstandingData,
-            color: Colors.indigo,
+            color: const Color(0xFFD97706),
             child: _filteredStudents.isEmpty
                 ? SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
@@ -381,57 +429,56 @@ class _OutstandingScreenState extends State<OutstandingScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.search_off_rounded, size: 48, color: Colors.grey.shade400),
+                          const Icon(Icons.search_off_rounded, size: 48, color: Color(0xFF94A3B8)),
                           const SizedBox(height: 12),
                           Text(
                             _searchController.text.isNotEmpty
                                 ? 'No student found matching "${_searchController.text}"'
                                 : 'No active students in this class.',
                             textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                            style: const TextStyle(fontSize: 13.5, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
                           ),
                         ],
                       ),
                     ),
                   )
                 : ListView.builder(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                     physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
                     itemCount: _filteredStudents.length,
                     itemBuilder: (context, index) {
-                      final student = _filteredStudents[index];
-                      final String name = student['name'] ?? 'Student';
+                      final student = _filteredStudents[index] is Map ? Map<String, dynamic>.from(_filteredStudents[index]) : <String, dynamic>{};
+                      final String name = (student['name'] ?? 'Student').toString();
                       final String rollNo = (student['roll_no'] ?? '').toString();
                       final int outstandingAmount = (student['outstanding_amount'] is int)
                           ? student['outstanding_amount']
                           : int.tryParse(student['outstanding_amount']?.toString() ?? '0') ?? 0;
-                      final String photoPath = student['photo_path'] ?? '';
 
                       final bool hasDues = outstandingAmount > 0;
 
                       return Container(
-                        margin: const EdgeInsets.only(bottom: 12),
+                        margin: const EdgeInsets.only(bottom: 10),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: hasDues ? Colors.amber.shade200 : Colors.grey.shade200,
+                            color: hasDues ? const Color(0xFFFED7AA) : const Color(0xFFE2E8F0),
                             width: 1.2,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.03),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
+                              color: Colors.black.withValues(alpha: 0.02),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
                             ),
                           ],
                         ),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                           child: Row(
                             children: [
-                              // Avatar / Photo
-                              _buildStudentAvatar(photoPath, name, hasDues),
+                              // Avatar / Photo (size: 56, tap to view full image)
+                              _buildStudentAvatar(student, hasDues),
                               const SizedBox(width: 14),
 
                               // Student Name & Roll No (Left Aligned)
@@ -441,20 +488,34 @@ class _OutstandingScreenState extends State<OutstandingScreen> {
                                   children: [
                                     Text(
                                       name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
+                                        fontWeight: FontWeight.w800,
                                         fontSize: 15,
-                                        color: Colors.black87,
+                                        color: Color(0xFF0F172A),
                                       ),
                                     ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      rollNo.isNotEmpty ? 'Roll No: $rollNo' : 'Roll No: N/A',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: Colors.grey.shade600,
-                                        fontWeight: FontWeight.w500,
-                                      ),
+                                    const SizedBox(height: 5),
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFF1F5F9),
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: Text(
+                                            rollNo.isNotEmpty ? 'Roll No: $rollNo' : 'Roll No: —',
+                                            style: const TextStyle(
+                                              fontSize: 11.5,
+                                              fontWeight: FontWeight.w700,
+                                              color: Color(0xFF64748B),
+                                              letterSpacing: 0.2,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
@@ -462,13 +523,24 @@ class _OutstandingScreenState extends State<OutstandingScreen> {
 
                               const SizedBox(width: 12),
 
-                              // Outstanding Amount (Right Aligned, Integer format, No Decimals)
-                              Text(
-                                _formatAmount(outstandingAmount),
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                  color: hasDues ? Colors.red.shade700 : Colors.green.shade700,
+                              // Outstanding Amount Badge (Right Aligned)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: hasDues ? const Color(0xFFFEF2F2) : const Color(0xFFECFDF5),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: hasDues ? const Color(0xFFFECACA) : const Color(0xFFA7F3D0),
+                                  ),
+                                ),
+                                child: Text(
+                                  _formatAmount(outstandingAmount),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 15,
+                                    color: hasDues ? const Color(0xFFDC2626) : const Color(0xFF059669),
+                                    letterSpacing: 0.2,
+                                  ),
                                 ),
                               ),
                             ],

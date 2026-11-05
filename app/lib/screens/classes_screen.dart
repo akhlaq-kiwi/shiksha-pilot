@@ -5383,6 +5383,8 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
     String? prefixText,
     Widget? suffixIcon,
     String? errorKey,
+    TextInputAction textInputAction = TextInputAction.next,
+    void Function(String)? onSubmitted,
   }) {
     final hasErr = errorKey != null && _errors.containsKey(errorKey);
 
@@ -5393,6 +5395,8 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
           controller: ctrl,
           enabled: enabled,
           keyboardType: isNumeric ? TextInputType.number : TextInputType.text,
+          textInputAction: textInputAction,
+          onSubmitted: onSubmitted ?? (_) => FocusScope.of(context).nextFocus(),
           inputFormatters: isNumeric ? [FilteringTextInputFormatter.digitsOnly] : null,
           maxLength: maxLength,
           style: TextStyle(

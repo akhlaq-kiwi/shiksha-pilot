@@ -15,6 +15,8 @@ import 'achievements_screen.dart';
 import 'attendance_screen.dart';
 import '../services/attendance_service.dart';
 import 'principal_tar_screen.dart';
+import 'fee_reminder_screen.dart';
+import '../services/fee_reminder_service.dart';
 
 class NotificationCenterScreen extends StatefulWidget {
   final String baseUrl;
@@ -447,6 +449,15 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                 http.post(uri, headers: headers).catchError((_) => http.Response('', 500));
                               } catch (_) {}
 
+                              final eventKey = (notif['event_key'] ?? '').toString();
+                              final isClassTeacherNotif = eventKey == 'CLASS_TEACHER_ASSIGNED' ||
+                                  titleLower.contains('class teacher') ||
+                                  msgLower.contains('class teacher');
+                              if (isClassTeacherNotif) {
+                                // Informational only: teacher is informed via notification; no deep link/navigation
+                                return;
+                              }
+
                               final isSalaryNotif = linkStr.contains('salary') || titleLower.contains('salary') || msgLower.contains('salary') || (notif['event_key'] ?? '').toString() == 'SALARY_DISBURSED';
                               if (isSalaryNotif) {
                                 Navigator.push(
@@ -679,6 +690,25 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                     );
                                   }
                                 }
+                                return;
+                              }
+
+                              final isFeeReminderNotif = linkStr.contains('fee-reminder') ||
+                                  linkStr.contains('fee-follow-up') ||
+                                  titleLower.contains('fee reminder') ||
+                                  titleLower.contains('fee follow-up') ||
+                                  (notif['event_key'] ?? '').toString() == 'FEE_FOLLOWUP_DUE_TODAY';
+                              if (isFeeReminderNotif) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => FeeReminderScreen(
+                                      service: FeeReminderService(baseUrl: widget.baseUrl, token: widget.token),
+                                      userRole: widget.userRole ?? 'TEACHER',
+                                      isFeeCollector: true,
+                                    ),
+                                  ),
+                                );
                                 return;
                               }
 

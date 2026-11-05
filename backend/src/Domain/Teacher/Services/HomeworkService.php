@@ -71,7 +71,7 @@ class HomeworkService extends BaseService
             FROM homework h
             LEFT JOIN classes c ON h.class_id = c.id
             WHERE h.school_id = :sid AND (h.teacher_id = :tid OR h.teacher_id = :uid)
-            ORDER BY h.id DESC
+            ORDER BY h.id ASC
         ");
         $stmt->execute([':sid' => $schoolId, ':tid' => $teacherId, ':uid' => $userId]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -127,7 +127,7 @@ class HomeworkService extends BaseService
             LEFT JOIN classes c ON h.class_id = c.id
             LEFT JOIN users u ON h.teacher_id = u.id
             WHERE h.school_id = :sid AND (h.class_id = :cid OR h.class_id IS NULL)
-            ORDER BY h.id DESC
+            ORDER BY h.id ASC
         ");
         $stmt->execute([':sid' => $schoolId, ':cid' => $classId]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];

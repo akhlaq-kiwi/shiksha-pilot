@@ -2871,6 +2871,8 @@ class _AddEditTeacherModalState extends State<_AddEditTeacherModal> {
     bool isNumber = false,
     bool isEmail = false,
     String? hint,
+    TextInputAction textInputAction = TextInputAction.next,
+    void Function(String)? onFieldSubmitted,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2888,6 +2890,8 @@ class _AddEditTeacherModalState extends State<_AddEditTeacherModal> {
         TextFormField(
           controller: ctrl,
           maxLength: maxLength,
+          textInputAction: textInputAction,
+          onFieldSubmitted: onFieldSubmitted ?? (_) => FocusScope.of(context).nextFocus(),
           keyboardType: isDigits || isNumber
               ? TextInputType.number
               : isEmail

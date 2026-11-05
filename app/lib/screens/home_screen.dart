@@ -48,6 +48,8 @@ import 'package:school_hub/screens/revenue_screen.dart';
 import 'package:school_hub/services/financial_report_service.dart';
 import 'package:school_hub/screens/principal_examinations_screen.dart';
 import 'package:school_hub/services/school_examination_service.dart';
+import 'package:school_hub/screens/fee_reminder_screen.dart';
+import 'package:school_hub/services/fee_reminder_service.dart';
 
 class LauncherFeature {
   final String name;
@@ -73,6 +75,7 @@ class HomeScreen extends StatefulWidget {
   final bool? isFeeCollector;
   final String? userPhoto;
   final String? userName;
+  final String? schoolName;
 
   const HomeScreen({
     Key? key,
@@ -83,6 +86,7 @@ class HomeScreen extends StatefulWidget {
     this.isFeeCollector,
     this.userPhoto,
     this.userName,
+    this.schoolName,
   }) : super(key: key);
 
   @override
@@ -93,7 +97,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Timer? _notifTimer;
   String _userName = '';
   String _userRoleDisplay = '';
-  String _schoolName = '';
+  late String _schoolName = (widget.schoolName != null && widget.schoolName!.trim().isNotEmpty)
+      ? widget.schoolName!.trim().toUpperCase()
+      : '';
   String _userPhone = '';
   int? _activeStudentId;
   String _activeStudentName = '';
@@ -115,6 +121,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _unreadTimetableCount = 0;
   int _unreadSalaryCount = 0;
   int _unreadExamsCount = 0;
+  int _unreadFeeReminderCount = 0;
+  DateTime? _lastBackPressTime;
   
   final TextEditingController _searchController = TextEditingController();
 
@@ -177,7 +185,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       isAvailable: true,
     ),
     LauncherFeature(
-      name: 'Notice',
+      name: 'Notice Board',
       icon: Icons.campaign_rounded,
       color: Colors.orange.shade700,
       allowedRoles: ['PARENT', 'TEACHER', 'PRINCIPAL', 'STUDENT'],
@@ -247,7 +255,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       isAvailable: true,
     ),
     LauncherFeature(
-      name: 'Class Teacher',
+      name: 'Class Assignment',
       icon: Icons.supervised_user_circle_rounded,
       color: const Color(0xFF1E3A8A),
       allowedRoles: ['TEACHER', 'PRINCIPAL', 'SCHOOL_ADMIN'],
@@ -268,10 +276,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       isAvailable: true,
     ),
     LauncherFeature(
-      name: 'Financial report',
+      name: 'Financial Report',
       icon: Icons.trending_up_rounded,
       color: const Color(0xFFD97706),
       allowedRoles: ['TEACHER', 'FEE_COLLECTOR'],
+      isAvailable: true,
+    ),
+    LauncherFeature(
+      name: 'Fee Reminder',
+      icon: Icons.pending_actions_rounded,
+      color: const Color(0xFFD97706),
+      allowedRoles: ['FEE_COLLECTOR'],
       isAvailable: true,
     ),
   ];
@@ -329,6 +344,53 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _loadSessionInfo() async {
     final prefs = await SharedPreferences.getInstance();
+    final roleUpper = widget.userRole.toUpperCase();
+    final savedId = prefs.getInt('selected_student_id');
+    final savedSchool = prefs.getString('school_name') ?? '';
+    final savedName = (widget.userName != null && widget.userName!.isNotEmpty)
+        ? widget.userName!
+        : (prefs.getString('user_name') ?? 'User');
+    final savedPhoto = prefs.getString('user_photo') ?? '';
+
+    // Immediately reflect cached data in state without waiting for network/background tasks!
+    if (mounted) {
+      setState(() {
+        if (_schoolName.isEmpty) {
+          _schoolName = (savedSchool.isNotEmpty ? savedSchool : 'Shiksha Pilot Academy').toUpperCase();
+        }
+        _userName = savedName;
+        _userPhone = prefs.getString('user_phone') ?? '';
+        _userPhoto = savedPhoto.isNotEmpty ? savedPhoto : (widget.userPhoto ?? _userPhoto);
+        _isPrincipal = (prefs.getBool('is_principal') == true) ||
+            (widget.isPrincipal == true) ||
+            (roleUpper == 'PRINCIPAL');
+        _isFeeCollector = (prefs.getBool('is_fee_collector') == true) ||
+            (widget.isFeeCollector == true);
+
+        if ((roleUpper == 'PARENT' || roleUpper == 'STUDENT') && savedId != null) {
+          _activeStudentId = savedId;
+        }
+        
+        if (roleUpper == 'PARENT') {
+          _userRoleDisplay = 'Parent Profile';
+        } else if (roleUpper == 'TEACHER') {
+          if (_isPrincipal) {
+            _userRoleDisplay = 'Teacher (Principal)';
+          } else if (_isFeeCollector) {
+            _userRoleDisplay = 'Teacher (Fee Collector)';
+          } else {
+            _userRoleDisplay = 'Teacher Profile';
+          }
+        } else if (roleUpper == 'SCHOOL_ADMIN') {
+          _userRoleDisplay = 'School Admin Profile';
+        } else if (roleUpper == 'PRINCIPAL') {
+          _userRoleDisplay = 'Principal Profile';
+        } else {
+          _userRoleDisplay = roleUpper;
+        }
+      });
+    }
+
     final savedBase = prefs.getString('base_url');
     if (savedBase != null && savedBase.isNotEmpty) {
       _workingBaseUrl = savedBase;
@@ -338,50 +400,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
     await prefs.setString('user_role', widget.userRole);
 
-    final roleUpper = widget.userRole.toUpperCase();
-    final savedId = prefs.getInt('selected_student_id');
-
     try {
       await PushNotificationService.init();
       await PushNotificationService.registerDevice();
     } catch (_) {}
-
-    setState(() {
-      _userName = (widget.userName != null && widget.userName!.isNotEmpty)
-          ? widget.userName!
-          : (prefs.getString('user_name') ?? 'User');
-      _schoolName = (prefs.getString('school_name') ?? 'Shiksha Pilot Academy').toUpperCase();
-      _userPhone = prefs.getString('user_phone') ?? '';
-      final savedPhoto = prefs.getString('user_photo') ?? '';
-      _userPhoto = savedPhoto.isNotEmpty ? savedPhoto : (widget.userPhoto ?? _userPhoto);
-      _isPrincipal = (prefs.getBool('is_principal') == true) ||
-          (widget.isPrincipal == true) ||
-          (roleUpper == 'PRINCIPAL');
-      _isFeeCollector = (prefs.getBool('is_fee_collector') == true) ||
-          (widget.isFeeCollector == true);
-
-      if ((roleUpper == 'PARENT' || roleUpper == 'STUDENT') && savedId != null) {
-        _activeStudentId = savedId;
-      }
-      
-      if (roleUpper == 'PARENT') {
-        _userRoleDisplay = 'Parent Profile';
-      } else if (roleUpper == 'TEACHER') {
-        if (_isPrincipal) {
-          _userRoleDisplay = 'Teacher (Principal)';
-        } else if (_isFeeCollector) {
-          _userRoleDisplay = 'Teacher (Fee Collector)';
-        } else {
-          _userRoleDisplay = 'Teacher Profile';
-        }
-      } else if (roleUpper == 'SCHOOL_ADMIN') {
-        _userRoleDisplay = 'School Admin Profile';
-      } else if (roleUpper == 'PRINCIPAL') {
-        _userRoleDisplay = 'Principal Profile';
-      } else {
-        _userRoleDisplay = roleUpper;
-      }
-    });
 
     if (roleUpper == 'PARENT' || roleUpper == 'STUDENT') {
       _resolveActiveStudentName();
@@ -408,6 +430,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       
       final latestPhoto = (profile['photo_path'] as String?) ?? (profile['staff_photo_path'] as String?) ?? '';
       final latestName = (profile['name'] as String?) ?? '';
+      final latestSchool = (profile['school_name'] as String?) ?? '';
       final bool isPrincipal = profile['is_principal'] == true ||
           profile['is_principal'] == 1 ||
           profile['is_principal'] == '1' ||
@@ -425,11 +448,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
       if (latestPhoto.isNotEmpty) await prefs.setString('user_photo', latestPhoto);
       if (latestName.isNotEmpty) await prefs.setString('user_name', latestName);
+      if (latestSchool.isNotEmpty) await prefs.setString('school_name', latestSchool.toUpperCase());
 
       if (mounted) {
         setState(() {
           if (latestPhoto.isNotEmpty) _userPhoto = latestPhoto;
           if (latestName.isNotEmpty) _userName = latestName;
+          if (latestSchool.isNotEmpty) _schoolName = latestSchool.toUpperCase();
           _isPrincipal = isPrincipal;
           _isFeeCollector = isFeeCollector;
           if (role == 'TEACHER') {
@@ -610,6 +635,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               titleStr.contains('datesheet');
         }
 
+        bool isFeeReminderNotif(dynamic n) {
+          final linkStr = (n['link'] ?? '').toString().toLowerCase();
+          final catStr = (n['category'] ?? '').toString().toUpperCase();
+          final evtStr = (n['event_key'] ?? '').toString().toUpperCase();
+          final titleStr = (n['title'] ?? '').toString().toLowerCase();
+          return linkStr.contains('fee-reminder') ||
+              linkStr.contains('fee-follow-up') ||
+              catStr == 'FEE_REMINDER' ||
+              evtStr.contains('FEE_REMINDER') ||
+              evtStr.contains('FEE_FOLLOWUP') ||
+              titleStr.contains('fee reminder') ||
+              titleStr.contains('fee follow-up') ||
+              titleStr.contains('due today');
+        }
+
         int count = data.where((n) {
           if (!isUnread(n)) return false;
           if (isNoticeNotif(n)) return false;
@@ -619,6 +659,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         int timetableCount = data.where((n) => isUnread(n) && isTimetableNotif(n)).length;
         int salaryCount = data.where((n) => isUnread(n) && isSalaryNotif(n)).length;
         int examsCount = data.where((n) => isUnread(n) && isExamsNotif(n)).length;
+        int feeReminderCount = data.where((n) => isUnread(n) && isFeeReminderNotif(n)).length;
 
         if (mounted) {
           setState(() {
@@ -626,6 +667,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             _unreadTimetableCount = timetableCount;
             _unreadSalaryCount = salaryCount;
             _unreadExamsCount = examsCount;
+            _unreadFeeReminderCount = feeReminderCount;
           });
         }
 
@@ -913,6 +955,28 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ).then((_) {
                   _fetchPendingFinancialReportCount();
                 });
+              } else if (titleLower.contains('fee reminder') || msgLower.contains('fee reminder') || titleLower.contains('fee follow-up') || msgLower.contains('fee follow-up') || (notif['event_key'] ?? '').toString() == 'FEE_FOLLOWUP_DUE_TODAY') {
+                if (mounted) {
+                  setState(() {
+                    _unreadFeeReminderCount = 0;
+                  });
+                }
+                _markFeatureNotificationsRead('fee_reminder');
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => FeeReminderScreen(
+                      service: FeeReminderService(
+                        baseUrl: widget.leaveService.baseUrl,
+                        token: widget.leaveService.token,
+                      ),
+                      userRole: widget.userRole,
+                      isFeeCollector: true,
+                    ),
+                  ),
+                ).then((_) {
+                  _fetchUnreadNotificationsCount();
+                });
               } else if (titleLower.contains('achievement') || msgLower.contains('achievement')) {
                 Navigator.push(
                   context,
@@ -1042,7 +1106,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       const orderedFeatureNames = [
         'Fees Portal',
         'Expense',
-        'Financial report',
+        'Financial Report',
+        'Fee Reminder',
         'TAR',
         'TSD',
         'Teachers',
@@ -1058,6 +1123,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       };
       final List<LauncherFeature> schoolAdminFeatures = [];
       for (final name in orderedFeatureNames) {
+        if (name == 'Fee Reminder' && !(_isFeeCollector == true)) continue;
         if (featureMap.containsKey(name)) {
           schoolAdminFeatures.add(featureMap[name]!);
         }
@@ -1077,8 +1143,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         'Attendance',
         'Fees Portal',
         'Expense',
-        'Financial report',
-        'Notice',
+        'Financial Report',
+        'Fee Reminder',
+        'Notice Board',
         'TAR',
         'TSD',
         'Timetable',
@@ -1087,7 +1154,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         'Leaves',
         'Notifications',
         'Salary',
-        'Class Teacher',
+        'Class Assignment',
         'Outstanding',
         'Classes',
         'Teachers',
@@ -1113,9 +1180,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           if (!(_isFeeCollector == true)) continue;
         } else if (f.name == 'Expense') {
           if (!(_isFeeCollector == true)) continue;
-        } else if (f.name == 'Financial report' || f.name == 'Revenue') {
+        } else if (f.name == 'Financial Report' || f.name == 'Financial report' || f.name == 'Revenue') {
           if (!(_isFeeCollector == true)) continue;
-        } else if (f.name == 'Class Teacher') {
+        } else if (f.name == 'Fee Reminder') {
+          if (!(_isFeeCollector == true)) continue;
+        } else if (f.name == 'Class Assignment' || f.name == 'Class assignment' || f.name == 'Class Teacher') {
           if (!(_isPrincipal == true || role == 'PRINCIPAL')) continue;
         } else if (f.name == 'Teachers') {
           if (!(_isPrincipal == true || role == 'PRINCIPAL' || _isFeeCollector == true)) continue;
@@ -1601,7 +1670,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           _fetchPendingExpenseCount();
           _fetchUnreadNotificationsCount();
         });
-      } else if (feature.name == 'Class Teacher') {
+      } else if (feature.name == 'Class Assignment' || feature.name == 'Class assignment' || feature.name == 'Class Teacher') {
         final prefs = await SharedPreferences.getInstance();
         final token = prefs.getString('auth_token') ?? widget.leaveService.token;
         String effectiveBase = widget.leaveService.baseUrl;
@@ -1659,7 +1728,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
         );
-      } else if (feature.name == 'Financial report' || feature.name == 'Revenue') {
+      } else if (feature.name == 'Financial Report' || feature.name == 'Financial report' || feature.name == 'Revenue') {
         final prefs = await SharedPreferences.getInstance();
         if (mounted) {
           setState(() {
@@ -1697,6 +1766,47 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         if (mounted) {
           _fetchPendingFinancialReportCount();
         }
+      } else if (feature.name == 'Fee Reminder') {
+        if (!(_isFeeCollector == true)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Access restricted to Fee Collector only.'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          return;
+        }
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('auth_token') ?? widget.leaveService.token;
+        String effectiveBase = widget.leaveService.baseUrl;
+        if (effectiveBase.isEmpty || effectiveBase.contains('10.22.6.71') || effectiveBase.contains('10.155.82.71')) {
+          effectiveBase = resolveBaseUrlFrom(prefs);
+        }
+        // Immediately clear badge count on tap per user requirement
+        if (mounted) {
+          setState(() {
+            _unreadFeeReminderCount = 0;
+          });
+        }
+        _markFeatureNotificationsRead('fee_reminder');
+
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => FeeReminderScreen(
+              service: FeeReminderService(
+                baseUrl: effectiveBase,
+                token: token,
+              ),
+              userRole: widget.userRole,
+              isPrincipal: _isPrincipal || (widget.userRole.toUpperCase() == 'SCHOOL_ADMIN'),
+              isFeeCollector: _isFeeCollector,
+            ),
+          ),
+        );
+        if (mounted) {
+          _fetchUnreadNotificationsCount();
+        }
       }
     } else {
 
@@ -1714,7 +1824,40 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final filteredFeatures = _getFilteredFeatures();
     
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        final now = DateTime.now();
+        if (_lastBackPressTime == null || now.difference(_lastBackPressTime!) > const Duration(seconds: 3)) {
+          _lastBackPressTime = now;
+          ScaffoldMessenger.of(context).clearSnackBars();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                'Tap again to exit',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 0.1,
+                ),
+              ),
+              backgroundColor: const Color(0xFF262626),
+              behavior: SnackBarBehavior.floating,
+              elevation: 4,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              margin: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).clearSnackBars();
+          SystemNavigator.pop();
+        }
+      },
+      child: Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: GestureDetector(
         behavior: HitTestBehavior.translucent,
@@ -1903,7 +2046,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           final bool isSalary = feature.name == 'Salary' || feature.name == 'Staff Salary' || feature.name == 'Salaries';
                           final bool isExams = feature.name == 'Examinations' || feature.name == 'Exams' || feature.name == 'Exam';
                           final bool isExpense = feature.name == 'Expense' || feature.name == 'Expenses';
-                          final bool isFinancialReport = feature.name == 'Financial report' || feature.name == 'Revenue';
+                          final bool isFinancialReport = feature.name == 'Financial Report' || feature.name == 'Financial report' || feature.name == 'Revenue';
+                          final bool isFeeReminder = feature.name == 'Fee Reminder';
                           final int badgeCount = isNotice 
                               ? _unreadNoticeCount 
                               : (isNotification 
@@ -1916,7 +2060,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                               ? _unreadExamsCount 
                                               : (isExpense 
                                                   ? _unreadExpenseCount 
-                                                  : (isFinancialReport ? _unreadFinancialReportCount : 0))))));
+                                                  : (isFinancialReport 
+                                                      ? _unreadFinancialReportCount 
+                                                      : (isFeeReminder ? _unreadFeeReminderCount : 0)))))));
 
                           return GestureDetector(
                             onTap: () => _onFeatureTap(feature),
@@ -2009,6 +2155,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       ),
     ),
   ),
+),
 );
   }
 }

@@ -22,6 +22,8 @@ import '../screens/principal_tar_screen.dart';
 import '../screens/notice_screen.dart';
 import '../screens/expense_screen.dart';
 import '../screens/revenue_screen.dart';
+import '../screens/fee_reminder_screen.dart';
+import '../services/fee_reminder_service.dart';
 import '../services/financial_report_service.dart';
 import '../services/attendance_service.dart';
 import '../services/leave_service.dart';
@@ -295,7 +297,14 @@ class NotificationHelper {
     }
 
     Widget targetScreen;
-    if (link == '/notice' || link.contains('notice') || link.contains('announcement') || eventKey == 'ANNOUNCEMENT_PUBLISHED' || eventKey == NotificationEvent.announcementPublished) {
+    if (eventKey == 'CLASS_TEACHER_ASSIGNED' || title.contains('class teacher') || message.contains('class teacher')) {
+      targetScreen = NotificationCenterScreen(
+        baseUrl: baseUrl,
+        token: token,
+        studentId: notifStudentId ?? studentId,
+        userRole: userRole,
+      );
+    } else if (link == '/notice' || link.contains('notice') || link.contains('announcement') || eventKey == 'ANNOUNCEMENT_PUBLISHED' || eventKey == NotificationEvent.announcementPublished) {
       targetScreen = NoticeScreen(
         baseUrl: baseUrl,
         token: token,
@@ -350,7 +359,7 @@ class NotificationHelper {
         selectedStudentId: notifStudentId ?? studentId,
         targetDate: notifDate,
       );
-    } else if (link.contains('homework') || title.contains('homework') || message.contains('homework') || link.contains('assignment') || title.contains('assignment') || message.contains('assignment')) {
+    } else if (!title.contains('class teacher') && !message.contains('class teacher') && (link.contains('homework') || title.contains('homework') || message.contains('homework') || link.contains('assignment') || title.contains('assignment') || message.contains('assignment'))) {
       targetScreen = HomeworkListScreen(
         baseUrl: baseUrl,
         userRole: userRole,
@@ -362,6 +371,12 @@ class NotificationHelper {
         token: token,
         userRole: userRole,
         studentId: notifStudentId ?? studentId,
+      );
+    } else if (link.contains('fee-reminder') || link.contains('fee-follow-up') || title.contains('fee reminder') || message.contains('fee reminder') || title.contains('fee follow-up') || message.contains('fee follow-up') || eventKey == 'FEE_FOLLOWUP_DUE_TODAY' || eventKey == NotificationEvent.feeFollowupDueToday) {
+      targetScreen = FeeReminderScreen(
+        service: FeeReminderService(baseUrl: baseUrl, token: token),
+        userRole: userRole,
+        isFeeCollector: true,
       );
     } else if (link.contains('teacher-attendance') || link.contains('tar') || title.contains('late teachers') || message.contains('were late') || eventKey == 'LATE_TEACHERS_ALERT') {
       targetScreen = PrincipalTarScreen(
@@ -402,6 +417,14 @@ class NotificationHelper {
     DateTime? targetDate,
   }) {
     switch (eventKey) {
+      case 'CLASS_TEACHER_ASSIGNED':
+        return NotificationCenterScreen(
+          baseUrl: baseUrl,
+          token: token,
+          studentId: studentId,
+          userRole: userRole,
+        );
+
       case NotificationEvent.leaveRequestSubmitted:
       case NotificationEvent.leaveCancelledByApplicant:
         return LeaveListScreen(
@@ -471,6 +494,14 @@ class NotificationHelper {
           baseUrl: baseUrl,
           token: token,
           studentId: studentId,
+        );
+
+      case NotificationEvent.feeFollowupDueToday:
+      case NotificationEvent.feeFollowupOverdue:
+        return FeeReminderScreen(
+          service: FeeReminderService(baseUrl: baseUrl, token: token),
+          userRole: userRole,
+          isFeeCollector: true,
         );
 
       case 'SALARY_DISBURSED':

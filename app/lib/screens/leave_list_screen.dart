@@ -552,356 +552,354 @@ class _LeaveListScreenState extends State<LeaveListScreen> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
+            final keyboardPadding = MediaQuery.of(context).viewInsets.bottom;
             final startText = startDate == null
-                ? 'mm/dd/yyyy'
-                : '${startDate!.month.toString().padLeft(2, '0')}/${startDate!.day.toString().padLeft(2, '0')}/${startDate!.year}';
+                ? 'Select start date'
+                : _formatDate('${startDate!.year}-${startDate!.month.toString().padLeft(2, '0')}-${startDate!.day.toString().padLeft(2, '0')}');
             final endText = endDate == null
-                ? 'mm/dd/yyyy'
-                : '${endDate!.month.toString().padLeft(2, '0')}/${endDate!.day.toString().padLeft(2, '0')}/${endDate!.year}';
+                ? 'Select end date (optional)'
+                : _formatDate('${endDate!.year}-${endDate!.month.toString().padLeft(2, '0')}-${endDate!.day.toString().padLeft(2, '0')}');
 
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
+            return Container(
+              margin: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 20),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              child: Container(
-                decoration: const BoxDecoration(
-                  color: Color(0xFFFAF6EC), // ivory/cream background matching screenshot
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                ),
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Header: OFFICIAL HOLIDAYS
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'OFFICIAL HOLIDAYS',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFF0F172A),
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.close_rounded, size: 22, color: Color(0xFF64748B)),
-                            onPressed: () => Navigator.pop(context),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-
-                      // Card box matching screenshot
-                      Container(
-                        padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.fromLTRB(20, 14, 20, 24 + keyboardPadding),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFAF6EC),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFFCBD5E1), width: 1.2),
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(2),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    const Text(
+                      'Add Official Holiday',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Add official holiday or school leave day to the calendar.',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                    ),
+                    const SizedBox(height: 16),
+
+                    if (formError != null) ...[
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF2F2),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFFECACA)),
+                        ),
+                        child: Row(
                           children: [
-                            // + Add Holiday / Leave Day
-                            Row(
-                              children: const [
-                                Icon(Icons.add, size: 16, color: Color(0xFFD97706)),
-                                SizedBox(width: 6),
-                                Text(
-                                  'Add Holiday / Leave Day',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF78350F),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-
-                            // LEAVE TITLE
-                            const Text(
-                              'LEAVE TITLE',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xFF64748B),
-                                letterSpacing: 0.8,
+                            const Icon(Icons.error_outline_rounded, size: 16, color: Colors.redAccent),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                formError!,
+                                style: const TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold),
                               ),
-                            ),
-                            const SizedBox(height: 6),
-                            Container(
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFAF6EC),
-                                borderRadius: BorderRadius.circular(24),
-                                border: Border.all(color: const Color(0xFF64748B), width: 1),
-                              ),
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
-                              alignment: Alignment.centerLeft,
-                              child: TextField(
-                                controller: titleController,
-                                style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
-                                decoration: const InputDecoration(
-                                  hintText: 'e.g. Diwali Holidays',
-                                  hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                                  border: InputBorder.none,
-                                  isDense: true,
-                                  contentPadding: EdgeInsets.zero,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 14),
-
-                            // START DATE
-                            const Text(
-                              'START DATE',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xFF64748B),
-                                letterSpacing: 0.8,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            InkWell(
-                              onTap: () async {
-                                final now = DateTime.now();
-                                final picked = await showDatePicker(
-                                  context: context,
-                                  initialDate: startDate ?? now,
-                                  firstDate: DateTime(now.year - 1),
-                                  lastDate: DateTime(now.year + 2),
-                                );
-                                if (picked != null) {
-                                  setSheetState(() {
-                                    startDate = picked;
-                                    formError = null;
-                                  });
-                                }
-                              },
-                              borderRadius: BorderRadius.circular(24),
-                              child: Container(
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFAF6EC),
-                                  borderRadius: BorderRadius.circular(24),
-                                  border: Border.all(color: const Color(0xFF64748B), width: 1),
-                                ),
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      startText,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: startDate == null ? const Color(0xFF94A3B8) : const Color(0xFF0F172A),
-                                      ),
-                                    ),
-                                    const Icon(Icons.calendar_today_outlined, size: 16, color: Color(0xFF64748B)),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 14),
-
-                            // END DATE (OPTIONAL)
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text(
-                                  'END DATE (OPTIONAL)',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFF64748B),
-                                    letterSpacing: 0.8,
-                                  ),
-                                ),
-                                if (endDate != null)
-                                  InkWell(
-                                    onTap: () {
-                                      setSheetState(() {
-                                        endDate = null;
-                                      });
-                                    },
-                                    child: const Text(
-                                      'Clear',
-                                      style: TextStyle(fontSize: 11, color: Color(0xFFDC2626), fontWeight: FontWeight.w600),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            InkWell(
-                              onTap: () async {
-                                final now = startDate ?? DateTime.now();
-                                final picked = await showDatePicker(
-                                  context: context,
-                                  initialDate: endDate ?? now,
-                                  firstDate: startDate ?? DateTime(now.year - 1),
-                                  lastDate: DateTime(now.year + 2),
-                                );
-                                if (picked != null) {
-                                  setSheetState(() {
-                                    endDate = picked;
-                                    formError = null;
-                                  });
-                                }
-                              },
-                              borderRadius: BorderRadius.circular(24),
-                              child: Container(
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFAF6EC),
-                                  borderRadius: BorderRadius.circular(24),
-                                  border: Border.all(color: const Color(0xFF64748B), width: 1),
-                                ),
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      endText,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: endDate == null ? const Color(0xFF94A3B8) : const Color(0xFF0F172A),
-                                      ),
-                                    ),
-                                    const Icon(Icons.calendar_today_outlined, size: 16, color: Color(0xFF64748B)),
-                                  ],
-                                ),
-                              ),
-                            ),
-
-                            if (formError != null) ...[
-                              const SizedBox(height: 12),
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFEF2F2),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: const Color(0xFFFECACA)),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.error_outline, size: 14, color: Color(0xFFDC2626)),
-                                    const SizedBox(width: 6),
-                                    Expanded(
-                                      child: Text(
-                                        formError!,
-                                        style: const TextStyle(fontSize: 11, color: Color(0xFFDC2626)),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-
-                            const SizedBox(height: 18),
-                            // Save button in amber on bottom right
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                ElevatedButton(
-                                  onPressed: isSaving
-                                      ? null
-                                      : () async {
-                                          final title = titleController.text.trim();
-                                          if (title.isEmpty) {
-                                            setSheetState(() {
-                                              formError = 'Leave title is required.';
-                                            });
-                                            return;
-                                          }
-                                          if (startDate == null) {
-                                            setSheetState(() {
-                                              formError = 'Start date is required.';
-                                            });
-                                            return;
-                                          }
-                                          if (endDate != null && endDate!.isBefore(startDate!)) {
-                                            setSheetState(() {
-                                              formError = 'End date cannot be before start date.';
-                                            });
-                                            return;
-                                          }
-
-                                          setSheetState(() {
-                                            isSaving = true;
-                                            formError = null;
-                                          });
-
-                                          final startStr = '${startDate!.year}-${startDate!.month.toString().padLeft(2, '0')}-${startDate!.day.toString().padLeft(2, '0')}';
-                                          final endStr = endDate == null
-                                              ? startStr
-                                              : '${endDate!.year}-${endDate!.month.toString().padLeft(2, '0')}-${endDate!.day.toString().padLeft(2, '0')}';
-
-                                          try {
-                                            await widget.leaveService.createHoliday(
-                                              name: title,
-                                              startDate: startStr,
-                                              endDate: endStr,
-                                            );
-                                            if (context.mounted) {
-                                              Navigator.pop(context);
-                                            }
-                                            if (mounted) {
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                const SnackBar(
-                                                  content: Text('Official holiday created successfully.'),
-                                                  backgroundColor: Color(0xFFD97706),
-                                                ),
-                                              );
-                                              _loadHolidays();
-                                            }
-                                          } catch (e) {
-                                            setSheetState(() {
-                                              formError = e.toString().replaceAll('Exception: ', '');
-                                              isSaving = false;
-                                            });
-                                          }
-                                        },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFFD97706),
-                                    foregroundColor: Colors.white,
-                                    elevation: 0,
-                                    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                  ),
-                                  child: isSaving
-                                      ? const SizedBox(
-                                          width: 16,
-                                          height: 16,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                          ),
-                                        )
-                                      : const Text(
-                                          'Save',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                ),
-                              ],
                             ),
                           ],
                         ),
                       ),
+                      const SizedBox(height: 14),
                     ],
-                  ),
+
+                    // LEAVE TITLE *
+                    const Text(
+                      'LEAVE TITLE *',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                      ),
+                      child: TextField(
+                        controller: titleController,
+                        style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
+                        decoration: const InputDecoration(
+                          hintText: 'e.g. Diwali Holidays',
+                          hintStyle: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                          border: InputBorder.none,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // START DATE *
+                    const Text(
+                      'START DATE *',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    InkWell(
+                      onTap: () async {
+                        final now = DateTime.now();
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: startDate ?? now,
+                          firstDate: DateTime(now.year - 1),
+                          lastDate: DateTime(now.year + 5),
+                          builder: (ctx, child) {
+                            return Theme(
+                              data: Theme.of(ctx).copyWith(
+                                colorScheme: const ColorScheme.light(primary: Color(0xFFD97706)),
+                                dialogTheme: DialogThemeData(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
+                              ),
+                              child: child!,
+                            );
+                          },
+                        );
+                        if (picked != null) {
+                          setSheetState(() {
+                            startDate = picked;
+                            formError = null;
+                            if (endDate != null && endDate!.isBefore(picked)) {
+                              endDate = picked;
+                            }
+                          });
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFCBD5E1)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              startText,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: startDate == null ? FontWeight.normal : FontWeight.bold,
+                                color: startDate == null ? const Color(0xFF94A3B8) : const Color(0xFF0F172A),
+                              ),
+                            ),
+                            const Icon(Icons.calendar_today_rounded, size: 18, color: Color(0xFFD97706)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // END DATE (OPTIONAL)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'END DATE (OPTIONAL)',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                        if (endDate != null)
+                          InkWell(
+                            onTap: () {
+                              setSheetState(() {
+                                endDate = null;
+                              });
+                            },
+                            child: const Text(
+                              'Clear',
+                              style: TextStyle(fontSize: 11, color: Color(0xFFDC2626), fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    InkWell(
+                      onTap: () async {
+                        final now = startDate ?? DateTime.now();
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: endDate ?? now,
+                          firstDate: startDate ?? DateTime(now.year - 1),
+                          lastDate: DateTime(now.year + 5),
+                          builder: (ctx, child) {
+                            return Theme(
+                              data: Theme.of(ctx).copyWith(
+                                colorScheme: const ColorScheme.light(primary: Color(0xFFD97706)),
+                                dialogTheme: DialogThemeData(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
+                              ),
+                              child: child!,
+                            );
+                          },
+                        );
+                        if (picked != null) {
+                          setSheetState(() {
+                            endDate = picked;
+                            formError = null;
+                          });
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFCBD5E1)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              endText,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: endDate == null ? FontWeight.normal : FontWeight.bold,
+                                color: endDate == null ? const Color(0xFF94A3B8) : const Color(0xFF0F172A),
+                              ),
+                            ),
+                            const Icon(Icons.calendar_today_rounded, size: 18, color: Color(0xFFD97706)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Actions
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              side: const BorderSide(color: Color(0xFFCBD5E1)),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
+                            child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF64748B), fontSize: 13)),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: isSaving
+                                ? null
+                                : () async {
+                                    final title = titleController.text.trim();
+                                    if (title.isEmpty) {
+                                      setSheetState(() {
+                                        formError = 'Leave title is required.';
+                                      });
+                                      return;
+                                    }
+                                    if (startDate == null) {
+                                      setSheetState(() {
+                                        formError = 'Start date is required.';
+                                      });
+                                      return;
+                                    }
+                                    if (endDate != null && endDate!.isBefore(startDate!)) {
+                                      setSheetState(() {
+                                        formError = 'End date cannot be before start date.';
+                                      });
+                                      return;
+                                    }
+
+                                    setSheetState(() {
+                                      isSaving = true;
+                                      formError = null;
+                                    });
+
+                                    final startStr = '${startDate!.year}-${startDate!.month.toString().padLeft(2, '0')}-${startDate!.day.toString().padLeft(2, '0')}';
+                                    final endStr = endDate == null
+                                        ? startStr
+                                        : '${endDate!.year}-${endDate!.month.toString().padLeft(2, '0')}-${endDate!.day.toString().padLeft(2, '0')}';
+
+                                    try {
+                                      await widget.leaveService.createHoliday(
+                                        name: title,
+                                        startDate: startStr,
+                                        endDate: endStr,
+                                      );
+                                      if (context.mounted) {
+                                        Navigator.pop(context);
+                                      }
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Official holiday created successfully.'),
+                                            backgroundColor: Color(0xFFD97706),
+                                            behavior: SnackBarBehavior.floating,
+                                          ),
+                                        );
+                                        _loadHolidays();
+                                      }
+                                    } catch (e) {
+                                      setSheetState(() {
+                                        formError = e.toString().replaceAll('Exception: ', '');
+                                        isSaving = false;
+                                      });
+                                    }
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFD97706),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: isSaving
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    ),
+                                  )
+                                : const Text(
+                                    'Save',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             );
@@ -911,7 +909,7 @@ class _LeaveListScreenState extends State<LeaveListScreen> {
     );
   }
 
-  void _showLeaveDetails(LeaveRequest leave) {
+    void _showLeaveDetails(LeaveRequest leave) {
     final bool isStudent = leave.applicantRole.toUpperCase() == 'STUDENT';
     final bool isTeacher = leave.applicantRole.toUpperCase() == 'TEACHER';
     final bool isRejected = leave.status.toUpperCase() == 'REJECTED';
@@ -1084,11 +1082,11 @@ class _LeaveListScreenState extends State<LeaveListScreen> {
                         ElevatedButton(
                           onPressed: () => Navigator.pop(context),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.indigo,
+                            backgroundColor: const Color(0xFFD97706),
                             foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
-                          child: const Text('Close'),
+                          child: const Text('Close', style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
                       ] else ...[
                         ElevatedButton(
@@ -1858,7 +1856,7 @@ class _LeaveListScreenState extends State<LeaveListScreen> {
           bottom: 16,
           right: 16,
           child: FloatingActionButton(
-            backgroundColor: Colors.indigo,
+            backgroundColor: const Color(0xFFD97706),
             foregroundColor: Colors.white,
             onPressed: () async {
               final result = await Navigator.push(
@@ -1888,29 +1886,77 @@ class _LeaveListScreenState extends State<LeaveListScreen> {
       length: 2,
       initialIndex: widget.initialTabIndex,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF8FAFC),
+        backgroundColor: const Color(0xFFFBF8F2),
         appBar: AppBar(
-          title: const Text('Leaves', style: TextStyle(fontWeight: FontWeight.w900)),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF1E293B), size: 18),
+            onPressed: () => Navigator.pop(context),
+          ),
+          titleSpacing: 0,
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFFBEB),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFFDE68A)),
+                ),
+                child: const Icon(Icons.date_range_rounded, color: Color(0xFFD97706), size: 18),
+              ),
+              const SizedBox(width: 10),
+              const Text(
+                'LEAVES',
+                style: TextStyle(
+                  color: Color(0xFF0F172A),
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
           backgroundColor: Colors.white,
           elevation: 0,
           scrolledUnderElevation: 0,
           actions: [
             if (_isPrincipal)
-              IconButton(
-                icon: const Icon(Icons.settings_outlined, color: Color(0xFF0F172A)),
-                tooltip: 'Official Holidays Management',
-                onPressed: _showAddHolidaySheet,
+              Padding(
+                padding: const EdgeInsets.only(right: 14, top: 9, bottom: 9),
+                child: ElevatedButton.icon(
+                  onPressed: _showAddHolidaySheet,
+                  icon: const Icon(Icons.add_rounded, size: 16, color: Colors.white),
+                  label: const Text(
+                    'Add Leave',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFD97706),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
               ),
           ],
           bottom: const TabBar(
+            indicatorColor: Color(0xFFD97706),
+            indicatorWeight: 3,
+            labelColor: Color(0xFFD97706),
+            unselectedLabelColor: Color(0xFF64748B),
+            labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            unselectedLabelStyle: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
             tabs: [
               Tab(text: 'Official Holidays'),
               Tab(text: 'Leave Requests'),
             ],
-            indicatorColor: Colors.indigo,
-            labelColor: Colors.indigo,
-            unselectedLabelColor: Colors.grey,
-            labelStyle: TextStyle(fontWeight: FontWeight.bold),
           ),
         ),
         body: TabBarView(

@@ -230,6 +230,28 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     if (token != null && role != null) {
       final leaveService = LeaveService(baseUrl: baseUrl, token: token);
       
+      // Ensure school_name is loaded before navigating to HomeScreen so header never shows blank!
+      String schoolName = (prefs.getString('school_name') ?? '').trim();
+      if (schoolName.isEmpty) {
+        try {
+          final authService = AuthService(baseUrl: baseUrl);
+          final profile = await authService.fetchProfile(token);
+          final sName = ((profile['school_name'] as String?) ?? '').trim();
+          if (sName.isNotEmpty) {
+            schoolName = sName.toUpperCase();
+            await prefs.setString('school_name', schoolName);
+          }
+        } catch (e) {
+          debugPrint('Error fetching school name in SplashScreen: $e');
+        }
+      }
+      if (schoolName.isEmpty) {
+        schoolName = 'SHIKSHA PILOT ACADEMY';
+        await prefs.setString('school_name', schoolName);
+      } else {
+        schoolName = schoolName.toUpperCase();
+      }
+
       final roleUpper = role.toUpperCase();
       if (roleUpper == 'PARENT' || roleUpper == 'STUDENT') {
         final savedStudentId = prefs.getInt('selected_student_id');
@@ -264,6 +286,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                     leaveService: leaveService,
                     userRole: role,
                     selectedStudentId: activeStudentId,
+                    schoolName: schoolName,
                   ),
                 ),
               );
@@ -279,6 +302,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   leaveService: leaveService,
                   userRole: role,
                   selectedStudentId: savedStudentId,
+                  schoolName: schoolName,
                 ),
               ),
             );
@@ -302,6 +326,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                 isFeeCollector: isFeeCollector,
                 userPhoto: userPhoto,
                 userName: userName,
+                schoolName: schoolName,
               ),
             ),
           );
@@ -442,7 +467,19 @@ class _LoginScreenState extends State<LoginScreen> {
       if (user['id'] != null) {
         await prefs.setInt('user_id', int.tryParse(user['id'].toString()) ?? 0);
       }
-      await prefs.setString('school_name', ((user['school_name'] as String?) ?? 'Shiksha Pilot Academy').toUpperCase());
+      final fetchedSchoolName = ((user['school_name'] as String?) ?? '').trim();
+      String schoolName = fetchedSchoolName.isNotEmpty ? fetchedSchoolName.toUpperCase() : '';
+      if (schoolName.isEmpty) {
+        try {
+          final profile = await authService.fetchProfile(token);
+          final sName = ((profile['school_name'] as String?) ?? '').trim();
+          if (sName.isNotEmpty) schoolName = sName.toUpperCase();
+        } catch (_) {}
+      }
+      if (schoolName.isEmpty) {
+        schoolName = 'SHIKSHA PILOT ACADEMY';
+      }
+      await prefs.setString('school_name', schoolName);
       final String userPhoto = (user['staff_photo_path'] as String?) ?? (user['photo_path'] as String?) ?? (user['photo'] as String?) ?? '';
       await prefs.setString('user_photo', userPhoto);
       final bool isPrincipal = user['is_principal'] == true ||
@@ -479,6 +516,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   leaveService: leaveService,
                   userRole: role,
                   selectedStudentId: selId,
+                  schoolName: schoolName,
                 ),
               ),
             );
@@ -504,6 +542,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 leaveService: leaveService,
                 userRole: role,
                 selectedStudentId: studentId,
+                schoolName: schoolName,
               ),
             ),
           );
@@ -526,12 +565,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   leaveService: leaveService,
                   userRole: role,
                   selectedStudentId: childId,
+                  schoolName: schoolName,
                 ),
               ),
             );
           } else {
             // Multiple children, show selector dialog
-            _showChildrenSelector(children, leaveService, role);
+            _showChildrenSelector(children, leaveService, role, schoolName);
           }
         }
       } else {
@@ -547,6 +587,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 isFeeCollector: isFeeCollector,
                 userPhoto: userPhoto,
                 userName: name,
+                schoolName: schoolName,
               ),
             ),
           );
@@ -604,7 +645,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _showChildrenSelector(List<dynamic> children, LeaveService leaveService, String role) {
+  void _showChildrenSelector(List<dynamic> children, LeaveService leaveService, String role, [String? schoolName]) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -646,6 +687,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       final prefs = await SharedPreferences.getInstance();
                       final childId = student['id'] as int;
                       await prefs.setInt('selected_student_id', childId);
+                      final resolvedSchool = (schoolName != null && schoolName.isNotEmpty)
+                          ? schoolName
+                          : (prefs.getString('school_name') ?? 'SHIKSHA PILOT ACADEMY').toUpperCase();
                       if (context.mounted) {
                         Navigator.pop(context); // Close dialog
                         Navigator.pushReplacement(
@@ -655,6 +699,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               leaveService: leaveService,
                               userRole: role,
                               selectedStudentId: childId,
+                              schoolName: resolvedSchool,
                             ),
                           ),
                         );

@@ -235,6 +235,7 @@ return function (App $app) {
     $app->post('/api/school/fee-follow-ups/{id}/contacted', [SchoolAdminController::class, 'markFollowUpContacted']);
     $app->get('/api/school/students/{id}/outstanding-fee', [SchoolAdminController::class, 'getStudentOutstandingFee']);
     $app->get('/api/school/students/{id}/follow-ups', [SchoolAdminController::class, 'getStudentFollowUps']);
+    $app->get('/api/school/students/{id}/active-follow-up', [SchoolAdminController::class, 'getStudentActiveFollowUp']);
     
     // Persisted Dashboard Notifications
     $app->get('/api/school/notifications', [SchoolAdminController::class, 'getNotifications']);

@@ -43,6 +43,7 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
   String? _currentRecordingPath;
 
   // Audio player state for voice homework cards
+  final ScrollController _scrollController = ScrollController();
   final AudioPlayer _audioPlayer = AudioPlayer();
   int? _currentlyPlayingHomeworkId;
   PlayerState _playerState = PlayerState.stopped;
@@ -90,7 +91,53 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
     _playerDurationSub?.cancel();
     _playerCompleteSub?.cancel();
     _audioPlayer.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  int _compareHomeworkChronologically(dynamic a, dynamic b) {
+    final aMap = a is Map ? a : (a as dynamic);
+    final bMap = b is Map ? b : (b as dynamic);
+    final aStr = (aMap['created_at'] ?? '').toString();
+    final bStr = (bMap['created_at'] ?? '').toString();
+    final aDate = DateTime.tryParse(aStr);
+    final bDate = DateTime.tryParse(bStr);
+    if (aDate != null && bDate != null) {
+      final cmp = aDate.compareTo(bDate);
+      if (cmp != 0) return cmp;
+    }
+    final aId = (aMap['id'] as num?)?.toInt() ?? int.tryParse(aMap['id']?.toString() ?? '0') ?? 0;
+    final bId = (bMap['id'] as num?)?.toInt() ?? int.tryParse(bMap['id']?.toString() ?? '0') ?? 0;
+    return aId.compareTo(bId);
+  }
+
+  void _scrollToBottom({bool animated = false}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        if (animated) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        } else {
+          _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+        }
+      }
+      Future.delayed(const Duration(milliseconds: 60), () {
+        if (mounted && _scrollController.hasClients) {
+          if (animated) {
+            _scrollController.animateTo(
+              _scrollController.position.maxScrollExtent,
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOut,
+            );
+          } else {
+            _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+          }
+        }
+      });
+    });
   }
 
   Future<void> _initServiceAndFetch() async {
@@ -109,11 +156,13 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
         userRole: widget.userRole,
         selectedStudentId: widget.selectedStudentId,
       );
+      list.sort(_compareHomeworkChronologically);
       if (mounted) {
         setState(() {
           _homeworkList = list;
           _isLoading = false;
         });
+        _scrollToBottom();
       }
     } catch (e) {
       if (mounted) {
@@ -144,7 +193,8 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
       homeworkService: _homeworkService,
     );
     if (res == true) {
-      _fetchHomework();
+      await _fetchHomework();
+      _scrollToBottom(animated: true);
     }
   }
 
@@ -811,7 +861,8 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
                                               behavior: SnackBarBehavior.floating,
                                             ),
                                           );
-                                          _fetchHomework();
+                                          await _fetchHomework();
+                                          _scrollToBottom(animated: true);
                                         }
                                       } catch (err) {
                                         setModalState(() => isSubmitting = false);
@@ -864,19 +915,19 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
     );
   }
 
-  String _formatDateHeader(String rawDateStr) {
-    if (rawDateStr.isEmpty) return 'Earlier';
+  String _getDateHeaderTitle(String dateStr) {
+    if (dateStr.isEmpty) return 'Recent';
     try {
       DateTime? dt;
-      if (RegExp(r'^\d{4}-\d{2}-\d{2}').hasMatch(rawDateStr)) {
-        dt = DateTime.parse(rawDateStr);
+      if (RegExp(r'^\d{4}-\d{2}-\d{2}').hasMatch(dateStr)) {
+        dt = DateTime.parse(dateStr).toLocal();
       } else {
-        final parts = rawDateStr.split(' ');
+        final parts = dateStr.split(' ');
         if (parts.length >= 3) {
           final day = int.tryParse(parts[0]) ?? 1;
           final monthStr = parts[1].toLowerCase();
           final year = int.tryParse(parts[2]) ?? DateTime.now().year;
-          final months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+          const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
           final monthIndex = months.indexWhere((m) => monthStr.startsWith(m));
           if (monthIndex != -1) {
             dt = DateTime(year, monthIndex + 1, day);
@@ -884,26 +935,48 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
         }
       }
 
-      if (dt == null) return rawDateStr;
+      if (dt == null) return dateStr;
 
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
-      final targetDate = DateTime(dt.year, dt.month, dt.day);
-      final diffDays = today.difference(targetDate).inDays;
+      final yesterday = today.subtract(const Duration(days: 1));
+      final hwDate = DateTime(dt.year, dt.month, dt.day);
 
-      if (diffDays == 0) {
+      if (hwDate == today) {
         return 'Today';
-      } else if (diffDays == 1) {
+      } else if (hwDate == yesterday) {
         return 'Yesterday';
-      } else if (diffDays > 1 && diffDays < 7) {
-        final days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-        return days[dt.weekday - 1];
       } else {
-        return rawDateStr;
+        const months = [
+          'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+          'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+        ];
+        return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
       }
     } catch (_) {
-      return rawDateStr;
+      return 'Recent';
     }
+  }
+
+  List<_HomeworkListItem> _getGroupedHomework() {
+    final List<_HomeworkListItem> items = [];
+    String? lastHeader;
+
+    final sortedList = List<dynamic>.from(_homeworkList)
+      ..sort(_compareHomeworkChronologically);
+
+    for (final hw in sortedList) {
+      final hwMap = Map<String, dynamic>.from(hw);
+      final dateStr = (hwMap['created_at'] ?? hwMap['assigned_date'] ?? '').toString();
+      final header = _getDateHeaderTitle(dateStr);
+      if (header != lastHeader) {
+        lastHeader = header;
+        items.add(_HomeworkListItem.header(header));
+      }
+      items.add(_HomeworkListItem.homework(hwMap));
+    }
+
+    return items;
   }
 
   Widget _buildDateHeader(String dateLabel) {
@@ -1134,35 +1207,19 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
       );
     }
 
+    final groupedItems = _getGroupedHomework();
+
     return ListView.builder(
+      controller: _scrollController,
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 20),
-      itemCount: _homeworkList.length,
+      itemCount: groupedItems.length,
       itemBuilder: (context, index) {
-        final item = Map<String, dynamic>.from(_homeworkList[index]);
-        final currentDateLabel = _formatDateHeader(item['assigned_date'] ?? '');
-
-        bool showHeader = false;
-        if (index == 0) {
-          showHeader = true;
-        } else {
-          final prevItem = Map<String, dynamic>.from(_homeworkList[index - 1]);
-          final prevDateLabel = _formatDateHeader(prevItem['assigned_date'] ?? '');
-          if (currentDateLabel != prevDateLabel) {
-            showHeader = true;
-          }
+        final item = groupedItems[index];
+        if (item.isHeader) {
+          return _buildDateHeader(item.headerText!);
         }
-
-        if (showHeader) {
-          return Column(
-            children: [
-              _buildDateHeader(currentDateLabel),
-              _buildHomeworkCard(item),
-            ],
-          );
-        }
-
-        return _buildHomeworkCard(item);
+        return _buildHomeworkCard(Map<String, dynamic>.from(item.homework));
       },
     );
   }
@@ -1445,4 +1502,18 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
       ),
     );
   }
+}
+
+class _HomeworkListItem {
+  final bool isHeader;
+  final String? headerText;
+  final dynamic homework;
+
+  _HomeworkListItem.header(this.headerText)
+      : isHeader = true,
+        homework = null;
+
+  _HomeworkListItem.homework(this.homework)
+      : isHeader = false,
+        headerText = null;
 }

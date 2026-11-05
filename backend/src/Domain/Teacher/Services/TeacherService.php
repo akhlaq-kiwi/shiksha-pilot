@@ -2492,6 +2492,8 @@ class TeacherService extends BaseService
                     $query .= " AND (event_key LIKE '%TIMETABLE%' OR event_key = 'SUBSTITUTE_ASSIGNED' OR link LIKE '%timetable%' OR title LIKE '%Timetable%' OR title LIKE '%Time Table%' OR category = 'TIMETABLE')";
                 } elseif ($module === 'salary') {
                     $query .= " AND (event_key = 'SALARY_DISBURSED' OR link LIKE '%salary%' OR title LIKE '%Salary%' OR category = 'Finance' OR category = 'SALARY')";
+                } elseif ($module === 'fee_reminder' || $module === 'fee-reminder' || $module === 'fee_follow_up' || $module === 'fee-follow-up') {
+                    $query .= " AND (event_key LIKE '%FEE_REMINDER%' OR event_key LIKE '%FEE_FOLLOWUP%' OR link LIKE '%fee-reminder%' OR link LIKE '%fee-follow-up%' OR title LIKE '%Fee Reminder%' OR title LIKE '%Fee Follow-up%')";
                 } elseif ($module === 'exams' || $module === 'exam') {
                     $query .= " AND (event_key LIKE '%EXAM%' OR category = 'EXAM' OR link LIKE '%exam%' OR title LIKE '%exam%' OR title LIKE '%examination%' OR title LIKE '%admit card%' OR title LIKE '%report card%' OR title LIKE '%scheme%' OR title LIKE '%datesheet%')";
                 } elseif (!empty($eventKey)) {

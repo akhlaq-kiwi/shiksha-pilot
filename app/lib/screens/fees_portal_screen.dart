@@ -7,6 +7,7 @@ import 'package:printing/printing.dart';
 import 'package:school_hub/services/fee_service.dart';
 import 'package:school_hub/screens/fees_collection_history_screen.dart';
 import 'package:school_hub/screens/manage_finance_fees_screen.dart';
+import 'package:school_hub/screens/full_screen_image_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class FeesPortalScreen extends StatefulWidget {
@@ -1604,19 +1605,38 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
         ? (int.tryParse(studentInfo['id'].toString()) ?? widget.studentId)
         : widget.studentId;
     studentInfo['id'] = resolvedId;
+    if ((studentInfo['parent_phone'] == null || studentInfo['parent_phone'].toString().trim().isEmpty) &&
+        widget.studentSummary['parent_phone'] != null) {
+      studentInfo['parent_phone'] = widget.studentSummary['parent_phone'];
+    }
+    if ((studentInfo['student_mobile'] == null || studentInfo['student_mobile'].toString().trim().isEmpty) &&
+        widget.studentSummary['student_mobile'] != null) {
+      studentInfo['student_mobile'] = widget.studentSummary['student_mobile'];
+    }
 
     final name = (studentInfo['name'] ?? widget.studentSummary['name'] ?? 'Student').toString();
     final className = (studentInfo['class_name'] ?? widget.studentSummary['class_name'] ?? 'N/A').toString();
     final rollNo = (studentInfo['roll_no'] ?? widget.studentSummary['roll_no'] ?? '—').toString();
     final srNo = (studentInfo['sr_no'] ?? '—').toString();
-    final photoRaw = (studentInfo['photo_path'] ?? widget.studentSummary['photo_path'] ?? studentInfo['photo'] ?? widget.studentSummary['photo'] ?? '').toString().trim();
+    final photoRaw = (studentInfo['photo_path'] ??
+            widget.studentSummary['photo_path'] ??
+            studentInfo['photo'] ??
+            widget.studentSummary['photo'] ??
+            studentInfo['student_photo'] ??
+            widget.studentSummary['student_photo'] ??
+            studentInfo['profile_image'] ??
+            widget.studentSummary['profile_image'] ??
+            _studentDetail['photo_path'] ??
+            _studentDetail['photo'] ??
+            '').toString().trim();
     String photoUrl = '';
-    if (photoRaw.isNotEmpty) {
+    if (photoRaw.isNotEmpty && photoRaw != 'null' && photoRaw != '—') {
       if (photoRaw.startsWith('http')) {
         photoUrl = photoRaw;
       } else {
+        final cleanBase = widget.feeService.baseUrl.replaceAll(RegExp(r'/+$'), '');
         final cleanPath = photoRaw.startsWith('/') ? photoRaw : '/$photoRaw';
-        photoUrl = '${widget.feeService.baseUrl}$cleanPath';
+        photoUrl = '$cleanBase$cleanPath';
       }
     }
 
@@ -1735,7 +1755,7 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       // Left aligned student photo
-                      _buildLedgerStudentAvatar(photoUrl, name),
+                      _buildLedgerStudentAvatar(photoUrl, name, resolvedId),
                       const SizedBox(width: 14),
 
                       // Right: Student details
@@ -2433,12 +2453,21 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
     required List<dynamic> payments,
     required bool isAdditional,
   }) {
+    final mergedStudentInfo = Map<String, dynamic>.from(studentInfo);
+    if ((mergedStudentInfo['parent_phone'] == null || mergedStudentInfo['parent_phone'].toString().trim().isEmpty) &&
+        widget.studentSummary['parent_phone'] != null) {
+      mergedStudentInfo['parent_phone'] = widget.studentSummary['parent_phone'];
+    }
+    if ((mergedStudentInfo['student_mobile'] == null || mergedStudentInfo['student_mobile'].toString().trim().isEmpty) &&
+        widget.studentSummary['student_mobile'] != null) {
+      mergedStudentInfo['student_mobile'] = widget.studentSummary['student_mobile'];
+    }
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => _ReceiptShareSheet(
-        studentInfo: studentInfo,
+        studentInfo: mergedStudentInfo,
         title: title,
         payments: payments,
         isAdditional: isAdditional,
@@ -2447,54 +2476,107 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
     );
   }
 
-  Widget _buildLedgerStudentAvatar(String photoUrl, String name) {
+  Widget _buildLedgerStudentAvatar(String photoUrl, String name, [dynamic studentId]) {
     final initial = name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : 'S';
-    return Container(
-      width: 66,
-      height: 66,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: const Color(0xFFF1F5F9),
-        border: Border.all(color: const Color(0xFFCBD5E1), width: 1.5),
-      ),
-      child: ClipOval(
-        child: photoUrl.isNotEmpty
-            ? CachedNetworkImage(
+    final heroTag = 'ledger_student_avatar_${studentId ?? name}';
+    return GestureDetector(
+      onTap: () {
+        if (photoUrl.isNotEmpty) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => FullScreenImageScreen(
                 imageUrl: photoUrl,
-                width: 66,
-                height: 66,
-                fit: BoxFit.cover,
-                placeholder: (context, url) => Center(
-                  child: Text(
-                    initial,
-                    style: const TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFFD97706),
-                    ),
-                  ),
-                ),
-                errorWidget: (context, url, error) => Center(
-                  child: Text(
-                    initial,
-                    style: const TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFFD97706),
-                    ),
-                  ),
-                ),
-              )
-            : Center(
-                child: Text(
-                  initial,
-                  style: const TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFFD97706),
-                  ),
-                ),
+                title: name,
+                heroTag: heroTag,
               ),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No profile photo uploaded for this student.'),
+              behavior: SnackBarBehavior.floating,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      },
+      child: Stack(
+        alignment: Alignment.bottomRight,
+        children: [
+          Container(
+            width: 66,
+            height: 66,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFFF1F5F9),
+              border: Border.all(color: const Color(0xFFCBD5E1), width: 1.5),
+            ),
+            child: ClipOval(
+              child: photoUrl.isNotEmpty
+                  ? Hero(
+                      tag: heroTag,
+                      child: CachedNetworkImage(
+                        imageUrl: photoUrl,
+                        width: 66,
+                        height: 66,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => Center(
+                          child: Text(
+                            initial,
+                            style: const TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFFD97706),
+                            ),
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => Center(
+                          child: Text(
+                            initial,
+                            style: const TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFFD97706),
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  : Center(
+                      child: Text(
+                        initial,
+                        style: const TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFFD97706),
+                        ),
+                      ),
+                    ),
+            ),
+          ),
+          if (photoUrl.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.all(3.5),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.18),
+                    blurRadius: 3,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.fullscreen_rounded,
+                size: 13,
+                color: Color(0xFF475569),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -2633,6 +2715,18 @@ class _ReceiptShareSheetState extends State<_ReceiptShareSheet> {
     final className = (widget.studentInfo['class_name'] ?? '—').toString();
     final rollNo = (widget.studentInfo['roll_no'] ?? '—').toString();
     final srNo = (widget.studentInfo['sr_no'] ?? '—').toString();
+    final phone = (widget.studentInfo['parent_phone'] ??
+            widget.studentInfo['student_mobile'] ??
+            widget.studentInfo['mobile_number'] ??
+            widget.studentInfo['mobile'] ??
+            widget.studentInfo['phone'] ??
+            widget.studentInfo['emergency_phone'] ??
+            widget.studentInfo['father_phone'] ??
+            widget.studentInfo['mother_phone'] ??
+            '')
+        .toString()
+        .trim();
+    final hasValidPhone = phone.isNotEmpty && phone != '—' && phone != 'null';
 
     // Consolidate payments by receipt_no so multiple additional fees deposited in 1 transaction form 1 single receipt slip!
     final List<Map<String, dynamic>> consolidatedSlips = [];
@@ -2800,9 +2894,62 @@ class _ReceiptShareSheetState extends State<_ReceiptShareSheet> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          studentName.isNotEmpty ? studentName : 'Student',
-                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                studentName.isNotEmpty ? studentName : 'Student',
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                            ),
+                            if (hasValidPhone) ...[
+                              const SizedBox(width: 8),
+                              InkWell(
+                                onTap: () {
+                                  Clipboard.setData(ClipboardData(text: phone));
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Copied $phone to clipboard'),
+                                      behavior: SnackBarBehavior.floating,
+                                      duration: const Duration(seconds: 2),
+                                    ),
+                                  );
+                                },
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.phone_outlined, size: 14, color: Color(0xFF64748B)),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        phone,
+                                        style: const TextStyle(
+                                          fontSize: 13.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF0F172A),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 5),
+                                      const Icon(Icons.copy_rounded, size: 12, color: Color(0xFF94A3B8)),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                         const SizedBox(height: 4),
                         Wrap(

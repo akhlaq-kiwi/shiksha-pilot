@@ -283,13 +283,15 @@ class _ClassTeacherAssignmentScreenState extends State<ClassTeacherAssignmentScr
       context: context,
       builder: (dialogCtx) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          titlePadding: const EdgeInsets.fromLTRB(22, 22, 22, 10),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
           title: const Text(
             'Replace Existing Class Teacher?',
             style: TextStyle(
-              fontSize: 16.5,
+              fontSize: 17,
               fontWeight: FontWeight.bold,
               color: Color(0xFF0F172A),
             ),
@@ -306,8 +308,8 @@ class _ClassTeacherAssignmentScreenState extends State<ClassTeacherAssignmentScr
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(12),
+                  color: const Color(0xFFFDFBF7),
+                  borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: const Color(0xFFE2E8F0)),
                 ),
                 child: Column(
@@ -335,7 +337,7 @@ class _ClassTeacherAssignmentScreenState extends State<ClassTeacherAssignmentScr
                         ),
                         Text(
                           newTeacherName,
-                          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF0D9488)),
+                          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFFD97706)),
                         ),
                       ],
                     ),
@@ -344,28 +346,28 @@ class _ClassTeacherAssignmentScreenState extends State<ClassTeacherAssignmentScr
               ),
             ],
           ),
-          actionsPadding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          actionsPadding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogCtx),
               child: const Text(
                 'Cancel',
-                style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold),
+                style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold, fontSize: 13.5),
               ),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0D9488),
+                backgroundColor: const Color(0xFFD97706),
                 foregroundColor: Colors.white,
                 elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               ),
               onPressed: () {
                 Navigator.pop(dialogCtx);
                 _executeAutoSave(classId, newTeacherId, previousTeacherId);
               },
-              child: const Text('Replace', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: const Text('Replace', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
             ),
           ],
         );
@@ -382,7 +384,7 @@ class _ClassTeacherAssignmentScreenState extends State<ClassTeacherAssignmentScr
       isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) {
         return StatefulBuilder(
@@ -452,10 +454,11 @@ class _ClassTeacherAssignmentScreenState extends State<ClassTeacherAssignmentScr
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                       child: Container(
-                        height: 40,
+                        height: 42,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(10),
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
                         ),
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         child: Row(
@@ -514,35 +517,35 @@ class _ClassTeacherAssignmentScreenState extends State<ClassTeacherAssignmentScr
                               ),
                               child: Row(
                                 children: [
-                                  CircleAvatar(
-                                    radius: 16,
-                                    backgroundColor: const Color(0xFFFEE2E2),
-                                    child: Icon(
-                                      Icons.person_off_rounded,
-                                      size: 16,
-                                      color: Colors.red.shade600,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      '-- Unassigned --',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: currentTeacherId == null ? FontWeight.bold : FontWeight.w500,
-                                        color: currentTeacherId == null
-                                            ? Colors.red.shade700
-                                            : const Color(0xFF64748B),
-                                        fontStyle: FontStyle.italic,
+                                    CircleAvatar(
+                                      radius: 16,
+                                      backgroundColor: const Color(0xFFFEE2E2),
+                                      child: Icon(
+                                        Icons.person_off_rounded,
+                                        size: 16,
+                                        color: Colors.red.shade600,
                                       ),
                                     ),
-                                  ),
-                                  if (currentTeacherId == null)
-                                    Icon(Icons.check_circle_rounded, color: Colors.red.shade600, size: 20),
-                                ],
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        '-- Unassigned --',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: currentTeacherId == null ? FontWeight.bold : FontWeight.w500,
+                                          color: currentTeacherId == null
+                                              ? Colors.red.shade700
+                                              : const Color(0xFF64748B),
+                                          fontStyle: FontStyle.italic,
+                                        ),
+                                      ),
+                                    ),
+                                    if (currentTeacherId == null)
+                                      Icon(Icons.check_circle_rounded, color: Colors.red.shade600, size: 20),
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
 
                           const SizedBox(height: 4),
 
@@ -562,10 +565,10 @@ class _ClassTeacherAssignmentScreenState extends State<ClassTeacherAssignmentScr
                                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
                                 margin: const EdgeInsets.symmetric(vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: isSelected ? const Color(0xFFF0FDFA) : Colors.transparent,
+                                  color: isSelected ? const Color(0xFFFFFBEB) : Colors.transparent,
                                   borderRadius: BorderRadius.circular(12),
                                   border: isSelected
-                                      ? Border.all(color: const Color(0xFF99F6E4))
+                                      ? Border.all(color: const Color(0xFFFCD34D), width: 1.5)
                                       : null,
                                 ),
                                 child: Row(
@@ -573,7 +576,7 @@ class _ClassTeacherAssignmentScreenState extends State<ClassTeacherAssignmentScr
                                     CircleAvatar(
                                       radius: 16,
                                       backgroundColor: isSelected
-                                          ? const Color(0xFFCCFBF1)
+                                          ? const Color(0xFFFEF3C7)
                                           : const Color(0xFFF1F5F9),
                                       child: Text(
                                         name.isNotEmpty ? name[0].toUpperCase() : 'T',
@@ -581,7 +584,7 @@ class _ClassTeacherAssignmentScreenState extends State<ClassTeacherAssignmentScr
                                           fontSize: 13,
                                           fontWeight: FontWeight.bold,
                                           color: isSelected
-                                              ? const Color(0xFF0F766E)
+                                              ? const Color(0xFFB45309)
                                               : const Color(0xFF475569),
                                         ),
                                       ),
@@ -597,7 +600,7 @@ class _ClassTeacherAssignmentScreenState extends State<ClassTeacherAssignmentScr
                                               fontSize: 14,
                                               fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
                                               color: isSelected
-                                                  ? const Color(0xFF0F766E)
+                                                  ? const Color(0xFF92400E)
                                                   : const Color(0xFF0F172A),
                                             ),
                                           ),
@@ -612,7 +615,7 @@ class _ClassTeacherAssignmentScreenState extends State<ClassTeacherAssignmentScr
                                     if (isSelected)
                                       const Icon(
                                         Icons.check_circle_rounded,
-                                        color: Color(0xFF0D9488),
+                                        color: Color(0xFFD97706),
                                         size: 20,
                                       ),
                                   ],
@@ -650,40 +653,36 @@ class _ClassTeacherAssignmentScreenState extends State<ClassTeacherAssignmentScr
     final assignedCount = _localAssignments.values.where((id) => id != null).length;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFAF9F6), // Warm background matching web portal design
+      backgroundColor: const Color(0xFFFAF7F2), // Warm canvas matching app theme
       appBar: AppBar(
         backgroundColor: Colors.white,
-        elevation: 0.5,
+        elevation: 0,
+        scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF1E293B), size: 18),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF0F172A), size: 18),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            'CLASS TEACHER ASSIGNMENT',
-            style: TextStyle(
-              color: Color(0xFF0F172A),
-              fontWeight: FontWeight.bold,
-              fontSize: 16.5,
-              letterSpacing: 0.2,
-            ),
+        title: const Text(
+          'CLASS TEACHER ASSIGNMENT',
+          style: TextStyle(
+            color: Color(0xFF0F172A),
+            fontWeight: FontWeight.bold,
+            fontSize: 16.5,
+            letterSpacing: 0.2,
           ),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: Color(0xFF475569)),
-            onPressed: _loadData,
-          ),
-        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(color: const Color(0xFFE2E8F0), height: 1),
+        ),
       ),
       body: _isLoading
           ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFF0D9488)),
+              child: CircularProgressIndicator(color: Color(0xFFD97706)),
             )
           : RefreshIndicator(
               onRefresh: _loadData,
-              color: const Color(0xFF0D9488),
+              color: const Color(0xFFD97706),
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -909,7 +908,7 @@ class _ClassTeacherAssignmentScreenState extends State<ClassTeacherAssignmentScr
                                               borderRadius: BorderRadius.circular(22),
                                               border: Border.all(
                                                 color: isSaving
-                                                    ? const Color(0xFF0D9488)
+                                                    ? const Color(0xFFD97706)
                                                     : const Color(0xFFCBD5E1),
                                                 width: 1.0,
                                               ),
@@ -938,7 +937,7 @@ class _ClassTeacherAssignmentScreenState extends State<ClassTeacherAssignmentScr
                                                     height: 16,
                                                     child: CircularProgressIndicator(
                                                       strokeWidth: 2,
-                                                      color: Color(0xFF0D9488),
+                                                      color: Color(0xFFD97706),
                                                     ),
                                                   )
                                                 else

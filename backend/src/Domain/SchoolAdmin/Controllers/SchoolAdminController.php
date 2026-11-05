@@ -202,6 +202,15 @@ class SchoolAdminController extends BaseController
         $this->requireRole($user, ['SCHOOL_ADMIN']);
     }
 
+    private function requireFeeCollectorAccess(array $user): void
+    {
+        $role = (string) ($user['role'] ?? '');
+        if ($role === 'SCHOOL_ADMIN' || $role === 'SUPER_ADMIN' || $this->service->isFeeCollector($user)) {
+            return;
+        }
+        throw new \App\Shared\Exceptions\ForbiddenException('Access Denied. Only Fee Collector can access Fee Follow-up.');
+    }
+
     public function getStaff(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
@@ -2395,7 +2404,7 @@ class SchoolAdminController extends BaseController
     public function getFeeFollowUps(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireFeeCollectorAccess($user);
         $params = $request->getQueryParams();
         $data = $this->service->getFeeFollowUps($user, $params);
         return $this->success($response, $data);
@@ -2404,7 +2413,7 @@ class SchoolAdminController extends BaseController
     public function createFeeFollowUp(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireFeeCollectorAccess($user);
         $body = RequestParser::body($request);
         $data = $this->service->createFeeFollowUp($user, $body);
         return $this->success($response, $data, 'Fee follow-up saved successfully', 201);
@@ -2413,7 +2422,7 @@ class SchoolAdminController extends BaseController
     public function getFeeFollowUpDetails(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireFeeCollectorAccess($user);
         $id = (int)$args['id'];
         $data = $this->service->getFeeFollowUpDetails($user, $id);
         return $this->success($response, $data);
@@ -2422,7 +2431,7 @@ class SchoolAdminController extends BaseController
     public function updateFeeFollowUp(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireFeeCollectorAccess($user);
         $id = (int)$args['id'];
         $body = RequestParser::body($request);
         $data = $this->service->updateFeeFollowUp($user, $id, $body);
@@ -2432,7 +2441,7 @@ class SchoolAdminController extends BaseController
     public function extendFeeFollowUp(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireFeeCollectorAccess($user);
         $id = (int)$args['id'];
         $body = RequestParser::body($request);
         $data = $this->service->extendFeeFollowUp($user, $id, $body);
@@ -2442,7 +2451,7 @@ class SchoolAdminController extends BaseController
     public function updateFeeFollowUpStatus(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireFeeCollectorAccess($user);
         $id = (int)$args['id'];
         $body = RequestParser::body($request);
         $data = $this->service->updateFeeFollowUpStatus($user, $id, $body);
@@ -2452,7 +2461,7 @@ class SchoolAdminController extends BaseController
     public function deleteFeeFollowUp(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireFeeCollectorAccess($user);
         $id = (int)$args['id'];
         $data = $this->service->deleteFeeFollowUp($user, $id);
         return $this->success($response, $data, 'Fee follow-up deleted successfully');
@@ -2461,7 +2470,7 @@ class SchoolAdminController extends BaseController
     public function addFollowUpNote(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireFeeCollectorAccess($user);
         $id = (int)$args['id'];
         $body = RequestParser::body($request);
         $data = $this->service->addFollowUpNote($user, $id, $body);
@@ -2471,7 +2480,7 @@ class SchoolAdminController extends BaseController
     public function markFollowUpContacted(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireFeeCollectorAccess($user);
         $id = (int)$args['id'];
         $body = RequestParser::body($request);
         $data = $this->service->markFollowUpContacted($user, $id, $body);
@@ -2481,7 +2490,7 @@ class SchoolAdminController extends BaseController
     public function getStudentOutstandingFee(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireFeeCollectorAccess($user);
         $studentId = (int)$args['id'];
         $data = $this->service->getStudentOutstandingFee($user, $studentId);
         return $this->success($response, $data);
@@ -2490,9 +2499,18 @@ class SchoolAdminController extends BaseController
     public function getStudentFollowUps(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireFeeCollectorAccess($user);
         $studentId = (int)$args['id'];
         $data = $this->service->getStudentFollowUps($user, $studentId);
+        return $this->success($response, $data);
+    }
+
+    public function getStudentActiveFollowUp(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireFeeCollectorAccess($user);
+        $studentId = (int)$args['id'];
+        $data = $this->service->getStudentActiveFollowUp($user, $studentId);
         return $this->success($response, $data);
     }
 

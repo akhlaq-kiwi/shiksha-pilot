@@ -2672,33 +2672,32 @@ class SchoolAdminService extends BaseService
                 }
             }
 
-            if (strcasecmp($s['role'], 'Teacher') === 0) {
-                $count = $teacherCounts[$s['id']] ?? 0;
+            // Sync today's active periods and day workloads for all staff
+            $count = $teacherCounts[$s['id']] ?? 0;
 
-                if ((int)$s['assigned_periods'] !== $count) {
-                    $stmtUpdate = $pdo->prepare("UPDATE staff SET assigned_periods = :count WHERE id = :tid");
-                    $stmtUpdate->execute([':count' => $count, ':tid' => $s['id']]);
-                    $s['assigned_periods'] = $count;
-                }
-
-                // Query day workloads for the teacher
-                $stmtDays = $pdo->prepare("
-                    SELECT day_of_week, COUNT(*) as cnt 
-                    FROM timetable 
-                    WHERE teacher_id = :tid AND school_id = :sid AND end_date IS NULL
-                    GROUP BY day_of_week
-                ");
-                $stmtDays->execute([':tid' => $s['id'], ':sid' => $schoolId]);
-                $dayCounts = $stmtDays->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
-                $s['day_workloads'] = [
-                    'Monday'    => (int)($dayCounts['Monday'] ?? 0),
-                    'Tuesday'   => (int)($dayCounts['Tuesday'] ?? 0),
-                    'Wednesday' => (int)($dayCounts['Wednesday'] ?? 0),
-                    'Thursday'  => (int)($dayCounts['Thursday'] ?? 0),
-                    'Friday'    => (int)($dayCounts['Friday'] ?? 0),
-                    'Saturday'  => (int)($dayCounts['Saturday'] ?? 0),
-                ];
+            if ((int)$s['assigned_periods'] !== $count) {
+                $stmtUpdate = $pdo->prepare("UPDATE staff SET assigned_periods = :count WHERE id = :tid");
+                $stmtUpdate->execute([':count' => $count, ':tid' => $s['id']]);
             }
+            $s['assigned_periods'] = $count;
+
+            // Query day workloads for the teacher
+            $stmtDays = $pdo->prepare("
+                SELECT day_of_week, COUNT(*) as cnt 
+                FROM timetable 
+                WHERE teacher_id = :tid AND school_id = :sid AND end_date IS NULL
+                GROUP BY day_of_week
+            ");
+            $stmtDays->execute([':tid' => $s['id'], ':sid' => $schoolId]);
+            $dayCounts = $stmtDays->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
+            $s['day_workloads'] = [
+                'Monday'    => (int)($dayCounts['Monday'] ?? 0),
+                'Tuesday'   => (int)($dayCounts['Tuesday'] ?? 0),
+                'Wednesday' => (int)($dayCounts['Wednesday'] ?? 0),
+                'Thursday'  => (int)($dayCounts['Thursday'] ?? 0),
+                'Friday'    => (int)($dayCounts['Friday'] ?? 0),
+                'Saturday'  => (int)($dayCounts['Saturday'] ?? 0),
+            ];
         }
 
         return $staffList;
@@ -2762,38 +2761,40 @@ class SchoolAdminService extends BaseService
         }
 
         // Dynamic workload sync
-        if (strcasecmp($member['role'], 'Teacher') === 0) {
-            $stmtCount = $pdo->prepare("
-                SELECT COUNT(*) FROM timetable 
-                WHERE teacher_id = :tid AND school_id = :sid AND end_date IS NULL
-            ");
-            $stmtCount->execute([':tid' => $member['id'], ':sid' => $schoolId]);
-            $count = (int)$stmtCount->fetchColumn();
+        $today = date('Y-m-d');
+        $dayOfWeek = date('l');
+        $stmtCount = $pdo->prepare("
+            SELECT COUNT(*) FROM timetable 
+            WHERE teacher_id = :tid AND school_id = :sid AND day_of_week = :day 
+              AND (start_date IS NULL OR start_date <= :today)
+              AND end_date IS NULL
+        ");
+        $stmtCount->execute([':tid' => $member['id'], ':sid' => $schoolId, ':day' => $dayOfWeek, ':today' => $today]);
+        $count = (int)$stmtCount->fetchColumn();
 
-            if ((int)$member['assigned_periods'] !== $count) {
-                $stmtUpdate = $pdo->prepare("UPDATE staff SET assigned_periods = :count WHERE id = :tid");
-                $stmtUpdate->execute([':count' => $count, ':tid' => $member['id']]);
-                $member['assigned_periods'] = $count;
-            }
-
-            // Query day workloads for the teacher
-            $stmtDays = $pdo->prepare("
-                SELECT day_of_week, COUNT(*) as cnt 
-                FROM timetable 
-                WHERE teacher_id = :tid AND school_id = :sid AND end_date IS NULL
-                GROUP BY day_of_week
-            ");
-            $stmtDays->execute([':tid' => $member['id'], ':sid' => $schoolId]);
-            $dayCounts = $stmtDays->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
-            $member['day_workloads'] = [
-                'Monday'    => (int)($dayCounts['Monday'] ?? 0),
-                'Tuesday'   => (int)($dayCounts['Tuesday'] ?? 0),
-                'Wednesday' => (int)($dayCounts['Wednesday'] ?? 0),
-                'Thursday'  => (int)($dayCounts['Thursday'] ?? 0),
-                'Friday'    => (int)($dayCounts['Friday'] ?? 0),
-                'Saturday'  => (int)($dayCounts['Saturday'] ?? 0),
-            ];
+        if ((int)($member['assigned_periods'] ?? 0) !== $count) {
+            $stmtUpdate = $pdo->prepare("UPDATE staff SET assigned_periods = :count WHERE id = :tid");
+            $stmtUpdate->execute([':count' => $count, ':tid' => $member['id']]);
         }
+        $member['assigned_periods'] = $count;
+
+        // Query day workloads for the teacher
+        $stmtDays = $pdo->prepare("
+            SELECT day_of_week, COUNT(*) as cnt 
+            FROM timetable 
+            WHERE teacher_id = :tid AND school_id = :sid AND end_date IS NULL
+            GROUP BY day_of_week
+        ");
+        $stmtDays->execute([':tid' => $member['id'], ':sid' => $schoolId]);
+        $dayCounts = $stmtDays->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
+        $member['day_workloads'] = [
+            'Monday'    => (int)($dayCounts['Monday'] ?? 0),
+            'Tuesday'   => (int)($dayCounts['Tuesday'] ?? 0),
+            'Wednesday' => (int)($dayCounts['Wednesday'] ?? 0),
+            'Thursday'  => (int)($dayCounts['Thursday'] ?? 0),
+            'Friday'    => (int)($dayCounts['Friday'] ?? 0),
+            'Saturday'  => (int)($dayCounts['Saturday'] ?? 0),
+        ];
 
         // Fetch documents
         $stmtDocs = $pdo->prepare("SELECT * FROM staff_documents WHERE staff_id = :sid ORDER BY id ASC");
@@ -7698,11 +7699,15 @@ class SchoolAdminService extends BaseService
 
     private function syncTeacherAssignedPeriods(\PDO $pdo, int $teacherId, int $schoolId): void
     {
+        $today = date('Y-m-d');
+        $dayOfWeek = date('l');
         $stmtCount = $pdo->prepare("
             SELECT COUNT(*) FROM timetable 
-            WHERE teacher_id = :tid AND school_id = :sid AND end_date IS NULL
+            WHERE teacher_id = :tid AND school_id = :sid AND day_of_week = :day 
+              AND (start_date IS NULL OR start_date <= :today)
+              AND end_date IS NULL
         ");
-        $stmtCount->execute([':tid' => $teacherId, ':sid' => $schoolId]);
+        $stmtCount->execute([':tid' => $teacherId, ':sid' => $schoolId, ':day' => $dayOfWeek, ':today' => $today]);
         $count = (int)$stmtCount->fetchColumn();
         
         $stmtUpdate = $pdo->prepare("
@@ -18756,21 +18761,20 @@ Only approve the settlement after reviewing all financial records.
         if (empty($data['promised_date'])) {
             throw new ValidationException(['promised_date' => 'Promised Payment Date is required']);
         }
-        if (empty($data['reason'])) {
-            throw new ValidationException(['reason' => 'Reason / Commitment is required']);
-        }
 
         $studentId = (int)$data['student_id'];
         $promisedDate = $data['promised_date'];
-        $reason = trim($data['reason']);
+        $reason = isset($data['reason']) ? trim((string)$data['reason']) : '';
 
-        if (strlen($reason) > 500) {
-            throw new ValidationException(['reason' => 'Reason cannot exceed 500 characters.']);
-        }
+        if ($reason !== '') {
+            if (strlen($reason) > 500) {
+                throw new ValidationException(['reason' => 'Reason cannot exceed 500 characters.']);
+            }
 
-        $wordCount = count(preg_split('/\s+/', $reason));
-        if ($wordCount > 25) {
-            throw new ValidationException(['reason' => 'Maximum 25 words allowed.']);
+            $wordCount = count(preg_split('/\s+/', $reason));
+            if ($wordCount > 25) {
+                throw new ValidationException(['reason' => 'Maximum 25 words allowed.']);
+            }
         }
 
         $today = date('Y-m-d');
@@ -18786,6 +18790,20 @@ Only approve the settlement after reviewing all financial records.
             throw new NotFoundException('Student not found');
         }
         $academicYearId = (int)$student['academic_year_id'];
+
+        // Prevent creating multiple active commitments for same student
+        $stmtActive = $pdo->prepare("
+            SELECT id, status 
+            FROM fee_follow_ups 
+            WHERE student_id = :sid AND school_id = :school_id AND status IN ('PENDING', 'DUE_TODAY', 'OVERDUE')
+            LIMIT 1
+        ");
+        $stmtActive->execute([':sid' => $studentId, ':school_id' => $schoolId]);
+        $existingActive = $stmtActive->fetch(PDO::FETCH_ASSOC);
+        if ($existingActive) {
+            $statusLabel = str_replace('_', ' ', $existingActive['status']);
+            throw new ValidationException(['student_id' => "This student already has an active payment commitment with status {$statusLabel}."]);
+        }
 
         // Get pending amount
         $dues = $this->getStudentCurrentOutstandingBalance($pdo, $studentId, $schoolId, $academicYearId);
@@ -18822,7 +18840,7 @@ Only approve the settlement after reviewing all financial records.
         $pdo = $this->classRepo->getPdo();
 
         $stmt = $pdo->prepare("
-            SELECT f.*, s.name AS student_name, s.admission_no, c.name AS class_name, 
+            SELECT f.*, s.name AS student_name, s.roll_no, s.admission_no, c.name AS class_name, 
                    s.father_name AS parent_name, s.parent_phone AS mobile_number, u.name AS creator_name
             FROM fee_follow_ups f
             JOIN students s ON f.student_id = s.id
@@ -18867,21 +18885,20 @@ Only approve the settlement after reviewing all financial records.
         if (empty($data['promised_date'])) {
             throw new ValidationException(['promised_date' => 'Promised Payment Date is required']);
         }
-        if (empty($data['reason'])) {
-            throw new ValidationException(['reason' => 'Reason / Commitment is required']);
-        }
 
         $promisedDate = $data['promised_date'];
-        $reason = trim($data['reason']);
+        $reason = isset($data['reason']) ? trim((string)$data['reason']) : '';
         $pendingAmount = (float)$data['pending_amount'];
 
-        if (strlen($reason) > 500) {
-            throw new ValidationException(['reason' => 'Reason cannot exceed 500 characters.']);
-        }
+        if ($reason !== '') {
+            if (strlen($reason) > 500) {
+                throw new ValidationException(['reason' => 'Reason cannot exceed 500 characters.']);
+            }
 
-        $wordCount = count(preg_split('/\s+/', $reason));
-        if ($wordCount > 25) {
-            throw new ValidationException(['reason' => 'Maximum 25 words allowed.']);
+            $wordCount = count(preg_split('/\s+/', $reason));
+            if ($wordCount > 25) {
+                throw new ValidationException(['reason' => 'Maximum 25 words allowed.']);
+            }
         }
 
         if ($pendingAmount < 0.0) {
@@ -19193,7 +19210,7 @@ Only approve the settlement after reviewing all financial records.
         $academicYearId = $workingYear ? (int)$workingYear['id'] : (int)($student['academic_year_id'] ?? 0);
         $dues = $this->getStudentCurrentOutstandingBalance($pdo, $studentId, $schoolId, $academicYearId);
 
-        return ['outstanding_balance' => $dues];
+        return ['outstanding_balance' => round((float)$dues)];
     }
 
     public function getStudentFollowUps(array $user, int $studentId): array
@@ -19259,6 +19276,47 @@ Only approve the settlement after reviewing all financial records.
         });
         
         return $timeline;
+    }
+
+    public function getStudentActiveFollowUp(array $user, int $studentId): ?array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->classRepo->getPdo();
+
+        // Self-healing: update statuses for today before checking
+        $today = date('Y-m-d');
+        $pdo->prepare("
+            UPDATE fee_follow_ups 
+            SET status = 'DUE_TODAY' 
+            WHERE school_id = :sid 
+              AND status = 'PENDING' 
+              AND promised_date = :today
+        ")->execute([':sid' => $schoolId, ':today' => $today]);
+
+        $pdo->prepare("
+            UPDATE fee_follow_ups 
+            SET status = 'OVERDUE' 
+            WHERE school_id = :sid 
+              AND status IN ('PENDING', 'DUE_TODAY') 
+              AND promised_date < :today
+        ")->execute([':sid' => $schoolId, ':today' => $today]);
+
+        $stmt = $pdo->prepare("
+            SELECT f.id, f.student_id, f.pending_amount, f.promised_date, f.status, f.reason,
+                   s.name AS student_name, s.roll_no, c.name AS class_name
+            FROM fee_follow_ups f
+            JOIN students s ON f.student_id = s.id
+            LEFT JOIN classes c ON s.class_id = c.id
+            WHERE f.student_id = :student_id 
+              AND f.school_id = :school_id
+              AND f.status IN ('PENDING', 'DUE_TODAY', 'OVERDUE')
+            ORDER BY f.id DESC
+            LIMIT 1
+        ");
+        $stmt->execute([':student_id' => $studentId, ':school_id' => $schoolId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $row ?: null;
     }
 
     public function getNotifications(array $user, array $params = []): array
@@ -19367,6 +19425,8 @@ Only approve the settlement after reviewing all financial records.
                     $query .= " AND (event_key = 'SALARY_DISBURSED' OR link LIKE '%salary%' OR title LIKE '%Salary%' OR category = 'Finance' OR category = 'SALARY')";
                 } elseif ($module === 'exams' || $module === 'exam') {
                     $query .= " AND (event_key LIKE '%EXAM%' OR category = 'EXAM' OR link LIKE '%exam%' OR title LIKE '%exam%' OR title LIKE '%examination%' OR title LIKE '%admit card%' OR title LIKE '%report card%' OR title LIKE '%scheme%' OR title LIKE '%datesheet%')";
+                } elseif ($module === 'fee_reminder' || $module === 'fee-reminder' || $module === 'fee_follow_up' || $module === 'fee-follow-up') {
+                    $query .= " AND (event_key LIKE '%FEE_REMINDER%' OR event_key LIKE '%FEE_FOLLOWUP%' OR link LIKE '%fee-reminder%' OR link LIKE '%fee-follow-up%' OR title LIKE '%Fee Reminder%' OR title LIKE '%Fee Follow-up%')";
                 } elseif ($module === 'expense' || $module === 'expenses') {
                     $query .= " AND (event_key = 'EXPENSE_APPROVAL_REQUEST' OR link LIKE '%expense%' OR title LIKE '%Expense%' OR title LIKE '%expense%')";
                 } elseif ($module === 'financial_report' || $module === 'financial-report' || $module === 'financial-reports' || $module === 'revenue') {
@@ -20126,6 +20186,7 @@ Only approve the settlement after reviewing all financial records.
         // Self-healing database check OUTSIDE transaction: Ensure any unique index on teacher_id is dropped on class_teacher_assignments table
         $this->ensureMultiClassTeacherAssignmentSchema($pdo);
 
+        $notificationsToSend = [];
         $pdo->beginTransaction();
         try {
             // Save / delete assignments
@@ -20177,6 +20238,14 @@ Only approve the settlement after reviewing all financial records.
                             ':tid' => $teacherId
                         ]);
 
+                        $isNewlyAssigned = !$prev || (int)$prev['teacher_id'] !== $teacherId;
+                        if ($isNewlyAssigned) {
+                            $notificationsToSend[] = [
+                                'teacher_id' => $teacherId,
+                                'class_name' => $clsName,
+                            ];
+                        }
+
                         if ($prev) {
                             if ((int)$prev['teacher_id'] !== $teacherId) {
                                 $this->logAudit($pdo, $user, 'Audits & Settings', 'Assign User Role', "Replaced class teacher for {$clsName}: {$tName} replaces {$prev['name']}");
@@ -20192,6 +20261,54 @@ Only approve the settlement after reviewing all financial records.
         } catch (\Exception $e) {
             $pdo->rollBack();
             throw $e;
+        }
+
+        // Send push notification & create dashboard notification for newly assigned class teachers
+        foreach ($notificationsToSend as $nt) {
+            try {
+                $stmtUser = $pdo->prepare("
+                    SELECT DISTINCT u.id, u.role
+                    FROM users u
+                    JOIN staff s ON (s.phone = u.phone OR (s.phone IS NOT NULL AND u.phone IS NOT NULL AND RIGHT(s.phone, 10) = RIGHT(u.phone, 10)))
+                    WHERE s.id = :tid AND s.school_id = :sid
+                ");
+                $stmtUser->execute([':tid' => $nt['teacher_id'], ':sid' => $schoolId]);
+                $teacherUsers = $stmtUser->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                $notifTitle = 'Class Teacher Assignment';
+                $notifMsg = "You have been assigned as the Class Teacher for {$nt['class_name']}.";
+
+                foreach ($teacherUsers as $tu) {
+                    $tUserId = (int)$tu['id'];
+                    $tRole = $tu['role'] ?: 'TEACHER';
+
+                    $stmtNotif = $pdo->prepare("
+                        INSERT INTO dashboard_notifications 
+                        (school_id, user_role, user_id, title, message, link, category, event_key, is_read, created_at)
+                        VALUES (:sid, :role, :uid, :title, :msg, '', 'ACADEMICS', 'CLASS_TEACHER_ASSIGNED', 0, NOW())
+                    ");
+                    $stmtNotif->execute([
+                        ':sid' => $schoolId,
+                        ':role' => $tRole,
+                        ':uid' => $tUserId,
+                        ':title' => $notifTitle,
+                        ':msg' => $notifMsg,
+                    ]);
+
+                    \App\Shared\Notifications\PushDispatcher::pushOnly(
+                        $pdo,
+                        $schoolId,
+                        $tRole,
+                        $tUserId,
+                        'CLASS_TEACHER_ASSIGNED',
+                        $notifTitle,
+                        $notifMsg,
+                        ''
+                    );
+                }
+            } catch (\Throwable $eNotif) {
+                error_log("Failed to send class teacher assignment notification: " . $eNotif->getMessage());
+            }
         }
 
         return ['success' => true];
@@ -21707,8 +21824,239 @@ Only approve the settlement after reviewing all financial records.
         }
         return ((int)($staff['is_fee_collector'] ?? 0) === 1);
     }
+
+    public function checkAndSendFeeReminderDueTodayNotifications(?int $schoolId = null, bool $force = false): array
+    {
+        $pdo = $this->classRepo->getPdo();
+        $today = date('Y-m-d');
+        $currentMinutes = ((int)date('G') * 60) + (int)date('i');
+
+        if ($schoolId !== null && $schoolId > 0) {
+            $schools = [['id' => $schoolId]];
+        } else {
+            $stmtSchools = $pdo->query("SELECT id FROM schools WHERE status = 'ACTIVE'");
+            $schools = $stmtSchools->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        $results = [];
+
+        foreach ($schools as $sch) {
+            $sid = (int)$sch['id'];
+
+            $stmtEntry = $pdo->prepare("
+                SELECT entry_time 
+                FROM teacher_attendance_settings 
+                WHERE school_id = :sid 
+                ORDER BY id DESC 
+                LIMIT 1
+            ");
+            $stmtEntry->execute([':sid' => $sid]);
+            $entryTimeStr = $stmtEntry->fetchColumn() ?: '08:05 AM';
+
+            $timestamp = strtotime($entryTimeStr);
+            if ($timestamp === false) {
+                $timestamp = strtotime('08:05 AM');
+            }
+            $officialMinutes = ((int)date('G', $timestamp) * 60) + (int)date('i', $timestamp);
+
+            if ($currentMinutes < $officialMinutes && !$force) {
+                $results[$sid] = [
+                    'status' => 'skipped',
+                    'reason' => 'Current time is before teacher entry time (' . $entryTimeStr . ')',
+                    'entry_time' => $entryTimeStr
+                ];
+                continue;
+            }
+
+            $stmtAlreadySent = $pdo->prepare("
+                SELECT COUNT(*) 
+                FROM dashboard_notifications 
+                WHERE school_id = :sid 
+                  AND event_key = 'FEE_FOLLOWUP_DUE_TODAY' 
+                  AND DATE(created_at) = :today
+            ");
+            $stmtAlreadySent->execute([':sid' => $sid, ':today' => $today]);
+            $alreadyCount = (int)$stmtAlreadySent->fetchColumn();
+
+            if ($alreadyCount > 0 && !$force) {
+                $results[$sid] = [
+                    'status' => 'skipped',
+                    'reason' => 'Fee reminder push notification already triggered for today.'
+                ];
+                continue;
+            }
+
+            // Auto-transition PENDING to DUE_TODAY for today's promised dates
+            $pdo->prepare("
+                UPDATE fee_follow_ups 
+                SET status = 'DUE_TODAY' 
+                WHERE school_id = :sid 
+                  AND status = 'PENDING' 
+                  AND promised_date = :today
+            ")->execute([':sid' => $sid, ':today' => $today]);
+
+            // Count distinct students with DUE_TODAY commitments
+            $stmtDue = $pdo->prepare("
+                SELECT COUNT(DISTINCT student_id) 
+                FROM fee_follow_ups 
+                WHERE school_id = :sid 
+                  AND status = 'DUE_TODAY' 
+                  AND promised_date = :today
+            ");
+            $stmtDue->execute([':sid' => $sid, ':today' => $today]);
+            $dueCount = (int)$stmtDue->fetchColumn();
+
+            if ($dueCount <= 0 && !$force) {
+                $results[$sid] = [
+                    'status' => 'skipped',
+                    'reason' => 'No fee follow-ups due today.'
+                ];
+                continue;
+            }
+
+            $effectiveCount = $dueCount > 0 ? $dueCount : 3;
+
+            // Find Fee Collector users for this school
+            $stmtFC = $pdo->prepare("
+                SELECT DISTINCT u.id AS user_id, u.name, u.phone, u.role
+                FROM users u
+                JOIN staff s ON (s.phone = u.phone OR (s.phone IS NOT NULL AND u.phone IS NOT NULL AND RIGHT(s.phone, 10) = RIGHT(u.phone, 10)))
+                WHERE s.school_id = :sid AND s.is_fee_collector = 1
+            ");
+            $stmtFC->execute([':sid' => $sid]);
+            $feeCollectors = $stmtFC->fetchAll(PDO::FETCH_ASSOC);
+
+            if (empty($feeCollectors)) {
+                $results[$sid] = [
+                    'status' => 'skipped',
+                    'reason' => 'No staff assigned as Fee Collector found for school.'
+                ];
+                continue;
+            }
+
+            $studentText = $effectiveCount === 1 ? '1 student has a' : "{$effectiveCount} students have";
+            $title = "Fee Reminder: Due Today";
+            $message = "Today, {$studentText} fee payment commitment scheduled. Tap to review details.";
+            $link = "/school-admin/fee-follow-ups";
+
+            $sentUsers = [];
+            foreach ($feeCollectors as $fc) {
+                $fcUserId = (int)$fc['user_id'];
+                $role = strtoupper($fc['role'] ?? 'TEACHER');
+
+                $stmtIns = $pdo->prepare("
+                    INSERT INTO dashboard_notifications 
+                    (school_id, user_role, user_id, title, message, link, is_read, category, event_key)
+                    VALUES (:sid, :role, :uid, :title, :msg, :link, 0, 'FEES', 'FEE_FOLLOWUP_DUE_TODAY')
+                ");
+                $stmtIns->execute([
+                    ':sid' => $sid,
+                    ':role' => $role,
+                    ':uid' => $fcUserId,
+                    ':title' => $title,
+                    ':msg' => $message,
+                    ':link' => $link
+                ]);
+
+                \App\Shared\Notifications\PushDispatcher::pushOnly(
+                    $pdo,
+                    $sid,
+                    $role,
+                    $fcUserId,
+                    'FEE_FOLLOWUP_DUE_TODAY',
+                    $title,
+                    $message,
+                    $link
+                );
+
+                $sentUsers[] = $fc['name'] . " (ID: {$fcUserId})";
+            }
+
+            $results[$sid] = [
+                'status' => 'sent',
+                'students_due' => $effectiveCount,
+                'sent_to' => $sentUsers,
+                'entry_time' => $entryTimeStr
+            ];
+        }
+
+        return $results;
+    }
+
+    public function triggerTestFeeReminderNotification(int $schoolId, int $studentCount = 3): array
+    {
+        $pdo = $this->classRepo->getPdo();
+        $sid = $schoolId;
+
+        $stmtEntry = $pdo->prepare("
+            SELECT entry_time 
+            FROM teacher_attendance_settings 
+            WHERE school_id = :sid 
+            ORDER BY id DESC 
+            LIMIT 1
+        ");
+        $stmtEntry->execute([':sid' => $sid]);
+        $entryTimeStr = $stmtEntry->fetchColumn() ?: '08:05 AM';
+
+        $stmtFC = $pdo->prepare("
+            SELECT DISTINCT u.id AS user_id, u.name, u.phone, u.role
+            FROM users u
+            JOIN staff s ON (s.phone = u.phone OR (s.phone IS NOT NULL AND u.phone IS NOT NULL AND RIGHT(s.phone, 10) = RIGHT(u.phone, 10)))
+            WHERE s.school_id = :sid AND s.is_fee_collector = 1
+        ");
+        $stmtFC->execute([':sid' => $sid]);
+        $feeCollectors = $stmtFC->fetchAll(PDO::FETCH_ASSOC);
+
+        if (empty($feeCollectors)) {
+            return [
+                'status' => 'error',
+                'message' => 'No Fee Collector found for school ' . $schoolId
+            ];
+        }
+
+        $studentText = $studentCount === 1 ? '1 student has a' : "{$studentCount} students have";
+        $title = "Fee Reminder: Due Today";
+        $message = "Today, {$studentText} fee payment commitment scheduled. Tap to review details.";
+        $link = "/school-admin/fee-follow-ups";
+
+        $sentUsers = [];
+        foreach ($feeCollectors as $fc) {
+            $fcUserId = (int)$fc['user_id'];
+            $role = strtoupper($fc['role'] ?? 'TEACHER');
+
+            $stmtIns = $pdo->prepare("
+                INSERT INTO dashboard_notifications 
+                (school_id, user_role, user_id, title, message, link, is_read, category, event_key)
+                VALUES (:sid, :role, :uid, :title, :msg, :link, 0, 'FEES', 'FEE_FOLLOWUP_DUE_TODAY')
+            ");
+            $stmtIns->execute([
+                ':sid' => $sid,
+                ':role' => $role,
+                ':uid' => $fcUserId,
+                ':title' => $title,
+                ':msg' => $message,
+                ':link' => $link
+            ]);
+
+            \App\Shared\Notifications\PushDispatcher::pushOnly(
+                $pdo,
+                $sid,
+                $role,
+                $fcUserId,
+                'FEE_FOLLOWUP_DUE_TODAY',
+                $title,
+                $message,
+                $link
+            );
+
+            $sentUsers[] = $fc['name'] . " (ID: {$fcUserId})";
+        }
+
+        return [
+            'status' => 'sent',
+            'students_count' => $studentCount,
+            'sent_to' => $sentUsers,
+            'entry_time' => $entryTimeStr
+        ];
+    }
 }
-
-
-
-
