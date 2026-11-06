@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import '../services/attendance_service.dart';
 import '../utils/class_formatter.dart';
+import '../widgets/profile_avatar_view.dart';
 
 class AttendanceScreen extends StatefulWidget {
   final AttendanceService attendanceService;
@@ -1380,6 +1381,12 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                         final sId = student['id'] as int;
                         final rollNo = student['roll_no'] ?? student['roll_number'] ?? '—';
                         final sName = student['name'] ?? '';
+                        final sPhoto = (student['photo_path'] ??
+                                student['photo'] ??
+                                student['student_photo'] ??
+                                student['photo_url'] ??
+                                '')
+                            .toString();
                         final currentMark = _tempAttendance[sId];
 
                         final isEditable = !_isSubmittedForSelectedDate && !_isLoadingAttendanceForDate;
@@ -1402,6 +1409,17 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                           ),
                           child: Row(
                             children: [
+                              // Student Profile Avatar with Full-View Zoom
+                              ProfileAvatarView(
+                                photoUrl: sPhoto,
+                                baseUrl: widget.attendanceService.baseUrl,
+                                name: sName,
+                                size: 40,
+                                entityType: 'student',
+                                heroTag: 'attendance_student_avatar_${sId}_$sPhoto',
+                              ),
+                              const SizedBox(width: 12),
+
                               // Roll & Name block
                               Expanded(
                                 child: Column(

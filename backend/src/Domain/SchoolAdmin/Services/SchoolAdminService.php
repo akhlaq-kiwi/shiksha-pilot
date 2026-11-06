@@ -1060,7 +1060,32 @@ class SchoolAdminService extends BaseService
         ");
         $addStmt->execute([':student_id' => $id, ':ayid' => $workingYearId, ':today' => $today]);
         $additionalPayments = $addStmt->fetchAll(PDO::FETCH_ASSOC);
-        $additionalPayments = array_map(function($ap) {
+
+        // Fetch payment history for additional fees
+        $stmtHistory = $pdo->prepare("
+            SELECT id, payment_id, school_id, student_id, amount_paid, discount_amount, payment_method, collected_by, receipt_no, payment_date, created_at
+            FROM additional_fee_payment_history
+            WHERE school_id = :sid AND student_id = :stid
+            ORDER BY id ASC
+        ");
+        $stmtHistory->execute([':sid' => $schoolId, ':stid' => $id]);
+        $historyRows = $stmtHistory->fetchAll(PDO::FETCH_ASSOC);
+        $historyByPaymentId = [];
+        foreach ($historyRows as $h) {
+            $historyByPaymentId[(int)$h['payment_id']][] = [
+                'id' => (int)$h['id'],
+                'payment_id' => (int)$h['payment_id'],
+                'amount_paid' => (float)$h['amount_paid'],
+                'discount_amount' => (float)($h['discount_amount'] ?? 0.0),
+                'payment_method' => $h['payment_method'],
+                'collected_by' => $h['collected_by'],
+                'receipt_no' => $h['receipt_no'],
+                'payment_date' => $h['payment_date'],
+                'created_at' => $h['created_at'],
+            ];
+        }
+
+        $additionalPayments = array_map(function($ap) use ($historyByPaymentId) {
             $ap['id'] = (int)$ap['id'];
             $ap['student_id'] = (int)$ap['student_id'];
             $ap['fee_type_id'] = (int)$ap['fee_type_id'];
@@ -1072,6 +1097,11 @@ class SchoolAdminService extends BaseService
             if (empty($cBy) || $cByLower === 'school admin' || $cByLower === 'admin' || str_ends_with($cByLower, 'admin') || str_contains($cByLower, 'school admin') || str_contains($cByLower, 'accounts office')) {
                 $ap['collected_by'] = 'ADMIN';
             }
+            $hist = $historyByPaymentId[$ap['id']] ?? [];
+            if (empty($hist) && !empty($ap['receipt_no'])) {
+                $hist = [$ap];
+            }
+            $ap['payments'] = $hist;
             return $ap;
         }, $additionalPayments);
 
@@ -1124,39 +1154,51 @@ class SchoolAdminService extends BaseService
         ];
     }
 
-    public function getFeeReceipt(array $user, int $studentId, int $paymentId, bool $isAdditional): array
+    public function getFeeReceipt(array $user, int $studentId, int $paymentId, bool $isAdditional, ?string $receiptNo = null): array
     {
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->studentRepo->getPdo();
 
         if ($isAdditional) {
-            // 1. First locate target payment or history record to identify its receipt_no
-            $stmtTarget = $pdo->prepare("
-                SELECT 
-                    afp.id AS payment_id,
-                    afph.id AS history_id,
-                    COALESCE(afph.receipt_no, afp.receipt_no) AS receipt_no
-                FROM additional_fee_payments afp
-                LEFT JOIN additional_fee_payment_history afph ON afph.payment_id = afp.id
-                WHERE (afp.id = :pid OR afph.id = :hid OR afp.receipt_no = :rno OR afph.receipt_no = :rno2)
-                  AND afp.student_id = :student_id
-                  AND afp.school_id = :sid
-                ORDER BY afph.id DESC
-                LIMIT 1
-            ");
-            $stmtTarget->execute([
-                ':pid' => $paymentId,
-                ':hid' => $paymentId,
-                ':rno' => (string)$paymentId,
-                ':rno2' => (string)$paymentId,
-                ':student_id' => $studentId,
-                ':sid' => $schoolId
-            ]);
-            $targetRec = $stmtTarget->fetch(PDO::FETCH_ASSOC);
-            if (!$targetRec) {
-                throw new NotFoundException('Additional fee payment record not found');
+            $targetReceiptNo = !empty($receiptNo) ? trim($receiptNo) : null;
+            if (empty($targetReceiptNo) && $paymentId > 0) {
+                $stmtHistCheck = $pdo->prepare("SELECT receipt_no FROM additional_fee_payment_history WHERE id = :hid AND student_id = :stid AND school_id = :sid LIMIT 1");
+                $stmtHistCheck->execute([':hid' => $paymentId, ':stid' => $studentId, ':sid' => $schoolId]);
+                $foundRno = $stmtHistCheck->fetchColumn();
+                if (!empty($foundRno)) {
+                    $targetReceiptNo = trim($foundRno);
+                }
             }
-            $targetReceiptNo = !empty($targetRec['receipt_no']) ? trim($targetRec['receipt_no']) : null;
+
+            if (empty($targetReceiptNo)) {
+                // 1. First locate target payment or history record to identify its receipt_no
+                $stmtTarget = $pdo->prepare("
+                    SELECT 
+                        afp.id AS payment_id,
+                        afph.id AS history_id,
+                        COALESCE(afph.receipt_no, afp.receipt_no) AS receipt_no
+                    FROM additional_fee_payments afp
+                    LEFT JOIN additional_fee_payment_history afph ON afph.payment_id = afp.id
+                    WHERE (afp.id = :pid OR afph.id = :hid OR afp.receipt_no = :rno OR afph.receipt_no = :rno2)
+                      AND afp.student_id = :student_id
+                      AND afp.school_id = :sid
+                    ORDER BY afph.id DESC
+                    LIMIT 1
+                ");
+                $stmtTarget->execute([
+                    ':pid' => $paymentId,
+                    ':hid' => $paymentId,
+                    ':rno' => (string)$paymentId,
+                    ':rno2' => (string)$paymentId,
+                    ':student_id' => $studentId,
+                    ':sid' => $schoolId
+                ]);
+                $targetRec = $stmtTarget->fetch(PDO::FETCH_ASSOC);
+                if (!$targetRec) {
+                    throw new NotFoundException('Additional fee payment record not found');
+                }
+                $targetReceiptNo = !empty($targetRec['receipt_no']) ? trim($targetRec['receipt_no']) : null;
+            }
 
             if (!empty($targetReceiptNo)) {
                 $stmt = $pdo->prepare("
@@ -1293,18 +1335,37 @@ class SchoolAdminService extends BaseService
 
             $amountPaidFormatted = "Rs " . number_format((float)$totalAmountPaid, 0);
         } else {
-            $stmt = $pdo->prepare("
-                SELECT fp.*, s.first_name, s.last_name, s.roll_no, s.sr_no, c.name AS class_name, c.section, sch.name AS school_name, sch.logo_path, ay.name AS academic_year_name, s.class_id
-                FROM fee_payments fp
-                JOIN students s ON fp.student_id = s.id
-                LEFT JOIN classes c ON s.class_id = c.id
-                JOIN schools sch ON fp.school_id = sch.id
-                LEFT JOIN academic_years ay ON s.academic_year_id = ay.id
-                WHERE fp.id = :id AND fp.student_id = :student_id AND fp.school_id = :sid
-                LIMIT 1
-            ");
-            $stmt->execute([':id' => $paymentId, ':student_id' => $studentId, ':sid' => $schoolId]);
-            $payment = $stmt->fetch(PDO::FETCH_ASSOC);
+            $payment = null;
+            if (!empty($receiptNo)) {
+                $stmtRno = $pdo->prepare("
+                    SELECT fp.*, s.first_name, s.last_name, s.roll_no, s.sr_no, c.name AS class_name, c.section, sch.name AS school_name, sch.logo_path, ay.name AS academic_year_name, s.class_id
+                    FROM fee_payments fp
+                    JOIN students s ON fp.student_id = s.id
+                    LEFT JOIN classes c ON s.class_id = c.id
+                    JOIN schools sch ON fp.school_id = sch.id
+                    LEFT JOIN academic_years ay ON s.academic_year_id = ay.id
+                    WHERE fp.receipt_no = :rno AND fp.student_id = :student_id AND fp.school_id = :sid
+                    LIMIT 1
+                ");
+                $stmtRno->execute([':rno' => $receiptNo, ':student_id' => $studentId, ':sid' => $schoolId]);
+                $payment = $stmtRno->fetch(PDO::FETCH_ASSOC);
+            }
+
+            if (!$payment) {
+                $stmt = $pdo->prepare("
+                    SELECT fp.*, s.first_name, s.last_name, s.roll_no, s.sr_no, c.name AS class_name, c.section, sch.name AS school_name, sch.logo_path, ay.name AS academic_year_name, s.class_id
+                    FROM fee_payments fp
+                    JOIN students s ON fp.student_id = s.id
+                    LEFT JOIN classes c ON s.class_id = c.id
+                    JOIN schools sch ON fp.school_id = sch.id
+                    LEFT JOIN academic_years ay ON s.academic_year_id = ay.id
+                    WHERE fp.id = :id AND fp.student_id = :student_id AND fp.school_id = :sid
+                    LIMIT 1
+                ");
+                $stmt->execute([':id' => $paymentId, ':student_id' => $studentId, ':sid' => $schoolId]);
+                $payment = $stmt->fetch(PDO::FETCH_ASSOC);
+            }
+
             if (!$payment) {
                 throw new NotFoundException('Fee payment record not found');
             }
@@ -21914,7 +21975,15 @@ Only approve the settlement after reviewing all financial records.
                 continue;
             }
 
-            $effectiveCount = $dueCount > 0 ? $dueCount : 3;
+            if ($dueCount <= 0) {
+                $results[$sid] = [
+                    'status' => 'skipped',
+                    'reason' => 'No fee follow-ups due today.'
+                ];
+                continue;
+            }
+
+            $effectiveCount = $dueCount;
 
             // Find Fee Collector users for this school
             $stmtFC = $pdo->prepare("
@@ -21983,10 +22052,24 @@ Only approve the settlement after reviewing all financial records.
         return $results;
     }
 
-    public function triggerTestFeeReminderNotification(int $schoolId, int $studentCount = 3): array
+    public function triggerTestFeeReminderNotification(int $schoolId, ?int $studentCount = null): array
     {
         $pdo = $this->classRepo->getPdo();
         $sid = $schoolId;
+        $today = date('Y-m-d');
+
+        if ($studentCount === null || $studentCount <= 0) {
+            $stmtDue = $pdo->prepare("
+                SELECT COUNT(DISTINCT student_id) 
+                FROM fee_follow_ups 
+                WHERE school_id = :sid 
+                  AND status = 'DUE_TODAY' 
+                  AND promised_date = :today
+            ");
+            $stmtDue->execute([':sid' => $sid, ':today' => $today]);
+            $actualCount = (int)$stmtDue->fetchColumn();
+            $studentCount = $actualCount > 0 ? $actualCount : 1;
+        }
 
         $stmtEntry = $pdo->prepare("
             SELECT entry_time 

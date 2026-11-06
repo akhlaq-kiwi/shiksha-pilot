@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:school_hub/services/http_service.dart' as http_service;
 import 'package:school_hub/services/leave_service.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:school_hub/widgets/profile_avatar_view.dart';
 import 'principal_tar_settings_screen.dart';
 
 class PrincipalTarScreen extends StatefulWidget {
@@ -567,20 +567,15 @@ class _PrincipalTarScreenState extends State<PrincipalTarScreen> with SingleTick
             Row(
               children: [
                 // Avatar
-                CircleAvatar(
-                  radius: 22,
-                  backgroundColor: const Color(0xFFF1F5F9),
-                  backgroundImage: photo.isNotEmpty
-                      ? CachedNetworkImageProvider(
-                          photo.startsWith('http') ? photo : '${widget.leaveService.baseUrl}$photo',
-                        )
-                      : null,
-                  child: photo.isEmpty
-                      ? Text(
-                          name.isNotEmpty ? name[0].toUpperCase() : 'T',
-                          style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF0F766E), fontSize: 16),
-                        )
-                      : null,
+                ProfileAvatarView(
+                  photoUrl: photo,
+                  baseUrl: widget.leaveService.baseUrl,
+                  name: name,
+                  size: 44,
+                  entityType: 'teacher',
+                  singleInitial: true,
+                  fallbackColor: const Color(0xFF0F766E),
+                  heroTag: 'tar_staff_avatar_${staffId}_$photo',
                 ),
                 const SizedBox(width: 12),
 

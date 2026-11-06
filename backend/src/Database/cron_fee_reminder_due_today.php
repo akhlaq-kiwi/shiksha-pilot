@@ -15,11 +15,11 @@ $service = $container->get(SchoolAdminService::class);
 $options = getopt('', ['force', 'school_id:', 'test_count:']);
 $force = isset($options['force']);
 $schoolId = isset($options['school_id']) ? (int)$options['school_id'] : null;
-$testCount = isset($options['test_count']) ? (int)$options['test_count'] : 3;
+$testCount = isset($options['test_count']) ? (int)$options['test_count'] : null;
 
 echo "[" . date('Y-m-d H:i:s') . "] Starting Fee Reminder Due Today check...\n";
 
-if ($force && $schoolId !== null) {
+if ($force && $schoolId !== null && $testCount !== null) {
     $res = $service->triggerTestFeeReminderNotification($schoolId, $testCount);
 } else {
     $res = $service->checkAndSendFeeReminderDueTodayNotifications($schoolId, $force);

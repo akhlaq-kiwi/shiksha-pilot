@@ -83,8 +83,9 @@ class SchoolAdminController extends BaseController
         $params = $request->getQueryParams();
         $id = isset($params['id']) ? (int)$params['id'] : 0;
         $isAdditional = isset($params['additional']) && (int)$params['additional'] === 1;
+        $receiptNo = !empty($params['receipt_no']) ? trim((string)$params['receipt_no']) : null;
 
-        $receipt = $this->service->getFeeReceipt($user, $studentId, $id, $isAdditional);
+        $receipt = $this->service->getFeeReceipt($user, $studentId, $id, $isAdditional, $receiptNo);
 
         $response->getBody()->write($receipt['data']);
         return $response

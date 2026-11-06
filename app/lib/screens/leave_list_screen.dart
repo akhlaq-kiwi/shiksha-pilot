@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/leave_request.dart';
 import '../services/leave_service.dart';
 import '../main.dart';
-import 'apply_leave_screen.dart';
+import 'apply_leave_bottom_sheet.dart';
 
 class LeaveListScreen extends StatefulWidget {
   final LeaveService leaveService;
@@ -25,16 +25,18 @@ class LeaveListScreen extends StatefulWidget {
   _LeaveListScreenState createState() => _LeaveListScreenState();
 }
 
-class _LeaveListScreenState extends State<LeaveListScreen> {
+class _LeaveListScreenState extends State<LeaveListScreen> with SingleTickerProviderStateMixin {
   List<LeaveRequest> _leaves = [];
   List<dynamic> _holidays = [];
   bool _isLoadingLeaves = true;
   bool _isLoadingHolidays = true;
   bool _isPrincipal = false;
   final ScrollController _holidaysScrollController = ScrollController();
+  late TabController _tabController;
 
   @override
   void dispose() {
+    _tabController.dispose();
     _holidaysScrollController.dispose();
     super.dispose();
   }
@@ -77,6 +79,16 @@ class _LeaveListScreenState extends State<LeaveListScreen> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: widget.initialTabIndex,
+    );
+    _tabController.addListener(() {
+      if (mounted) {
+        setState(() {});
+      }
+    });
     final roleUpper = widget.userRole.toUpperCase();
     _isPrincipal = widget.isPrincipal ?? (roleUpper == 'PRINCIPAL');
     _initPrincipalAndLoad();
@@ -1235,7 +1247,12 @@ class _LeaveListScreenState extends State<LeaveListScreen> {
       child: ListView.builder(
         controller: _holidaysScrollController,
         cacheExtent: 5000,
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 16,
+          bottom: !_isPrincipal ? 88 : 16,
+        ),
         itemCount: _holidays.length,
         itemBuilder: (context, index) {
           final holiday = _holidays[index];
@@ -1848,124 +1865,174 @@ class _LeaveListScreenState extends State<LeaveListScreen> {
       );
     }
 
-    // For non-principal users (Teachers, Parents, Students), retain the floating + button
-    return Stack(
-      children: [
-        content,
-        Positioned(
-          bottom: 16,
-          right: 16,
-          child: FloatingActionButton(
-            backgroundColor: const Color(0xFFD97706),
-            foregroundColor: Colors.white,
-            onPressed: () async {
-              final result = await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ApplyLeaveScreen(
-                    leaveService: widget.leaveService,
-                    userRole: widget.userRole,
-                    selectedStudentId: widget.selectedStudentId,
-                  ),
-                ),
-              );
-              if (result == true) {
-                _loadLeaves();
-              }
-            },
-            child: const Icon(Icons.add),
-          ),
-        ),
-      ],
+    // For non-principal users (Teachers, Parents, Students), content is returned
+    return content;
+  }
+
+  void _showApplyLeaveBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => ApplyLeaveBottomSheet(
+        leaveService: widget.leaveService,
+        userRole: widget.userRole,
+        selectedStudentId: widget.selectedStudentId,
+        onSuccess: () {
+          _loadLeaves();
+        },
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      initialIndex: widget.initialTabIndex,
-      child: Scaffold(
-        backgroundColor: const Color(0xFFFBF8F2),
-        appBar: AppBar(
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF1E293B), size: 18),
-            onPressed: () => Navigator.pop(context),
-          ),
-          titleSpacing: 0,
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(7),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFFBEB),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFFDE68A)),
-                ),
-                child: const Icon(Icons.date_range_rounded, color: Color(0xFFD97706), size: 18),
-              ),
-              const SizedBox(width: 10),
-              const Text(
-                'LEAVES',
-                style: TextStyle(
-                  color: Color(0xFF0F172A),
-                  fontWeight: FontWeight.w800,
-                  fontSize: 16,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: Colors.white,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          actions: [
-            if (_isPrincipal)
-              Padding(
-                padding: const EdgeInsets.only(right: 14, top: 9, bottom: 9),
-                child: ElevatedButton.icon(
-                  onPressed: _showAddHolidaySheet,
-                  icon: const Icon(Icons.add_rounded, size: 16, color: Colors.white),
-                  label: const Text(
-                    'Add Leave',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFD97706),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-              ),
-          ],
-          bottom: const TabBar(
-            indicatorColor: Color(0xFFD97706),
-            indicatorWeight: 3,
-            labelColor: Color(0xFFD97706),
-            unselectedLabelColor: Color(0xFF64748B),
-            labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-            unselectedLabelStyle: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-            tabs: [
-              Tab(text: 'Official Holidays'),
-              Tab(text: 'Leave Requests'),
-            ],
-          ),
+    return Scaffold(
+      backgroundColor: const Color(0xFFFBF8F2),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF1E293B), size: 18),
+          onPressed: () => Navigator.pop(context),
         ),
-        body: TabBarView(
+        titleSpacing: 0,
+        title: Row(
           children: [
-            _buildHolidaysTab(),
-            _buildRequestsTab(),
+            Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: const Icon(Icons.date_range_rounded, color: Color(0xFFD97706), size: 18),
+            ),
+            const SizedBox(width: 10),
+            const Text(
+              'LEAVES',
+              style: TextStyle(
+                color: Color(0xFF0F172A),
+                fontWeight: FontWeight.w800,
+                fontSize: 16,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        actions: [
+          if (_isPrincipal)
+            AnimatedBuilder(
+              animation: _tabController.animation ?? _tabController,
+              builder: (context, child) {
+                final double animValue =
+                    _tabController.animation?.value ?? _tabController.index.toDouble();
+                if (animValue >= 0.15) {
+                  return const SizedBox.shrink();
+                }
+                final double opacity = (1.0 - (animValue / 0.15)).clamp(0.0, 1.0);
+                return Opacity(
+                  opacity: opacity,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 14, top: 9, bottom: 9),
+                    child: ElevatedButton.icon(
+                      onPressed: _showAddHolidaySheet,
+                      icon: const Icon(Icons.add_rounded, size: 16, color: Colors.white),
+                      label: const Text(
+                        'Add Leave',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD97706),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+        ],
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: const Color(0xFFD97706),
+          indicatorWeight: 3,
+          labelColor: const Color(0xFFD97706),
+          unselectedLabelColor: const Color(0xFF64748B),
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+          tabs: const [
+            Tab(text: 'Official Holidays'),
+            Tab(text: 'Leave Requests'),
           ],
         ),
       ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _buildHolidaysTab(),
+          _buildRequestsTab(),
+        ],
+      ),
+      bottomNavigationBar: !_isPrincipal
+          ? Container(
+              color: Colors.white,
+              padding: EdgeInsets.fromLTRB(
+                16,
+                10,
+                16,
+                MediaQuery.of(context).padding.bottom > 0
+                    ? MediaQuery.of(context).padding.bottom + 6
+                    : 14,
+              ),
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFD97706).withOpacity(0.25),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: _showApplyLeaveBottomSheet,
+                    icon: const Icon(Icons.add_rounded, size: 20, color: Colors.white),
+                    label: const Text(
+                      'Apply for Leave',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.3,
+                        color: Colors.white,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFD97706),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            )
+          : null,
     );
   }
 }

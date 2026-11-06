@@ -1737,8 +1737,25 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
     return Column(
       children: [
         Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(14),
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onHorizontalDragEnd: (details) {
+              if (details.primaryVelocity != null) {
+                if (details.primaryVelocity! < -200) {
+                  // Swipe Left -> Additional Tab
+                  if (_selectedLedgerTab != 1) {
+                    setState(() => _selectedLedgerTab = 1);
+                  }
+                } else if (details.primaryVelocity! > 200) {
+                  // Swipe Right -> Monthly Tab
+                  if (_selectedLedgerTab != 0) {
+                    setState(() => _selectedLedgerTab = 0);
+                  }
+                }
+              }
+            },
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -2005,46 +2022,58 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
                                       ),
                                     ),
                                     if (isPaid || isPartial) ...[
-                                      const SizedBox(width: 6),
-                                      InkWell(
-                                        onTap: () {
-                                          final curRnos = monthPayments
-                                              .map((p) => p['receipt_no']?.toString().trim())
-                                              .where((r) => r != null && r.isNotEmpty)
-                                              .toSet();
-                                          List<dynamic> allMatchingPayments = monthPayments;
-                                          if (curRnos.isNotEmpty) {
-                                            final matches = payments.where((p) {
-                                              final r = p['receipt_no']?.toString().trim();
-                                              return r != null && curRnos.contains(r);
-                                            }).toList();
-                                            if (matches.isNotEmpty) {
-                                              allMatchingPayments = matches;
-                                            }
+                                      () {
+                                        final cleanMonthPayments = monthPayments.where((p) {
+                                          if (p is Map) {
+                                            final r = p['receipt_no']?.toString().trim();
+                                            final pid = p['id'];
+                                            return (r != null && r.isNotEmpty) || (pid != null && pid != 0);
                                           }
-                                          _showReceiptBottomSheet(
-                                            studentInfo: studentInfo,
-                                            title: '$monthName Tuition Fee',
-                                            payments: allMatchingPayments,
-                                            isAdditional: false,
+                                          return false;
+                                        }).toList();
+                                        cleanMonthPayments.sort((a, b) => ((a['id'] ?? 0) as num).compareTo((b['id'] ?? 0) as num));
+
+                                        if (cleanMonthPayments.isEmpty) {
+                                          return const SizedBox.shrink();
+                                        }
+
+                                        if (cleanMonthPayments.length == 1) {
+                                          return Padding(
+                                            padding: const EdgeInsets.only(left: 6),
+                                            child: _buildReceiptIconBtn(
+                                              onTap: () {
+                                                _showReceiptBottomSheet(
+                                                  studentInfo: studentInfo,
+                                                  title: '$monthName Tuition Fee',
+                                                  payments: cleanMonthPayments,
+                                                  isAdditional: false,
+                                                );
+                                              },
+                                            ),
                                           );
-                                        },
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: Container(
-                                          width: 28,
-                                          height: 24,
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFFFFFBEB),
-                                            borderRadius: BorderRadius.circular(8),
-                                            border: Border.all(color: const Color(0xFFFDE68A)),
-                                          ),
-                                          child: const Icon(
-                                            Icons.receipt_long_rounded,
-                                            size: 14,
-                                            color: Color(0xFFB45309),
-                                          ),
-                                        ),
-                                      ),
+                                        }
+
+                                        return Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: List.generate(cleanMonthPayments.length, (idx) {
+                                            final p = cleanMonthPayments[idx];
+                                            return Padding(
+                                              padding: const EdgeInsets.only(left: 6),
+                                              child: _buildReceiptIconBtn(
+                                                badgeNumber: idx + 1,
+                                                onTap: () {
+                                                  _showReceiptBottomSheet(
+                                                    studentInfo: studentInfo,
+                                                    title: '$monthName Tuition Fee (Part ${idx + 1})',
+                                                    payments: [p],
+                                                    isAdditional: false,
+                                                  );
+                                                },
+                                              ),
+                                            );
+                                          }),
+                                        );
+                                      }(),
                                     ],
                                   ],
                                 ),
@@ -2209,61 +2238,86 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
                                         ),
                                       ),
                                       if (isPaid || isPartial) ...[
-                                        const SizedBox(width: 6),
-                                        InkWell(
-                                          onTap: () {
-                                            final rawMap = af['raw'] is Map ? Map<String, dynamic>.from(af['raw']) : Map<String, dynamic>.from(af);
+                                        () {
+                                          final rawMap = af['raw'] is Map ? Map<String, dynamic>.from(af['raw']) : Map<String, dynamic>.from(af);
+                                          final afPayments = ((rawMap['payments'] ?? af['payments']) as List<dynamic>?) ?? [];
+                                          final cleanAfPayments = afPayments.where((p) {
+                                            if (p is Map) {
+                                              final r = p['receipt_no']?.toString().trim();
+                                              final pid = p['id'];
+                                              return (r != null && r.isNotEmpty) || (pid != null && pid != 0);
+                                            }
+                                            return false;
+                                          }).toList();
+                                          if (cleanAfPayments.isEmpty) {
                                             final curRno = (rawMap['receipt_no'] ?? af['receipt_no'] ?? '').toString().trim();
-                                            List<Map<String, dynamic>> matchingFees = [];
-                                            if (curRno.isNotEmpty) {
-                                              matchingFees = processedAdditional.where((item) {
-                                                final iRaw = item['raw'] is Map ? Map<String, dynamic>.from(item['raw']) : Map<String, dynamic>.from(item);
-                                                final r = (iRaw['receipt_no'] ?? item['receipt_no'] ?? '').toString().trim();
-                                                return r == curRno;
-                                              }).toList();
+                                            if (curRno.isNotEmpty || (af['id'] != null && af['id'] != 0)) {
+                                              cleanAfPayments.add({
+                                                ...rawMap,
+                                                'fee_name': title,
+                                                'remaining': af['remaining'],
+                                                'fee': af['amount'] ?? af['fee'],
+                                              });
                                             }
-                                            if (matchingFees.isEmpty) {
-                                              matchingFees = [af];
-                                            }
+                                          }
+                                          cleanAfPayments.sort((a, b) => ((a['id'] ?? 0) as num).compareTo((b['id'] ?? 0) as num));
 
-                                            final names = matchingFees
-                                                .map((f) => (f['fee_name'] ?? 'Additional Fee').toString().trim())
-                                                .where((n) => n.isNotEmpty)
-                                                .toSet()
-                                                .toList();
-                                            final combinedTitle = names.join(', ');
+                                          if (cleanAfPayments.isEmpty) {
+                                            return const SizedBox.shrink();
+                                          }
 
-                                            _showReceiptBottomSheet(
-                                              studentInfo: studentInfo,
-                                              title: combinedTitle.isNotEmpty ? combinedTitle : title,
-                                              payments: matchingFees.map((f) {
-                                                final fRaw = f['raw'] is Map ? Map<String, dynamic>.from(f['raw']) : Map<String, dynamic>.from(f);
-                                                return {
-                                                  ...fRaw,
-                                                  'fee_name': f['fee_name'],
-                                                  'remaining': f['remaining'],
-                                                  'fee': f['amount'] ?? f['fee'],
-                                                };
-                                              }).toList(),
-                                              isAdditional: true,
+                                          if (cleanAfPayments.length == 1) {
+                                            final p = cleanAfPayments.first;
+                                            return Padding(
+                                              padding: const EdgeInsets.only(left: 6),
+                                              child: _buildReceiptIconBtn(
+                                                onTap: () {
+                                                  _showReceiptBottomSheet(
+                                                    studentInfo: studentInfo,
+                                                    title: title,
+                                                    payments: [
+                                                      {
+                                                        if (p is Map) ...Map<String, dynamic>.from(p),
+                                                        'fee_name': title,
+                                                        'remaining': af['remaining'],
+                                                        'fee': af['amount'] ?? af['fee'],
+                                                      }
+                                                    ],
+                                                    isAdditional: true,
+                                                  );
+                                                },
+                                              ),
                                             );
-                                          },
-                                          borderRadius: BorderRadius.circular(8),
-                                          child: Container(
-                                            width: 28,
-                                            height: 24,
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFFFFBEB),
-                                              borderRadius: BorderRadius.circular(8),
-                                              border: Border.all(color: const Color(0xFFFDE68A)),
-                                            ),
-                                            child: const Icon(
-                                              Icons.receipt_long_rounded,
-                                              size: 14,
-                                              color: Color(0xFFB45309),
-                                            ),
-                                          ),
-                                        ),
+                                          }
+
+                                          return Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: List.generate(cleanAfPayments.length, (idx) {
+                                              final p = cleanAfPayments[idx];
+                                              return Padding(
+                                                padding: const EdgeInsets.only(left: 6),
+                                                child: _buildReceiptIconBtn(
+                                                  badgeNumber: idx + 1,
+                                                  onTap: () {
+                                                    _showReceiptBottomSheet(
+                                                      studentInfo: studentInfo,
+                                                      title: '$title (Part ${idx + 1})',
+                                                      payments: [
+                                                        {
+                                                          if (p is Map) ...Map<String, dynamic>.from(p),
+                                                          'fee_name': title,
+                                                          'remaining': af['remaining'],
+                                                          'fee': af['amount'] ?? af['fee'],
+                                                        }
+                                                      ],
+                                                      isAdditional: true,
+                                                    );
+                                                  },
+                                                ),
+                                              );
+                                            }),
+                                          );
+                                        }(),
                                       ],
                                     ],
                                   ),
@@ -2328,6 +2382,7 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
               ],
             ),
           ),
+        ),
         ),
 
         // Bottom Action Bar
@@ -2444,6 +2499,70 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
           },
         );
       },
+    );
+  }
+
+  Widget _buildReceiptIconBtn({
+    required VoidCallback onTap,
+    int? badgeNumber,
+  }) {
+    final baseButton = Container(
+      width: 28,
+      height: 24,
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBEB),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFFDE68A)),
+      ),
+      child: const Icon(
+        Icons.receipt_long_rounded,
+        size: 14,
+        color: Color(0xFFB45309),
+      ),
+    );
+
+    if (badgeNumber == null) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: baseButton,
+      );
+    }
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          baseButton,
+          Positioned(
+            top: -6,
+            right: -6,
+            child: Container(
+              padding: const EdgeInsets.all(2.5),
+              constraints: const BoxConstraints(minWidth: 15, minHeight: 15),
+              decoration: BoxDecoration(
+                color: const Color(0xFFD97706),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 1.2),
+              ),
+              child: Center(
+                child: Text(
+                  '$badgeNumber',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 8.5,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    height: 1.0,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -2616,6 +2735,7 @@ class _ReceiptShareSheetState extends State<_ReceiptShareSheet> {
         studentId,
         paymentId,
         isAdditional: widget.isAdditional,
+        receiptNo: receiptNo,
       );
       final cleanName = itemTitle.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
       final fileName = '${cleanName}_Receipt_${receiptNo}.pdf';

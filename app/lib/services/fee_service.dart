@@ -142,8 +142,9 @@ class FeeService {
   }
 
   /// Download fee receipt PDF bytes
-  Future<Uint8List> downloadFeeReceipt(int studentId, int paymentId, {bool isAdditional = false}) async {
-    final uri = Uri.parse('$baseUrl/api/school/students/$studentId/fees/receipt?id=$paymentId&additional=${isAdditional ? 1 : 0}');
+  Future<Uint8List> downloadFeeReceipt(int studentId, int paymentId, {bool isAdditional = false, String? receiptNo}) async {
+    final rParam = (receiptNo != null && receiptNo.trim().isNotEmpty) ? '&receipt_no=${Uri.encodeComponent(receiptNo.trim())}' : '';
+    final uri = Uri.parse('$baseUrl/api/school/students/$studentId/fees/receipt?id=$paymentId&additional=${isAdditional ? 1 : 0}$rParam');
     final res = await http.get(uri, headers: _headers);
     if (res.statusCode == 200) {
       return res.bodyBytes;

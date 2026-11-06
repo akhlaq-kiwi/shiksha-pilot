@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:school_hub/services/staff_salary_service.dart';
+import 'package:school_hub/widgets/profile_avatar_view.dart';
 
 class TeacherProfileSalaryScreen extends StatefulWidget {
   final String baseUrl;
@@ -586,8 +587,6 @@ class _TeacherProfileSalaryScreenState extends State<TeacherProfileSalaryScreen>
     final status = t['status']?.toString().toUpperCase() ?? 'ACTIVE';
     final photo = t['photo_path']?.toString() ?? '';
 
-    final initials = name.split(' ').where((s) => s.isNotEmpty).map((s) => s[0]).take(2).join('').toUpperCase();
-
     // Fallback if employee_id is missing or '-'
     final displayEmpId = (empId != null && empId.isNotEmpty && empId != '-')
         ? empId
@@ -611,40 +610,15 @@ class _TeacherProfileSalaryScreenState extends State<TeacherProfileSalaryScreen>
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // Profile Photo
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              color: const Color(0xFFE0F2FE),
-              shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFFBAE6FD), width: 2),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: photo.isNotEmpty
-                ? Image.network(
-                    photo.startsWith('http') ? photo : '${widget.baseUrl}$photo',
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Center(
-                      child: Text(
-                        initials.isNotEmpty ? initials : '??',
-                        style: const TextStyle(
-                          color: Color(0xFF0369A1),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 20,
-                        ),
-                      ),
-                    ),
-                  )
-                : Center(
-                    child: Text(
-                      initials.isNotEmpty ? initials : '??',
-                      style: const TextStyle(
-                        color: Color(0xFF0369A1),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 20,
-                      ),
-                    ),
-                  ),
+          ProfileAvatarView(
+            photoUrl: photo,
+            baseUrl: widget.baseUrl,
+            name: name,
+            size: 64,
+            entityType: 'teacher',
+            singleInitial: false,
+            fallbackColor: const Color(0xFF0369A1),
+            heroTag: 'salary_profile_staff_${widget.staffId}_$photo',
           ),
           const SizedBox(width: 14),
 

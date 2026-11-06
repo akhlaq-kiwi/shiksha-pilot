@@ -13,6 +13,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:school_hub/services/teacher_management_service.dart';
+import 'package:school_hub/widgets/profile_avatar_view.dart';
 
 class TeachersScreen extends StatefulWidget {
   final TeacherManagementService teacherService;
@@ -1080,15 +1081,6 @@ class _TeacherDetailsScreenState extends State<_TeacherDetailsScreen> {
     }
   }
 
-  String _resolveFileUrl(String url) {
-    if (url.isEmpty) return '';
-    if (url.startsWith('http://') || url.startsWith('https://')) return url;
-    final base = widget.teacherService.baseUrl;
-    final cleanBase = base.endsWith('/') ? base.substring(0, base.length - 1) : base;
-    final cleanPath = url.startsWith('/') ? url : '/$url';
-    return '$cleanBase$cleanPath';
-  }
-
   @override
   Widget build(BuildContext context) {
     final t = _details;
@@ -1419,43 +1411,14 @@ class _TeacherDetailsScreenState extends State<_TeacherDetailsScreen> {
   }
 
   Widget _buildBigAvatar(String photoPath, String name) {
-    final initials = name.trim().split(' ').where((w) => w.isNotEmpty).map((w) => w[0]).take(2).join('').toUpperCase();
-    final cleanInitials = initials.isEmpty ? 'TC' : initials;
-
-    if (photoPath.isNotEmpty) {
-      final fullUrl = _resolveFileUrl(photoPath);
-      return ClipOval(
-        child: CachedNetworkImage(
-          imageUrl: fullUrl,
-          width: 96,
-          height: 96,
-          fit: BoxFit.cover,
-          placeholder: (_, __) => _avatarBigInitials(cleanInitials),
-          errorWidget: (_, __, ___) => _avatarBigInitials(cleanInitials),
-        ),
-      );
-    }
-    return _avatarBigInitials(cleanInitials);
-  }
-
-  Widget _avatarBigInitials(String initials) {
-    return Container(
-      width: 96,
-      height: 96,
-      decoration: BoxDecoration(
-        color: const Color(0xFFE0F2FE),
-        shape: BoxShape.circle,
-        border: Border.all(color: const Color(0xFFBAE6FD), width: 1.5),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        initials,
-        style: const TextStyle(
-          fontSize: 34,
-          fontWeight: FontWeight.w900,
-          color: Color(0xFF0369A1),
-        ),
-      ),
+    return ProfileAvatarView(
+      photoUrl: photoPath,
+      baseUrl: widget.teacherService.baseUrl,
+      name: name,
+      size: 96,
+      entityType: 'teacher',
+      fallbackColor: const Color(0xFF0F766E),
+      heroTag: 'teacher_detail_avatar_${widget.teacherId}_$photoPath',
     );
   }
 

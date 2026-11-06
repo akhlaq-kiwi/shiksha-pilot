@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:school_hub/services/staff_salary_service.dart';
 import 'package:school_hub/screens/teacher_salary_profile_screen.dart';
+import 'package:school_hub/widgets/profile_avatar_view.dart';
 
 
 class TeacherSalaryDisbursementScreen extends StatefulWidget {
@@ -654,8 +655,6 @@ class _TeacherSalaryDisbursementScreenState extends State<TeacherSalaryDisbursem
     final isProrated = teacher['proration_details'] != null;
     final photo = teacher['photo_path']?.toString() ?? '';
 
-    final initials = name.split(' ').where((s) => s.isNotEmpty).map((s) => s[0]).take(2).join('').toUpperCase();
-
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -678,39 +677,15 @@ class _TeacherSalaryDisbursementScreenState extends State<TeacherSalaryDisbursem
           Row(
             children: [
               // Avatar
-              Container(
-                width: 44,
-                height: 44,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF1F5F9),
-                  shape: BoxShape.circle,
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: photo.isNotEmpty
-                    ? Image.network(
-                        photo.startsWith('http') ? photo : '${widget.baseUrl}$photo',
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Center(
-                          child: Text(
-                            initials.isNotEmpty ? initials : '??',
-                            style: const TextStyle(
-                              color: Color(0xFF475569),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                      )
-                    : Center(
-                        child: Text(
-                          initials.isNotEmpty ? initials : '??',
-                          style: const TextStyle(
-                            color: Color(0xFF475569),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
+              ProfileAvatarView(
+                photoUrl: photo,
+                baseUrl: widget.baseUrl,
+                name: name,
+                size: 44,
+                entityType: 'teacher',
+                singleInitial: false,
+                fallbackColor: const Color(0xFF475569),
+                heroTag: 'salary_disburse_staff_${staffId}_$photo',
               ),
               const SizedBox(width: 12),
 

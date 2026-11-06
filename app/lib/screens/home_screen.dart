@@ -262,7 +262,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       isAvailable: true,
     ),
     LauncherFeature(
-      name: 'Teachers',
+      name: 'Faculty',
       icon: Icons.badge_rounded,
       color: const Color(0xFF0D9488),
       allowedRoles: ['TEACHER', 'PRINCIPAL', 'FEE_COLLECTOR'],
@@ -1110,7 +1110,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         'Fee Reminder',
         'TAR',
         'TSD',
-        'Teachers',
+        'Faculty',
         'Classes',
         'Timetable',
         'Examinations',
@@ -1133,7 +1133,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         return schoolAdminFeatures;
       }
       final query = _searchQuery.toLowerCase().trim();
-      return schoolAdminFeatures.where((f) => f.name.toLowerCase().contains(query)).toList();
+      return schoolAdminFeatures.where((f) {
+        if (f.name.toLowerCase().contains(query)) return true;
+        if (f.name == 'Faculty' && (query.contains('teach') || 'teachers'.contains(query) || 'teacher'.contains(query))) return true;
+        return false;
+      }).toList();
     }
     
     // Filter and order for Teachers & Staff
@@ -1157,7 +1161,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         'Class Assignment',
         'Outstanding',
         'Classes',
-        'Teachers',
+        'Faculty',
         'Paper Designer',
         'Achievements',
         'Settings',
@@ -1186,7 +1190,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           if (!(_isFeeCollector == true)) continue;
         } else if (f.name == 'Class Assignment' || f.name == 'Class assignment' || f.name == 'Class Teacher') {
           if (!(_isPrincipal == true || role == 'PRINCIPAL')) continue;
-        } else if (f.name == 'Teachers') {
+        } else if (f.name == 'Faculty' || f.name == 'Teachers') {
           if (!(_isPrincipal == true || role == 'PRINCIPAL' || _isFeeCollector == true)) continue;
         } else if (f.name == 'Classes') {
           if (!(_isPrincipal == true || role == 'PRINCIPAL' || _isFeeCollector == true)) continue;
@@ -1201,7 +1205,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         return teacherFeatures;
       }
       final query = _searchQuery.toLowerCase().trim();
-      return teacherFeatures.where((f) => f.name.toLowerCase().contains(query)).toList();
+      return teacherFeatures.where((f) {
+        if (f.name.toLowerCase().contains(query)) return true;
+        if (f.name == 'Faculty' && (query.contains('teach') || 'teachers'.contains(query) || 'teacher'.contains(query))) return true;
+        return false;
+      }).toList();
     }
 
     // Role-scoped for Parents / Students
@@ -1215,7 +1223,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
     
     final query = _searchQuery.toLowerCase().trim();
-    return roleScoped.where((f) => f.name.toLowerCase().contains(query)).toList();
+    return roleScoped.where((f) {
+      if (f.name.toLowerCase().contains(query)) return true;
+      if (f.name == 'Faculty' && (query.contains('teach') || 'teachers'.contains(query) || 'teacher'.contains(query))) return true;
+      return false;
+    }).toList();
   }
 
   Future<void> _handleSwitchStudent(int childId) async {
@@ -1686,7 +1698,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
         );
-      } else if (feature.name == 'Teachers') {
+      } else if (feature.name == 'Faculty' || feature.name == 'Teachers') {
         final prefs = await SharedPreferences.getInstance();
         final token = prefs.getString('auth_token') ?? widget.leaveService.token;
         String effectiveBase = widget.leaveService.baseUrl;
