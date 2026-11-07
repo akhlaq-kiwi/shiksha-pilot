@@ -19492,6 +19492,8 @@ Only approve the settlement after reviewing all financial records.
                     $query .= " AND (event_key = 'EXPENSE_APPROVAL_REQUEST' OR link LIKE '%expense%' OR title LIKE '%Expense%' OR title LIKE '%expense%')";
                 } elseif ($module === 'financial_report' || $module === 'financial-report' || $module === 'financial-reports' || $module === 'revenue') {
                     $query .= " AND (event_key = 'FINANCIAL_REPORT_APPROVAL_REQUEST' OR link LIKE '%financial-report%' OR link LIKE '%revenue%' OR title LIKE '%Financial Report%' OR title LIKE '%Settlement%')";
+                } elseif ($module === 'leave' || $module === 'leaves' || $module === 'leave_request' || $module === 'leave-request') {
+                    $query .= " AND (event_key LIKE '%LEAVE%' OR category = 'LEAVE' OR category = 'LEAVE_MANAGEMENT' OR link LIKE '%leave%' OR title LIKE '%Leave%')";
                 } elseif (!empty($eventKey)) {
                     $query .= " AND event_key = :ekey";
                     $params[':ekey'] = $eventKey;

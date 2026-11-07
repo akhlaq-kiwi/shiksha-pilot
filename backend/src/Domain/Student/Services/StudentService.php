@@ -2763,6 +2763,8 @@ class StudentService extends BaseService
                     $query .= " AND (event_key = 'SALARY_DISBURSED' OR link LIKE '%salary%' OR title LIKE '%Salary%' OR category = 'Finance' OR category = 'SALARY')";
                 } elseif ($module === 'exams' || $module === 'exam') {
                     $query .= " AND (event_key LIKE '%EXAM%' OR category = 'EXAM' OR link LIKE '%exam%' OR title LIKE '%exam%' OR title LIKE '%examination%' OR title LIKE '%admit card%' OR title LIKE '%report card%' OR title LIKE '%scheme%' OR title LIKE '%datesheet%')";
+                } elseif ($module === 'leave' || $module === 'leaves' || $module === 'leave_request' || $module === 'leave-request') {
+                    $query .= " AND (event_key LIKE '%LEAVE%' OR category = 'LEAVE' OR category = 'LEAVE_MANAGEMENT' OR link LIKE '%leave%' OR title LIKE '%Leave%')";
                 } elseif (!empty($eventKey)) {
                     $query .= " AND event_key = :ekey";
                     $params[':ekey'] = $eventKey;

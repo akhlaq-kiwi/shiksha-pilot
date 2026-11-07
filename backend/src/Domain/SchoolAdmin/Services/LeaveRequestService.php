@@ -197,17 +197,70 @@ class LeaveRequestService extends BaseService
             'created_by' => (int)$user['id']
         ]);
 
-        // 6. Notify School Admins
+        // 6. Notify School Admins and Principals
         $applicantName = $role === 'TEACHER' ? $teacher['name'] : ($this->getStudentName($pdo, $studentId) ?? 'Student');
+        $notifTitle = 'New Leave Request';
+        $notifMsg = "Leave request submitted by $applicantName ($applicantRole)";
+        $notifLink = '/school-admin/leave-requests';
+        $eventKey = 'LEAVE_REQUEST_SUBMITTED';
+
         $this->createNotification(
             $pdo,
             $schoolId,
             'SCHOOL_ADMIN',
-            'New Leave Request',
-            "Leave request submitted by $applicantName ($applicantRole)",
-            '/school-admin/leave-requests',
-            'LEAVE_REQUEST_SUBMITTED'
+            $notifTitle,
+            $notifMsg,
+            $notifLink,
+            $eventKey
         );
+
+        // Also notify all Principals (role='PRINCIPAL' or staff with is_principal=1)
+        try {
+            $stmtPrincipals = $pdo->prepare("
+                SELECT DISTINCT u.id, u.role
+                FROM users u
+                LEFT JOIN staff st ON (u.phone = st.phone AND u.school_id = st.school_id)
+                WHERE u.school_id = :sid
+                  AND (
+                      UPPER(COALESCE(u.role, '')) IN ('PRINCIPAL', 'SCHOOL_ADMIN')
+                      OR st.is_principal = 1
+                      OR UPPER(COALESCE(st.role, '')) = 'PRINCIPAL'
+                  )
+            ");
+            $stmtPrincipals->execute([':sid' => $schoolId]);
+            $principals = $stmtPrincipals->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+            $notifiedUserIds = [];
+            foreach ($principals as $pr) {
+                $pUid = (int)$pr['id'];
+                if (isset($notifiedUserIds[$pUid])) {
+                    continue;
+                }
+                $notifiedUserIds[$pUid] = true;
+                $pRole = strtoupper($pr['role'] ?? 'TEACHER');
+
+                $stmtNotif = $pdo->prepare("
+                    INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, category, event_key, is_read)
+                    VALUES (:school_id, :user_role, :user_id, :title, :message, :link, 'LEAVE', :event_key, 0)
+                ");
+                $stmtNotif->execute([
+                    ':school_id' => $schoolId,
+                    ':user_role' => $pRole,
+                    ':user_id' => $pUid,
+                    ':title' => $notifTitle,
+                    ':message' => $notifMsg,
+                    ':link' => $notifLink,
+                    ':event_key' => $eventKey,
+                ]);
+
+                PushDispatcher::pushOnly($pdo, $schoolId, $pRole, $pUid, $eventKey, $notifTitle, $notifMsg, $notifLink);
+            }
+
+            // Also broadcast to PRINCIPAL role topic
+            PushDispatcher::pushOnly($pdo, $schoolId, 'PRINCIPAL', null, $eventKey, $notifTitle, $notifMsg, $notifLink);
+        } catch (\Throwable $e) {
+            error_log('[leave] Failed to notify principals: ' . $e->getMessage());
+        }
 
         $this->log('Leave request applied', ['id' => $id, 'role' => $applicantRole, 'school_id' => $schoolId]);
 

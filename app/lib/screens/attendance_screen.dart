@@ -607,7 +607,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.light(
-              primary: Colors.indigo,
+              primary: Color(0xFFD97706),
               onPrimary: Colors.white,
               onSurface: Colors.black87,
             ),
@@ -1497,7 +1497,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               child: ElevatedButton(
                 onPressed: _isTeacherSubmitting ? null : _submitAttendance,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.indigo,
+                  backgroundColor: const Color(0xFFD97706),
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   elevation: 0,

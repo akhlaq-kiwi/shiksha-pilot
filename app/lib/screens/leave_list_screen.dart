@@ -1,9 +1,12 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/leave_request.dart';
 import '../services/leave_service.dart';
 import '../main.dart';
 import 'apply_leave_bottom_sheet.dart';
+import '../widgets/profile_avatar_view.dart';
 
 class LeaveListScreen extends StatefulWidget {
   final LeaveService leaveService;
@@ -43,7 +46,7 @@ class _LeaveListScreenState extends State<LeaveListScreen> with SingleTickerProv
 
   // Principal Filters
   String _statusFilter = 'ALL'; // 'ALL', 'PENDING', 'APPROVED', 'REJECTED'
-  String _roleFilter = 'TEACHER'; // 'TEACHER', 'STUDENT', 'ALL' - Teacher selected by default
+  String _roleFilter = 'ALL'; // 'ALL', 'TEACHER', 'STUDENT' - 'All' selected by default
 
   String _formatDate(String dateStr) {
     try {
@@ -69,7 +72,7 @@ class _LeaveListScreenState extends State<LeaveListScreen> with SingleTickerProv
       if (days == 1) {
         return '1 Day leave';
       } else {
-        return '$days Days leaves';
+        return '$days Days leave';
       }
     } catch (_) {
       return '1 Day leave';
@@ -88,10 +91,49 @@ class _LeaveListScreenState extends State<LeaveListScreen> with SingleTickerProv
       if (mounted) {
         setState(() {});
       }
+      if (_tabController.index == 1) {
+        _markLeaveNotificationsAsRead();
+      }
     });
     final roleUpper = widget.userRole.toUpperCase();
     _isPrincipal = widget.isPrincipal ?? (roleUpper == 'PRINCIPAL');
     _initPrincipalAndLoad();
+    _markLeaveNotificationsAsRead();
+  }
+
+  Future<void> _markLeaveNotificationsAsRead() async {
+    try {
+      final baseUrl = widget.leaveService.baseUrl;
+      final token = widget.leaveService.token;
+      if (token.isEmpty) return;
+
+      final roleUpper = widget.userRole.toUpperCase();
+      final bool isSchoolStaff = (roleUpper == 'TEACHER' ||
+          roleUpper == 'PRINCIPAL' ||
+          roleUpper == 'SCHOOL_ADMIN' ||
+          roleUpper == 'SUPER_ADMIN');
+      final String path = isSchoolStaff
+          ? ((roleUpper == 'SCHOOL_ADMIN' || roleUpper == 'SUPER_ADMIN')
+              ? '/api/school/notifications/0/read'
+              : '/api/teacher/notifications/0/read')
+          : '/api/student/notifications/0/read';
+
+      final uri = Uri.parse('$baseUrl$path');
+      final headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+        if (!isSchoolStaff && widget.selectedStudentId != null)
+          'X-Student-Id': widget.selectedStudentId.toString(),
+      };
+
+      await http.post(
+        uri,
+        headers: headers,
+        body: json.encode({'module': 'leaves'}),
+      );
+    } catch (e) {
+      debugPrint('Error marking leave notifications as read: $e');
+    }
   }
 
   Future<void> _initPrincipalAndLoad() async {
@@ -122,6 +164,13 @@ class _LeaveListScreenState extends State<LeaveListScreen> with SingleTickerProv
         viewType: viewType,
         studentId: _isPrincipal ? null : widget.selectedStudentId,
       );
+      data.sort((a, b) {
+        final aPending = a.status.toUpperCase() == 'PENDING';
+        final bPending = b.status.toUpperCase() == 'PENDING';
+        if (aPending && !bPending) return -1;
+        if (!aPending && bPending) return 1;
+        return b.id.compareTo(a.id);
+      });
       if (mounted) {
         setState(() {
           _leaves = data;
@@ -258,24 +307,109 @@ class _LeaveListScreenState extends State<LeaveListScreen> with SingleTickerProv
     }
   }
 
+  Color _getStatusBgColor(String status) {
+    switch (status.toUpperCase()) {
+      case 'APPROVED':
+        return const Color(0xFFECFDF5);
+      case 'REJECTED':
+        return const Color(0xFFFEF2F2);
+      case 'PENDING':
+      default:
+        return const Color(0xFFFFFBEB);
+    }
+  }
+
+  Color _getStatusBorderColor(String status) {
+    switch (status.toUpperCase()) {
+      case 'APPROVED':
+        return const Color(0xFFA7F3D0);
+      case 'REJECTED':
+        return const Color(0xFFFECACA);
+      case 'PENDING':
+      default:
+        return const Color(0xFFFDE68A);
+    }
+  }
+
+  IconData _getStatusIcon(String status) {
+    switch (status.toUpperCase()) {
+      case 'APPROVED':
+        return Icons.check_circle_rounded;
+      case 'REJECTED':
+        return Icons.cancel_rounded;
+      case 'PENDING':
+      default:
+        return Icons.access_time_rounded;
+    }
+  }
+
   Future<void> _confirmCancelLeave(LeaveRequest request) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Cancel Leave Request'),
-        content: Text('Are you sure you want to cancel this leave request for ${request.leaveType}?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('NO'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+        titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(9),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFECACA)),
+              ),
+              child: const Icon(Icons.cancel_outlined, color: Color(0xFFDC2626), size: 22),
             ),
-            child: const Text('YES, CANCEL'),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Cancel Leave Request',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to cancel this leave request for ${request.leaveType}?',
+          style: const TextStyle(fontSize: 13.5, color: Color(0xFF334155), fontWeight: FontWeight.w500),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        actions: [
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFFCBD5E1)),
+                    padding: const EdgeInsets.symmetric(vertical: 11),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: const Text('No', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold, fontSize: 13)),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFDC2626),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 11),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: const Text('Yes, Cancel', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -308,22 +442,31 @@ class _LeaveListScreenState extends State<LeaveListScreen> with SingleTickerProv
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+        titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
         title: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(9),
               decoration: BoxDecoration(
                 color: const Color(0xFFECFDF5),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFA7F3D0)),
               ),
-              child: const Icon(Icons.check_circle_rounded, color: Color(0xFF059669), size: 24),
+              child: const Icon(Icons.check_circle_rounded, color: Color(0xFF059669), size: 22),
             ),
             const SizedBox(width: 12),
             const Expanded(
               child: Text(
                 'Approve Leave',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18,
+                  color: Color(0xFF0F172A),
+                ),
               ),
             ),
           ],
@@ -334,64 +477,85 @@ class _LeaveListScreenState extends State<LeaveListScreen> with SingleTickerProv
           children: [
             Text(
               'Are you sure you want to approve leave for $applicantName?',
-              style: const TextStyle(fontSize: 14, color: Color(0xFF334155)),
+              style: const TextStyle(fontSize: 13.5, color: Color(0xFF334155), fontWeight: FontWeight.w500),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
+                color: const Color(0xFFFFFBEB).withOpacity(0.5),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFDE68A)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.event_note_rounded, size: 14, color: Color(0xFF64748B)),
-                      const SizedBox(width: 6),
+                      const Icon(Icons.event_note_rounded, size: 15, color: Color(0xFFD97706)),
+                      const SizedBox(width: 7),
                       Text(
                         leave.leaveType,
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                        style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '•  ${_formatLeaveDays(leave.fromDate, leave.toDate)}',
+                        style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFFB45309)),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   Row(
                     children: [
-                      const Icon(Icons.calendar_today_rounded, size: 14, color: Color(0xFF64748B)),
-                      const SizedBox(width: 6),
+                      const Icon(Icons.calendar_month_rounded, size: 15, color: Color(0xFFD97706)),
+                      const SizedBox(width: 7),
                       Text(
                         '${_formatDate(leave.fromDate)} to ${_formatDate(leave.toDate)}',
-                        style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                        style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
                       ),
                     ],
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             const Text(
               'Attendance for these dates will automatically be updated to "Leave".',
               style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontStyle: FontStyle.italic),
             ),
           ],
         ),
+        actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('CANCEL', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF059669),
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            child: const Text('APPROVE', style: TextStyle(fontWeight: FontWeight.bold)),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFFCBD5E1)),
+                    padding: const EdgeInsets.symmetric(vertical: 11),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold, fontSize: 13)),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF059669),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 11),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: const Text('Approve', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -436,22 +600,31 @@ class _LeaveListScreenState extends State<LeaveListScreen> with SingleTickerProv
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              backgroundColor: Colors.white,
+              surfaceTintColor: Colors.transparent,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              contentPadding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+              titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
               title: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(9),
                     decoration: BoxDecoration(
                       color: const Color(0xFFFEF2F2),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFFECACA)),
                     ),
-                    child: const Icon(Icons.cancel_outlined, color: Color(0xFFDC2626), size: 24),
+                    child: const Icon(Icons.cancel_outlined, color: Color(0xFFDC2626), size: 22),
                   ),
                   const SizedBox(width: 12),
                   const Expanded(
                     child: Text(
                       'Reject Leave Request',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 18,
+                        color: Color(0xFF0F172A),
+                      ),
                     ),
                   ),
                 ],
@@ -462,27 +635,28 @@ class _LeaveListScreenState extends State<LeaveListScreen> with SingleTickerProv
                 children: [
                   Text(
                     'Please specify the reason for rejecting leave for $applicantName:',
-                    style: const TextStyle(fontSize: 13, color: Color(0xFF334155)),
+                    style: const TextStyle(fontSize: 13.5, color: Color(0xFF334155), fontWeight: FontWeight.w500),
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: reasonController,
                     maxLines: 3,
+                    style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
                     decoration: InputDecoration(
                       hintText: 'Enter rejection reason (required)...',
                       hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                       errorText: errorText,
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(10),
                         borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
                       ),
                       enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(10),
                         borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
                       ),
                       focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Color(0xFFDC2626)),
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: Color(0xFFDC2626), width: 1.5),
                       ),
                       filled: true,
                       fillColor: const Color(0xFFF8FAFC),
@@ -490,29 +664,45 @@ class _LeaveListScreenState extends State<LeaveListScreen> with SingleTickerProv
                   ),
                 ],
               ),
+              actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
               actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('CANCEL', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    final reason = reasonController.text.trim();
-                    if (reason.isEmpty) {
-                      setDialogState(() {
-                        errorText = 'Rejection reason is required.';
-                      });
-                      return;
-                    }
-                    Navigator.pop(context, true);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFDC2626),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  child: const Text('REJECT', style: TextStyle(fontWeight: FontWeight.bold)),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFFCBD5E1)),
+                          padding: const EdgeInsets.symmetric(vertical: 11),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold, fontSize: 13)),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          final reason = reasonController.text.trim();
+                          if (reason.isEmpty) {
+                            setDialogState(() {
+                              errorText = 'Rejection reason is required.';
+                            });
+                            return;
+                          }
+                          Navigator.pop(context, true);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFDC2626),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 11),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        child: const Text('Reject', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             );
@@ -921,7 +1111,7 @@ class _LeaveListScreenState extends State<LeaveListScreen> with SingleTickerProv
     );
   }
 
-    void _showLeaveDetails(LeaveRequest leave) {
+  void _showLeaveDetails(LeaveRequest leave) {
     final bool isStudent = leave.applicantRole.toUpperCase() == 'STUDENT';
     final bool isTeacher = leave.applicantRole.toUpperCase() == 'TEACHER';
     final bool isRejected = leave.status.toUpperCase() == 'REJECTED';
@@ -933,188 +1123,301 @@ class _LeaveListScreenState extends State<LeaveListScreen> with SingleTickerProv
 
     final String boxLabel = isRejected ? 'ADMIN REMARKS / REJECTION REASON' : 'REASON';
     final String boxText = isRejected ? (leave.rejectReason ?? '') : leave.reason;
-    final Color boxBgColor = isRejected ? Colors.red.shade50 : const Color(0xFFF8FAFC);
-    final Color boxBorderColor = isRejected ? Colors.red.shade100 : const Color(0xFFE2E8F0);
-    final Color boxTextColor = isRejected ? Colors.red.shade900 : const Color(0xFF0F172A);
+    final Color boxBgColor = isRejected ? const Color(0xFFFEF2F2) : const Color(0xFFF8FAFC);
+    final Color boxBorderColor = isRejected ? const Color(0xFFFECACA) : const Color(0xFFE2E8F0);
+    final Color boxTextColor = isRejected ? const Color(0xFF991B1B) : const Color(0xFF0F172A);
 
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          contentPadding: const EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 12),
-          title: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Request Details',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: _getStatusColor(leave.status).withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                    color: _getStatusColor(leave.status).withOpacity(0.4),
-                  ),
-                ),
-                child: Text(
-                  leave.status,
-                  style: TextStyle(
-                    color: _getStatusColor(leave.status),
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (modalCtx) {
+        final keyboardPadding = MediaQuery.of(modalCtx).viewInsets.bottom;
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
-          content: SizedBox(
-            width: 320,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildPopupDetailRow('Applicant', applicantName),
-                  const SizedBox(height: 12),
-                  if (isStudent && leave.classLabel != null) ...[
-                    _buildPopupDetailRow('Class', leave.classLabel!),
-                    const SizedBox(height: 12),
-                  ],
-                  _buildPopupDetailRow('Period', _formatLeaveDays(leave.fromDate, leave.toDate)),
-                  const SizedBox(height: 12),
-                  _buildPopupDetailRow('Leave Type', leave.leaveType),
-                  const SizedBox(height: 12),
-                  _buildPopupDetailRow(
-                    'Duration',
-                    '${_formatDate(leave.fromDate)} to ${_formatDate(leave.toDate)}',
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    boxLabel,
-                    style: const TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFF64748B),
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 12,
+            bottom: 24 + keyboardPadding,
+          ),
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(modalCtx).size.height * 0.88,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Grab Handle
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
                     decoration: BoxDecoration(
-                      color: boxBgColor,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: boxBorderColor),
+                      color: const Color(0xFFCBD5E1),
+                      borderRadius: BorderRadius.circular(2),
                     ),
-                    child: Text(
-                      boxText,
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // Header Row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Leave Request Details',
                       style: TextStyle(
-                        fontSize: 13,
-                        color: boxTextColor,
-                        height: 1.4,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F172A),
                       ),
                     ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 22, color: Color(0xFF64748B)),
+                      onPressed: () => Navigator.pop(modalCtx),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Overview Card
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFDF8),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFFDE68A).withOpacity(0.6)),
                   ),
-                  if (leave.attachmentPath != null && leave.attachmentPath!.isNotEmpty) ...[
-                    const SizedBox(height: 14),
-                    InkWell(
-                      onTap: () {
-                        _showAttachmentPreview(leave.attachmentPath!);
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFEF3C7),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFF59E0B)),
-                        ),
-                        child: Row(
-                          children: const [
-                            Icon(Icons.attach_file_rounded, size: 16, color: Color(0xFF78350F)),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'View Attached Document/Image',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF78350F),
-                                ),
+                  child: Row(
+                    children: [
+                      ProfileAvatarView(
+                        photoUrl: leave.photoPath ?? '',
+                        baseUrl: widget.leaveService.baseUrl,
+                        name: applicantName,
+                        size: 52,
+                        entityType: isTeacher ? 'teacher' : 'student',
+                        enableZoom: true,
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              applicantName,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF0F172A),
                               ),
                             ),
-                            Icon(Icons.chevron_right_rounded, size: 18, color: Color(0xFF78350F)),
+                            const SizedBox(height: 4),
+                            if (isTeacher && leave.formattedEmpId != null && leave.formattedEmpId!.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                'EMP ID: ${leave.formattedEmpId}',
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                              ),
+                            ] else if (isStudent && leave.classLabel != null) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                '${leave.classLabel!}${leave.rollNo != null && leave.rollNo!.trim().isNotEmpty ? ' • Roll No: ${leave.rollNo}' : ''}',
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                              ),
+                            ],
                           ],
                         ),
                       ),
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _getStatusBgColor(leave.status),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: _getStatusBorderColor(leave.status)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(_getStatusIcon(leave.status), size: 12, color: _getStatusColor(leave.status)),
+                            const SizedBox(width: 4),
+                            Text(
+                              leave.status.toUpperCase(),
+                              style: TextStyle(
+                                color: _getStatusColor(leave.status),
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Details Grid / Info Rows
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
                     children: [
-                      if (_isPrincipal && isPending) ...[
-                        OutlinedButton(
+                      _buildPopupDetailRow('Leave Type', leave.leaveType),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: Divider(height: 1, color: Color(0xFFE2E8F0)),
+                      ),
+                      _buildPopupDetailRow('Leave Duration', _formatLeaveDays(leave.fromDate, leave.toDate)),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: Divider(height: 1, color: Color(0xFFE2E8F0)),
+                      ),
+                      _buildPopupDetailRow(
+                        'Period',
+                        '${_formatDate(leave.fromDate)} to ${_formatDate(leave.toDate)}',
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Reason section
+                Text(
+                  boxLabel,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF64748B),
+                    letterSpacing: 0.8,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: boxBgColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: boxBorderColor),
+                  ),
+                  child: Text(
+                    boxText.isNotEmpty ? boxText : 'No reason specified',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: boxTextColor,
+                      height: 1.45,
+                    ),
+                  ),
+                ),
+
+                // Attachment preview if present
+                if (leave.attachmentPath != null && leave.attachmentPath!.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  InkWell(
+                    onTap: () {
+                      _showAttachmentPreview(leave.attachmentPath!);
+                    },
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFFBEB),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFFDE68A)),
+                      ),
+                      child: Row(
+                        children: const [
+                          Icon(Icons.attach_file_rounded, size: 18, color: Color(0xFFD97706)),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'View Attached Document / Image',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF92400E),
+                              ),
+                            ),
+                          ),
+                          Icon(Icons.chevron_right_rounded, size: 20, color: Color(0xFFD97706)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 20),
+
+                // Action Buttons
+                if (_isPrincipal && isPending) ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
                           onPressed: () {
-                            Navigator.pop(context);
+                            Navigator.pop(modalCtx);
                             _handleReject(leave);
                           },
+                          icon: const Icon(Icons.close_rounded, size: 16),
+                          label: const Text('Reject', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                           style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Color(0xFFDC2626)),
                             foregroundColor: const Color(0xFFDC2626),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            side: const BorderSide(color: Color(0xFFFECACA)),
+                            backgroundColor: const Color(0xFFFEF2F2),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
-                          child: const Text('Reject', style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
-                        const SizedBox(width: 8),
-                        ElevatedButton(
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
                           onPressed: () {
-                            Navigator.pop(context);
+                            Navigator.pop(modalCtx);
                             _handleApprove(leave);
                           },
+                          icon: const Icon(Icons.check_rounded, size: 16),
+                          label: const Text('Approve', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF059669),
                             foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          ),
-                          child: const Text('Approve', style: TextStyle(fontWeight: FontWeight.bold)),
-                        ),
-                      ] else if (!_isPrincipal && isPending) ...[
-                        TextButton(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            _confirmCancelLeave(leave);
-                          },
-                          child: const Text('Cancel Request', style: TextStyle(color: Colors.red)),
-                        ),
-                        const SizedBox(width: 8),
-                        ElevatedButton(
-                          onPressed: () => Navigator.pop(context),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFD97706),
-                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
-                          child: const Text('Close', style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
-                      ] else ...[
-                        ElevatedButton(
-                          onPressed: () => Navigator.pop(context),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0F172A),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          ),
-                          child: const Text('Close'),
-                        ),
-                      ],
+                      ),
                     ],
                   ),
+                ] else if (!_isPrincipal && isPending) ...[
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: () {
+                        Navigator.pop(modalCtx);
+                        _confirmCancelLeave(leave);
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFDC2626),
+                        side: const BorderSide(color: Color(0xFFFECACA)),
+                        backgroundColor: const Color(0xFFFEF2F2),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      child: const Text('Cancel Leave Request', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ),
                 ],
-              ),
+              ],
             ),
           ),
         );
@@ -1189,26 +1492,26 @@ class _LeaveListScreenState extends State<LeaveListScreen> with SingleTickerProv
   }
 
   Widget _buildPopupDetailRow(String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
-          label.toUpperCase(),
+          label,
           style: const TextStyle(
-            fontSize: 9,
-            fontWeight: FontWeight.w900,
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
             color: Color(0xFF64748B),
-            letterSpacing: 0.8,
           ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF0F172A),
-            height: 1.3,
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF0F172A),
+            ),
           ),
         ),
       ],
@@ -1597,253 +1900,172 @@ class _LeaveListScreenState extends State<LeaveListScreen> with SingleTickerProv
             final leave = leavesToDisplay[index];
             final bool isStudent = leave.applicantRole.toUpperCase() == 'STUDENT';
             final bool isTeacher = leave.applicantRole.toUpperCase() == 'TEACHER';
-            final bool isPending = leave.status.toUpperCase() == 'PENDING';
-            final bool isRejected = leave.status.toUpperCase() == 'REJECTED';
 
             final String applicantName = isTeacher
                 ? (leave.teacherName ?? 'Teacher')
                 : (leave.studentName ?? (isStudent ? 'Student' : 'Staff'));
 
             return Container(
-              margin: const EdgeInsets.only(bottom: 14),
+              margin: const EdgeInsets.only(bottom: 12),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: const Color(0xFFE2E8F0)),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.02),
                     blurRadius: 8,
-                    offset: const Offset(0, 3),
+                    offset: const Offset(0, 2),
                   ),
                 ],
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(16),
                 child: InkWell(
                   onTap: () => _showLeaveDetails(leave),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      border: Border(
-                        left: BorderSide(
-                          color: _getStatusColor(leave.status),
-                          width: 5,
-                        ),
-                      ),
-                    ),
+                  child: Padding(
                     padding: const EdgeInsets.all(14),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Top row: Role / Class badge + Status badge
+                        // Top row: Avatar + Name & Class & Days count + Status badge
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            if (_isPrincipal)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: isStudent
-                                      ? const Color(0xFFEFF6FF)
-                                      : const Color(0xFFF5F3FF),
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(
-                                    color: isStudent
-                                        ? const Color(0xFFBFDBFE)
-                                        : const Color(0xFFDDD6FE),
-                                  ),
-                                ),
-                                child: Text(
-                                  _formatLeaveDays(leave.fromDate, leave.toDate),
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: isStudent
-                                        ? const Color(0xFF1D4ED8)
-                                        : const Color(0xFF6D28D9),
-                                  ),
-                                ),
-                              )
-                            else
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[100],
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  leave.leaveType,
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: _getStatusColor(leave.status).withOpacity(0.12),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(
-                                  color: _getStatusColor(leave.status).withOpacity(0.35),
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
+                            ProfileAvatarView(
+                              photoUrl: leave.photoPath ?? '',
+                              baseUrl: widget.leaveService.baseUrl,
+                              name: applicantName,
+                              size: 46,
+                              entityType: isTeacher ? 'teacher' : 'student',
+                              enableZoom: true,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  if (isPending)
-                                    const Icon(Icons.access_time_rounded, size: 11, color: Color(0xFFD97706))
-                                  else if (leave.status.toUpperCase() == 'APPROVED')
-                                    const Icon(Icons.check_circle_rounded, size: 11, color: Color(0xFF059669))
-                                  else if (isRejected)
-                                    const Icon(Icons.cancel_rounded, size: 11, color: Color(0xFFDC2626)),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    leave.status,
-                                    style: TextStyle(
-                                      color: _getStatusColor(leave.status),
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          applicantName,
+                                          style: const TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w800,
+                                            color: Color(0xFF0F172A),
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: _getStatusBgColor(leave.status),
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(color: _getStatusBorderColor(leave.status)),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(_getStatusIcon(leave.status), size: 11, color: _getStatusColor(leave.status)),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              leave.status.toUpperCase(),
+                                              style: TextStyle(
+                                                color: _getStatusColor(leave.status),
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                   ),
+                                  if (isTeacher && leave.formattedEmpId != null && leave.formattedEmpId!.isNotEmpty) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'EMP ID: ${leave.formattedEmpId}',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF64748B),
+                                      ),
+                                    ),
+                                  ] else if (isStudent && leave.classLabel != null && leave.classLabel!.isNotEmpty) ...[
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          leave.classLabel!,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF64748B),
+                                          ),
+                                        ),
+                                        if (leave.rollNo != null && leave.rollNo!.trim().isNotEmpty) ...[
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            '•  Roll No: ${leave.rollNo}',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                              color: Color(0xFF64748B),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
                           ],
                         ),
+                        const SizedBox(height: 12),
+                        const Divider(height: 1, color: Color(0xFFF1F5F9)),
                         const SizedBox(height: 10),
-
-                        // Applicant Name & Leave Type
-                        if (_isPrincipal) ...[
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  applicantName,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 15,
-                                    color: Color(0xFF0F172A),
-                                  ),
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF1F5F9),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  leave.leaveType,
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFF475569),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                        ] else if (leave.studentName != null) ...[
-                          Text(
-                            'Student: ${leave.studentName}',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                              color: Color(0xFF0F172A),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                        ],
-
-                        // Date range
+                        // Bottom row: Leave Type + Details button
                         Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Icon(Icons.calendar_today_outlined, size: 13, color: Color(0xFF64748B)),
-                            const SizedBox(width: 6),
-                            Text(
-                              '${_formatDate(leave.fromDate)} to ${_formatDate(leave.toDate)}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 12,
-                                color: Color(0xFF334155),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-
-                        // Reason
-                        Text(
-                          leave.reason,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 12, height: 1.4, color: Color(0xFF64748B)),
-                        ),
-
-                        // Rejection Reason Banner if rejected
-                        if (isRejected && leave.rejectReason != null && leave.rejectReason!.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFEF2F2),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: const Color(0xFFFECACA)),
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            Row(
                               children: [
-                                const Icon(Icons.info_outline, size: 13, color: Color(0xFFDC2626)),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: Text(
-                                    'Reason: ${leave.rejectReason}',
-                                    style: const TextStyle(fontSize: 11, color: Color(0xFF991B1B), fontWeight: FontWeight.w600),
+                                const Icon(Icons.event_note_rounded, size: 14, color: Color(0xFF64748B)),
+                                const SizedBox(width: 5),
+                                Text(
+                                  _formatLeaveDays(leave.fromDate, leave.toDate),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF475569),
                                   ),
                                 ),
                               ],
                             ),
-                          ),
-                        ],
-
-                        // Principal Quick Approve / Reject action buttons for PENDING requests
-                        if (_isPrincipal && isPending) ...[
-                          const SizedBox(height: 12),
-                          const Divider(height: 1, color: Color(0xFFE2E8F0)),
-                          const SizedBox(height: 10),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              OutlinedButton.icon(
-                                onPressed: () => _handleReject(leave),
-                                icon: const Icon(Icons.close_rounded, size: 15),
-                                label: const Text('Reject', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: const Color(0xFFDC2626),
-                                  side: const BorderSide(color: Color(0xFFFECACA)),
-                                  backgroundColor: const Color(0xFFFEF2F2),
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                ),
+                            ElevatedButton(
+                              onPressed: () => _showLeaveDetails(leave),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFD97706),
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               ),
-                              const SizedBox(width: 10),
-                              ElevatedButton.icon(
-                                onPressed: () => _handleApprove(leave),
-                                icon: const Icon(Icons.check_rounded, size: 15),
-                                label: const Text('Approve', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF059669),
-                                  foregroundColor: Colors.white,
-                                  elevation: 0,
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                ),
+                              child: const Text(
+                                'Details',
+                                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
                               ),
-                            ],
-                          ),
-                        ],
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -1984,53 +2206,62 @@ class _LeaveListScreenState extends State<LeaveListScreen> with SingleTickerProv
         ],
       ),
       bottomNavigationBar: !_isPrincipal
-          ? Container(
-              color: Colors.white,
-              padding: EdgeInsets.fromLTRB(
-                16,
-                10,
-                16,
-                MediaQuery.of(context).padding.bottom > 0
-                    ? MediaQuery.of(context).padding.bottom + 6
-                    : 14,
-              ),
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFD97706).withOpacity(0.25),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
+          ? AnimatedBuilder(
+              animation: _tabController.animation ?? _tabController,
+              builder: (context, child) {
+                final animValue = _tabController.animation?.value ?? _tabController.index.toDouble();
+                if (animValue <= 0.5) {
+                  return const SizedBox.shrink();
+                }
+                return Container(
+                  color: Colors.white,
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    10,
+                    16,
+                    MediaQuery.of(context).padding.bottom > 0
+                        ? MediaQuery.of(context).padding.bottom + 6
+                        : 14,
+                  ),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFD97706).withOpacity(0.25),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton.icon(
-                    onPressed: _showApplyLeaveBottomSheet,
-                    icon: const Icon(Icons.add_rounded, size: 20, color: Colors.white),
-                    label: const Text(
-                      'Apply for Leave',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.3,
-                        color: Colors.white,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD97706),
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton.icon(
+                        onPressed: _showApplyLeaveBottomSheet,
+                        icon: const Icon(Icons.add_rounded, size: 20, color: Colors.white),
+                        label: const Text(
+                          'Apply for Leave',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.3,
+                            color: Colors.white,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFD97706),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ),
+                );
+              },
             )
           : null,
     );

@@ -2433,6 +2433,27 @@ class TeacherService extends BaseService
         $role = strtoupper($user['role'] ?? 'TEACHER');
         $pdo = $this->teacherRepo->getPdo();
 
+        $isPrincipal = ($role === 'PRINCIPAL');
+
+        if ($isPrincipal) {
+            $stmt = $pdo->prepare("
+                SELECT * FROM dashboard_notifications
+                WHERE school_id = :school_id 
+                  AND (user_id = :user_id OR (user_id IS NULL AND (user_role = 'PRINCIPAL' OR user_role = 'TEACHER' OR user_role = 'SCHOOL_ADMIN')))
+                  AND (link != '/notice' OR link IS NULL)
+                  AND (event_key != 'ANNOUNCEMENT_PUBLISHED' OR event_key IS NULL)
+                  AND (category != 'ANNOUNCEMENT' OR category IS NULL)
+                ORDER BY id DESC
+                LIMIT :limit OFFSET :offset
+            ");
+            $stmt->bindValue(':school_id', $schoolId, PDO::PARAM_INT);
+            $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
+            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        }
+
         $stmt = $pdo->prepare("
             SELECT * FROM dashboard_notifications
             WHERE school_id = :school_id 
@@ -2460,17 +2481,24 @@ class TeacherService extends BaseService
         $pdo = $this->teacherRepo->getPdo();
 
         if ($id > 0) {
+            $roleCond = ($role === 'PRINCIPAL')
+                ? "(user_id = :user_id OR (user_id IS NULL AND (user_role = 'PRINCIPAL' OR user_role = 'TEACHER' OR user_role = 'SCHOOL_ADMIN')))"
+                : "(user_id = :user_id OR (user_role = :role AND user_id IS NULL))";
+
             $stmt = $pdo->prepare("
                 UPDATE dashboard_notifications
                 SET is_read = 1
-                WHERE id = :id AND school_id = :school_id AND (user_id = :user_id OR (user_role = :role AND user_id IS NULL))
+                WHERE id = :id AND school_id = :school_id AND $roleCond
             ");
-            $stmt->execute([
+            $params = [
                 ':id' => $id,
                 ':school_id' => $schoolId,
                 ':user_id' => $userId,
-                ':role' => $role
-            ]);
+            ];
+            if ($role !== 'PRINCIPAL') {
+                $params[':role'] = $role;
+            }
+            $stmt->execute($params);
         } else {
             $module = strtolower($body['module'] ?? '');
             $eventKey = $body['event_key'] ?? '';
@@ -2482,7 +2510,7 @@ class TeacherService extends BaseService
                 $params = [':sid' => $schoolId, ':uid' => $userId];
 
                 if ($role === 'PRINCIPAL') {
-                    $query .= " AND (user_id = :uid OR (user_id IS NULL AND (user_role = 'TEACHER' OR user_role = 'PRINCIPAL')))";
+                    $query .= " AND (user_id = :uid OR (user_id IS NULL AND (user_role = 'TEACHER' OR user_role = 'PRINCIPAL' OR user_role = 'SCHOOL_ADMIN')))";
                 } else {
                     $query .= " AND (user_id = :uid OR (user_id IS NULL AND user_role = :role))";
                     $params[':role'] = $role;
@@ -2496,6 +2524,8 @@ class TeacherService extends BaseService
                     $query .= " AND (event_key LIKE '%FEE_REMINDER%' OR event_key LIKE '%FEE_FOLLOWUP%' OR link LIKE '%fee-reminder%' OR link LIKE '%fee-follow-up%' OR title LIKE '%Fee Reminder%' OR title LIKE '%Fee Follow-up%')";
                 } elseif ($module === 'exams' || $module === 'exam') {
                     $query .= " AND (event_key LIKE '%EXAM%' OR category = 'EXAM' OR link LIKE '%exam%' OR title LIKE '%exam%' OR title LIKE '%examination%' OR title LIKE '%admit card%' OR title LIKE '%report card%' OR title LIKE '%scheme%' OR title LIKE '%datesheet%')";
+                } elseif ($module === 'leave' || $module === 'leaves' || $module === 'leave_request' || $module === 'leave-request') {
+                    $query .= " AND (event_key LIKE '%LEAVE%' OR category = 'LEAVE' OR category = 'LEAVE_MANAGEMENT' OR link LIKE '%leave%' OR title LIKE '%Leave%')";
                 } elseif (!empty($eventKey)) {
                     $query .= " AND event_key = :ekey";
                     $params[':ekey'] = $eventKey;
@@ -2522,16 +2552,23 @@ class TeacherService extends BaseService
         $role = strtoupper($user['role'] ?? 'TEACHER');
         $pdo = $this->teacherRepo->getPdo();
 
+        $roleCond = ($role === 'PRINCIPAL')
+            ? "(user_id = :user_id OR (user_id IS NULL AND (user_role = 'PRINCIPAL' OR user_role = 'TEACHER' OR user_role = 'SCHOOL_ADMIN')))"
+            : "(user_id = :user_id OR (user_role = :role AND user_id IS NULL))";
+
         $stmt = $pdo->prepare("
             DELETE FROM dashboard_notifications
-            WHERE id = :id AND school_id = :school_id AND (user_id = :user_id OR (user_role = :role AND user_id IS NULL))
+            WHERE id = :id AND school_id = :school_id AND $roleCond
         ");
-        $stmt->execute([
+        $params = [
             ':id' => $id,
             ':school_id' => $schoolId,
             ':user_id' => $userId,
-            ':role' => $role
-        ]);
+        ];
+        if ($role !== 'PRINCIPAL') {
+            $params[':role'] = $role;
+        }
+        $stmt->execute($params);
         return ['status' => 'success'];
     }
 }

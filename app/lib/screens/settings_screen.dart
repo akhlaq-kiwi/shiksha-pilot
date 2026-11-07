@@ -10,6 +10,8 @@ import '../main.dart';
 import '../widgets/change_password_dialog.dart';
 import 'full_screen_image_screen.dart';
 import 'academic_year_migration_screen.dart';
+import 'penalty_screen.dart';
+import 'restrictions_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -134,6 +136,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool get _canSwitchAcademicYear {
     final role = widget.userRole.toUpperCase();
     return _isFeeCollector || role == 'SCHOOL_ADMIN' || role == 'SUPER_ADMIN' || role == 'PRINCIPAL';
+  }
+
+  bool get _canManagePenaltyAndPermission {
+    final role = widget.userRole.toUpperCase();
+    if (role == 'SCHOOL_ADMIN' || role == 'SUPER_ADMIN') {
+      return true;
+    }
+    return _isFeeCollector;
   }
 
   bool get _isPrincipalUser => _isPrincipal;
@@ -2323,6 +2333,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     subtitle: 'Application version info',
                     onTap: _showAboutDialog,
                   ),
+
+                  if (_canManagePenaltyAndPermission) ...[
+                    Divider(height: 1, thickness: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9), indent: 64, endIndent: 16),
+                    _buildSettingsTile(
+                      icon: Icons.timer_outlined,
+                      iconColor: const Color(0xFFD97706),
+                      iconBgColor: const Color(0xFFFEF3C7),
+                      title: 'Penalty',
+                      subtitle: 'Late fee penalty configuration',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => PenaltyScreen(
+                              leaveService: widget.leaveService,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    Divider(height: 1, thickness: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9), indent: 64, endIndent: 16),
+                    _buildSettingsTile(
+                      icon: Icons.shield_outlined,
+                      iconColor: const Color(0xFF4F46E5),
+                      iconBgColor: const Color(0xFFE0E7FF),
+                      title: 'Restrictions',
+                      subtitle: 'Student document access restrictions',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => RestrictionsScreen(
+                              leaveService: widget.leaveService,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
 
                   Divider(height: 1, thickness: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9), indent: 64, endIndent: 16),
 

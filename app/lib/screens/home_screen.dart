@@ -122,6 +122,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _unreadSalaryCount = 0;
   int _unreadExamsCount = 0;
   int _unreadFeeReminderCount = 0;
+  int _unreadLeaveCount = 0;
   DateTime? _lastBackPressTime;
   
   final TextEditingController _searchController = TextEditingController();
@@ -650,6 +651,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               titleStr.contains('due today');
         }
 
+        bool isLeaveNotif(dynamic n) {
+          final linkStr = (n['link'] ?? '').toString().toLowerCase();
+          final catStr = (n['category'] ?? '').toString().toUpperCase();
+          final evtStr = (n['event_key'] ?? '').toString().toUpperCase();
+          final titleStr = (n['title'] ?? '').toString().toLowerCase();
+          return linkStr.contains('leave') ||
+              catStr == 'LEAVE' ||
+              catStr == 'LEAVE_MANAGEMENT' ||
+              evtStr.contains('LEAVE') ||
+              titleStr.contains('leave');
+        }
+
         int count = data.where((n) {
           if (!isUnread(n)) return false;
           if (isNoticeNotif(n)) return false;
@@ -660,6 +673,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         int salaryCount = data.where((n) => isUnread(n) && isSalaryNotif(n)).length;
         int examsCount = data.where((n) => isUnread(n) && isExamsNotif(n)).length;
         int feeReminderCount = data.where((n) => isUnread(n) && isFeeReminderNotif(n)).length;
+        int leaveCount = data.where((n) => isUnread(n) && isLeaveNotif(n)).length;
 
         if (mounted) {
           setState(() {
@@ -668,6 +682,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             _unreadSalaryCount = salaryCount;
             _unreadExamsCount = examsCount;
             _unreadFeeReminderCount = feeReminderCount;
+            _unreadLeaveCount = leaveCount;
           });
         }
 
@@ -832,6 +847,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               final isLeaveApprovalOrReqNotif = titleLower.contains('approve') || titleLower.contains('reject') || msgLower.contains('approve') || msgLower.contains('reject') || titleLower.contains('request') || msgLower.contains('request');
               final isHolidayNotif = titleLower.contains('holiday') || msgLower.contains('holiday');
               if (titleLower.contains('leave') || msgLower.contains('leave') || isHolidayNotif) {
+                if (mounted) {
+                  setState(() {
+                    _unreadLeaveCount = 0;
+                  });
+                }
+                _markFeatureNotificationsRead('leaves');
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -843,7 +864,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       isPrincipal: _isPrincipal,
                     ),
                   ),
-                ).then((_) => _loadSessionInfo());
+                ).then((_) {
+                  _loadSessionInfo();
+                  if (mounted) {
+                    _fetchUnreadNotificationsCount();
+                  }
+                });
               } else if (titleLower.contains('timetable') || msgLower.contains('timetable')) {
                 setState(() {
                   _unreadTimetableCount = 0;
@@ -1359,6 +1385,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void _onFeatureTap(LauncherFeature feature) async {
     if (feature.isAvailable) {
       if (feature.name == 'Leaves') {
+        if (mounted) {
+          setState(() {
+            _unreadLeaveCount = 0;
+          });
+        }
+        _markFeatureNotificationsRead('leaves');
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -1370,7 +1402,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               isPrincipal: _isPrincipal,
             ),
           ),
-        ).then((_) => _loadSessionInfo()); // reload details in case anything changed
+        ).then((_) {
+          _loadSessionInfo();
+          if (mounted) {
+            _fetchUnreadNotificationsCount();
+          }
+        });
       } else if (feature.name == 'Settings') {
         Navigator.push(
           context,
@@ -2054,27 +2091,33 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           final feature = filteredFeatures[index];
                           final bool isNotice = feature.name == 'Notice' || feature.name == 'Notice Board' || feature.name == 'Notices';
                           final bool isNotification = feature.name == 'Notifications' || feature.name == 'Messages';
+                          final bool isLeaves = feature.name == 'Leaves' || feature.name == 'Leave';
                           final bool isTimetable = feature.name == 'Timetable' || feature.name == 'Time Table';
                           final bool isSalary = feature.name == 'Salary' || feature.name == 'Staff Salary' || feature.name == 'Salaries';
                           final bool isExams = feature.name == 'Examinations' || feature.name == 'Exams' || feature.name == 'Exam';
                           final bool isExpense = feature.name == 'Expense' || feature.name == 'Expenses';
                           final bool isFinancialReport = feature.name == 'Financial Report' || feature.name == 'Financial report' || feature.name == 'Revenue';
                           final bool isFeeReminder = feature.name == 'Fee Reminder';
-                          final int badgeCount = isNotice 
-                              ? _unreadNoticeCount 
-                              : (isNotification 
-                                  ? _unreadNotificationCount 
-                                  : (isTimetable 
-                                      ? _unreadTimetableCount 
-                                      : (isSalary 
-                                          ? _unreadSalaryCount 
-                                          : (isExams 
-                                              ? _unreadExamsCount 
-                                              : (isExpense 
-                                                  ? _unreadExpenseCount 
-                                                  : (isFinancialReport 
-                                                      ? _unreadFinancialReportCount 
-                                                      : (isFeeReminder ? _unreadFeeReminderCount : 0)))))));
+                          int badgeCount = 0;
+                          if (isNotice) {
+                            badgeCount = _unreadNoticeCount;
+                          } else if (isNotification) {
+                            badgeCount = _unreadNotificationCount;
+                          } else if (isLeaves) {
+                            badgeCount = _unreadLeaveCount;
+                          } else if (isTimetable) {
+                            badgeCount = _unreadTimetableCount;
+                          } else if (isSalary) {
+                            badgeCount = _unreadSalaryCount;
+                          } else if (isExams) {
+                            badgeCount = _unreadExamsCount;
+                          } else if (isExpense) {
+                            badgeCount = _unreadExpenseCount;
+                          } else if (isFinancialReport) {
+                            badgeCount = _unreadFinancialReportCount;
+                          } else if (isFeeReminder) {
+                            badgeCount = _unreadFeeReminderCount;
+                          }
 
                           return GestureDetector(
                             onTap: () => _onFeatureTap(feature),

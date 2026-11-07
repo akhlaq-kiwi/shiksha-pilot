@@ -16,6 +16,9 @@ class LeaveRequest {
   final String? teacherName;
   final String? teacherDepartment;
   final String? classLabel;
+  final String? rollNo;
+  final String? teacherEmployeeId;
+  final String? photoPath;
 
   LeaveRequest({
     required this.id,
@@ -35,6 +38,9 @@ class LeaveRequest {
     this.teacherName,
     this.teacherDepartment,
     this.classLabel,
+    this.rollNo,
+    this.teacherEmployeeId,
+    this.photoPath,
   });
 
   factory LeaveRequest.fromJson(Map<String, dynamic> json) {
@@ -55,8 +61,29 @@ class LeaveRequest {
       studentName: json['student_name'],
       teacherName: json['teacher_name'],
       teacherDepartment: json['teacher_department'],
-      classLabel: json['class_name'] != null ? "${json['class_name']}-${json['class_section'] ?? ''}" : null,
+      classLabel: json['class_name'] != null
+          ? ((json['class_section'] != null && json['class_section'].toString().trim().isNotEmpty)
+              ? "${json['class_name']} - ${json['class_section']}"
+              : "${json['class_name']}")
+          : null,
+      rollNo: json['student_roll_no'] != null ? json['student_roll_no'].toString() : (json['roll_no'] != null ? json['roll_no'].toString() : null),
+      teacherEmployeeId: json['teacher_employee_id'] != null 
+          ? json['teacher_employee_id'].toString() 
+          : (json['employee_id'] != null ? json['employee_id'].toString() : null),
+      photoPath: json['photo_path'] ?? json['photo'] ?? json['student_photo'] ?? json['staff_photo_path'],
     );
+  }
+
+  String? get formattedEmpId {
+    if (teacherEmployeeId != null && teacherEmployeeId!.trim().isNotEmpty) {
+      final raw = teacherEmployeeId!.trim();
+      final stripped = raw.replaceAll(RegExp(r'^EMP[-:\s]*', caseSensitive: false), '');
+      return stripped.isNotEmpty ? stripped : raw;
+    }
+    if (teacherId != null) {
+      return teacherId.toString();
+    }
+    return null;
   }
 
   Map<String, dynamic> toJson() {

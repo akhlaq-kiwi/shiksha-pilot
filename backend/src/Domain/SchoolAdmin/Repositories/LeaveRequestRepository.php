@@ -49,10 +49,13 @@ class LeaveRequestRepository extends BaseRepository
         $sql = "
             SELECT lr.*,
                    s.name AS student_name,
+                   s.roll_no AS student_roll_no,
                    c.name AS class_name,
                    c.section AS class_section,
                    st.name AS teacher_name,
                    st.department AS teacher_department,
+                   COALESCE(NULLIF(st.employee_id, ''), CONCAT('EMP-', st.id)) AS teacher_employee_id,
+                   COALESCE(st.photo_path, s.photo_path, '') AS photo_path,
                    u_creator.name AS creator_name,
                    u_approver.name AS approver_name,
                    u_rejecter.name AS rejecter_name
@@ -64,7 +67,7 @@ class LeaveRequestRepository extends BaseRepository
             LEFT JOIN users u_approver ON lr.approved_by = u_approver.id
             LEFT JOIN users u_rejecter ON lr.rejected_by = u_rejecter.id
             WHERE {$where}
-            ORDER BY lr.id DESC
+            ORDER BY CASE WHEN UPPER(lr.status) = 'PENDING' THEN 0 ELSE 1 END ASC, lr.id DESC
         ";
 
         $stmt = $this->pdo->prepare($sql);
@@ -78,10 +81,13 @@ class LeaveRequestRepository extends BaseRepository
         $sql = "
             SELECT lr.*,
                    s.name AS student_name,
+                   s.roll_no AS student_roll_no,
                    c.name AS class_name,
                    c.section AS class_section,
                    st.name AS teacher_name,
                    st.department AS teacher_department,
+                   COALESCE(NULLIF(st.employee_id, ''), CONCAT('EMP-', st.id)) AS teacher_employee_id,
+                   COALESCE(st.photo_path, s.photo_path, '') AS photo_path,
                    u_creator.name AS creator_name,
                    u_approver.name AS approver_name,
                    u_rejecter.name AS rejecter_name

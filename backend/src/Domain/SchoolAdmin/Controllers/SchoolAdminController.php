@@ -209,7 +209,7 @@ class SchoolAdminController extends BaseController
         if ($role === 'SCHOOL_ADMIN' || $role === 'SUPER_ADMIN' || $this->service->isFeeCollector($user)) {
             return;
         }
-        throw new \App\Shared\Exceptions\ForbiddenException('Access Denied. Only Fee Collector can access Fee Follow-up.');
+        throw new \App\Shared\Exceptions\ForbiddenException('Access Denied. Only Fee Collector can access this feature.');
     }
 
     public function getStaff(Request $request, Response $response): Response
@@ -2628,7 +2628,7 @@ class SchoolAdminController extends BaseController
     public function getLatePaymentPenaltyStats(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN', 'SUPER_ADMIN']);
+        $this->requireFeeCollectorAccess($user);
         $data = $this->service->getLatePaymentPenaltyStats($user);
         return $this->success($response, $data);
     }
@@ -2636,7 +2636,7 @@ class SchoolAdminController extends BaseController
     public function getLatePaymentPenaltyConfig(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN', 'SUPER_ADMIN']);
+        $this->requireFeeCollectorAccess($user);
         $data = $this->service->getLatePaymentPenaltyConfig($user);
         return $this->success($response, $data);
     }
@@ -2644,7 +2644,7 @@ class SchoolAdminController extends BaseController
     public function saveLatePaymentPenaltyConfig(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN', 'SUPER_ADMIN']);
+        $this->requireFeeCollectorAccess($user);
         $body = RequestParser::body($request);
         $data = $this->service->saveLatePaymentPenaltyConfig($user, $body);
         return $this->success($response, $data, 'Late payment penalty configuration saved successfully.');
@@ -2653,7 +2653,7 @@ class SchoolAdminController extends BaseController
     public function deleteLatePaymentPenaltyConfig(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN', 'SUPER_ADMIN']);
+        $this->requireFeeCollectorAccess($user);
         $data = $this->service->deleteLatePaymentPenaltyConfig($user);
         return $this->success($response, $data, 'Late payment penalty configuration removed successfully.');
     }
@@ -2661,7 +2661,7 @@ class SchoolAdminController extends BaseController
     public function checkLatePaymentPenaltyConfig(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN', 'PRINCIPAL', 'SUPER_ADMIN']);
+        $this->requireFeeCollectorAccess($user);
         $data = $this->service->checkLatePaymentPenaltyConfig($user);
         return $this->success($response, $data);
     }
@@ -2669,7 +2669,7 @@ class SchoolAdminController extends BaseController
     public function getFinanceSettings(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN', 'SUPER_ADMIN']);
+        $this->requireFeeCollectorAccess($user);
         $data = $this->service->getFinanceSettings($user);
         return $this->success($response, $data);
     }
@@ -2677,7 +2677,7 @@ class SchoolAdminController extends BaseController
     public function saveFinanceSettings(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN', 'SUPER_ADMIN']);
+        $this->requireFeeCollectorAccess($user);
         $body = RequestParser::body($request);
         $data = $this->service->saveFinanceSettings($user, $body);
         return $this->success($response, $data, 'School finance settings saved successfully.');
@@ -2686,7 +2686,7 @@ class SchoolAdminController extends BaseController
     public function getLatePaymentPenaltyHistory(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN', 'SUPER_ADMIN']);
+        $this->requireFeeCollectorAccess($user);
         $filters = $request->getQueryParams();
         $data = $this->service->getLatePaymentPenaltyHistory($user, $filters);
         return $this->success($response, $data);
