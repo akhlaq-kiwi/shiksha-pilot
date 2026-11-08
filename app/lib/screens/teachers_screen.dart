@@ -158,24 +158,25 @@ class _TeachersScreenState extends State<TeachersScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final filtered = _filteredTeachers;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'TEACHERS',
           style: TextStyle(
             fontWeight: FontWeight.w800,
             fontSize: 18,
             letterSpacing: 0.5,
-            color: Color(0xFF0F172A),
+            color: isDark ? Colors.white : const Color(0xFF0F172A),
           ),
         ),
         centerTitle: false,
-        backgroundColor: Colors.white,
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
         elevation: 0.5,
-        iconTheme: const IconThemeData(color: Color(0xFF0F172A)),
+        iconTheme: IconThemeData(color: isDark ? Colors.white : const Color(0xFF0F172A)),
         actions: [
           IconButton(
             tooltip: 'Add Teacher',
@@ -203,11 +204,14 @@ class _TeachersScreenState extends State<TeachersScreen> {
                 ],
               ),
             )
-          : Column(
-              children: [
-                // Top Search Header (Fixed at top, does not scroll)
+          : GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: () => FocusScope.of(context).unfocus(),
+              child: Column(
+                children: [
+                  // Top Search Header (Fixed at top, does not scroll)
                 Container(
-                  color: const Color(0xFFF8FAFC),
+                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -272,12 +276,12 @@ class _TeachersScreenState extends State<TeachersScreen> {
                       // Search Bar Only
                       Container(
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: isDark ? const Color(0xFF1E293B) : Colors.white,
                           borderRadius: BorderRadius.circular(30),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.02),
+                              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
                               blurRadius: 4,
                               offset: const Offset(0, 2),
                             ),
@@ -285,6 +289,8 @@ class _TeachersScreenState extends State<TeachersScreen> {
                         ),
                         child: TextField(
                           controller: _searchController,
+                          style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13),
+                          onTapOutside: (_) => FocusScope.of(context).unfocus(),
                           onChanged: (val) {
                             setState(() {
                               _searchQuery = val;
@@ -378,6 +384,7 @@ class _TeachersScreenState extends State<TeachersScreen> {
                     color: const Color(0xFFD97706),
                     child: filtered.isEmpty
                         ? ListView(
+                            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                             physics: const AlwaysScrollableScrollPhysics(),
                             children: [
                               Container(
@@ -425,6 +432,7 @@ class _TeachersScreenState extends State<TeachersScreen> {
                             ],
                           )
                         : GridView.builder(
+                            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                             physics: const AlwaysScrollableScrollPhysics(),
                             padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -442,6 +450,7 @@ class _TeachersScreenState extends State<TeachersScreen> {
                 ),
               ],
             ),
+          ),
     );
   }
 
@@ -467,8 +476,10 @@ class _TeachersScreenState extends State<TeachersScreen> {
     final bool isInactive = status == 'INACTIVE';
     final bool isOccupied = assigned >= maxPeriods;
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Material(
-      color: Colors.white,
+      color: isDark ? const Color(0xFF1E293B) : Colors.white,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         onTap: () => _openTeacherDetails(t),
@@ -476,10 +487,10 @@ class _TeachersScreenState extends State<TeachersScreen> {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.02),
+                color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
                 blurRadius: 4,
                 offset: const Offset(0, 2),
               ),
@@ -614,10 +625,10 @@ class _TeachersScreenState extends State<TeachersScreen> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
-                  color: Color(0xFF0F172A),
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
                 ),
               ),
               const SizedBox(height: 2),
@@ -2173,6 +2184,7 @@ class _AddEditTeacherModalState extends State<_AddEditTeacherModal> {
                   const SizedBox(height: 8),
                   TextField(
                     autofocus: true,
+                    onTapOutside: (_) => FocusScope.of(context).unfocus(),
                     decoration: InputDecoration(
                       hintText: 'Search...',
                       prefixIcon: const Icon(Icons.search, size: 20, color: Color(0xFF64748B)),
@@ -3702,6 +3714,8 @@ class _TeacherRoleAssignmentModalState extends State<_TeacherRoleAssignmentModal
   String _error = '';
   String _maskedEmail = '';
   final TextEditingController _otpCtrl = TextEditingController();
+  Timer? _resendTimer;
+  int _resendCooldown = 0;
 
   bool get _isPrincipal => widget.role.toLowerCase().contains('principal');
   Color get _primaryColor => _isPrincipal ? const Color(0xFFD97706) : const Color(0xFF059669);
@@ -3713,8 +3727,26 @@ class _TeacherRoleAssignmentModalState extends State<_TeacherRoleAssignmentModal
 
   @override
   void dispose() {
+    _resendTimer?.cancel();
     _otpCtrl.dispose();
     super.dispose();
+  }
+
+  void _startResendTimer() {
+    _resendTimer?.cancel();
+    setState(() => _resendCooldown = 30);
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_resendCooldown <= 1) {
+        timer.cancel();
+        setState(() => _resendCooldown = 0);
+      } else {
+        setState(() => _resendCooldown--);
+      }
+    });
   }
 
   Future<void> _handleSendOtp() async {
@@ -3733,6 +3765,7 @@ class _TeacherRoleAssignmentModalState extends State<_TeacherRoleAssignmentModal
           _step = 'otp';
           _isLoading = false;
         });
+        _startResendTimer();
       }
     } catch (e) {
       if (mounted) {
@@ -4039,11 +4072,19 @@ class _TeacherRoleAssignmentModalState extends State<_TeacherRoleAssignmentModal
             Align(
               alignment: Alignment.centerLeft,
               child: TextButton.icon(
-                onPressed: _isLoading ? null : _handleSendOtp,
+                onPressed: (_isLoading || _resendCooldown > 0) ? null : _handleSendOtp,
                 icon: const Icon(Icons.refresh_rounded, size: 14),
-                label: const Text('Resend OTP', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                label: Text(
+                  _resendCooldown > 0 ? 'Resend in ${_resendCooldown}s' : 'Resend OTP',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: _resendCooldown > 0 ? const Color(0xFF94A3B8) : _primaryColor,
+                  ),
+                ),
                 style: TextButton.styleFrom(
                   foregroundColor: _primaryColor,
+                  disabledForegroundColor: const Color(0xFF94A3B8),
                   padding: EdgeInsets.zero,
                   visualDensity: VisualDensity.compact,
                 ),

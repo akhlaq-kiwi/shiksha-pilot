@@ -9,6 +9,7 @@ import 'exam_list_screen.dart';
 import 'exam_detail_screen.dart';
 import '../services/exam_service.dart';
 import 'fees_card_screen.dart';
+import 'fees_portal_screen.dart';
 import 'salary_card_screen.dart';
 import 'homework_list_screen.dart';
 import 'achievements_screen.dart';
@@ -111,6 +112,9 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
           if (linkStr == '/notice' || linkStr.contains('notice') || catStr == 'ANNOUNCEMENT' || evtStr == 'ANNOUNCEMENT_PUBLISHED') {
             return false;
           }
+          if (role == 'SCHOOL_ADMIN' && (catStr == 'LEAVE' || evtStr.contains('LEAVE') || linkStr.contains('leave'))) {
+            return false;
+          }
           return true;
         }).toList();
 
@@ -172,6 +176,9 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
           final catStr = (n['category'] ?? '').toString().toUpperCase();
           final evtStr = (n['event_key'] ?? '').toString().toUpperCase();
           if (linkStr == '/notice' || linkStr.contains('notice') || catStr == 'ANNOUNCEMENT' || evtStr == 'ANNOUNCEMENT_PUBLISHED') {
+            return false;
+          }
+          if (role == 'SCHOOL_ADMIN' && (catStr == 'LEAVE' || evtStr.contains('LEAVE') || linkStr.contains('leave'))) {
             return false;
           }
           return true;
@@ -311,6 +318,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final Widget bodyContent = _isLoading
         ? const Center(child: CircularProgressIndicator(color: Colors.indigo))
         : _errorText.isNotEmpty
@@ -416,7 +424,9 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                           margin: const EdgeInsets.only(bottom: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           elevation: 1,
-                          color: isUnread ? Colors.indigo.shade50.withOpacity(0.4) : Colors.white,
+                          color: isUnread
+                              ? (isDark ? const Color(0xFF1E3A8A).withOpacity(0.3) : Colors.indigo.shade50.withOpacity(0.4))
+                              : (isDark ? const Color(0xFF1E293B) : Colors.white),
                           child: InkWell(
                             borderRadius: BorderRadius.circular(12),
                             onTap: () async {
@@ -712,6 +722,34 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                 return;
                               }
 
+                              if (linkStr.contains('fees-portal') ||
+                                  (notif['event_key'] ?? '').toString() == 'DISCOUNT_REQUEST_APPROVED' ||
+                                  (notif['event_key'] ?? '').toString() == 'DISCOUNT_REQUEST_REJECTED' ||
+                                  titleLower.contains('discount request') ||
+                                  msgLower.contains('discount request')) {
+                                int? targetStudentId;
+                                try {
+                                  final cleanLink = linkStr.startsWith('http') ? linkStr : 'http://localhost$linkStr';
+                                  final uri = Uri.parse(cleanLink);
+                                  final idStr = uri.queryParameters['student_id'] ?? uri.queryParameters['studentId'];
+                                  if (idStr != null) targetStudentId = int.tryParse(idStr);
+                                } catch (_) {}
+                                if (targetStudentId == null && notif['student_id'] != null) {
+                                  targetStudentId = int.tryParse(notif['student_id'].toString());
+                                }
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => FeesPortalScreen(
+                                      baseUrl: widget.baseUrl,
+                                      token: widget.token,
+                                      initialStudentId: targetStudentId,
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+
                               if (linkStr.contains('fees') || titleLower.contains('fee') || msgLower.contains('fee')) {
                                 Navigator.push(
                                   context,
@@ -874,7 +912,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                                 style: TextStyle(
                                                   fontSize: 15,
                                                   fontWeight: isUnread ? FontWeight.w800 : FontWeight.bold,
-                                                  color: Colors.black87,
+                                                  color: isDark ? Colors.white : Colors.black87,
                                                 ),
                                               ),
                                             ),
@@ -894,7 +932,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                           notif['message'] ?? '',
                                           style: TextStyle(
                                             fontSize: 13.5,
-                                            color: Colors.grey.shade700,
+                                            color: isDark ? const Color(0xFFCBD5E1) : Colors.grey.shade700,
                                             height: 1.3,
                                           ),
                                         ),
@@ -925,15 +963,15 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Notifications',
-          style: TextStyle(fontWeight: FontWeight.w900, color: Colors.black87),
+          style: TextStyle(fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87),
         ),
-        backgroundColor: Colors.white,
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black87),
+        iconTheme: IconThemeData(color: isDark ? Colors.white : Colors.black87),
       ),
       body: bodyContent,
     );

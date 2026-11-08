@@ -22,6 +22,7 @@ return function (App $app) {
     $app->post('/api/auth/identify', [AuthController::class, 'identify']);
     $app->post('/api/auth/login', [AuthController::class, 'login']);
     $app->post('/api/auth/change-password', [AuthController::class, 'changePassword']);
+    $app->post('/api/auth/verify-password', [AuthController::class, 'verifyPassword']);
     $app->get('/api/auth/profile', [AuthController::class, 'getProfile']);
     
     // Platform / Super Admin Domain
@@ -106,6 +107,14 @@ return function (App $app) {
     $app->post('/api/school/expenses/settings', [SchoolAdminController::class, 'updateExpenseSettings']);
     $app->post('/api/school/expenses/{id}/approve', [SchoolAdminController::class, 'approveSchoolExpense']);
     $app->post('/api/school/expenses/{id}/reject', [SchoolAdminController::class, 'rejectSchoolExpense']);
+    // Manage Discount / Discount Approval
+    $app->get('/api/school/discount/settings', [SchoolAdminController::class, 'getDiscountSettings']);
+    $app->post('/api/school/discount/settings', [SchoolAdminController::class, 'updateDiscountSettings']);
+    $app->get('/api/school/discount-requests', [SchoolAdminController::class, 'getDiscountRequests']);
+    $app->post('/api/school/discount-requests', [SchoolAdminController::class, 'createDiscountRequest']);
+    $app->post('/api/school/discount-requests/{id}/approve', [SchoolAdminController::class, 'approveDiscountRequest']);
+    $app->post('/api/school/discount-requests/{id}/reject', [SchoolAdminController::class, 'rejectDiscountRequest']);
+    $app->post('/api/school/discount-requests/{id}/cancel', [SchoolAdminController::class, 'cancelDiscountRequest']);
     $app->get('/api/school/expenses', [SchoolAdminController::class, 'getSchoolExpenses']);
     $app->post('/api/school/expenses', [SchoolAdminController::class, 'createSchoolExpense']);
     $app->put('/api/school/expenses/{id}', [SchoolAdminController::class, 'updateSchoolExpense']);

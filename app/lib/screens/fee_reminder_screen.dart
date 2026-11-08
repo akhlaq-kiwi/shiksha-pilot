@@ -354,6 +354,7 @@ class _FeeReminderScreenState extends State<FeeReminderScreen> {
                           border: Border.all(color: const Color(0xFFCBD5E1)),
                         ),
                         child: TextField(
+                          onTapOutside: (_) => FocusScope.of(context).unfocus(),
                           onChanged: (val) => setModalState(() => studentSearchVal = val),
                           textAlignVertical: TextAlignVertical.center,
                           style: const TextStyle(fontSize: 13, color: _textPrimary, fontWeight: FontWeight.w500),
@@ -532,6 +533,7 @@ class _FeeReminderScreenState extends State<FeeReminderScreen> {
                       ),
                       child: TextField(
                         controller: amountController,
+                        onTapOutside: (_) => FocusScope.of(context).unfocus(),
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                         decoration: const InputDecoration(
@@ -642,6 +644,7 @@ class _FeeReminderScreenState extends State<FeeReminderScreen> {
                       ),
                       child: TextField(
                         controller: reasonController,
+                        onTapOutside: (_) => FocusScope.of(context).unfocus(),
                         maxLines: 3,
                         maxLength: 500,
                         onChanged: (_) => setModalState(() {}),
@@ -1001,6 +1004,7 @@ class _FeeReminderScreenState extends State<FeeReminderScreen> {
                       ),
                       child: TextField(
                         controller: reasonController,
+                        onTapOutside: (_) => FocusScope.of(context).unfocus(),
                         maxLines: 3,
                         maxLength: 500,
                         onChanged: (_) => setModalState(() {}),

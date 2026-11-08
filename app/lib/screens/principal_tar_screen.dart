@@ -287,11 +287,15 @@ class _PrincipalTarScreenState extends State<PrincipalTarScreen> with SingleTick
       }
     }
 
-    return RefreshIndicator(
-      color: const Color(0xFF0F766E),
-      onRefresh: _fetchDailyAttendance,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: RefreshIndicator(
+        color: const Color(0xFF0F766E),
+        onRefresh: _fetchDailyAttendance,
+        child: ListView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
         children: [
           // Date navigation selector bar
           _buildDateSelectorBar(),
@@ -352,7 +356,8 @@ class _PrincipalTarScreenState extends State<PrincipalTarScreen> with SingleTick
             ...records.map((r) => _buildTeacherDailyCard(r)),
         ],
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildDateSelectorBar() {
@@ -784,11 +789,15 @@ class _PrincipalTarScreenState extends State<PrincipalTarScreen> with SingleTick
       orElse: () => {'name': 'Month'},
     );
 
-    return RefreshIndicator(
-      color: const Color(0xFF0F766E),
-      onRefresh: _fetchMonthlyReport,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 30),
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: RefreshIndicator(
+        color: const Color(0xFF0F766E),
+        onRefresh: _fetchMonthlyReport,
+        child: ListView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 30),
         children: [
           // Month & Year Selector Header Bar (matches Screenshot 2)
           Container(
@@ -908,6 +917,7 @@ class _PrincipalTarScreenState extends State<PrincipalTarScreen> with SingleTick
                 // Search field
                 TextField(
                   onChanged: (val) => setState(() => _reportSearchQuery = val),
+                  onTapOutside: (_) => FocusScope.of(context).unfocus(),
                   decoration: InputDecoration(
                     hintText: 'Search teacher or EMP ID...',
                     hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
@@ -923,6 +933,10 @@ class _PrincipalTarScreenState extends State<PrincipalTarScreen> with SingleTick
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
                       borderSide: BorderSide(color: Colors.grey.shade200),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: Color(0xFF0F766E), width: 1.2),
                     ),
                   ),
                 ),
@@ -942,14 +956,15 @@ class _PrincipalTarScreenState extends State<PrincipalTarScreen> with SingleTick
             ...filtered.map((r) => _buildMonthlyTeacherCard(r)),
         ],
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildMonthlyTeacherCard(dynamic r) {
     final staffId = r['staff_id'];
     final name = (r['name'] as String?) ?? 'Teacher';
     final empId = (r['emp_id'] as String?) ?? 'EMP-$staffId';
-    final totalWorkingDays = r['total_working_days'] ?? 0;
+    final photo = (r['photo_path'] as String?) ?? '';
     final present = r['present_days'] ?? 0;
     final absent = r['absent_days'] ?? 0;
     final leave = r['leave_days'] ?? 0;
@@ -978,51 +993,71 @@ class _PrincipalTarScreenState extends State<PrincipalTarScreen> with SingleTick
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Top line: EMP ID and Name
+              // Top line: Avatar & Teacher Name (Left) | EMP ID & Attendance % (Right)
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          empId,
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF475569),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        name,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF0F172A),
-                        ),
-                      ),
-                    ],
+                  ProfileAvatarView(
+                    photoUrl: photo,
+                    baseUrl: widget.leaveService.baseUrl,
+                    name: name,
+                    size: 40,
+                    entityType: 'teacher',
+                    singleInitial: true,
+                    fallbackColor: const Color(0xFF0F766E),
+                    heroTag: 'tar_staff_monthly_avatar_${staffId}_$photo',
                   ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      name,
+                      style: const TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F172A),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // EMP ID badge on right
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Text(
+                      empId,
+                      style: const TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF475569),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
                   // Attendance %
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                     decoration: BoxDecoration(
                       color: attPercentage >= 75
                           ? Colors.green.shade50
                           : (attPercentage >= 50 ? Colors.amber.shade50 : Colors.red.shade50),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: attPercentage >= 75
+                            ? Colors.green.shade200
+                            : (attPercentage >= 50 ? Colors.amber.shade200 : Colors.red.shade200),
+                        width: 0.8,
+                      ),
                     ),
                     child: Text(
                       '$attPercentage%',
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 11,
                         fontWeight: FontWeight.w900,
                         color: attPercentage >= 75
                             ? Colors.green.shade700
@@ -1035,7 +1070,7 @@ class _PrincipalTarScreenState extends State<PrincipalTarScreen> with SingleTick
               const SizedBox(height: 10),
 
               // Breakdown numbers matching table columns:
-              // TOTAL WORKING DAYS | PRESENT | ABSENT | LEAVE | LATE DAYS
+              // PRESENT | ABSENT | LEAVE | LATE DAYS (Working removed per request)
               Container(
                 padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
                 decoration: BoxDecoration(
@@ -1045,7 +1080,6 @@ class _PrincipalTarScreenState extends State<PrincipalTarScreen> with SingleTick
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _buildTableStat('Working', '$totalWorkingDays', Colors.blueGrey),
                     _buildTableStat('Present', '$present', const Color(0xFF16A34A)),
                     _buildTableStat('Absent', '$absent', const Color(0xFFDC2626)),
                     _buildTableStat('Leave', '$leave', const Color(0xFFD97706)),
@@ -1139,7 +1173,19 @@ class _PrincipalTarScreenState extends State<PrincipalTarScreen> with SingleTick
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
+                        ProfileAvatarView(
+                          photoUrl: (teacher['photo_path'] as String?) ?? '',
+                          baseUrl: widget.leaveService.baseUrl,
+                          name: name,
+                          size: 40,
+                          entityType: 'teacher',
+                          singleInitial: true,
+                          fallbackColor: const Color(0xFF0F766E),
+                          heroTag: 'tar_breakdown_avatar_${teacher['staff_id']}_${teacher['photo_path']}',
+                        ),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1147,15 +1193,17 @@ class _PrincipalTarScreenState extends State<PrincipalTarScreen> with SingleTick
                               Text(
                                 name,
                                 style: const TextStyle(
-                                  fontSize: 17,
+                                  fontSize: 16,
                                   fontWeight: FontWeight.w900,
                                   color: Color(0xFF0F172A),
                                 ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 2),
-                              Text(
-                                '$empId • Attendance Breakdown',
-                                style: const TextStyle(
+                              const Text(
+                                'Attendance Breakdown',
+                                style: TextStyle(
                                   fontSize: 12,
                                   color: Color(0xFF64748B),
                                   fontWeight: FontWeight.w600,
@@ -1164,9 +1212,22 @@ class _PrincipalTarScreenState extends State<PrincipalTarScreen> with SingleTick
                             ],
                           ),
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.close_rounded),
-                          onPressed: () => Navigator.pop(context),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Text(
+                            empId,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF475569),
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -1672,6 +1733,7 @@ class _PrincipalTarScreenState extends State<PrincipalTarScreen> with SingleTick
     }
 
     return ListView.builder(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       itemCount: items.length,
       itemBuilder: (context, i) {

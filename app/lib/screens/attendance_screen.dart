@@ -544,6 +544,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   // -----------------------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final roleUpper = widget.userRole.toUpperCase();
     final isTeacher = roleUpper == 'TEACHER' || roleUpper == 'PRINCIPAL';
 
@@ -552,15 +553,15 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: const Text(
           'Mark Attendance',
           style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
         ),
         centerTitle: false,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        foregroundColor: isDark ? Colors.white : Colors.black87,
         elevation: 0,
       ),
       body: Column(
@@ -642,12 +643,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   // STUDENT VIEW BUILDERS (Matching Reference Image Design)
   // -----------------------------------------------------------------------------
   Widget _buildStudentView() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     if (_isLoadingStudent) {
       return Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
         appBar: AppBar(
           title: const Text('Monthly Attendance', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white)),
-          backgroundColor: const Color(0xFF2196F3),
+          backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFF2196F3),
           foregroundColor: Colors.white,
           elevation: 0,
           leading: IconButton(
@@ -666,10 +668,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     );
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
       appBar: AppBar(
         title: const Text('Monthly Attendance', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white)),
-        backgroundColor: const Color(0xFF2196F3),
+        backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFF2196F3),
         foregroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(

@@ -177,6 +177,9 @@ class AuthService extends BaseService
         }
 
         $safeUser = array_diff_key($user, ['password' => true]);
+        if (in_array(strtoupper((string)($user['role'] ?? '')), ['ADMIN', 'SCHOOL_ADMIN'], true)) {
+            $safeUser['name'] = 'Admin';
+        }
         $isPrincipal = (strtoupper((string)($user['role'] ?? '')) === 'PRINCIPAL');
         $isFeeCollector = false;
         if (in_array(strtoupper((string)($user['role'] ?? '')), ['TEACHER', 'STAFF', 'PRINCIPAL'], true)) {
@@ -277,6 +280,18 @@ class AuthService extends BaseService
         $this->logAuditDirect($user, 'Security', 'Password Changed', 'Password changed for user "' . ($user['name'] ?? $user['email']) . '"');
     }
 
+    /**
+     * Verify user password without changing anything.
+     */
+    public function verifyPassword(int $userId, string $password): bool
+    {
+        $user = $this->repo->findById($userId);
+        if ($user === null) {
+            throw new \App\Shared\Exceptions\NotFoundException('User not found.');
+        }
+        return password_verify($password, (string) ($user['password'] ?? ''));
+    }
+
     private function logAuditDirect(
         array $actorUser,
         string $module,
@@ -362,6 +377,9 @@ class AuthService extends BaseService
         }
 
         $profile = array_diff_key($user, ['password' => true]);
+        if (in_array(strtoupper((string)($user['role'] ?? '')), ['ADMIN', 'SCHOOL_ADMIN'], true)) {
+            $profile['name'] = 'Admin';
+        }
 
         $isPrincipal = (strtoupper((string)($user['role'] ?? '')) === 'PRINCIPAL');
         $isFeeCollector = false;

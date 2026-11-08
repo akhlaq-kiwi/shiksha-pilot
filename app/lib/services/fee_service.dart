@@ -422,5 +422,150 @@ class FeeService {
       throw Exception(msg);
     }
   }
+
+  // ==========================================
+  // MANAGE DISCOUNT / APPROVAL SERVICE METHODS
+  // ==========================================
+
+  /// Get discount settings (whether approval is required)
+  Future<bool> getDiscountApprovalRequired() async {
+    try {
+      final res = await http.get(Uri.parse('$baseUrl/api/school/discount/settings'), headers: _headers);
+      if (res.statusCode == 200) {
+        final decoded = json.decode(res.body);
+        return decoded['data']?['discount_approval_required'] == true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  /// Update discount settings
+  Future<bool> updateDiscountSettings(bool required) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/api/school/discount/settings'),
+      headers: _headers,
+      body: json.encode({'discount_approval_required': required}),
+    );
+    final decoded = json.decode(res.body);
+    if (res.statusCode == 200) {
+      return decoded['data']?['discount_approval_required'] == true;
+    }
+    throw Exception(decoded['message'] ?? 'Failed to update discount settings');
+  }
+
+  /// Get discount requests with optional status, period, search, and requestedBy filters
+  Future<Map<String, dynamic>> getDiscountRequests({
+    String? status,
+    String? period,
+    String? search,
+    String? requestedBy,
+  }) async {
+    final queryParams = <String, String>{};
+    if (status != null && status.isNotEmpty && status != 'ALL') {
+      queryParams['status'] = status;
+    }
+    if (period != null && period.isNotEmpty && period != 'ALL TIME') {
+      queryParams['period'] = period;
+    }
+    if (requestedBy != null && requestedBy.isNotEmpty && requestedBy != 'All Users' && requestedBy != 'All Collectors' && requestedBy != 'ALL') {
+      queryParams['requested_by'] = requestedBy;
+    }
+    if (search != null && search.isNotEmpty) {
+      queryParams['search'] = search;
+    }
+    final uri = Uri.parse('$baseUrl/api/school/discount-requests').replace(
+      queryParameters: queryParams.isNotEmpty ? queryParams : null,
+    );
+    final res = await http.get(uri, headers: _headers);
+    if (res.statusCode == 200) {
+      final decoded = json.decode(res.body);
+      return (decoded['data'] ?? {}) as Map<String, dynamic>;
+    }
+    throw Exception('Failed to load discount requests');
+  }
+
+  /// Submit a new discount request
+  Future<Map<String, dynamic>> createDiscountRequest(Map<String, dynamic> data) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/api/school/discount-requests'),
+      headers: _headers,
+      body: json.encode(data),
+    );
+    final decoded = json.decode(res.body);
+    if (res.statusCode == 200 || res.statusCode == 201) {
+      return decoded;
+    }
+    String msg = 'Failed to submit discount request';
+    if (decoded['message'] != null) {
+      msg = decoded['message'].toString();
+    } else if (decoded['errors'] != null) {
+      final errs = decoded['errors'];
+      msg = errs is Map ? errs.values.first.toString() : errs.toString();
+    }
+    throw Exception(msg);
+  }
+
+  /// Approve a discount request (School Admin only)
+  Future<Map<String, dynamic>> approveDiscountRequest(int id) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/api/school/discount-requests/$id/approve'),
+      headers: _headers,
+      body: json.encode({}),
+    );
+    final decoded = json.decode(res.body);
+    if (res.statusCode == 200) {
+      return decoded;
+    }
+    String msg = 'Failed to approve discount request';
+    if (decoded['message'] != null) {
+      msg = decoded['message'].toString();
+    } else if (decoded['errors'] != null) {
+      final errs = decoded['errors'];
+      msg = errs is Map ? errs.values.first.toString() : errs.toString();
+    }
+    throw Exception(msg);
+  }
+
+  /// Reject a discount request (School Admin only)
+  Future<Map<String, dynamic>> rejectDiscountRequest(int id, {String? reason}) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/api/school/discount-requests/$id/reject'),
+      headers: _headers,
+      body: json.encode({'reason': reason ?? 'Rejected by School Admin'}),
+    );
+    final decoded = json.decode(res.body);
+    if (res.statusCode == 200) {
+      return decoded;
+    }
+    String msg = 'Failed to reject discount request';
+    if (decoded['message'] != null) {
+      msg = decoded['message'].toString();
+    } else if (decoded['errors'] != null) {
+      final errs = decoded['errors'];
+      msg = errs is Map ? errs.values.first.toString() : errs.toString();
+    }
+    throw Exception(msg);
+  }
+
+  /// Cancel a discount request (Fee Collector or Admin)
+  Future<Map<String, dynamic>> cancelDiscountRequest(int id) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/api/school/discount-requests/$id/cancel'),
+      headers: _headers,
+      body: json.encode({}),
+    );
+    final decoded = json.decode(res.body);
+    if (res.statusCode == 200) {
+      return decoded;
+    }
+    String msg = 'Failed to cancel discount request';
+    if (decoded['message'] != null) {
+      msg = decoded['message'].toString();
+    } else if (decoded['errors'] != null) {
+      final errs = decoded['errors'];
+      msg = errs is Map ? errs.values.first.toString() : errs.toString();
+    }
+    throw Exception(msg);
+  }
 }
 

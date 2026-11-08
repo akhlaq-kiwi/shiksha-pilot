@@ -13,6 +13,7 @@ import '../screens/leave_list_screen.dart';
 import '../screens/timetable_screen.dart';
 import '../screens/notification_center_screen.dart';
 import '../screens/fees_card_screen.dart';
+import '../screens/fees_portal_screen.dart';
 import '../screens/salary_card_screen.dart';
 import '../screens/exam_list_screen.dart';
 import '../screens/homework_list_screen.dart';
@@ -184,6 +185,24 @@ class NotificationHelper {
     final body = message.notification?.body ?? data['body'] ?? '';
     if (title.isEmpty && body.isEmpty) return;
 
+    final prefs = await SharedPreferences.getInstance();
+    final userRole = prefs.getString('user_role')?.toUpperCase() ?? '';
+    if (userRole == 'SCHOOL_ADMIN') {
+      final catStr = (data['category'] ?? '').toString().toUpperCase();
+      final evtStr = (data['event_key'] ?? '').toString().toUpperCase();
+      final linkStr = (data['link'] ?? data['target_screen'] ?? '').toString().toLowerCase();
+      final titleStr = title.toLowerCase();
+      final msgStr = body.toLowerCase();
+      if (catStr == 'LEAVE' ||
+          catStr == 'LEAVE_MANAGEMENT' ||
+          evtStr.contains('LEAVE') ||
+          linkStr.contains('leave') ||
+          titleStr.contains('leave') ||
+          msgStr.contains('leave')) {
+        return;
+      }
+    }
+
     final category = NotificationCategory.byId(data['category']);
 
     await _flutterLocalNotificationsPlugin.show(
@@ -322,6 +341,16 @@ class NotificationHelper {
         examService: examService,
         userRole: userRole,
         selectedStudentId: notifStudentId ?? studentId,
+      );
+    } else if (link.contains('fees-portal') ||
+               eventKey == 'DISCOUNT_REQUEST_APPROVED' ||
+               eventKey == 'DISCOUNT_REQUEST_REJECTED' ||
+               title.contains('discount request') ||
+               message.contains('discount request')) {
+      targetScreen = FeesPortalScreen(
+        baseUrl: baseUrl,
+        token: token,
+        initialStudentId: notifStudentId ?? studentId,
       );
     } else if (link.contains('fees') || title.contains('fee') || message.contains('fee')) {
       targetScreen = FeesCardScreen(
@@ -504,6 +533,14 @@ class NotificationHelper {
           isFeeCollector: true,
         );
 
+      case 'DISCOUNT_REQUEST_APPROVED':
+      case 'DISCOUNT_REQUEST_REJECTED':
+        return FeesPortalScreen(
+          baseUrl: baseUrl,
+          token: token,
+          initialStudentId: studentId,
+        );
+
       case 'SALARY_DISBURSED':
         return SalaryCardScreen(
           baseUrl: baseUrl,
@@ -592,6 +629,25 @@ class NotificationHelper {
 
   static Future<void> showNotification(dynamic notif, {int? badgeCount}) async {
     final prefs = await SharedPreferences.getInstance();
+    final userRole = prefs.getString('user_role')?.toUpperCase() ?? '';
+
+    // Suppress leave notifications for SCHOOL_ADMIN in mobile app
+    if (userRole == 'SCHOOL_ADMIN') {
+      final catStr = (notif['category'] ?? '').toString().toUpperCase();
+      final evtStr = (notif['event_key'] ?? '').toString().toUpperCase();
+      final linkStr = (notif['link'] ?? notif['target_screen'] ?? '').toString().toLowerCase();
+      final titleStr = (notif['title'] ?? '').toString().toLowerCase();
+      final msgStr = (notif['message'] ?? '').toString().toLowerCase();
+      if (catStr == 'LEAVE' ||
+          catStr == 'LEAVE_MANAGEMENT' ||
+          evtStr.contains('LEAVE') ||
+          linkStr.contains('leave') ||
+          titleStr.contains('leave') ||
+          msgStr.contains('leave')) {
+        return;
+      }
+    }
+
     final schoolName = prefs.getString('school_name') ?? 'Shiksha Pilot';
 
     final rawTitle = (notif['title'] ?? '').toString().trim();

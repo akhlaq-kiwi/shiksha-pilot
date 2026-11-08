@@ -258,24 +258,25 @@ class _ClassesScreenState extends State<ClassesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final grouped = _groupedClasses;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFAF8F5),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFFAF8F5),
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Classes',
           style: TextStyle(
             fontWeight: FontWeight.w800,
             fontSize: 20,
             letterSpacing: -0.3,
-            color: Color(0xFF0F172A),
+            color: isDark ? Colors.white : const Color(0xFF0F172A),
           ),
         ),
         centerTitle: false,
-        backgroundColor: Colors.white,
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
         elevation: 0.5,
-        iconTheme: const IconThemeData(color: Color(0xFF0F172A)),
+        iconTheme: IconThemeData(color: isDark ? Colors.white : const Color(0xFF0F172A)),
       ),
       body: RefreshIndicator(
         onRefresh: _loadAllData,
@@ -2541,28 +2542,32 @@ class _ClassRosterScreenState extends State<_ClassRosterScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Top Search Bar (Fixed at top, does not scroll)
-          Container(
-            color: const Color(0xFFFAF8F5),
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(30),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.02),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: TextField(
-                controller: _searchController,
-                onChanged: (val) => setState(() => _search = val),
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Column(
+          children: [
+            // Top Search Bar (Fixed at top, does not scroll)
+            Container(
+              color: const Color(0xFFFAF8F5),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.02),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: TextField(
+                  controller: _searchController,
+                  onTapOutside: (_) => FocusScope.of(context).unfocus(),
+                  onChanged: (val) => setState(() => _search = val),
                 decoration: InputDecoration(
                   hintText: 'Search roster by name or roll number...',
                   hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
@@ -2643,6 +2648,7 @@ class _ClassRosterScreenState extends State<_ClassRosterScreen> {
               color: const Color(0xFFD97706),
               child: filtered.isEmpty
                   ? ListView(
+                      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                       physics: const AlwaysScrollableScrollPhysics(),
                       children: [
                         Container(
@@ -2691,6 +2697,7 @@ class _ClassRosterScreenState extends State<_ClassRosterScreen> {
                       ],
                     )
                   : GridView.builder(
+                      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                       physics: const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -2708,7 +2715,8 @@ class _ClassRosterScreenState extends State<_ClassRosterScreen> {
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 }
 
@@ -4178,6 +4186,7 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
                   const SizedBox(height: 10),
                   TextField(
                     autofocus: true,
+                    onTapOutside: (_) => FocusScope.of(context).unfocus(),
                     decoration: InputDecoration(
                       prefixIcon: const Icon(Icons.search, size: 20, color: Color(0xFF94A3B8)),
                       hintText: 'Search $title...',
@@ -5357,6 +5366,7 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
         TextField(
           controller: ctrl,
           enabled: enabled,
+          onTapOutside: (_) => FocusScope.of(context).unfocus(),
           keyboardType: isNumeric ? TextInputType.number : TextInputType.text,
           textInputAction: textInputAction,
           onSubmitted: onSubmitted ?? (_) => FocusScope.of(context).nextFocus(),

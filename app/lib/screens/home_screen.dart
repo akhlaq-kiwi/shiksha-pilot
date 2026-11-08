@@ -50,6 +50,8 @@ import 'package:school_hub/screens/principal_examinations_screen.dart';
 import 'package:school_hub/services/school_examination_service.dart';
 import 'package:school_hub/screens/fee_reminder_screen.dart';
 import 'package:school_hub/services/fee_reminder_service.dart';
+import 'package:school_hub/screens/manage_discount_screen.dart';
+import 'package:school_hub/services/fee_service.dart';
 
 class LauncherFeature {
   final String name;
@@ -122,6 +124,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _unreadSalaryCount = 0;
   int _unreadExamsCount = 0;
   int _unreadFeeReminderCount = 0;
+  int _unreadDiscountRequestCount = 0;
   int _unreadLeaveCount = 0;
   DateTime? _lastBackPressTime;
   
@@ -290,6 +293,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       allowedRoles: ['FEE_COLLECTOR'],
       isAvailable: true,
     ),
+    LauncherFeature(
+      name: 'Manage Discount',
+      icon: Icons.percent_rounded,
+      color: const Color(0xFFD97706),
+      allowedRoles: ['SCHOOL_ADMIN'],
+      isAvailable: true,
+    ),
   ];
 
 
@@ -307,6 +317,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _notifTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
       _fetchUnreadNotificationsCount();
       _fetchUnreadNoticesCount();
+      _fetchPendingExpenseCount();
+      _fetchPendingFinancialReportCount();
+      _fetchPendingDiscountRequestCount();
     });
   }
 
@@ -348,9 +361,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final roleUpper = widget.userRole.toUpperCase();
     final savedId = prefs.getInt('selected_student_id');
     final savedSchool = prefs.getString('school_name') ?? '';
-    final savedName = (widget.userName != null && widget.userName!.isNotEmpty)
-        ? widget.userName!
-        : (prefs.getString('user_name') ?? 'User');
+    final savedName = (roleUpper == 'SCHOOL_ADMIN' || roleUpper == 'ADMIN')
+        ? 'Admin'
+        : ((widget.userName != null && widget.userName!.isNotEmpty)
+            ? widget.userName!
+            : (prefs.getString('user_name') ?? 'User'));
     final savedPhoto = prefs.getString('user_photo') ?? '';
 
     // Immediately reflect cached data in state without waiting for network/background tasks!
@@ -419,6 +434,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _fetchUnreadNoticesCount();
     _fetchPendingExpenseCount();
     _fetchPendingFinancialReportCount();
+    _fetchPendingDiscountRequestCount();
   }
 
   Future<void> _syncProfileDetails(String token) async {
@@ -666,6 +682,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         int count = data.where((n) {
           if (!isUnread(n)) return false;
           if (isNoticeNotif(n)) return false;
+          if (roleUpper == 'SCHOOL_ADMIN' && isLeaveNotif(n)) return false;
           return true;
         }).length;
 
@@ -673,7 +690,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         int salaryCount = data.where((n) => isUnread(n) && isSalaryNotif(n)).length;
         int examsCount = data.where((n) => isUnread(n) && isExamsNotif(n)).length;
         int feeReminderCount = data.where((n) => isUnread(n) && isFeeReminderNotif(n)).length;
-        int leaveCount = data.where((n) => isUnread(n) && isLeaveNotif(n)).length;
+        int leaveCount = roleUpper == 'SCHOOL_ADMIN' ? 0 : data.where((n) => isUnread(n) && isLeaveNotif(n)).length;
 
         if (mounted) {
           setState(() {
@@ -696,6 +713,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             final catStr = (n['category'] ?? '').toString().toUpperCase();
             final evtStr = (n['event_key'] ?? '').toString().toUpperCase();
             if (linkStr == '/notice' || linkStr.contains('notice') || catStr == 'ANNOUNCEMENT' || evtStr == 'ANNOUNCEMENT_PUBLISHED') {
+              return false;
+            }
+            if (roleUpper == 'SCHOOL_ADMIN' && isLeaveNotif(n)) {
               return false;
             }
             final int nId = n['id'] is int ? n['id'] : int.parse(n['id'].toString());
@@ -824,9 +844,63 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _fetchPendingDiscountRequestCount() async {
+    final roleUpper = widget.userRole.toUpperCase();
+    if (roleUpper != 'SCHOOL_ADMIN' && roleUpper != 'SUPER_ADMIN') return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token') ?? widget.leaveService.token;
+      if (token.isEmpty) return;
+      final baseUrl = resolveBaseUrlFrom(prefs);
+      final feeService = FeeService(baseUrl: baseUrl, token: token);
+      final isApprovalReq = await feeService.getDiscountApprovalRequired();
+      if (!isApprovalReq) {
+        if (mounted) {
+          setState(() {
+            _unreadDiscountRequestCount = 0;
+          });
+        }
+        return;
+      }
+      final pendingList = await feeService.getDiscountRequests(status: 'PENDING');
+      final pendingCount = pendingList.length;
+      final lastViewed = prefs.getInt('last_viewed_discount_pending_count') ?? 0;
+      final badgeCleared = prefs.getBool('discount_badge_cleared') ?? false;
+
+      int unread = 0;
+      if (!badgeCleared) {
+        unread = pendingCount;
+      } else if (pendingCount > lastViewed) {
+        unread = pendingCount - lastViewed;
+      }
+
+      if (mounted) {
+        setState(() {
+          _unreadDiscountRequestCount = unread;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching pending discount request count: $e');
+    }
+  }
+
   void _showPushNotificationToast(dynamic notif) {
     final title = notif['title'] ?? 'New Notification';
     final message = notif['message'] ?? '';
+
+    if (widget.userRole.toUpperCase() == 'SCHOOL_ADMIN') {
+      final cat = (notif['category'] ?? '').toString().toUpperCase();
+      final link = (notif['link'] ?? notif['target_screen'] ?? '').toString().toLowerCase();
+      final titleStr = title.toString().toLowerCase();
+      final msgStr = message.toString().toLowerCase();
+      if (cat == 'LEAVE' ||
+          cat == 'LEAVE_MANAGEMENT' ||
+          titleStr.contains('leave') ||
+          msgStr.contains('leave') ||
+          link.contains('leave')) {
+        return;
+      }
+    }
 
     late OverlayEntry overlayEntry;
     overlayEntry = OverlayEntry(
@@ -837,7 +911,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         child: Material(
           color: Colors.transparent,
           child: GestureDetector(
-            onTap: () {
+            onTap: () async {
               overlayEntry.remove();
 
               // Handle deep linking on click
@@ -1015,6 +1089,33 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ),
                   ),
                 );
+              } else if (titleLower.contains('discount request') ||
+                  msgLower.contains('discount request') ||
+                  (notif['event_key'] ?? '').toString().contains('DISCOUNT_REQUEST')) {
+                int? targetStudentId;
+                try {
+                  final rawLink = (notif['link'] ?? '').toString();
+                  final cleanLink = rawLink.startsWith('http') ? rawLink : 'http://localhost$rawLink';
+                  final uri = Uri.parse(cleanLink);
+                  final idStr = uri.queryParameters['student_id'] ?? uri.queryParameters['studentId'];
+                  if (idStr != null) targetStudentId = int.tryParse(idStr);
+                } catch (_) {}
+                if (targetStudentId == null && notif['student_id'] != null) {
+                  targetStudentId = int.tryParse(notif['student_id'].toString());
+                }
+                final prefs = await SharedPreferences.getInstance();
+                final token = prefs.getString('auth_token') ?? widget.leaveService.token;
+                final baseUrl = resolveBaseUrlFrom(prefs);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => FeesPortalScreen(
+                      baseUrl: baseUrl,
+                      token: token,
+                      initialStudentId: targetStudentId,
+                    ),
+                  ),
+                );
               } else {
                 Navigator.push(
                   context,
@@ -1138,7 +1239,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         'TSD',
         'Faculty',
         'Classes',
-        'Timetable',
+        'Manage Discount',
         'Examinations',
         'Achievements',
         'Notifications',
@@ -1288,7 +1389,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     await LocalNotificationScheduler.cancelAll();
 
     final prefs = await SharedPreferences.getInstance();
+    final allKeys = prefs.getKeys();
+    final preserved = <String, dynamic>{};
+    for (final k in allKeys) {
+      if (k.startsWith('app_lock_enabled_') || k.startsWith('app_lock_pin_') || k == 'base_url' || k == 'selected_base_url') {
+        preserved[k] = prefs.get(k);
+      }
+    }
     await prefs.clear();
+    for (final e in preserved.entries) {
+      if (e.value is bool) await prefs.setBool(e.key, e.value as bool);
+      else if (e.value is String) await prefs.setString(e.key, e.value as String);
+      else if (e.value is int) await prefs.setInt(e.key, e.value as int);
+    }
 
     if (mounted) {
       // Redirect to LoginScreen
@@ -1856,6 +1969,36 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         if (mounted) {
           _fetchUnreadNotificationsCount();
         }
+      } else if (feature.name == 'Manage Discount') {
+        final prefs = await SharedPreferences.getInstance();
+        setState(() {
+          _unreadDiscountRequestCount = 0;
+        });
+        await prefs.setBool('discount_badge_cleared', true);
+        final token = prefs.getString('auth_token') ?? widget.leaveService.token;
+        String effectiveBase = widget.leaveService.baseUrl;
+        if (effectiveBase.isEmpty || effectiveBase.contains('10.22.6.71') || effectiveBase.contains('10.155.82.71')) {
+          effectiveBase = resolveBaseUrlFrom(prefs);
+        }
+        try {
+          final feeService = FeeService(baseUrl: effectiveBase, token: token);
+          final pending = await feeService.getDiscountRequests(status: 'PENDING');
+          await prefs.setInt('last_viewed_discount_pending_count', pending.length);
+        } catch (_) {}
+
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ManageDiscountScreen(
+              baseUrl: effectiveBase,
+              token: token,
+              userRole: widget.userRole,
+            ),
+          ),
+        );
+        if (mounted) {
+          _fetchPendingDiscountRequestCount();
+        }
       }
     } else {
 
@@ -1872,6 +2015,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final filteredFeatures = _getFilteredFeatures();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return PopScope(
       canPop: false,
@@ -1907,7 +2051,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         }
       },
       child: Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
       body: GestureDetector(
         behavior: HitTestBehavior.translucent,
         onTap: () {
@@ -1938,10 +2082,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         alignment: Alignment.centerLeft,
                         child: Text(
                           _schoolName.toUpperCase(),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.w900,
-                            color: Colors.black87,
+                            color: isDark ? Colors.white : Colors.black87,
                             letterSpacing: -0.3,
                           ),
                         ),
@@ -1954,7 +2098,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         tag: 'user_profile_icon',
                         child: CircleAvatar(
                           radius: 24,
-                          backgroundColor: Colors.indigo.shade50,
+                          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.indigo.shade50,
                           child: Builder(
                             builder: (context) {
                               String photoUrl = '';
@@ -2026,11 +2170,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
                     borderRadius: BorderRadius.circular(16),
+                    border: isDark ? Border.all(color: const Color(0xFF334155)) : null,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.03),
+                        color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       )
@@ -2038,17 +2183,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   ),
                   child: TextField(
                     controller: _searchController,
+                    onTapOutside: (_) => FocusScope.of(context).unfocus(),
                     onChanged: (val) {
                       setState(() {
                         _searchQuery = val;
                       });
                     },
-                    decoration: const InputDecoration(
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    ),
+                    decoration: InputDecoration(
                       hintText: 'Search Features...',
-                      hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
-                      prefixIcon: Icon(Icons.search_rounded, color: Colors.grey),
+                      hintStyle: TextStyle(color: isDark ? const Color(0xFF94A3B8) : Colors.grey, fontSize: 14),
+                      prefixIcon: Icon(Icons.search_rounded, color: isDark ? const Color(0xFF94A3B8) : Colors.grey),
                       border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     ),
                   ),
                 ),
@@ -2065,12 +2216,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.search_off_rounded, size: 48, color: Colors.grey.shade400),
+                            Icon(Icons.search_off_rounded, size: 48, color: isDark ? const Color(0xFF64748B) : Colors.grey.shade400),
                             const SizedBox(height: 12),
                             Text(
                               'No features match "${_searchQuery}"',
                               style: TextStyle(
-                                color: Colors.grey.shade500,
+                                color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade500,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 14,
                               ),
@@ -2098,6 +2249,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           final bool isExpense = feature.name == 'Expense' || feature.name == 'Expenses';
                           final bool isFinancialReport = feature.name == 'Financial Report' || feature.name == 'Financial report' || feature.name == 'Revenue';
                           final bool isFeeReminder = feature.name == 'Fee Reminder';
+                          final bool isManageDiscount = feature.name == 'Manage Discount';
                           int badgeCount = 0;
                           if (isNotice) {
                             badgeCount = _unreadNoticeCount;
@@ -2117,6 +2269,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             badgeCount = _unreadFinancialReportCount;
                           } else if (isFeeReminder) {
                             badgeCount = _unreadFeeReminderCount;
+                          } else if (isManageDiscount) {
+                            badgeCount = _unreadDiscountRequestCount;
                           }
 
                           return GestureDetector(
@@ -2134,10 +2288,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                         width: double.infinity,
                                         height: double.infinity,
                                         decoration: BoxDecoration(
-                                          color: feature.color.withValues(alpha: 0.08),
+                                          color: isDark ? feature.color.withOpacity(0.16) : feature.color.withValues(alpha: 0.08),
                                           borderRadius: BorderRadius.circular(20),
                                           border: Border.all(
-                                            color: feature.color.withValues(alpha: 0.25),
+                                            color: isDark ? feature.color.withOpacity(0.4) : feature.color.withValues(alpha: 0.25),
                                             width: 1.8,
                                           ),
                                         ),
@@ -2194,7 +2348,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w700,
-                                    color: Colors.grey.shade800,
+                                    color: isDark ? const Color(0xFFE2E8F0) : Colors.grey.shade800,
                                   ),
                                 ),
                               ],

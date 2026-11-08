@@ -222,7 +222,7 @@ class LeaveRequestService extends BaseService
                 LEFT JOIN staff st ON (u.phone = st.phone AND u.school_id = st.school_id)
                 WHERE u.school_id = :sid
                   AND (
-                      UPPER(COALESCE(u.role, '')) IN ('PRINCIPAL', 'SCHOOL_ADMIN')
+                      UPPER(COALESCE(u.role, '')) = 'PRINCIPAL'
                       OR st.is_principal = 1
                       OR UPPER(COALESCE(st.role, '')) = 'PRINCIPAL'
                   )
@@ -843,7 +843,7 @@ class LeaveRequestService extends BaseService
             ':event_key' => $eventKey,
         ]);
 
-        if ($eventKey !== null) {
+        if ($eventKey !== null && $role !== 'SCHOOL_ADMIN') {
             PushDispatcher::pushOnly($pdo, $schoolId, $role, null, $eventKey, $title, $message, $link);
         }
     }

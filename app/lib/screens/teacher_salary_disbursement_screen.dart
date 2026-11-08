@@ -311,63 +311,68 @@ class _TeacherSalaryDisbursementScreenState extends State<TeacherSalaryDisbursem
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // 1. Month Selector Dropdown / Bar
-          _buildMonthSelectorHeader(),
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Column(
+          children: [
+            // 1. Month Selector Dropdown / Bar
+            _buildMonthSelectorHeader(),
 
-          // Main scrollable area
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: () => _fetchMonthPayments(_selectedMonth),
-              color: const Color(0xFF0D9488),
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // 2. Summary Cards (Total, Disbursed, Pending)
-                    _buildSummaryCards(totalSalary, disbursedSalary, pendingSalary),
+            // Main scrollable area
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: () => _fetchMonthPayments(_selectedMonth),
+                color: const Color(0xFF0D9488),
+                child: SingleChildScrollView(
+                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 2. Summary Cards (Total, Disbursed, Pending)
+                      _buildSummaryCards(totalSalary, disbursedSalary, pendingSalary),
 
-                    const SizedBox(height: 16),
+                      const SizedBox(height: 16),
 
-                    // 3. Search and Filter Bar
-                    _buildSearchAndFilterBar(filteredList.length),
+                      // 3. Search and Filter Bar
+                      _buildSearchAndFilterBar(filteredList.length),
 
-                    const SizedBox(height: 12),
+                      const SizedBox(height: 12),
 
-                    // 4. Staff Payroll List
-                    if (_isLoading)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 60),
-                        child: Center(
-                          child: CircularProgressIndicator(color: Color(0xFF0D9488)),
+                      // 4. Staff Payroll List
+                      if (_isLoading)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 60),
+                          child: Center(
+                            child: CircularProgressIndicator(color: Color(0xFF0D9488)),
+                          ),
+                        )
+                      else if (_errorMessage.isNotEmpty)
+                        _buildErrorState()
+                      else if (filteredList.isEmpty)
+                        _buildEmptyState()
+                      else
+                        ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: filteredList.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 10),
+                          itemBuilder: (ctx, index) {
+                            final teacher = filteredList[index];
+                            return _buildTeacherCard(teacher);
+                          },
                         ),
-                      )
-                    else if (_errorMessage.isNotEmpty)
-                      _buildErrorState()
-                    else if (filteredList.isEmpty)
-                      _buildEmptyState()
-                    else
-                      ListView.separated(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: filteredList.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (ctx, index) {
-                          final teacher = filteredList[index];
-                          return _buildTeacherCard(teacher);
-                        },
-                      ),
 
-                    const SizedBox(height: 32),
-                  ],
+                      const SizedBox(height: 32),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -566,6 +571,7 @@ class _TeacherSalaryDisbursementScreenState extends State<TeacherSalaryDisbursem
               Expanded(
                 child: TextField(
                   controller: _searchController,
+                  onTapOutside: (_) => FocusScope.of(context).unfocus(),
                   style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
                   decoration: const InputDecoration(
                     hintText: 'Search teacher name or role...',

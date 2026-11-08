@@ -366,11 +366,13 @@ class _PenaltyScreenState extends State<PenaltyScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFFBF8F2),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFFBF8F2),
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF1E293B), size: 18),
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: isDark ? Colors.white : const Color(0xFF1E293B), size: 18),
           onPressed: () => Navigator.pop(context),
         ),
         titleSpacing: 0,
@@ -379,17 +381,17 @@ class _PenaltyScreenState extends State<PenaltyScreen> {
             Container(
               padding: const EdgeInsets.all(7),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFFBEB),
+                color: isDark ? const Color(0xFF2E2415) : const Color(0xFFFFFBEB),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFFDE68A)),
+                border: Border.all(color: isDark ? const Color(0xFF78350F) : const Color(0xFFFDE68A)),
               ),
               child: const Icon(Icons.timer_outlined, color: Color(0xFFD97706), size: 18),
             ),
             const SizedBox(width: 10),
-            const Text(
+            Text(
               'PENALTY',
               style: TextStyle(
-                color: Color(0xFF0F172A),
+                color: isDark ? Colors.white : const Color(0xFF0F172A),
                 fontWeight: FontWeight.w800,
                 fontSize: 16,
                 letterSpacing: 0.3,
@@ -397,7 +399,7 @@ class _PenaltyScreenState extends State<PenaltyScreen> {
             ),
           ],
         ),
-        backgroundColor: Colors.white,
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
         elevation: 0.5,
       ),
       body: GestureDetector(
@@ -422,7 +424,7 @@ class _PenaltyScreenState extends State<PenaltyScreen> {
                           Text(
                             _errorMessage!,
                             textAlign: TextAlign.center,
-                            style: const TextStyle(fontSize: 14, color: Color(0xFF475569), fontWeight: FontWeight.w600),
+                            style: TextStyle(fontSize: 14, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569), fontWeight: FontWeight.w600),
                           ),
                           const SizedBox(height: 16),
                           ElevatedButton.icon(
@@ -450,17 +452,17 @@ class _PenaltyScreenState extends State<PenaltyScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           // Top Statistics Grid
-                          _buildTopStatsGrid(),
+                          _buildTopStatsGrid(isDark),
 
                           if (_lastAppliedDate != null && _lastAppliedDate!.isNotEmpty) ...[
                             const SizedBox(height: 12),
-                            _buildLastAppliedBanner(),
+                            _buildLastAppliedBanner(isDark),
                           ],
 
                           const SizedBox(height: 18),
 
                           // Late Payment Penalty Card
-                          _buildPenaltySection(),
+                          _buildPenaltySection(isDark),
 
                           const SizedBox(height: 24),
                         ],
@@ -471,7 +473,7 @@ class _PenaltyScreenState extends State<PenaltyScreen> {
     );
   }
 
-  Widget _buildTopStatsGrid() {
+  Widget _buildTopStatsGrid(bool isDark) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final double itemWidth = (constraints.maxWidth - 12) / 2;
@@ -485,7 +487,8 @@ class _PenaltyScreenState extends State<PenaltyScreen> {
               value: _academicSession,
               icon: Icons.calendar_month_rounded,
               iconColor: const Color(0xFFD97706),
-              valueColor: const Color(0xFF0F172A),
+              valueColor: isDark ? Colors.white : const Color(0xFF0F172A),
+              isDark: isDark,
             ),
             _buildStatCard(
               width: itemWidth,
@@ -493,7 +496,8 @@ class _PenaltyScreenState extends State<PenaltyScreen> {
               value: _totalStudents.toString(),
               icon: Icons.people_alt_outlined,
               iconColor: const Color(0xFF6366F1),
-              valueColor: const Color(0xFF0F172A),
+              valueColor: isDark ? Colors.white : const Color(0xFF0F172A),
+              isDark: isDark,
             ),
             _buildStatCard(
               width: itemWidth,
@@ -502,6 +506,7 @@ class _PenaltyScreenState extends State<PenaltyScreen> {
               icon: Icons.warning_amber_rounded,
               iconColor: const Color(0xFFD97706),
               valueColor: const Color(0xFFD97706),
+              isDark: isDark,
             ),
             _buildStatCard(
               width: itemWidth,
@@ -510,6 +515,7 @@ class _PenaltyScreenState extends State<PenaltyScreen> {
               icon: Icons.account_balance_outlined,
               iconColor: const Color(0xFF059669),
               valueColor: const Color(0xFF059669),
+              isDark: isDark,
             ),
           ],
         );
@@ -524,17 +530,18 @@ class _PenaltyScreenState extends State<PenaltyScreen> {
     required IconData icon,
     required Color iconColor,
     required Color valueColor,
+    required bool isDark,
   }) {
     return Container(
       width: width,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFDF8),
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFFFFDF8),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFF1EDE4)),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFF1EDE4)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -551,10 +558,10 @@ class _PenaltyScreenState extends State<PenaltyScreen> {
                   title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF64748B),
+                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                     letterSpacing: 0.3,
                   ),
                 ),
@@ -578,13 +585,13 @@ class _PenaltyScreenState extends State<PenaltyScreen> {
     );
   }
 
-  Widget _buildLastAppliedBanner() {
+  Widget _buildLastAppliedBanner(bool isDark) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFF0FDF4),
+        color: isDark ? const Color(0xFF064E3B).withOpacity(0.3) : const Color(0xFFF0FDF4),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFBBF7D0)),
+        border: Border.all(color: isDark ? const Color(0xFF065F46) : const Color(0xFFBBF7D0)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -594,7 +601,7 @@ class _PenaltyScreenState extends State<PenaltyScreen> {
           Expanded(
             child: RichText(
               text: TextSpan(
-                style: const TextStyle(fontSize: 11, color: Color(0xFF166534), height: 1.35),
+                style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF86EFAC) : const Color(0xFF166534), height: 1.35),
                 children: [
                   const TextSpan(text: 'Late Payment Penalty was last successfully applied for this session on '),
                   TextSpan(
@@ -618,15 +625,15 @@ class _PenaltyScreenState extends State<PenaltyScreen> {
     );
   }
 
-  Widget _buildPenaltySection() {
+  Widget _buildPenaltySection(bool isDark) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFDF8),
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFFFFDF8),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFF1EDE4), width: 1.2),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFF1EDE4), width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
             blurRadius: 6,
             offset: const Offset(0, 3),
           ),
@@ -642,7 +649,7 @@ class _PenaltyScreenState extends State<PenaltyScreen> {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFEF3C7),
+                  color: isDark ? const Color(0xFF2E2415) : const Color(0xFFFEF3C7),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(Icons.timer_outlined, color: Color(0xFFD97706), size: 16),
@@ -651,10 +658,10 @@ class _PenaltyScreenState extends State<PenaltyScreen> {
               Expanded(
                 child: Text(
                   'LATE PAYMENT PENALTY FOR AY ($_academicSession)',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF0F172A),
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
                     letterSpacing: 0.3,
                   ),
                 ),
@@ -663,18 +670,19 @@ class _PenaltyScreenState extends State<PenaltyScreen> {
           ),
 
           const SizedBox(height: 14),
-          const Divider(color: Color(0xFFF1EDE4), height: 1),
+          Divider(color: isDark ? const Color(0xFF334155) : const Color(0xFFF1EDE4), height: 1),
           const SizedBox(height: 14),
 
           // 1. Penalty Percentage (%)
-          _buildFieldLabel('PENALTY PERCENTAGE (%)'),
+          _buildFieldLabel('PENALTY PERCENTAGE (%)', isDark),
           const SizedBox(height: 6),
           TextFormField(
             controller: _penaltyPercentageController,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
             decoration: _inputDecoration(
               hintText: 'e.g. 5.50',
+              isDark: isDark,
               suffixIcon: const Icon(Icons.percent_rounded, size: 18, color: Color(0xFF94A3B8)),
             ),
           ),
@@ -682,28 +690,30 @@ class _PenaltyScreenState extends State<PenaltyScreen> {
           const SizedBox(height: 14),
 
           // 2. Custom Description
-          _buildFieldLabel('CUSTOM DESCRIPTION'),
+          _buildFieldLabel('CUSTOM DESCRIPTION', isDark),
           const SizedBox(height: 6),
           TextFormField(
             controller: _penaltyDescController,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isDark ? Colors.white : const Color(0xFF0F172A)),
             decoration: _inputDecoration(
               hintText: 'Late Payment Penalty $_academicSession',
+              isDark: isDark,
             ),
           ),
 
           const SizedBox(height: 14),
 
           // 3. Target Academic Session (Read-only)
-          _buildFieldLabel('TARGET ACADEMIC SESSION'),
+          _buildFieldLabel('TARGET ACADEMIC SESSION', isDark),
           const SizedBox(height: 6),
           TextFormField(
             initialValue: _academicSession,
             enabled: false,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
             decoration: _inputDecoration(
               filled: true,
-              fillColor: const Color(0xFFF1F5F9),
+              isDark: isDark,
+              fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
             ),
           ),
 
@@ -713,9 +723,9 @@ class _PenaltyScreenState extends State<PenaltyScreen> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFFBEB),
+              color: isDark ? const Color(0xFF2E2415) : const Color(0xFFFFFBEB),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFFDE68A)),
+              border: Border.all(color: isDark ? const Color(0xFF78350F) : const Color(0xFFFDE68A)),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -725,22 +735,22 @@ class _PenaltyScreenState extends State<PenaltyScreen> {
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
+                    children: [
                       Text(
                         'LATE PAYMENT PENALTY INFORMATION',
                         style: TextStyle(
                           fontSize: 10.5,
                           fontWeight: FontWeight.w800,
-                          color: Color(0xFFB45309),
+                          color: isDark ? const Color(0xFFF59E0B) : const Color(0xFFB45309),
                           letterSpacing: 0.3,
                         ),
                       ),
-                      SizedBox(height: 3),
+                      const SizedBox(height: 3),
                       Text(
                         'If you configure a Late Payment Penalty, it will be added automatically after the Academic Year Migration is completed. Only students who have pending dues will receive the penalty. Students who have no pending dues will not be affected. You can change or remove this configuration anytime before migration.',
                         style: TextStyle(
                           fontSize: 11,
-                          color: Color(0xFF92400E),
+                          color: isDark ? const Color(0xFFFCD34D) : const Color(0xFF92400E),
                           height: 1.4,
                         ),
                       ),
@@ -810,13 +820,13 @@ class _PenaltyScreenState extends State<PenaltyScreen> {
     );
   }
 
-  Widget _buildFieldLabel(String label) {
+  Widget _buildFieldLabel(String label, [bool isDark = false]) {
     return Text(
       label,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 11,
         fontWeight: FontWeight.w800,
-        color: Color(0xFF64748B),
+        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
         letterSpacing: 0.3,
       ),
     );
@@ -827,21 +837,22 @@ class _PenaltyScreenState extends State<PenaltyScreen> {
     Widget? suffixIcon,
     bool filled = false,
     Color? fillColor,
+    bool isDark = false,
   }) {
     return InputDecoration(
       hintText: hintText,
-      hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8), fontWeight: FontWeight.normal),
+      hintStyle: TextStyle(fontSize: 13, color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8), fontWeight: FontWeight.normal),
       suffixIcon: suffixIcon,
       filled: filled,
-      fillColor: fillColor,
+      fillColor: fillColor ?? (isDark ? const Color(0xFF0F172A) : Colors.white),
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+        borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+        borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
@@ -849,7 +860,7 @@ class _PenaltyScreenState extends State<PenaltyScreen> {
       ),
       disabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        borderSide: BorderSide(color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0)),
       ),
     );
   }

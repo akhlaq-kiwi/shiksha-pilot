@@ -640,6 +640,7 @@ class _LeaveListScreenState extends State<LeaveListScreen> with SingleTickerProv
                   const SizedBox(height: 12),
                   TextField(
                     controller: reasonController,
+                    onTapOutside: (_) => FocusScope.of(context).unfocus(),
                     maxLines: 3,
                     style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
                     decoration: InputDecoration(
@@ -843,6 +844,7 @@ class _LeaveListScreenState extends State<LeaveListScreen> with SingleTickerProv
                       ),
                       child: TextField(
                         controller: titleController,
+                        onTapOutside: (_) => FocusScope.of(context).unfocus(),
                         style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
                         decoration: const InputDecoration(
                           hintText: 'e.g. Diwali Holidays',
@@ -1548,6 +1550,7 @@ class _LeaveListScreenState extends State<LeaveListScreen> with SingleTickerProv
     return RefreshIndicator(
       onRefresh: _loadHolidays,
       child: ListView.builder(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         controller: _holidaysScrollController,
         cacheExtent: 5000,
         padding: EdgeInsets.only(
@@ -1889,6 +1892,7 @@ class _LeaveListScreenState extends State<LeaveListScreen> with SingleTickerProv
       content = RefreshIndicator(
         onRefresh: _loadLeaves,
         child: ListView.builder(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: EdgeInsets.only(
             left: 16,
             right: 16,
@@ -2109,11 +2113,13 @@ class _LeaveListScreenState extends State<LeaveListScreen> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFFBF8F2),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFFBF8F2),
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF1E293B), size: 18),
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: isDark ? Colors.white : const Color(0xFF1E293B), size: 18),
           onPressed: () => Navigator.pop(context),
         ),
         titleSpacing: 0,
@@ -2122,17 +2128,17 @@ class _LeaveListScreenState extends State<LeaveListScreen> with SingleTickerProv
             Container(
               padding: const EdgeInsets.all(7),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFFBEB),
+                color: isDark ? const Color(0xFF2E2415) : const Color(0xFFFFFBEB),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFFDE68A)),
+                border: Border.all(color: isDark ? const Color(0xFF78350F) : const Color(0xFFFDE68A)),
               ),
               child: const Icon(Icons.date_range_rounded, color: Color(0xFFD97706), size: 18),
             ),
             const SizedBox(width: 10),
-            const Text(
+            Text(
               'LEAVES',
               style: TextStyle(
-                color: Color(0xFF0F172A),
+                color: isDark ? Colors.white : const Color(0xFF0F172A),
                 fontWeight: FontWeight.w800,
                 fontSize: 16,
                 letterSpacing: 0.5,
@@ -2140,7 +2146,7 @@ class _LeaveListScreenState extends State<LeaveListScreen> with SingleTickerProv
             ),
           ],
         ),
-        backgroundColor: Colors.white,
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
         elevation: 0,
         scrolledUnderElevation: 0,
         actions: [

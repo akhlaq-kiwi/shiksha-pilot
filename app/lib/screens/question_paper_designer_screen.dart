@@ -1921,11 +1921,27 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
                 child: DropdownButtonFormField<String>(
                   value: safeClassValue,
                   isExpanded: true,
-                  decoration: const InputDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  dropdownColor: Colors.white,
+                  elevation: 4,
+                  icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
+                  decoration: InputDecoration(
                     labelText: 'Select Class *',
+                    labelStyle: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
                     isDense: true,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                    border: OutlineInputBorder(),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
+                    ),
                   ),
                   items: effectiveClasses.map((c) {
                     final shortName = formatShortClassName(c['name']?.toString(), section: c['section']?.toString());
@@ -1944,11 +1960,27 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
                 child: DropdownButtonFormField<String>(
                   value: safeSubjectValue,
                   isExpanded: true,
-                  decoration: const InputDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  dropdownColor: Colors.white,
+                  elevation: 4,
+                  icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
+                  decoration: InputDecoration(
                     labelText: 'Select Subject *',
+                    labelStyle: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
                     isDense: true,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                    border: OutlineInputBorder(),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
+                    ),
                   ),
                   items: effectiveSubjects.map((s) {
                     return DropdownMenuItem<String>(
@@ -1975,10 +2007,23 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
               Expanded(
                 child: TextField(
                   controller: _paperTitleController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Paper Title',
+                    labelStyle: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
                     isDense: true,
-                    border: OutlineInputBorder(),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
+                    ),
                   ),
                 ),
               ),
@@ -1986,10 +2031,23 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
               Expanded(
                 child: TextField(
                   controller: _examNameController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Exam Name',
+                    labelStyle: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
                     isDense: true,
-                    border: OutlineInputBorder(),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
+                    ),
                   ),
                 ),
               ),
@@ -2003,10 +2061,23 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
               Expanded(
                 child: TextField(
                   controller: _durationController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Duration',
+                    labelStyle: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
                     isDense: true,
-                    border: OutlineInputBorder(),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
+                    ),
                   ),
                 ),
               ),
@@ -2015,10 +2086,23 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
                 child: TextField(
                   controller: _maxMarksController,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Max Marks',
+                    labelStyle: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
                     isDense: true,
-                    border: OutlineInputBorder(),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
+                    ),
                   ),
                 ),
               ),

@@ -87,6 +87,26 @@ class AuthService {
     }
   }
 
+  Future<bool> verifyPassword(String token, String password) async {
+    final uri = Uri.parse('$baseUrl/api/auth/verify-password');
+    final response = await http.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: json.encode({
+        'password': password,
+      }),
+    );
+
+    final resData = json.decode(response.body);
+    if (response.statusCode == 200) {
+      return true;
+    }
+    throw Exception(resData['message'] ?? 'Current password is incorrect.');
+  }
+
   Future<Map<String, dynamic>> fetchProfile(String token) async {
     final uri = Uri.parse('$baseUrl/api/auth/profile');
     final response = await http.get(

@@ -98,6 +98,26 @@ class AuthController extends BaseController
     }
 
     /**
+     * POST /api/auth/verify-password
+     *
+     * Body: { "password": "..." }
+     * Requires a valid auth token.
+     */
+    public function verifyPassword(Request $request, Response $response): Response
+    {
+        $claims = $this->authenticate($request);
+        $body = RequestParser::body($request);
+        RequestParser::required($body, ['password']);
+
+        $isValid = $this->authService->verifyPassword((int) $claims['id'], (string) $body['password']);
+        if (!$isValid) {
+            throw new \App\Shared\Exceptions\ValidationException(['password' => 'Current password is incorrect.'], 'Current password is incorrect.');
+        }
+
+        return $this->success($response, ['verified' => true], 'Password verified successfully.');
+    }
+
+    /**
      * GET /api/auth/profile
      *
      * Requires a valid auth token.

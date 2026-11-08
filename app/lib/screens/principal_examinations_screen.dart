@@ -5729,25 +5729,29 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
             return name.contains(query) || roll.contains(query) || sr.contains(query);
           }).toList();
 
-    return Column(
-      children: [
-        // Search Bar for Students
-        Container(
-          margin: const EdgeInsets.fromLTRB(16, 12, 16, 6),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.02),
-                blurRadius: 4,
-                offset: const Offset(0, 1),
-              ),
-            ],
-          ),
-          child: TextField(
-            controller: _reportCardSearchCtrl,
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Column(
+        children: [
+          // Search Bar for Students
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.02),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
+            child: TextField(
+              controller: _reportCardSearchCtrl,
+              onTapOutside: (_) => FocusScope.of(context).unfocus(),
             onChanged: (val) {
               setState(() {
                 _reportCardSearchQuery = val;
@@ -5800,6 +5804,7 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
                   ),
                 )
               : ListView.separated(
+                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                   itemCount: filteredCards.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 10),
@@ -5937,7 +5942,8 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
       },
     ),
   ),
-]);
+]),
+    );
   }
 
   void _showReportCardViewer(Map<String, dynamic> rcData) {

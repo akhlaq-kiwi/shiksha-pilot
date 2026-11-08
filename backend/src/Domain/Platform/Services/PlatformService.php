@@ -400,7 +400,7 @@ class PlatformService extends BaseService
         // Create initial School Administrator user account
         $adminPhone = !empty($data['admin_phone']) ? trim((string)$data['admin_phone']) : trim((string)($data['contact_phone'] ?? ''));
         $rawPassword = !empty($data['admin_password']) ? (string)$data['admin_password'] : 'changeme123';
-        $adminName = trim((string)($data['name'] ?? 'School')) . ' Admin';
+        $adminName = 'Admin';
         $adminEmail = !empty($data['contact_email']) ? trim((string)$data['contact_email']) : null;
 
         if (!empty($adminPhone)) {

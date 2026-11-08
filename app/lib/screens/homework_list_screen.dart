@@ -678,6 +678,7 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
                     // Title / Subject Name Field
                     TextField(
                       controller: titleCtrl,
+                      onTapOutside: (_) => FocusScope.of(context).unfocus(),
                       decoration: InputDecoration(
                         labelText: 'Subject / Title',
                         hintText: 'e.g. English, Math, General',
@@ -1176,6 +1177,7 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
 
     if (_homeworkList.isEmpty) {
       return ListView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
           SizedBox(height: MediaQuery.of(context).size.height * 0.25),
@@ -1210,6 +1212,7 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
     final groupedItems = _getGroupedHomework();
 
     return ListView.builder(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       controller: _scrollController,
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 20),

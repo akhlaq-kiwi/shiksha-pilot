@@ -7,17 +7,20 @@ import 'package:printing/printing.dart';
 import 'package:school_hub/services/fee_service.dart';
 import 'package:school_hub/screens/fees_collection_history_screen.dart';
 import 'package:school_hub/screens/manage_finance_fees_screen.dart';
+import 'package:school_hub/screens/pending_discount_requests_screen.dart';
 import 'package:school_hub/screens/full_screen_image_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class FeesPortalScreen extends StatefulWidget {
   final String baseUrl;
   final String token;
+  final int? initialStudentId;
 
   const FeesPortalScreen({
     Key? key,
     required this.baseUrl,
     required this.token,
+    this.initialStudentId,
   }) : super(key: key);
 
   @override
@@ -28,6 +31,8 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
   late FeeService _feeService;
   bool _isLoading = true;
   String _errorMessage = '';
+  int _pendingDiscountCount = 0;
+  bool _initialLedgerOpened = false;
 
   List<dynamic> _rawStudents = [];
   List<dynamic> _classes = [];
@@ -106,6 +111,20 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
       }
 
       _computeStudentDues();
+
+      int pendingCount = 0;
+      try {
+        final reqData = await _feeService.getDiscountRequests(status: 'PENDING');
+        final reqList = (reqData['requests'] as List<dynamic>?) ?? [];
+        pendingCount = reqList.length;
+      } catch (_) {}
+      if (mounted) {
+        setState(() {
+          _pendingDiscountCount = pendingCount;
+        });
+      }
+
+      _checkInitialStudentLedger();
     } catch (e) {
       debugPrint('Error loading fees portal data: $e');
       if (mounted) {
@@ -284,6 +303,20 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
     });
   }
 
+  void _checkInitialStudentLedger() {
+    if (_initialLedgerOpened || widget.initialStudentId == null) return;
+    _initialLedgerOpened = true;
+    final target = _processedStudents.firstWhere(
+      (s) => s['id'] == widget.initialStudentId,
+      orElse: () => {'id': widget.initialStudentId, 'name': 'Student'},
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _openStudentLedger(target);
+      }
+    });
+  }
+
   void _applyFilters() {
     final query = _searchController.text.trim().toLowerCase();
     List<Map<String, dynamic>> result = List.from(_processedStudents);
@@ -432,15 +465,16 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final availableClasses = _getAvailableClassNames();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFBF9F2),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFFBF9F2),
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
         elevation: 0.5,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF1E293B)),
+          icon: Icon(Icons.arrow_back, color: isDark ? Colors.white : const Color(0xFF1E293B)),
           onPressed: () => Navigator.pop(context),
         ),
         title: Row(
@@ -458,10 +492,10 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
               ),
             ),
             const SizedBox(width: 10),
-            const Text(
+            Text(
               'FEES PORTAL',
               style: TextStyle(
-                color: Color(0xFF0F172A),
+                color: isDark ? Colors.white : const Color(0xFF0F172A),
                 fontWeight: FontWeight.w800,
                 fontSize: 18,
                 letterSpacing: 1.1,
@@ -470,6 +504,84 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
           ],
         ),
         actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: Center(
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => PendingDiscountRequestsScreen(
+                          feeService: _feeService,
+                          allStudents: _processedStudents,
+                        ),
+                      ),
+                    );
+                    if (mounted) {
+                      _loadPortalData();
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF3C7),
+                          border: Border.all(color: const Color(0xFFF59E0B), width: 1.5),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFD97706).withValues(alpha: 0.2),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        alignment: Alignment.center,
+                        child: const Text(
+                          'D',
+                          style: TextStyle(
+                            color: Color(0xFFB45309),
+                            fontWeight: FontWeight.w900,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                      if (_pendingDiscountCount > 0)
+                        Positioned(
+                          top: -3,
+                          right: -3,
+                          child: Container(
+                            padding: const EdgeInsets.all(3.5),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFDC2626),
+                              shape: BoxShape.circle,
+                            ),
+                            constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                            child: Text(
+                              _pendingDiscountCount > 9 ? '9+' : '$_pendingDiscountCount',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w900,
+                                height: 1,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 14.0),
             child: Center(
@@ -809,22 +921,24 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
     required num amount,
     bool isClickable = false,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 10),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        color: isDark ? const Color(0xFF1E293B) : null,
+        gradient: isDark ? null : const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [Color(0xFFFFFBEB), Color(0xFFFEF5D6)],
         ),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: isClickable ? const Color(0xFFF59E0B) : const Color(0xFFFCD34D),
+          color: isClickable ? const Color(0xFFF59E0B) : (isDark ? const Color(0xFF334155) : const Color(0xFFFCD34D)),
           width: isClickable ? 1.2 : 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.02),
             blurRadius: 3,
             offset: const Offset(0, 1),
           ),
@@ -883,8 +997,9 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
   }
 
   Widget _buildFilterSection(List<String> availableClasses) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      color: Colors.white,
+      color: isDark ? const Color(0xFF1E293B) : Colors.white,
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
       child: Column(
         children: [
@@ -896,24 +1011,24 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
             height: 44,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
+              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
             ),
             child: TextField(
               controller: _searchController,
               textAlignVertical: TextAlignVertical.center,
               textInputAction: TextInputAction.search,
-              style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
+              style: TextStyle(fontSize: 13, color: isDark ? Colors.white : const Color(0xFF0F172A), fontWeight: FontWeight.w600),
               decoration: InputDecoration(
                 isDense: true,
                 hintText: 'Search by Student Name...',
-                hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8), fontWeight: FontWeight.normal),
-                prefixIcon: const Icon(Icons.search, size: 20, color: Color(0xFF64748B)),
+                hintStyle: TextStyle(fontSize: 13, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF94A3B8), fontWeight: FontWeight.normal),
+                prefixIcon: Icon(Icons.search, size: 20, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                 prefixIconConstraints: const BoxConstraints(minWidth: 42, minHeight: 44),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear, size: 16, color: Color(0xFF94A3B8)),
+                        icon: Icon(Icons.clear, size: 16, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF94A3B8)),
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(minWidth: 36, minHeight: 44),
                         onPressed: () {
@@ -1206,6 +1321,7 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
   }
 
   Widget _buildStudentCard(Map<String, dynamic> student) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final name = student['name'] ?? 'Unnamed';
     final className = student['class_name'] ?? 'N/A';
     final rollNo = student['roll_no']?.toString().isNotEmpty == true ? student['roll_no'] : '—';
@@ -1216,12 +1332,12 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.02),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -1241,10 +1357,10 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
                     name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF0F172A),
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -1455,7 +1571,7 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
-        return _StudentLedgerSheet(
+        return StudentLedgerSheet(
           studentId: studentSummary['id'],
           studentSummary: studentSummary,
           feeService: _feeService,
@@ -1468,16 +1584,38 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
   }
 }
 
+void openStudentLedgerSheet({
+  required BuildContext context,
+  required int studentId,
+  required Map<String, dynamic> studentSummary,
+  required FeeService feeService,
+  VoidCallback? onRefreshNeeded,
+}) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (context) {
+      return StudentLedgerSheet(
+        studentId: studentId,
+        studentSummary: studentSummary,
+        feeService: feeService,
+        onPaymentSuccess: onRefreshNeeded ?? () {},
+      );
+    },
+  );
+}
+
 // =============================================================================
 // STUDENT LEDGER SHEET COMPONENT
 // =============================================================================
-class _StudentLedgerSheet extends StatefulWidget {
+class StudentLedgerSheet extends StatefulWidget {
   final int studentId;
   final Map<String, dynamic> studentSummary;
   final FeeService feeService;
   final VoidCallback onPaymentSuccess;
 
-  const _StudentLedgerSheet({
+  const StudentLedgerSheet({
     Key? key,
     required this.studentId,
     required this.studentSummary,
@@ -1486,13 +1624,23 @@ class _StudentLedgerSheet extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<_StudentLedgerSheet> createState() => _StudentLedgerSheetState();
+  State<StudentLedgerSheet> createState() => _StudentLedgerSheetState();
 }
 
-class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
+class _StudentLedgerSheetState extends State<StudentLedgerSheet> {
   bool _isLoading = true;
   String _errorMessage = '';
+  int _pendingDiscountCount = 0;
+  bool _initialLedgerOpened = false;
   Map<String, dynamic> _studentDetail = {};
+  Map<String, dynamic>? _pendingDiscountRequest;
+  Map<String, int> _monthToPendingRequestId = {};
+  Map<int, int> _additionalFeeToPendingRequestId = {};
+  Map<String, int> _additionalFeeNameToPendingRequestId = {};
+  Map<int, Map<String, dynamic>> _pendingRequestsMap = {};
+  int _currentUserId = 0;
+  String _currentUserRole = '';
+  String _currentUserName = '';
   int _selectedLedgerTab = 0; // 0: Monthly Tuition Fees, 1: Additional Fees
 
   static const List<String> _academicMonths = [
@@ -1503,7 +1651,38 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
   @override
   void initState() {
     super.initState();
+    _loadCurrentUserInfo();
     _fetchDetail();
+  }
+
+  Future<void> _loadCurrentUserInfo() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (mounted) {
+        setState(() {
+          _currentUserId = prefs.getInt('user_id') ?? 0;
+          _currentUserRole = (prefs.getString('user_role') ?? '').toUpperCase();
+          _currentUserName = (prefs.getString('user_name') ?? '').trim();
+        });
+      }
+    } catch (_) {}
+  }
+
+  bool _canCancelRequest(int reqId) {
+    if (_currentUserRole == 'SCHOOL_ADMIN' || _currentUserRole == 'SUPER_ADMIN' || _currentUserRole == 'ADMIN') {
+      return true;
+    }
+    final r = _pendingRequestsMap[reqId];
+    if (r == null) return false;
+    final reqUserId = int.tryParse(r['requested_by_id']?.toString() ?? '') ?? 0;
+    if (reqUserId > 0 && _currentUserId > 0) {
+      return reqUserId == _currentUserId;
+    }
+    final reqUserName = (r['requested_by'] ?? '').toString().trim();
+    if (reqUserName.isNotEmpty && _currentUserName.isNotEmpty) {
+      return reqUserName.toLowerCase() == _currentUserName.toLowerCase();
+    }
+    return false;
   }
 
   Future<void> _fetchDetail() async {
@@ -1513,9 +1692,78 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
     });
     try {
       final data = await widget.feeService.fetchStudentDetail(widget.studentId);
+      Map<String, dynamic>? pendingReq;
+      final Map<String, int> pendingMonthsMap = {};
+      final Map<int, int> pendingAddFeesMap = {};
+      final Map<String, int> pendingAddFeeNamesMap = {};
+      final Map<int, Map<String, dynamic>> pendingRequestsMap = {};
+      try {
+        final reqs = await widget.feeService.getDiscountRequests(status: 'PENDING');
+        final list = (reqs['requests'] as List<dynamic>?) ?? [];
+        for (final r in list) {
+          final sId = int.tryParse(r['student_id']?.toString() ?? '') ?? 0;
+          if (sId == widget.studentId) {
+            final reqId = int.tryParse(r['id']?.toString() ?? '') ?? 0;
+            if (reqId > 0) {
+              pendingRequestsMap[reqId] = Map<String, dynamic>.from(r as Map);
+            }
+            pendingReq ??= Map<String, dynamic>.from(r as Map);
+            final feeType = (r['fee_type'] ?? '').toString().toUpperCase();
+
+            dynamic payload = r['deposit_payload'];
+            if (payload is String) {
+              try {
+                payload = json.decode(payload);
+              } catch (_) {}
+            }
+
+            if (feeType == 'MONTHLY') {
+              List<String> months = [];
+              if (payload is Map && payload['months'] is List) {
+                months = (payload['months'] as List).map((m) => m.toString()).toList();
+              } else if (r['fee_items_summary'] != null) {
+                months = r['fee_items_summary']
+                    .toString()
+                    .split(',')
+                    .map((m) => m.trim())
+                    .where((m) => m.isNotEmpty)
+                    .toList();
+              }
+              for (final m in months) {
+                pendingMonthsMap[m] = reqId;
+              }
+            } else if (feeType == 'ADDITIONAL') {
+              if (payload is Map && payload['fees'] is List) {
+                for (final f in payload['fees']) {
+                  final fid = int.tryParse(f['id']?.toString() ?? '') ?? 0;
+                  if (fid > 0) {
+                    pendingAddFeesMap[fid] = reqId;
+                  }
+                }
+              }
+              if (r['fee_items_summary'] != null) {
+                final names = r['fee_items_summary']
+                    .toString()
+                    .split(',')
+                    .map((s) => s.trim().toUpperCase())
+                    .where((s) => s.isNotEmpty);
+                for (final name in names) {
+                  pendingAddFeeNamesMap[name] = reqId;
+                }
+              }
+            }
+          }
+        }
+      } catch (_) {}
+
       if (mounted) {
         setState(() {
           _studentDetail = data;
+          _pendingDiscountRequest = pendingReq;
+          _monthToPendingRequestId = pendingMonthsMap;
+          _additionalFeeToPendingRequestId = pendingAddFeesMap;
+          _additionalFeeNameToPendingRequestId = pendingAddFeeNamesMap;
+          _pendingRequestsMap = pendingRequestsMap;
           _isLoading = false;
         });
       }
@@ -1525,6 +1773,89 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
           _errorMessage = e.toString().replaceAll('Exception: ', '');
           _isLoading = false;
         });
+      }
+    }
+  }
+
+  Future<void> _handleCancelDiscountRequest(int reqId, String itemLabel) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(
+            'Cancel Discount Request',
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A),
+            ),
+          ),
+          content: Text(
+            'Are you sure you want to cancel the pending discount request for $itemLabel? Once cancelled, the fee will be available for normal deposit again.',
+            style: TextStyle(
+              fontSize: 13.5,
+              height: 1.4,
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+            ),
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(
+                'Keep Request',
+                style: TextStyle(
+                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              ),
+              child: const Text('Cancel Request', style: TextStyle(fontWeight: FontWeight.w700)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm != true) return;
+
+    try {
+      await widget.feeService.cancelDiscountRequest(reqId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Discount request cancelled successfully.',
+              style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
+            ),
+            backgroundColor: Color(0xFFD97706),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      _fetchDetail();
+      widget.onPaymentSuccess();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception: ', '')),
+            backgroundColor: const Color(0xFFDC2626),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     }
   }
@@ -1756,10 +2087,52 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
             },
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Student Profile Card
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_pendingDiscountRequest != null) ...[
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFFDE68A)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.shield_outlined, size: 20, color: Color(0xFFD97706)),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Discount Approval Pending',
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF92400E),
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'A discount request of ₹${(double.tryParse(_pendingDiscountRequest!['discount_amount']?.toString() ?? '0') ?? 0).round()} has been submitted and is awaiting School Admin approval.',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFFB45309),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  // Student Profile Card
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.fromLTRB(6, 6, 16, 6),
@@ -1969,6 +2342,8 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
                                 'fee': mRow['fee'],
                               })
                           .toList();
+                      final pendingReqId = _monthToPendingRequestId[monthName];
+                      final isWaitingApproval = pendingReqId != null;
 
                       return Container(
                         padding: const EdgeInsets.all(12),
@@ -1976,7 +2351,10 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
-                            color: !isPaid ? const Color(0xFFFED7AA) : const Color(0xFFE2E8F0),
+                            color: isWaitingApproval
+                                ? const Color(0xFFFDE68A)
+                                : (!isPaid ? const Color(0xFFFED7AA) : const Color(0xFFE2E8F0)),
+                            width: isWaitingApproval ? 1.5 : 1.0,
                           ),
                         ),
                         child: Column(
@@ -1994,34 +2372,55 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
                                 Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Container(
-                                      width: 62,
-                                      height: 24,
-                                      alignment: Alignment.center,
-                                      decoration: BoxDecoration(
-                                        color: isPaid
-                                            ? const Color(0xFFD1FAE5)
-                                            : isPartial
-                                                ? const Color(0xFFDBEAFE)
-                                                : const Color(0xFFFEF3C7),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Text(
-                                        mStatus,
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          fontSize: 9.5,
-                                          fontWeight: FontWeight.w800,
-                                          letterSpacing: 0.3,
+                                    if (isWaitingApproval)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        alignment: Alignment.center,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFFEF3C7),
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: const Color(0xFFFDE68A)),
+                                        ),
+                                        child: const Text(
+                                          'WAITING FOR APPROVAL',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 9.5,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 0.3,
+                                            color: Color(0xFFD97706),
+                                          ),
+                                        ),
+                                      )
+                                    else
+                                      Container(
+                                        width: 62,
+                                        height: 24,
+                                        alignment: Alignment.center,
+                                        decoration: BoxDecoration(
                                           color: isPaid
+                                              ? const Color(0xFFD1FAE5)
+                                              : isPartial
+                                                  ? const Color(0xFFDBEAFE)
+                                                  : const Color(0xFFFEF3C7),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          mStatus,
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 9.5,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 0.3,
+                                            color: isPaid
                                               ? const Color(0xFF065F46)
                                               : isPartial
                                                   ? const Color(0xFF1E40AF)
                                                   : const Color(0xFF92400E),
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                    if (isPaid || isPartial) ...[
+                                    if (!isWaitingApproval && (isPaid || isPartial)) ...[
                                       () {
                                         final cleanMonthPayments = monthPayments.where((p) {
                                           if (p is Map) {
@@ -2104,23 +2503,38 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
                                   ],
                                 ),
                                 if (rem > 0.01)
-                                  ElevatedButton(
-                                    onPressed: () => _openDepositModal(
-                                      student: studentInfo,
-                                      payments: payments,
-                                      classFeeConfig: _studentDetail['class_fee_config'] ?? studentInfo['class_fee_config'],
-                                      initialSelectedMonth: monthName,
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFFD97706),
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                      minimumSize: Size.zero,
-                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                    ),
-                                    child: const Text('Deposit', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
-                                  ),
+                                  isWaitingApproval
+                                      ? (_canCancelRequest(pendingReqId)
+                                          ? ElevatedButton(
+                                              onPressed: () => _handleCancelDiscountRequest(pendingReqId, monthName),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: const Color(0xFFDC2626),
+                                                foregroundColor: Colors.white,
+                                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                                minimumSize: Size.zero,
+                                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                              ),
+                                              child: const Text('Cancel Request', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
+                                            )
+                                          : const SizedBox.shrink())
+                                      : ElevatedButton(
+                                          onPressed: () => _openDepositModal(
+                                            student: studentInfo,
+                                            payments: payments,
+                                            classFeeConfig: _studentDetail['class_fee_config'] ?? studentInfo['class_fee_config'],
+                                            initialSelectedMonth: monthName,
+                                          ),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color(0xFFD97706),
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                            minimumSize: Size.zero,
+                                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                          ),
+                                          child: const Text('Deposit', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
+                                        ),
                               ],
                             ),
                           ],
@@ -2185,6 +2599,8 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
                         final isPaid = status == 'Paid';
                         final isPartial = status == 'Partially Paid';
                         final dueDate = af['due_date'];
+                        final pendingReqId = _additionalFeeToPendingRequestId[feeId] ?? _additionalFeeNameToPendingRequestId[title.toUpperCase()];
+                        final isWaitingApproval = pendingReqId != null;
 
                         return Container(
                           padding: const EdgeInsets.all(12),
@@ -2192,7 +2608,10 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
-                              color: !isPaid ? const Color(0xFFFED7AA) : const Color(0xFFE2E8F0),
+                              color: isWaitingApproval
+                                  ? const Color(0xFFFDE68A)
+                                  : (!isPaid ? const Color(0xFFFED7AA) : const Color(0xFFE2E8F0)),
+                              width: isWaitingApproval ? 1.5 : 1.0,
                             ),
                           ),
                           child: Column(
@@ -2210,34 +2629,55 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
                                   Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Container(
-                                        width: 62,
-                                        height: 24,
-                                        alignment: Alignment.center,
-                                        decoration: BoxDecoration(
-                                          color: isPaid
-                                              ? const Color(0xFFD1FAE5)
-                                              : isPartial
-                                                  ? const Color(0xFFDBEAFE)
-                                                  : const Color(0xFFFEF3C7),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Text(
-                                          isPartial ? 'PARTIAL' : (isPaid ? 'PAID' : 'UNPAID'),
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            fontSize: 9.5,
-                                            fontWeight: FontWeight.w800,
-                                            letterSpacing: 0.3,
+                                      if (isWaitingApproval)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          alignment: Alignment.center,
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFFEF3C7),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: const Color(0xFFFDE68A)),
+                                          ),
+                                          child: const Text(
+                                            'WAITING FOR APPROVAL',
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              fontSize: 9.5,
+                                              fontWeight: FontWeight.w800,
+                                              letterSpacing: 0.3,
+                                              color: Color(0xFFD97706),
+                                            ),
+                                          ),
+                                        )
+                                      else
+                                        Container(
+                                          width: 62,
+                                          height: 24,
+                                          alignment: Alignment.center,
+                                          decoration: BoxDecoration(
                                             color: isPaid
-                                                ? const Color(0xFF065F46)
+                                                ? const Color(0xFFD1FAE5)
                                                 : isPartial
-                                                    ? const Color(0xFF1E40AF)
-                                                    : const Color(0xFF92400E),
+                                                    ? const Color(0xFFDBEAFE)
+                                                    : const Color(0xFFFEF3C7),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Text(
+                                            isPartial ? 'PARTIAL' : (isPaid ? 'PAID' : 'UNPAID'),
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              fontSize: 9.5,
+                                              fontWeight: FontWeight.w800,
+                                              letterSpacing: 0.3,
+                                              color: isPaid
+                                                  ? const Color(0xFF065F46)
+                                                  : isPartial
+                                                      ? const Color(0xFF1E40AF)
+                                                      : const Color(0xFF92400E),
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                      if (isPaid || isPartial) ...[
+                                      if (!isWaitingApproval && (isPaid || isPartial)) ...[
                                         () {
                                           final rawMap = af['raw'] is Map ? Map<String, dynamic>.from(af['raw']) : Map<String, dynamic>.from(af);
                                           final afPayments = ((rawMap['payments'] ?? af['payments']) as List<dynamic>?) ?? [];
@@ -2355,22 +2795,37 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
                                     ],
                                   ),
                                   if (rem > 0.01)
-                                    ElevatedButton(
-                                      onPressed: () => _openAdditionalDepositModal(
-                                        student: studentInfo,
-                                        unpaidFees: unpaidAdditional,
-                                        initialSelectedIds: [feeId],
-                                      ),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(0xFFD97706),
-                                        foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                        minimumSize: Size.zero,
-                                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                      ),
-                                      child: const Text('Deposit', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
-                                    ),
+                                    isWaitingApproval
+                                        ? (_canCancelRequest(pendingReqId)
+                                            ? ElevatedButton(
+                                                onPressed: () => _handleCancelDiscountRequest(pendingReqId, title),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: const Color(0xFFDC2626),
+                                                  foregroundColor: Colors.white,
+                                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                                  minimumSize: Size.zero,
+                                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                ),
+                                                child: const Text('Cancel Request', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
+                                              )
+                                            : const SizedBox.shrink())
+                                        : ElevatedButton(
+                                            onPressed: () => _openAdditionalDepositModal(
+                                              student: studentInfo,
+                                              unpaidFees: unpaidAdditional,
+                                              initialSelectedIds: [feeId],
+                                            ),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: const Color(0xFFD97706),
+                                              foregroundColor: Colors.white,
+                                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                              minimumSize: Size.zero,
+                                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                            ),
+                                            child: const Text('Deposit', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
+                                          ),
                                 ],
                               ),
                             ],
@@ -2397,54 +2852,74 @@ class _StudentLedgerSheetState extends State<_StudentLedgerSheet> {
               width: double.infinity,
               height: 48,
               child: _selectedLedgerTab == 0
-                  ? ElevatedButton.icon(
-                      onPressed: totalTuitionDues <= 0
-                          ? null
-                          : () => _openDepositModal(
-                                student: studentInfo,
-                                payments: payments,
-                                classFeeConfig: _studentDetail['class_fee_config'] ?? studentInfo['class_fee_config'],
-                              ),
-                      icon: const Icon(Icons.payment_rounded, size: 18),
-                      label: Text(
-                        totalTuitionDues > 0
-                            ? 'Deposit Tuition Fees (₹${totalTuitionDues.round()})'
-                            : (monthRows.every((m) => (m['fee'] as num) == 0)
-                                ? 'Tuition Fee Not Configured'
-                                : 'Tuition Fees Fully Paid'),
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
-                      ),
+                  ? () {
+                      final availableMonths = monthRows.where((m) => (m['remaining'] as num) > 0.01 && !_monthToPendingRequestId.containsKey(m['month'])).toList();
+                      final allPending = totalTuitionDues > 0 && availableMonths.isEmpty && _monthToPendingRequestId.isNotEmpty;
 
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFD97706),
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor: Colors.grey.shade300,
-                        disabledForegroundColor: Colors.grey.shade600,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                    )
-                  : ElevatedButton.icon(
-                      onPressed: unpaidAdditional.isEmpty
-                          ? null
-                          : () => _openAdditionalDepositModal(
-                                student: studentInfo,
-                                unpaidFees: unpaidAdditional,
-                              ),
-                      icon: const Icon(Icons.add_card_rounded, size: 18),
-                      label: Text(
-                        unpaidAdditional.isNotEmpty
-                            ? 'Deposit Additional Fees (₹${totalAdditionalDues.round()})'
-                            : 'All Additional Fees Paid',
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFD97706),
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor: Colors.grey.shade300,
-                        disabledForegroundColor: Colors.grey.shade600,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                    ),
+                      return ElevatedButton.icon(
+                        onPressed: (totalTuitionDues <= 0 || allPending)
+                            ? null
+                            : () => _openDepositModal(
+                                  student: studentInfo,
+                                  payments: payments,
+                                  classFeeConfig: _studentDetail['class_fee_config'] ?? studentInfo['class_fee_config'],
+                                ),
+                        icon: const Icon(Icons.payment_rounded, size: 18),
+                        label: Text(
+                          allPending
+                              ? 'Tuition Fees Waiting for Approval'
+                              : (totalTuitionDues > 0
+                                  ? 'Deposit Tuition Fees (₹${totalTuitionDues.round()})'
+                                  : (monthRows.every((m) => (m['fee'] as num) == 0)
+                                      ? 'Tuition Fee Not Configured'
+                                      : 'Tuition Fees Fully Paid')),
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFD97706),
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor: Colors.grey.shade300,
+                          disabledForegroundColor: Colors.grey.shade600,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      );
+                    }()
+                  : () {
+                      final availableAddFees = unpaidAdditional.where((f) {
+                        final id = f['id'];
+                        final name = (f['fee_name'] ?? '').toString().trim().toUpperCase();
+                        return !_additionalFeeToPendingRequestId.containsKey(id) &&
+                            !_additionalFeeNameToPendingRequestId.containsKey(name);
+                      }).toList();
+                      final allPending = unpaidAdditional.isNotEmpty &&
+                          availableAddFees.isEmpty &&
+                          (_additionalFeeToPendingRequestId.isNotEmpty || _additionalFeeNameToPendingRequestId.isNotEmpty);
+
+                      return ElevatedButton.icon(
+                        onPressed: (unpaidAdditional.isEmpty || allPending)
+                            ? null
+                            : () => _openAdditionalDepositModal(
+                                  student: studentInfo,
+                                  unpaidFees: availableAddFees,
+                                ),
+                        icon: const Icon(Icons.add_card_rounded, size: 18),
+                        label: Text(
+                          allPending
+                              ? 'Additional Fees Waiting for Approval'
+                              : (unpaidAdditional.isNotEmpty
+                                  ? 'Deposit Additional Fees (₹${totalAdditionalDues.round()})'
+                                  : 'All Additional Fees Paid'),
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFD97706),
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor: Colors.grey.shade300,
+                          disabledForegroundColor: Colors.grey.shade600,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      );
+                    }(),
             ),
           ),
         ),
@@ -3434,6 +3909,7 @@ class _DepositDialogState extends State<_DepositDialog> {
   final List<String> _selectedMonths = [];
   final Map<String, int> _depositAmounts = {};
   bool _applyDiscount = false;
+  bool _isApprovalRequired = false;
   final TextEditingController _discountController = TextEditingController();
   final TextEditingController _partialAmountController = TextEditingController();
 
@@ -3447,12 +3923,16 @@ class _DepositDialogState extends State<_DepositDialog> {
 
   String _workingAyName = '';
   String _workingAyStatus = 'ACTIVE';
+  String _currentUserName = '';
 
   @override
   void initState() {
     super.initState();
     _loadWorkingAy();
     _initMonthlyConfig();
+    widget.feeService.getDiscountApprovalRequired().then((val) {
+      if (mounted) setState(() => _isApprovalRequired = val);
+    });
     final partial = _getPartialMonth();
     if (widget.initialSelectedMonth != null) {
       if (partial != null && widget.initialSelectedMonth != partial) {
@@ -3481,6 +3961,7 @@ class _DepositDialogState extends State<_DepositDialog> {
         setState(() {
           _workingAyName = prefs.getString('selected_academic_year_name') ?? '';
           _workingAyStatus = prefs.getString('selected_academic_year_status') ?? 'ACTIVE';
+          _currentUserName = (prefs.getString('user_name') ?? '').trim();
         });
       }
     } catch (_) {}
@@ -3758,6 +4239,51 @@ class _DepositDialogState extends State<_DepositDialog> {
         'payment_method': _paymentMethod,
       };
 
+      if (discApplied > 0) {
+        bool isApprovalRequired = _isApprovalRequired;
+        try {
+          isApprovalRequired = await widget.feeService.getDiscountApprovalRequired();
+        } catch (_) {}
+        if (isApprovalRequired) {
+          final shouldSend = await _showDiscountApprovalNoticeDialog(context);
+          if (!shouldSend) {
+            if (mounted) setState(() => _isSaving = false);
+            return;
+          }
+
+          final gross = _calculateGrossTotal();
+          final net = _calculateTotalDeposit();
+          final discountPayload = {
+            'student_id': resolvedStudentId,
+            'fee_type': 'MONTHLY',
+            'fee_items_summary': _selectedMonths.join(', '),
+            'total_amount': gross,
+            'paid_amount': net,
+            'discount_amount': discApplied,
+            'payment_method': _paymentMethod,
+            'deposit_payload': payload,
+            'requested_by': _currentUserName,
+          };
+
+          await widget.feeService.createDiscountRequest(discountPayload);
+          if (mounted) {
+            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Discount request sent for Admin approval.',
+                  style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
+                ),
+                backgroundColor: Color(0xFFD97706),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+            widget.onSuccess();
+          }
+          return;
+        }
+      }
+
       await widget.feeService.depositFeePayment(payload);
 
       if (mounted) {
@@ -3926,6 +4452,33 @@ class _DepositDialogState extends State<_DepositDialog> {
                                 isDense: true,
                               ),
                             ),
+                            if (_isApprovalRequired) ...[
+                              const SizedBox(height: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFEF3C7),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: const Color(0xFFFDE68A)),
+                                ),
+                                child: Row(
+                                  children: const [
+                                    Icon(Icons.shield_outlined, size: 16, color: Color(0xFFD97706)),
+                                    SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        'Admin approval is enabled. Submitting will send a discount request to the School Admin.',
+                                        style: TextStyle(
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xFF92400E),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ],
                         ],
                       ),
@@ -4238,7 +4791,9 @@ class _DepositDialogState extends State<_DepositDialog> {
                       child: _isSaving
                           ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                           : Text(
-                              'Deposit (₹$totalDeposit)',
+                              _isApprovalRequired && _getDiscAmount() > 0
+                                  ? 'Request Approval (₹$totalDeposit)'
+                                  : 'Deposit (₹$totalDeposit)',
                               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
                             ),
                     ),
@@ -4282,6 +4837,7 @@ class _AdditionalDepositModalState extends State<_AdditionalDepositModal> {
   final List<int> _selectedIds = [];
   final Map<int, int> _depositAmounts = {};
   bool _applyDiscount = false;
+  bool _isApprovalRequired = false;
   final TextEditingController _discountController = TextEditingController();
   final TextEditingController _partialAmountController = TextEditingController();
 
@@ -4290,11 +4846,27 @@ class _AdditionalDepositModalState extends State<_AdditionalDepositModal> {
 
   bool _isSaving = false;
   String _errorMessage = '';
+  String _currentUserName = '';
 
   @override
   void initState() {
     super.initState();
     _initSelection();
+    _loadUserName();
+    widget.feeService.getDiscountApprovalRequired().then((val) {
+      if (mounted) setState(() => _isApprovalRequired = val);
+    });
+  }
+
+  Future<void> _loadUserName() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (mounted) {
+        setState(() {
+          _currentUserName = (prefs.getString('user_name') ?? '').trim();
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -4506,6 +5078,92 @@ class _AdditionalDepositModalState extends State<_AdditionalDepositModal> {
 
     try {
       final totalDiscount = _getDiscAmount();
+
+      if (totalDiscount > 0) {
+        bool isApprovalRequired = _isApprovalRequired;
+        try {
+          isApprovalRequired = await widget.feeService.getDiscountApprovalRequired();
+        } catch (_) {}
+        if (isApprovalRequired) {
+          final shouldSend = await _showDiscountApprovalNoticeDialog(context);
+          if (!shouldSend) {
+            if (mounted) setState(() => _isSaving = false);
+            return;
+          }
+
+          final List<Map<String, dynamic>> feesList = [];
+          final List<String> feeNames = [];
+          int remainingDiscount = totalDiscount;
+          final isSingleFee = _selectedIds.length == 1;
+
+          final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+          final rnd = Random().nextInt(90) + 10;
+          final sharedReceiptNo = '$nowSec$rnd';
+
+          for (int i = 0; i < _selectedIds.length; i++) {
+            final id = _selectedIds[i];
+            final fee = widget.unpaidFees.firstWhere((f) => f['id'] == id);
+            feeNames.add(fee['fee_name']?.toString() ?? 'Additional Fee');
+            final remaining = (fee['remaining'] as num).round();
+            final userTypedAmt = isSingleFee
+                ? (int.tryParse(_partialAmountController.text.trim()) ?? _depositAmounts[id] ?? remaining)
+                : (_depositAmounts[id] ?? remaining);
+
+            int feeDisc = 0;
+            if (isSingleFee) {
+              feeDisc = totalDiscount.clamp(0, userTypedAmt);
+            } else {
+              feeDisc = remainingDiscount.clamp(0, userTypedAmt);
+              remainingDiscount -= feeDisc;
+            }
+
+            final netCashPaid = (userTypedAmt - feeDisc).clamp(0, 99999999);
+            feesList.add({
+              'id': id,
+              'payment_method': _paymentMethod,
+              'amount_paid': netCashPaid,
+              'discount_amount': feeDisc,
+              'receipt_no': sharedReceiptNo,
+            });
+          }
+
+          final int resolvedStudentId = widget.studentId != 0
+              ? widget.studentId
+              : (int.tryParse(widget.student['id']?.toString() ?? '') ?? 0);
+
+          final discountPayload = {
+            'student_id': resolvedStudentId,
+            'fee_type': 'ADDITIONAL',
+            'fee_items_summary': feeNames.join(', '),
+            'total_amount': _calculateGrossTotal(),
+            'paid_amount': _calculateTotalDeposit(),
+            'discount_amount': totalDiscount,
+            'payment_method': _paymentMethod,
+            'deposit_payload': {
+              'fees': feesList,
+            },
+            'requested_by': _currentUserName,
+          };
+
+          await widget.feeService.createDiscountRequest(discountPayload);
+          if (mounted) {
+            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Discount request sent for Admin approval.',
+                  style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
+                ),
+                backgroundColor: Color(0xFFD97706),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+            widget.onSuccess();
+          }
+          return;
+        }
+      }
+
       int remainingDiscount = totalDiscount;
       final isSingleFee = _selectedIds.length == 1;
 
@@ -4673,6 +5331,33 @@ class _AdditionalDepositModalState extends State<_AdditionalDepositModal> {
                                 isDense: true,
                               ),
                             ),
+                            if (_isApprovalRequired) ...[
+                              const SizedBox(height: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFEF3C7),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: const Color(0xFFFDE68A)),
+                                ),
+                                child: Row(
+                                  children: const [
+                                    Icon(Icons.shield_outlined, size: 16, color: Color(0xFFD97706)),
+                                    SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        'Admin approval is enabled. Submitting will send a discount request to the School Admin.',
+                                        style: TextStyle(
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xFF92400E),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ],
                         ],
                       ),
@@ -4969,7 +5654,9 @@ class _AdditionalDepositModalState extends State<_AdditionalDepositModal> {
                       child: _isSaving
                           ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                           : Text(
-                              'Deposit (₹$totalDeposit)',
+                              _isApprovalRequired && _getDiscAmount() > 0
+                                  ? 'Request Approval (₹$totalDeposit)'
+                                  : 'Deposit (₹$totalDeposit)',
                               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
                             ),
                     ),
@@ -4979,6 +5666,378 @@ class _AdditionalDepositModalState extends State<_AdditionalDepositModal> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// DISCOUNT APPROVAL NOTICE DIALOG & COLLECTOR DISCOUNT REQUESTS SHEET
+// =============================================================================
+
+Future<bool> _showDiscountApprovalNoticeDialog(BuildContext context) async {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  return await showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) {
+      return AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+        contentPadding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF3C7),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.shield_outlined, color: Color(0xFFD97706), size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Admin Approval Required',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A),
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Applying a discount requires School Admin permission.',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Once submitted, this fee deposit will remain pending and will not reflect in fee collections, collection history, or financial reports until approved by the School Admin.',
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.4,
+                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, size: 16, color: Color(0xFFD97706)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Status will remain "Pending" until approved.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF334155),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFD97706),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            ),
+            child: const Text(
+              'Send Request',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      );
+    },
+  ) ?? false;
+}
+
+class _CollectorDiscountRequestsSheet extends StatefulWidget {
+  final FeeService feeService;
+  final VoidCallback onDataChanged;
+
+  const _CollectorDiscountRequestsSheet({
+    Key? key,
+    required this.feeService,
+    required this.onDataChanged,
+  }) : super(key: key);
+
+  @override
+  State<_CollectorDiscountRequestsSheet> createState() => _CollectorDiscountRequestsSheetState();
+}
+
+class _CollectorDiscountRequestsSheetState extends State<_CollectorDiscountRequestsSheet> {
+  bool _isLoading = true;
+  List<dynamic> _requests = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRequests();
+  }
+
+  Future<void> _loadRequests() async {
+    setState(() => _isLoading = true);
+    try {
+      final res = await widget.feeService.getDiscountRequests();
+      if (mounted) {
+        setState(() {
+          _requests = (res['requests'] as List<dynamic>?) ?? [];
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _handleCancel(int id, String studentName) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Cancel Discount Request'),
+          content: Text('Are you sure you want to cancel the discount request for $studentName? Once cancelled, the Admin will no longer be able to approve or reject it.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Keep Request'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Cancel Request'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm != true) return;
+
+    try {
+      await widget.feeService.cancelDiscountRequest(id);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Discount request cancelled.'),
+          backgroundColor: Color(0xFFD97706),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      widget.onDataChanged();
+      _loadRequests();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+          backgroundColor: const Color(0xFFDC2626),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.75,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 12),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.percent_rounded, color: Color(0xFFD97706), size: 18),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Discount Requests',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A),
+                      ),
+                    ),
+                  ],
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: Color(0xFFD97706)))
+                : _requests.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No discount requests found.',
+                          style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                        ),
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _requests.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        itemBuilder: (ctx, i) {
+                          final req = _requests[i];
+                          final id = int.tryParse(req['id']?.toString() ?? '0') ?? 0;
+                          final studentName = req['student_name']?.toString() ?? 'Student';
+                          final className = req['class_name']?.toString() ?? '';
+                          final summary = req['fee_items_summary']?.toString() ?? '';
+                          final disc = double.tryParse(req['discount_amount']?.toString() ?? '0') ?? 0.0;
+                          final paid = double.tryParse(req['paid_amount']?.toString() ?? '0') ?? 0.0;
+                          final status = req['status']?.toString().toUpperCase() ?? 'PENDING';
+
+                          Color badgeBg = const Color(0xFFFEF3C7);
+                          Color badgeText = const Color(0xFFD97706);
+                          if (status == 'APPROVED') {
+                            badgeBg = const Color(0xFFD1FAE5);
+                            badgeText = const Color(0xFF059669);
+                          } else if (status == 'REJECTED') {
+                            badgeBg = const Color(0xFFFEE2E2);
+                            badgeText = const Color(0xFFDC2626);
+                          } else if (status == 'CANCELLED') {
+                            badgeBg = const Color(0xFFF1F5F9);
+                            badgeText = const Color(0xFF64748B);
+                          }
+
+                          return Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        '$studentName ($className)',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 14,
+                                          color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A),
+                                        ),
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: badgeBg,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        status,
+                                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: badgeText),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  summary,
+                                  style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Discount: ₹${disc.round()} | Paid: ₹${paid.round()}',
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFD97706)),
+                                    ),
+                                    if (status == 'PENDING')
+                                      TextButton(
+                                        onPressed: () => _handleCancel(id, studentName),
+                                        style: TextButton.styleFrom(
+                                          foregroundColor: const Color(0xFFDC2626),
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                          visualDensity: VisualDensity.compact,
+                                        ),
+                                        child: const Text('Cancel Request', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                                      ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+          ),
+        ],
       ),
     );
   }

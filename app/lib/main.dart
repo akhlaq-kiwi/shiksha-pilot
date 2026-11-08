@@ -7,6 +7,7 @@ import 'package:workmanager/workmanager.dart';
 import 'constants/app_colors.dart';
 import 'package:http/http.dart' as http;
 import 'screens/home_screen.dart';
+import 'screens/app_lock_screen.dart';
 import 'services/leave_service.dart';
 import 'services/auth_service.dart';
 import 'services/notification_helper.dart';
@@ -105,11 +106,17 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
     final prefs = await SharedPreferences.getInstance();
-    final savedTheme = prefs.getString('theme_mode') ?? 'Light Mode';
-    if (savedTheme == 'Dark Mode') {
-      appThemeNotifier.value = ThemeMode.dark;
-    } else if (savedTheme == 'System Defaults' || savedTheme == 'System') {
-      appThemeNotifier.value = ThemeMode.system;
+    final token = prefs.getString('auth_token');
+    // Login screen is always light/normal. Only apply user-selected theme if already signed in!
+    if (token != null && token.isNotEmpty) {
+      final savedTheme = prefs.getString('theme_mode') ?? 'Light Mode';
+      if (savedTheme == 'Dark Mode') {
+        appThemeNotifier.value = ThemeMode.dark;
+      } else if (savedTheme == 'System Defaults' || savedTheme == 'System') {
+        appThemeNotifier.value = ThemeMode.system;
+      } else {
+        appThemeNotifier.value = ThemeMode.light;
+      }
     } else {
       appThemeNotifier.value = ThemeMode.light;
     }
@@ -164,14 +171,60 @@ class MyApp extends StatelessWidget {
           darkTheme: ThemeData(
             useMaterial3: true,
             fontFamily: 'Roboto',
+            brightness: Brightness.dark,
             scaffoldBackgroundColor: AppColors.darkSurfaceCanvas,
-            colorScheme: AppColors.darkColorScheme,
+            canvasColor: AppColors.darkSurfaceCanvas,
+            cardColor: const Color(0xFF1E293B),
+            colorScheme: AppColors.darkColorScheme.copyWith(
+              surface: const Color(0xFF1E293B),
+              onSurface: Colors.white,
+            ),
+            appBarTheme: const AppBarTheme(
+              backgroundColor: Color(0xFF1E293B),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              iconTheme: IconThemeData(color: Colors.white),
+              titleTextStyle: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            cardTheme: CardThemeData(
+              color: const Color(0xFF1E293B),
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+            bottomSheetTheme: const BottomSheetThemeData(
+              backgroundColor: Color(0xFF1E293B),
+              modalBackgroundColor: Color(0xFF1E293B),
+            ),
+            dialogTheme: const DialogThemeData(
+              backgroundColor: Color(0xFF1E293B),
+              titleTextStyle: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              contentTextStyle: TextStyle(color: Color(0xFFCBD5E1), fontSize: 14),
+            ),
             tabBarTheme: const TabBarThemeData(
               splashFactory: NoSplash.splashFactory,
               overlayColor: WidgetStatePropertyAll(Colors.transparent),
             ),
           ),
           themeMode: currentThemeMode,
+          builder: (context, child) {
+            return GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+              child: NotificationListener<ScrollStartNotification>(
+                onNotification: (scroll) {
+                  if (scroll.dragDetails != null) {
+                    FocusManager.instance.primaryFocus?.unfocus();
+                  }
+                  return false;
+                },
+                child: child ?? const SizedBox.shrink(),
+              ),
+            );
+          },
           home: const SplashScreen(),
         );
       },
@@ -228,6 +281,46 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     await prefs.setString('base_url', baseUrl);
 
     if (token != null && role != null) {
+      // Check if session token has expired
+      bool isExpired = false;
+      try {
+        String normalized = base64.normalize(token.trim());
+        final decodedBytes = base64.decode(normalized);
+        final decodedStr = utf8.decode(decodedBytes);
+        final payload = json.decode(decodedStr);
+        if (payload is Map && payload.containsKey('exp')) {
+          final expSec = int.tryParse(payload['exp'].toString());
+          if (expSec != null) {
+            final expTime = DateTime.fromMillisecondsSinceEpoch(expSec * 1000);
+            if (DateTime.now().isAfter(expTime)) {
+              isExpired = true;
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Token decode error in SplashScreen: $e');
+      }
+
+      if (isExpired) {
+        await prefs.remove('auth_token');
+        await prefs.remove('user_role');
+        await prefs.remove('user_name');
+        await prefs.remove('user_phone');
+        await prefs.remove('user_id');
+        await prefs.remove('selected_student_id');
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const LoginScreen(
+                initialErrorMessage: 'Your session has expired. Please sign in again.',
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
       final leaveService = LeaveService(baseUrl: baseUrl, token: token);
       
       // Ensure school_name is loaded before navigating to HomeScreen so header never shows blank!
@@ -253,6 +346,56 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       }
 
       final roleUpper = role.toUpperCase();
+
+      void navigateToHome(Widget homeScreenWidget) {
+        final uid = prefs.getInt('user_id') ?? 0;
+        final phone = (prefs.getString('user_phone') ?? '').trim();
+
+        // Remove legacy global keys so they never cross-contaminate users
+        prefs.remove('is_app_lock_enabled');
+        prefs.remove('app_lock_pin');
+
+        bool isAppLockEnabled = false;
+        String? appLockPin;
+
+        if (phone.isNotEmpty) {
+          isAppLockEnabled = prefs.getBool('app_lock_enabled_$phone') ?? false;
+          appLockPin = prefs.getString('app_lock_pin_$phone');
+        }
+        if (!isAppLockEnabled && uid > 0) {
+          isAppLockEnabled = prefs.getBool('app_lock_enabled_user_$uid') ?? false;
+          appLockPin = prefs.getString('app_lock_pin_user_$uid');
+        }
+        final String userName = prefs.getString('user_name') ?? '';
+
+        if (isAppLockEnabled && appLockPin != null && appLockPin.isNotEmpty) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => AppLockScreen(
+                userName: userName,
+                userRole: role,
+                schoolName: schoolName,
+                baseUrl: baseUrl,
+                token: token,
+                expectedPin: appLockPin,
+                onUnlockSuccess: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => homeScreenWidget),
+                  );
+                },
+              ),
+            ),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => homeScreenWidget),
+          );
+        }
+      }
+
       if (roleUpper == 'PARENT' || roleUpper == 'STUDENT') {
         final savedStudentId = prefs.getInt('selected_student_id');
         try {
@@ -279,15 +422,12 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
             await prefs.setInt('selected_student_id', activeStudentId);
 
             if (mounted) {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => HomeScreen(
-                    leaveService: leaveService,
-                    userRole: role,
-                    selectedStudentId: activeStudentId,
-                    schoolName: schoolName,
-                  ),
+              navigateToHome(
+                HomeScreen(
+                  leaveService: leaveService,
+                  userRole: role,
+                  selectedStudentId: activeStudentId,
+                  schoolName: schoolName,
                 ),
               );
               return;
@@ -295,15 +435,12 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           }
         } catch (e) {
           if (savedStudentId != null && mounted) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => HomeScreen(
-                  leaveService: leaveService,
-                  userRole: role,
-                  selectedStudentId: savedStudentId,
-                  schoolName: schoolName,
-                ),
+            navigateToHome(
+              HomeScreen(
+                leaveService: leaveService,
+                userRole: role,
+                selectedStudentId: savedStudentId,
+                schoolName: schoolName,
               ),
             );
             return;
@@ -316,18 +453,15 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         final String userPhoto = prefs.getString('user_photo') ?? '';
         final String userName = prefs.getString('user_name') ?? '';
         if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => HomeScreen(
-                leaveService: leaveService,
-                userRole: role,
-                isPrincipal: isPrincipal,
-                isFeeCollector: isFeeCollector,
-                userPhoto: userPhoto,
-                userName: userName,
-                schoolName: schoolName,
-              ),
+          navigateToHome(
+            HomeScreen(
+              leaveService: leaveService,
+              userRole: role,
+              isPrincipal: isPrincipal,
+              isFeeCollector: isFeeCollector,
+              userPhoto: userPhoto,
+              userName: userName,
+              schoolName: schoolName,
             ),
           );
           return;
@@ -502,6 +636,65 @@ class _LoginScreenState extends State<LoginScreen> {
         debugPrint('registerDevice error on login: $e');
       }
 
+      final inputPhone = _phoneController.text.trim();
+      final loginUid = user['id'] is int ? user['id'] : int.tryParse(user['id']?.toString() ?? '') ?? 0;
+
+      // Always clear any legacy un-scoped keys so they never cross-contaminate users
+      await prefs.remove('is_app_lock_enabled');
+      await prefs.remove('app_lock_pin');
+
+      // Check App Lock ONLY for this logging in user
+      bool isAppLockEnabled = false;
+      String? appLockPin;
+
+      if (inputPhone.isNotEmpty) {
+        isAppLockEnabled = prefs.getBool('app_lock_enabled_$inputPhone') ?? false;
+        appLockPin = prefs.getString('app_lock_pin_$inputPhone');
+      }
+      if (!isAppLockEnabled && loginUid > 0) {
+        isAppLockEnabled = prefs.getBool('app_lock_enabled_user_$loginUid') ?? false;
+        appLockPin = prefs.getString('app_lock_pin_user_$loginUid');
+      }
+
+      // Activate user's saved appearance theme after successful login
+      final savedTheme = prefs.getString('theme_mode') ?? 'Light Mode';
+      if (savedTheme == 'Dark Mode') {
+        appThemeNotifier.value = ThemeMode.dark;
+      } else if (savedTheme == 'System Defaults' || savedTheme == 'System') {
+        appThemeNotifier.value = ThemeMode.system;
+      } else {
+        appThemeNotifier.value = ThemeMode.light;
+      }
+
+      void navigateAfterLogin(Widget targetScreen) {
+        if (isAppLockEnabled && appLockPin != null && appLockPin.isNotEmpty) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => AppLockScreen(
+                userName: name,
+                userRole: role,
+                schoolName: schoolName,
+                baseUrl: workingBaseUrl,
+                token: token,
+                expectedPin: appLockPin,
+                onUnlockSuccess: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => targetScreen),
+                  );
+                },
+              ),
+            ),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => targetScreen),
+          );
+        }
+      }
+
       final pendingPayload = prefs.getString('pending_notification_payload');
       if (pendingPayload != null && pendingPayload.isNotEmpty) {
         await prefs.remove('pending_notification_payload');
@@ -509,15 +702,12 @@ class _LoginScreenState extends State<LoginScreen> {
           final notif = json.decode(pendingPayload);
           final selId = prefs.getInt('selected_student_id');
           if (mounted) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => HomeScreen(
-                  leaveService: leaveService,
-                  userRole: role,
-                  selectedStudentId: selId,
-                  schoolName: schoolName,
-                ),
+            navigateAfterLogin(
+              HomeScreen(
+                leaveService: leaveService,
+                userRole: role,
+                selectedStudentId: selId,
+                schoolName: schoolName,
               ),
             );
             NotificationHelper.navigateToTarget(notif, activeBaseUrl, token, role, selId);
@@ -535,15 +725,12 @@ class _LoginScreenState extends State<LoginScreen> {
         await prefs.setInt('selected_student_id', studentId);
         
         if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => HomeScreen(
-                leaveService: leaveService,
-                userRole: role,
-                selectedStudentId: studentId,
-                schoolName: schoolName,
-              ),
+          navigateAfterLogin(
+            HomeScreen(
+              leaveService: leaveService,
+              userRole: role,
+              selectedStudentId: studentId,
+              schoolName: schoolName,
             ),
           );
         }
@@ -558,37 +745,49 @@ class _LoginScreenState extends State<LoginScreen> {
             // Only one child, login directly
             final childId = children[0]['id'] as int;
             await prefs.setInt('selected_student_id', childId);
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => HomeScreen(
-                  leaveService: leaveService,
-                  userRole: role,
-                  selectedStudentId: childId,
-                  schoolName: schoolName,
-                ),
+            navigateAfterLogin(
+              HomeScreen(
+                leaveService: leaveService,
+                userRole: role,
+                selectedStudentId: childId,
+                schoolName: schoolName,
               ),
             );
           } else {
-            // Multiple children, show selector dialog
-            _showChildrenSelector(children, leaveService, role, schoolName);
+            // Multiple children, verify App Lock first if enabled, then show selector
+            if (isAppLockEnabled && appLockPin != null && appLockPin.isNotEmpty) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AppLockScreen(
+                    userName: name,
+                    userRole: role,
+                    schoolName: schoolName,
+                    baseUrl: workingBaseUrl,
+                    token: token,
+                    onUnlockSuccess: () {
+                      _showChildrenSelector(children, leaveService, role, schoolName);
+                    },
+                  ),
+                ),
+              );
+            } else {
+              _showChildrenSelector(children, leaveService, role, schoolName);
+            }
           }
         }
       } else {
         // Teacher / School Admin profile
         if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => HomeScreen(
-                leaveService: leaveService,
-                userRole: role,
-                isPrincipal: isPrincipal,
-                isFeeCollector: isFeeCollector,
-                userPhoto: userPhoto,
-                userName: name,
-                schoolName: schoolName,
-              ),
+          navigateAfterLogin(
+            HomeScreen(
+              leaveService: leaveService,
+              userRole: role,
+              isPrincipal: isPrincipal,
+              isFeeCollector: isFeeCollector,
+              userPhoto: userPhoto,
+              userName: name,
+              schoolName: schoolName,
             ),
           );
         }
@@ -720,21 +919,37 @@ class _LoginScreenState extends State<LoginScreen> {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final isKeyboardOpen = bottomInset > 0;
 
-    return Scaffold(
-      resizeToAvoidBottomInset: true,
-      body: GestureDetector(
-        onTap: () => FocusScope.of(context).unfocus(),
-        behavior: HitTestBehavior.opaque,
-        child: Container(
-          width: double.infinity,
-          height: double.infinity,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.indigo.shade900, Colors.indigo.shade700],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+    final lightTheme = ThemeData(
+      useMaterial3: true,
+      fontFamily: 'Roboto',
+      brightness: Brightness.light,
+      scaffoldBackgroundColor: AppColors.surfaceCanvas,
+      colorScheme: AppColors.lightColorScheme,
+      cardTheme: CardThemeData(
+        color: Colors.white,
+        elevation: 12,
+        shadowColor: Colors.black45,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      ),
+    );
+
+    return Theme(
+      data: lightTheme,
+      child: Scaffold(
+        resizeToAvoidBottomInset: true,
+        body: GestureDetector(
+          onTap: () => FocusScope.of(context).unfocus(),
+          behavior: HitTestBehavior.opaque,
+          child: Container(
+            width: double.infinity,
+            height: double.infinity,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Colors.indigo.shade900, Colors.indigo.shade700],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
             ),
-          ),
           child: SafeArea(
             child: LayoutBuilder(
               builder: (context, constraints) {
@@ -788,6 +1003,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                             // Form Card - keeps exact original size, padding, inputs and button
                             Card(
+                              color: Colors.white,
                               elevation: 12,
                               shadowColor: Colors.black45,
                               shape: RoundedRectangleBorder(
@@ -951,6 +1167,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

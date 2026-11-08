@@ -206,7 +206,19 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     } catch (_) {}
 
     final prefs = await SharedPreferences.getInstance();
+    final allKeys = prefs.getKeys();
+    final preserved = <String, dynamic>{};
+    for (final k in allKeys) {
+      if (k.startsWith('app_lock_enabled_') || k.startsWith('app_lock_pin_') || k == 'base_url' || k == 'selected_base_url') {
+        preserved[k] = prefs.get(k);
+      }
+    }
     await prefs.clear();
+    for (final e in preserved.entries) {
+      if (e.value is bool) await prefs.setBool(e.key, e.value as bool);
+      else if (e.value is String) await prefs.setString(e.key, e.value as String);
+      else if (e.value is int) await prefs.setInt(e.key, e.value as int);
+    }
 
     if (mounted) {
       Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
@@ -218,7 +230,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isStudentOrParent = widget.userRole.toUpperCase() == 'STUDENT' || widget.userRole.toUpperCase() == 'PARENT';
+    final roleUpper = widget.userRole.toUpperCase();
+    final bool isAdminRole = roleUpper == 'ADMIN' || roleUpper == 'SCHOOL_ADMIN';
+    final isStudentOrParent = roleUpper == 'STUDENT' || roleUpper == 'PARENT';
 
     // Resolve active student details if student/parent
     Map<String, dynamic>? activeStudent;
@@ -229,9 +243,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       ) as Map<String, dynamic>?;
     }
 
-    final String displayName = isStudentOrParent && activeStudent != null
-        ? (activeStudent['name'] ?? widget.userName)
-        : widget.userName;
+    final String displayName = isAdminRole
+        ? 'Admin'
+        : (isStudentOrParent && activeStudent != null
+            ? (activeStudent['name'] ?? widget.userName)
+            : widget.userName);
 
     String photo = isStudentOrParent && activeStudent != null
         ? (activeStudent['photo_path']?.toString() ?? activeStudent['photo']?.toString() ?? widget.photoUrl)
@@ -260,14 +276,16 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         ? widget.userPhone
         : (activeStudent?['parent_phone']?.toString() ?? activeStudent?['student_mobile']?.toString() ?? '—');
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: const Text(
           'Profile',
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
         ),
-        backgroundColor: const Color(0xFF2196F3),
+        backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFF2196F3),
         foregroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
@@ -293,7 +311,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                         placeholder: (context, url) => Container(
                           width: 100,
                           height: 100,
-                          color: Colors.blue.shade50,
+                          color: isDark ? const Color(0xFF1E293B) : Colors.blue.shade50,
                           child: const Icon(Icons.person, size: 50, color: Color(0xFF2196F3)),
                         ),
                         errorWidget: (context, url, error) {
@@ -312,7 +330,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                               errorWidget: (c, u, e) => Container(
                                 width: 100,
                                 height: 100,
-                                color: Colors.blue.shade50,
+                                color: isDark ? const Color(0xFF1E293B) : Colors.blue.shade50,
                                 child: const Icon(Icons.person, size: 50, color: Color(0xFF2196F3)),
                               ),
                             );
@@ -320,7 +338,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                           return Container(
                             width: 100,
                             height: 100,
-                            color: Colors.blue.shade50,
+                            color: isDark ? const Color(0xFF1E293B) : Colors.blue.shade50,
                             child: const Icon(Icons.person, size: 50, color: Color(0xFF2196F3)),
                           );
                         },
@@ -328,7 +346,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                     : Container(
                         width: 100,
                         height: 100,
-                        color: Colors.blue.shade50,
+                        color: isDark ? const Color(0xFF1E293B) : Colors.blue.shade50,
                         child: const Icon(Icons.person, size: 50, color: Color(0xFF2196F3)),
                       ),
               ),
@@ -339,10 +357,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             Text(
               displayName,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
-                color: Colors.black87,
+                color: isDark ? Colors.white : Colors.black87,
               ),
             ),
             const SizedBox(height: 24),
@@ -353,19 +371,19 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 margin: const EdgeInsets.only(bottom: 20),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.grey.shade200),
+                  border: Border.all(color: isDark ? const Color(0xFF334155) : Colors.grey.shade200),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'SWITCH STUDENT',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
-                        color: Colors.grey,
+                        color: isDark ? const Color(0xFF94A3B8) : Colors.grey,
                         letterSpacing: 0.5,
                       ),
                     ),
@@ -387,7 +405,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                             margin: const EdgeInsets.symmetric(vertical: 4),
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             decoration: BoxDecoration(
-                              color: isSelected ? Colors.blue.shade50 : Colors.grey.shade50,
+                              color: isSelected
+                                  ? (isDark ? const Color(0xFF1E3A8A).withOpacity(0.4) : Colors.blue.shade50)
+                                  : (isDark ? const Color(0xFF0F172A) : Colors.grey.shade50),
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
                                 color: isSelected ? const Color(0xFF2196F3) : Colors.transparent,
@@ -406,7 +426,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                    color: Colors.black87,
+                                    color: isDark ? Colors.white : Colors.black87,
                                   ),
                                 ),
                               ],
@@ -423,12 +443,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             // Details Container
             Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey.shade200),
+                border: Border.all(color: isDark ? const Color(0xFF334155) : Colors.grey.shade200),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.02),
+                    color: Colors.black.withOpacity(isDark ? 0.2 : 0.02),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -443,8 +463,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                           icon: Icons.school_rounded,
                           label: 'SCHOOL NAME',
                           value: widget.schoolName,
+                          isDark: isDark,
                         ),
-                        _buildDivider(),
+                        _buildDivider(isDark),
 
                         // 2. Class/Sec (Show section if available)
                         if (classSecDisplay.isNotEmpty) ...[
@@ -452,8 +473,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                             icon: Icons.class_rounded,
                             label: 'CLASS / SECTION',
                             value: classSecDisplay,
+                            isDark: isDark,
                           ),
-                          _buildDivider(),
+                          _buildDivider(isDark),
                         ],
 
                         // 3. Roll No
@@ -461,14 +483,16 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                           icon: Icons.badge_rounded,
                           label: 'ROLL NO',
                           value: rollNoDisplay,
+                          isDark: isDark,
                         ),
-                        _buildDivider(),
+                        _buildDivider(isDark),
 
                         // 4. Mobile Number
                         _buildProfileField(
                           icon: Icons.phone_android_rounded,
                           label: 'MOBILE NUMBER',
                           value: phoneDisplay.isNotEmpty ? phoneDisplay : '—',
+                          isDark: isDark,
                         ),
                       ]
                     : [
@@ -478,14 +502,16 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                           icon: Icons.school_rounded,
                           label: 'SCHOOL NAME',
                           value: widget.schoolName,
+                          isDark: isDark,
                         ),
-                        _buildDivider(),
+                        _buildDivider(isDark),
 
                         // 2. Mobile Number
                         _buildProfileField(
                           icon: Icons.phone_android_rounded,
                           label: 'MOBILE NUMBER',
                           value: phoneDisplay.isNotEmpty ? phoneDisplay : '—',
+                          isDark: isDark,
                         ),
                       ],
               ),
@@ -523,6 +549,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     required IconData icon,
     required String label,
     required String value,
+    bool isDark = false,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -531,7 +558,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.blue.shade50,
+              color: isDark ? const Color(0xFF1E3A8A).withOpacity(0.3) : Colors.blue.shade50,
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, size: 20, color: const Color(0xFF2196F3)),
@@ -546,17 +573,17 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
-                    color: Colors.grey.shade500,
+                    color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade500,
                     letterSpacing: 0.5,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   value,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
-                    color: Colors.black87,
+                    color: isDark ? Colors.white : Colors.black87,
                   ),
                 ),
               ],
@@ -567,7 +594,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     );
   }
 
-  Widget _buildDivider() {
-    return const Divider(height: 1, thickness: 1, color: Color(0xFFF1F5F9));
+  Widget _buildDivider([bool isDark = false]) {
+    return Divider(height: 1, thickness: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9));
   }
 }

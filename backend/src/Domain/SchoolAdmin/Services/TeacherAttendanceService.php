@@ -466,7 +466,7 @@ class TeacherAttendanceService
 
         // Fetch all active staff (including joining_date)
         $stmtStaff = $this->pdo->prepare("
-            SELECT id, name, phone, role, department, joining_date
+            SELECT id, name, phone, role, department, photo_path, joining_date
             FROM staff
             WHERE school_id = :sid AND status = 'ACTIVE' 
               AND (academic_year_id = :ayid OR academic_year_id IS NULL OR academic_year_id = 0)
@@ -620,6 +620,7 @@ class TeacherAttendanceService
                 'staff_id' => $stId,
                 'emp_id' => $empId,
                 'name' => $st['name'],
+                'photo_path' => $st['photo_path'] ?? '',
                 'role' => $st['role'],
                 'department' => $st['department'] ?? '',
                 'total_working_days' => $totalWorkingDays,

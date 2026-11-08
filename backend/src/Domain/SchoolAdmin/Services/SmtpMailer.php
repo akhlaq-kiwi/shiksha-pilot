@@ -52,7 +52,14 @@ class SmtpMailer
         }
 
         // Connect to server
-        $socket = @fsockopen($host, $port, $errno, $errstr, 4);
+        $ctx = stream_context_create([
+            'ssl' => [
+                'verify_peer' => false,
+                'verify_peer_name' => false,
+                'allow_self_signed' => true,
+            ]
+        ]);
+        $socket = @stream_socket_client("tcp://{$host}:{$port}", $errno, $errstr, 5, STREAM_CLIENT_CONNECT, $ctx);
         if (!$socket) {
             throw new RuntimeException("Failed to connect to SMTP server {$host}:{$port}. Error: {$errstr} ({$errno})");
         }

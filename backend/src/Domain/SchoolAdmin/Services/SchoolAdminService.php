@@ -7826,6 +7826,18 @@ class SchoolAdminService extends BaseService
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->feeRepo->getPdo();
 
+        $discAmount = (float)($data['discount_amount'] ?? 0.0);
+        if ($discAmount > 0.001) {
+            $stmtDiscReq = $pdo->prepare("SELECT discount_approval_required FROM schools WHERE id = :sid LIMIT 1");
+            $stmtDiscReq->execute([':sid' => $schoolId]);
+            $isDiscApprovalRequired = (int)$stmtDiscReq->fetchColumn();
+
+            $userRole = strtoupper((string)($user['role'] ?? ''));
+            if ($isDiscApprovalRequired === 1 && $userRole !== 'SCHOOL_ADMIN' && $userRole !== 'SUPER_ADMIN') {
+                throw new ValidationException(['fields' => 'Admin approval is required for fee discounts. Please submit a discount request for School Admin approval.']);
+            }
+        }
+
         // 1. Fetch student to get class_id and academic_year_id
         $stmtStudent = $pdo->prepare("SELECT class_id, academic_year_id, status FROM students WHERE id = :id AND school_id = :school_id LIMIT 1");
         $stmtStudent->execute([':id' => $studentId, ':school_id' => $schoolId]);
@@ -8052,7 +8064,9 @@ class SchoolAdminService extends BaseService
         $userId = (int) ($user['id'] ?? 0);
         $userRole = strtoupper($user['role'] ?? '');
         $collectedBy = 'ADMIN';
-        if ($userRole === 'SCHOOL_ADMIN' || $userRole === 'ADMIN') {
+        if (!empty($data['collected_by'])) {
+            $collectedBy = trim((string)$data['collected_by']);
+        } elseif ($userRole === 'SCHOOL_ADMIN' || $userRole === 'ADMIN') {
             $collectedBy = 'ADMIN';
         } elseif ($userId > 0) {
             $stmtUser = $pdo->prepare("SELECT name, role FROM users WHERE id = :id LIMIT 1");
@@ -8193,7 +8207,18 @@ class SchoolAdminService extends BaseService
             LEFT JOIN classes c ON s.class_id = c.id
             LEFT JOIN academic_years say ON s.academic_year_id = say.id
             LEFT JOIN academic_years pay_ay ON fp.academic_year_id = pay_ay.id
-            LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = fp.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = fp.school_id)
+            LEFT JOIN (
+                SELECT u1.name, u1.school_id, u1.phone, u1.role
+                FROM users u1
+                INNER JOIN (
+                    SELECT name, school_id, MIN(CASE WHEN role = 'STUDENT' THEN 2 ELSE 1 END) AS min_priority
+                    FROM users
+                    GROUP BY school_id, name COLLATE utf8mb4_unicode_ci
+                ) p ON u1.school_id = p.school_id 
+                   AND u1.name COLLATE utf8mb4_unicode_ci = p.name COLLATE utf8mb4_unicode_ci
+                   AND (CASE WHEN u1.role = 'STUDENT' THEN 2 ELSE 1 END) = p.min_priority
+                GROUP BY u1.school_id, u1.name COLLATE utf8mb4_unicode_ci
+            ) u ON (u.name COLLATE utf8mb4_unicode_ci = fp.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = fp.school_id)
             WHERE fp.school_id = :school_id AND fp.status IN ('PAID', 'Partial')
               {$ayClauseMonthlyHistory}
         ");
@@ -8244,7 +8269,18 @@ class SchoolAdminService extends BaseService
             JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
             LEFT JOIN academic_years say ON s.academic_year_id = say.id
             LEFT JOIN academic_years pay_ay ON aft.academic_year_id = pay_ay.id
-            LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = afph.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = afp.school_id)
+            LEFT JOIN (
+                SELECT u1.name, u1.school_id, u1.phone, u1.role
+                FROM users u1
+                INNER JOIN (
+                    SELECT name, school_id, MIN(CASE WHEN role = 'STUDENT' THEN 2 ELSE 1 END) AS min_priority
+                    FROM users
+                    GROUP BY school_id, name COLLATE utf8mb4_unicode_ci
+                ) p ON u1.school_id = p.school_id 
+                   AND u1.name COLLATE utf8mb4_unicode_ci = p.name COLLATE utf8mb4_unicode_ci
+                   AND (CASE WHEN u1.role = 'STUDENT' THEN 2 ELSE 1 END) = p.min_priority
+                GROUP BY u1.school_id, u1.name COLLATE utf8mb4_unicode_ci
+            ) u ON (u.name COLLATE utf8mb4_unicode_ci = afph.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = afp.school_id)
             WHERE afp.school_id = :school_id
               {$ayClauseAddHistory}
         ");
@@ -8409,20 +8445,25 @@ class SchoolAdminService extends BaseService
         $collectorsMap = [];
         foreach ($withBalance as $t) {
             $isAdmin = !empty($t['is_admin_collector']);
-            $displayName = $isAdmin ? 'ADMIN' : $t['display_collector_name'];
+            $displayName = $isAdmin ? 'School Admin' : $t['display_collector_name'];
             $filterKey = $isAdmin ? 'ADMIN' : strtolower($t['collected_by']);
             $cPhone = !empty($t['collector_phone']) ? trim($t['collector_phone']) : '';
+
+            $label = $displayName;
+            if ($cPhone !== '') {
+                $label = $displayName . ' (' . $cPhone . ')';
+            }
 
             if (!isset($collectorsMap[$filterKey])) {
                 $collectorsMap[$filterKey] = [
                     'name' => $isAdmin ? 'ADMIN' : $t['collected_by'],
                     'display_name' => $displayName,
                     'phone' => $cPhone,
-                    'label' => $cPhone !== '' ? $cPhone : $displayName
+                    'label' => $label
                 ];
             } elseif (empty($collectorsMap[$filterKey]['phone']) && $cPhone) {
                 $collectorsMap[$filterKey]['phone'] = $cPhone;
-                $collectorsMap[$filterKey]['label'] = $cPhone;
+                $collectorsMap[$filterKey]['label'] = $label;
             }
         }
         $availableCollectors = array_values($collectorsMap);
@@ -8486,7 +8527,20 @@ class SchoolAdminService extends BaseService
                     }
                 } else {
                     $cName = !empty($t['collected_by']) ? trim($t['collected_by']) : 'School Admin';
-                    if (strcasecmp($cName, $selectedCollector) !== 0) {
+                    $cPhone = !empty($t['collector_phone']) ? trim($t['collector_phone']) : '';
+                    $cLabel = $cPhone !== '' ? "$cName ($cPhone)" : $cName;
+
+                    $matched = (
+                        strcasecmp($cName, $selectedCollector) === 0 ||
+                        ($cPhone !== '' && strcasecmp($cPhone, $selectedCollector) === 0) ||
+                        strcasecmp($cLabel, $selectedCollector) === 0
+                    );
+                    if (!$matched && preg_match('/^(.*?)\s*\((.*?)\)$/', $selectedCollector, $m)) {
+                        $selName = trim($m[1]);
+                        $selPhone = trim($m[2]);
+                        $matched = (strcasecmp($cName, $selName) === 0 || ($cPhone !== '' && strcasecmp($cPhone, $selPhone) === 0));
+                    }
+                    if (!$matched) {
                         return false;
                     }
                 }
@@ -8548,7 +8602,19 @@ class SchoolAdminService extends BaseService
                     $matchesCollector = !empty($t['is_admin_collector']);
                 } else {
                     $cName = !empty($t['collected_by']) ? trim($t['collected_by']) : 'School Admin';
-                    $matchesCollector = (strcasecmp($cName, $selectedCollector) === 0);
+                    $cPhone = !empty($t['collector_phone']) ? trim($t['collector_phone']) : '';
+                    $cLabel = $cPhone !== '' ? "$cName ($cPhone)" : $cName;
+
+                    $matchesCollector = (
+                        strcasecmp($cName, $selectedCollector) === 0 ||
+                        ($cPhone !== '' && strcasecmp($cPhone, $selectedCollector) === 0) ||
+                        strcasecmp($cLabel, $selectedCollector) === 0
+                    );
+                    if (!$matchesCollector && preg_match('/^(.*?)\s*\((.*?)\)$/', $selectedCollector, $m)) {
+                        $selName = trim($m[1]);
+                        $selPhone = trim($m[2]);
+                        $matchesCollector = (strcasecmp($cName, $selName) === 0 || ($cPhone !== '' && strcasecmp($cPhone, $selPhone) === 0));
+                    }
                 }
             }
 
@@ -11464,7 +11530,18 @@ Only approve the settlement after reviewing all financial records.
             FROM fee_payments fp
             JOIN students s ON fp.student_id = s.id
             LEFT JOIN classes c ON s.class_id = c.id
-            LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = fp.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = fp.school_id)
+            LEFT JOIN (
+                SELECT u1.name, u1.school_id, u1.phone, u1.role
+                FROM users u1
+                INNER JOIN (
+                    SELECT name, school_id, MIN(CASE WHEN role = 'STUDENT' THEN 2 ELSE 1 END) AS min_priority
+                    FROM users
+                    GROUP BY school_id, name COLLATE utf8mb4_unicode_ci
+                ) p ON u1.school_id = p.school_id 
+                   AND u1.name COLLATE utf8mb4_unicode_ci = p.name COLLATE utf8mb4_unicode_ci
+                   AND (CASE WHEN u1.role = 'STUDENT' THEN 2 ELSE 1 END) = p.min_priority
+                GROUP BY u1.school_id, u1.name COLLATE utf8mb4_unicode_ci
+            ) u ON (u.name COLLATE utf8mb4_unicode_ci = fp.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = fp.school_id)
             WHERE fp.school_id = :sid 
               {$ayClauseFp}
               AND fp.status IN ('PAID', 'Partial')
@@ -11507,7 +11584,18 @@ Only approve the settlement after reviewing all financial records.
             JOIN students s ON afp.student_id = s.id
             LEFT JOIN classes c ON s.class_id = c.id
             JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
-            LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = afph.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = afp.school_id)
+            LEFT JOIN (
+                SELECT u1.name, u1.school_id, u1.phone, u1.role
+                FROM users u1
+                INNER JOIN (
+                    SELECT name, school_id, MIN(CASE WHEN role = 'STUDENT' THEN 2 ELSE 1 END) AS min_priority
+                    FROM users
+                    GROUP BY school_id, name COLLATE utf8mb4_unicode_ci
+                ) p ON u1.school_id = p.school_id 
+                   AND u1.name COLLATE utf8mb4_unicode_ci = p.name COLLATE utf8mb4_unicode_ci
+                   AND (CASE WHEN u1.role = 'STUDENT' THEN 2 ELSE 1 END) = p.min_priority
+                GROUP BY u1.school_id, u1.name COLLATE utf8mb4_unicode_ci
+            ) u ON (u.name COLLATE utf8mb4_unicode_ci = afph.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = afp.school_id)
             WHERE afp.school_id = :sid 
               {$ayClauseAdd}
               {$createdClauseAdd}
@@ -11748,7 +11836,18 @@ Only approve the settlement after reviewing all financial records.
             FROM fee_payments fp
             JOIN students s ON fp.student_id = s.id
             LEFT JOIN classes c ON s.class_id = c.id
-            LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = fp.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = fp.school_id)
+            LEFT JOIN (
+                SELECT u1.name, u1.school_id, u1.phone, u1.role
+                FROM users u1
+                INNER JOIN (
+                    SELECT name, school_id, MIN(CASE WHEN role = 'STUDENT' THEN 2 ELSE 1 END) AS min_priority
+                    FROM users
+                    GROUP BY school_id, name COLLATE utf8mb4_unicode_ci
+                ) p ON u1.school_id = p.school_id 
+                   AND u1.name COLLATE utf8mb4_unicode_ci = p.name COLLATE utf8mb4_unicode_ci
+                   AND (CASE WHEN u1.role = 'STUDENT' THEN 2 ELSE 1 END) = p.min_priority
+                GROUP BY u1.school_id, u1.name COLLATE utf8mb4_unicode_ci
+            ) u ON (u.name COLLATE utf8mb4_unicode_ci = fp.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = fp.school_id)
             WHERE fp.school_id = :sid 
               {$ayClauseFp}
               {$cutoffClauseFp}
@@ -11800,7 +11899,18 @@ Only approve the settlement after reviewing all financial records.
             JOIN students s ON afp.student_id = s.id
             LEFT JOIN classes c ON s.class_id = c.id
             JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
-            LEFT JOIN users u ON (u.name COLLATE utf8mb4_unicode_ci = afph.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = afp.school_id)
+            LEFT JOIN (
+                SELECT u1.name, u1.school_id, u1.phone, u1.role
+                FROM users u1
+                INNER JOIN (
+                    SELECT name, school_id, MIN(CASE WHEN role = 'STUDENT' THEN 2 ELSE 1 END) AS min_priority
+                    FROM users
+                    GROUP BY school_id, name COLLATE utf8mb4_unicode_ci
+                ) p ON u1.school_id = p.school_id 
+                   AND u1.name COLLATE utf8mb4_unicode_ci = p.name COLLATE utf8mb4_unicode_ci
+                   AND (CASE WHEN u1.role = 'STUDENT' THEN 2 ELSE 1 END) = p.min_priority
+                GROUP BY u1.school_id, u1.name COLLATE utf8mb4_unicode_ci
+            ) u ON (u.name COLLATE utf8mb4_unicode_ci = afph.collected_by COLLATE utf8mb4_unicode_ci AND u.school_id = afp.school_id)
             WHERE afp.school_id = :sid 
               {$ayClauseAdd}
               {$cutoffClauseAdd}
@@ -12537,6 +12647,547 @@ Only approve the settlement after reviewing all financial records.
         return $this->getExpenseById($schoolId, $id);
     }
 
+    public function getDiscountSettings(array $user): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->feeRepo->getPdo();
+
+        $stmt = $pdo->prepare("SELECT discount_approval_required FROM schools WHERE id = :sid LIMIT 1");
+        $stmt->execute([':sid' => $schoolId]);
+        $val = (int)$stmt->fetchColumn();
+
+        return [
+            'discount_approval_required' => ($val === 1),
+        ];
+    }
+
+    public function updateDiscountSettings(array $user, array $body): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->feeRepo->getPdo();
+
+        $required = !empty($body['discount_approval_required']) ? 1 : 0;
+        $stmt = $pdo->prepare("UPDATE schools SET discount_approval_required = :val WHERE id = :sid");
+        $stmt->execute([':val' => $required, ':sid' => $schoolId]);
+
+        return [
+            'discount_approval_required' => ($required === 1),
+        ];
+    }
+
+    public function getDiscountRequests(array $user, array $params = []): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->feeRepo->getPdo();
+
+        $status = !empty($params['status']) ? strtoupper(trim($params['status'])) : 'ALL';
+        $period = !empty($params['period']) ? strtoupper(trim($params['period'])) : 'ALL TIME';
+        $search = !empty($params['search']) ? trim($params['search']) : '';
+        $requestedBy = !empty($params['requested_by']) ? trim($params['requested_by']) : '';
+
+        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+        $workingYearId = $workingYear ? (int)$workingYear['id'] : null;
+
+        $lastReportTimestamp = null;
+        if (strcasecmp($period, 'SINCE LAST REPORT') === 0) {
+            $stmtLastRep = $pdo->prepare("
+                SELECT created_at FROM financial_reports 
+                WHERE school_id = :sid 
+                  AND (academic_year_id = :ayid OR academic_year_id IS NULL)
+                ORDER BY id DESC LIMIT 1
+            ");
+            $stmtLastRep->execute([':sid' => $schoolId, ':ayid' => $workingYearId]);
+            $lastRepRow = $stmtLastRep->fetch(PDO::FETCH_ASSOC);
+            if ($lastRepRow && !empty($lastRepRow['created_at'])) {
+                $lastReportTimestamp = $lastRepRow['created_at'];
+            }
+        }
+
+        $sql = "
+            SELECT 
+                fdr.id,
+                fdr.school_id,
+                fdr.academic_year_id,
+                fdr.student_id,
+                fdr.fee_type,
+                fdr.fee_items_summary,
+                fdr.total_amount,
+                fdr.paid_amount,
+                fdr.discount_amount,
+                fdr.payment_method,
+                fdr.deposit_payload,
+                fdr.requested_by,
+                fdr.requested_by_id,
+                fdr.status,
+                fdr.rejection_reason,
+                fdr.approved_by,
+                fdr.approved_at,
+                fdr.cancelled_at,
+                fdr.created_at,
+                fdr.updated_at,
+                s.name AS student_name,
+                s.roll_no,
+                s.admission_no,
+                CONCAT(COALESCE(c.name, ''), IF(c.section IS NOT NULL AND c.section != '', CONCAT(' ', c.section), '')) AS class_name
+            FROM fee_discount_requests fdr
+            JOIN students s ON s.id = fdr.student_id
+            LEFT JOIN classes c ON c.id = s.class_id
+            LEFT JOIN users u ON u.id = fdr.requested_by_id
+            WHERE fdr.school_id = :sid
+        ";
+        $queryParams = [':sid' => $schoolId];
+
+        if ($status !== 'ALL' && in_array($status, ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'])) {
+            $sql .= " AND fdr.status = :status";
+            $queryParams[':status'] = $status;
+        }
+
+        if ($lastReportTimestamp !== null) {
+            $sql .= " AND fdr.created_at > :last_rep_time";
+            $queryParams[':last_rep_time'] = $lastReportTimestamp;
+        }
+
+        if ($requestedBy !== '' && strcasecmp($requestedBy, 'ALL') !== 0 && strcasecmp($requestedBy, 'ALL USERS') !== 0 && strcasecmp($requestedBy, 'ALL COLLECTORS') !== 0) {
+            if (preg_match('/^(.*?)\s*\((.*?)\)$/', $requestedBy, $m)) {
+                $cleanName = trim($m[1]);
+                $cleanPhone = trim($m[2]);
+                $sql .= " AND (fdr.requested_by = :req_by OR fdr.requested_by = :req_clean_name OR u.phone = :req_clean_phone)";
+                $queryParams[':req_by'] = $requestedBy;
+                $queryParams[':req_clean_name'] = $cleanName;
+                $queryParams[':req_clean_phone'] = $cleanPhone;
+            } else {
+                $sql .= " AND (fdr.requested_by = :req_by OR u.phone = :req_by)";
+                $queryParams[':req_by'] = $requestedBy;
+            }
+        }
+
+        if ($search !== '') {
+            $sql .= " AND (s.name LIKE :search OR s.roll_no LIKE :search OR fdr.requested_by LIKE :search)";
+            $queryParams[':search'] = '%' . $search . '%';
+        }
+
+        $sql .= " ORDER BY fdr.id DESC";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($queryParams);
+        $requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Fetch counts summary for filter chips
+        $stmtCounts = $pdo->prepare("
+            SELECT 
+                COUNT(*) AS total_count,
+                SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) AS pending_count,
+                SUM(CASE WHEN status = 'APPROVED' THEN 1 ELSE 0 END) AS approved_count,
+                SUM(CASE WHEN status = 'REJECTED' THEN 1 ELSE 0 END) AS rejected_count,
+                SUM(CASE WHEN status = 'CANCELLED' THEN 1 ELSE 0 END) AS cancelled_count
+            FROM fee_discount_requests
+            WHERE school_id = :sid
+        ");
+        $stmtCounts->execute([':sid' => $schoolId]);
+        $counts = $stmtCounts->fetch(PDO::FETCH_ASSOC);
+
+        // Distinct collectors for filter dropdown with phone number
+        $stmtCols = $pdo->prepare("
+            SELECT DISTINCT 
+                fdr.requested_by,
+                fdr.requested_by_id,
+                u.phone AS collector_phone
+            FROM fee_discount_requests fdr
+            LEFT JOIN users u ON u.id = fdr.requested_by_id
+            WHERE fdr.school_id = :sid 
+              AND fdr.requested_by IS NOT NULL 
+              AND fdr.requested_by != ''
+            ORDER BY fdr.requested_by ASC
+        ");
+        $stmtCols->execute([':sid' => $schoolId]);
+        $colRows = $stmtCols->fetchAll(PDO::FETCH_ASSOC);
+
+        $availableCollectors = [
+            ['name' => 'All Users', 'label' => 'All Collectors', 'phone' => '']
+        ];
+        $seen = [];
+        foreach ($colRows as $row) {
+            $cName = trim($row['requested_by'] ?? '');
+            if (!empty($cName) && $cName !== 'Fee Collector') {
+                if (isset($seen[$cName])) {
+                    continue;
+                }
+                $seen[$cName] = true;
+                $cPhone = !empty($row['collector_phone']) ? trim($row['collector_phone']) : '';
+                
+                // If phone was not found via requested_by_id, look up user by name in this school
+                if (empty($cPhone)) {
+                    $stmtFindPhone = $pdo->prepare("
+                        SELECT phone FROM users 
+                        WHERE school_id = :sid AND name = :name AND phone IS NOT NULL AND phone != '' 
+                        LIMIT 1
+                    ");
+                    $stmtFindPhone->execute([':sid' => $schoolId, ':name' => $cName]);
+                    $foundPhone = $stmtFindPhone->fetchColumn();
+                    if ($foundPhone) {
+                        $cPhone = trim((string)$foundPhone);
+                    }
+                }
+
+                $label = !empty($cPhone) ? "$cName ($cPhone)" : $cName;
+
+                $availableCollectors[] = [
+                    'name' => $cName,
+                    'label' => $label,
+                    'phone' => $cPhone,
+                ];
+            }
+        }
+
+        return [
+            'requests' => $requests,
+            'available_periods' => ['ALL TIME', 'SINCE LAST REPORT'],
+            'available_collectors' => $availableCollectors,
+            'summary' => [
+                'total' => (int)($counts['total_count'] ?? 0),
+                'pending' => (int)($counts['pending_count'] ?? 0),
+                'approved' => (int)($counts['approved_count'] ?? 0),
+                'rejected' => (int)($counts['rejected_count'] ?? 0),
+                'cancelled' => (int)($counts['cancelled_count'] ?? 0),
+            ]
+        ];
+    }
+
+    public function createDiscountRequest(array $user, array $data): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->feeRepo->getPdo();
+
+        if (empty($data['student_id'])) {
+            throw new ValidationException(['fields' => 'Student ID is required']);
+        }
+
+        $studentId = (int)$data['student_id'];
+        $feeType = !empty($data['fee_type']) ? strtoupper(trim($data['fee_type'])) : 'MONTHLY';
+        $summary = !empty($data['fee_items_summary']) ? trim($data['fee_items_summary']) : 'Fee Discount';
+        $totalAmount = (float)($data['total_amount'] ?? 0.0);
+        $paidAmount = (float)($data['paid_amount'] ?? 0.0);
+        $discountAmount = (float)($data['discount_amount'] ?? 0.0);
+        $paymentMethod = !empty($data['payment_method']) ? trim($data['payment_method']) : 'Cash';
+        $depositPayload = !empty($data['deposit_payload']) ? (is_array($data['deposit_payload']) ? json_encode($data['deposit_payload']) : $data['deposit_payload']) : '{}';
+
+        if ($discountAmount <= 0) {
+            throw new ValidationException(['fields' => 'Discount amount must be greater than zero']);
+        }
+
+        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+        $ayid = $workingYear ? (int)$workingYear['id'] : null;
+
+        $requestedById = (int)($user['id'] ?? 0);
+        $requestedBy = !empty($data['requested_by']) ? trim($data['requested_by']) : (!empty($user['name']) ? trim($user['name']) : '');
+        if (empty($requestedBy) && $requestedById > 0) {
+            $stmtColUser = $pdo->prepare("SELECT name FROM users WHERE id = :uid LIMIT 1");
+            $stmtColUser->execute([':uid' => $requestedById]);
+            $colName = $stmtColUser->fetchColumn();
+            if (!empty($colName)) {
+                $requestedBy = trim((string)$colName);
+            }
+        }
+        if (empty($requestedBy)) {
+            $requestedBy = 'Fee Collector';
+        }
+
+        $stmt = $pdo->prepare("
+            INSERT INTO fee_discount_requests (
+                school_id, academic_year_id, student_id, fee_type, fee_items_summary,
+                deposit_payload, total_amount, paid_amount, discount_amount,
+                payment_method, requested_by, requested_by_id, status, created_at, updated_at
+            ) VALUES (
+                :sid, :ayid, :student_id, :fee_type, :summary,
+                :payload, :total, :paid, :discount,
+                :pmethod, :req_by, :req_by_id, 'PENDING', NOW(), NOW()
+            )
+        ");
+        $stmt->execute([
+            ':sid' => $schoolId,
+            ':ayid' => $ayid,
+            ':student_id' => $studentId,
+            ':fee_type' => $feeType,
+            ':summary' => $summary,
+            ':payload' => $depositPayload,
+            ':total' => $totalAmount,
+            ':paid' => $paidAmount,
+            ':discount' => $discountAmount,
+            ':pmethod' => $paymentMethod,
+            ':req_by' => $requestedBy,
+            ':req_by_id' => $requestedById > 0 ? $requestedById : null,
+        ]);
+
+        $requestId = (int)$pdo->lastInsertId();
+
+        return [
+            'id' => $requestId,
+            'status' => 'PENDING',
+            'message' => 'Discount request submitted successfully. Pending Admin approval.',
+        ];
+    }
+
+    public function approveDiscountRequest(array $user, int $id): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->feeRepo->getPdo();
+
+        $stmt = $pdo->prepare("SELECT * FROM fee_discount_requests WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmt->execute([':id' => $id, ':sid' => $schoolId]);
+        $req = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$req) {
+            throw new NotFoundException('Discount request not found');
+        }
+
+        if ($req['status'] === 'CANCELLED') {
+            throw new ValidationException(['fields' => 'Cannot approve a cancelled discount request. The fee collector has cancelled this request.']);
+        }
+
+        if ($req['status'] === 'APPROVED') {
+            throw new ValidationException(['fields' => 'This discount request has already been approved.']);
+        }
+
+        if ($req['status'] === 'REJECTED') {
+            throw new ValidationException(['fields' => 'This discount request has already been rejected.']);
+        }
+
+        $depositPayload = json_decode($req['deposit_payload'], true);
+        if (!$depositPayload) {
+            throw new ValidationException(['fields' => 'Invalid deposit payload']);
+        }
+
+        // Determine fee collector name to record in payments - check requested_by_id first for accuracy
+        $collectorName = '';
+        if (!empty($req['requested_by_id'])) {
+            $stmtColUser = $pdo->prepare("SELECT name FROM users WHERE id = :uid LIMIT 1");
+            $stmtColUser->execute([':uid' => $req['requested_by_id']]);
+            $colName = $stmtColUser->fetchColumn();
+            if (!empty($colName)) {
+                $collectorName = trim((string)$colName);
+            }
+        }
+        if (empty($collectorName) && !empty($req['requested_by']) && $req['requested_by'] !== 'Fee Collector') {
+            $collectorName = trim($req['requested_by']);
+        }
+        if (empty($collectorName)) {
+            $collectorName = 'Fee Collector';
+        }
+
+        // Execute actual fee collection based on fee_type
+        $paymentResult = null;
+        if ($req['fee_type'] === 'ADDITIONAL') {
+            $fees = $depositPayload['fees'] ?? [];
+            if (empty($fees)) {
+                if (!empty($depositPayload['additional_fee_id'])) {
+                    $fees = [$depositPayload];
+                }
+            }
+            $paymentResult = [];
+            foreach ($fees as $f) {
+                $additionalFeeId = (int)($f['id'] ?? $f['additional_fee_id'] ?? 0);
+                if ($additionalFeeId > 0) {
+                    $f['collected_by'] = $collectorName;
+                    $paymentResult[] = $this->collectAdditionalFeePayment($user, $additionalFeeId, $f);
+                }
+            }
+        } else {
+            $depositPayload['collected_by'] = $collectorName;
+            $paymentResult = $this->createFeePayment($user, $depositPayload);
+        }
+
+        $adminName = !empty($user['name']) ? $user['name'] : 'School Admin';
+        $stmtUp = $pdo->prepare("
+            UPDATE fee_discount_requests 
+            SET status = 'APPROVED', approved_by = :approved_by, approved_at = NOW(), updated_at = NOW()
+            WHERE id = :id AND school_id = :sid
+        ");
+        $stmtUp->execute([':approved_by' => $adminName, ':id' => $id, ':sid' => $schoolId]);
+
+        // Dispatch push & in-app notification to the Fee Collector who submitted the request
+        $collectorUserId = (int)($req['requested_by_id'] ?? 0);
+        if ($collectorUserId > 0) {
+            try {
+                $stmtSt = $pdo->prepare("
+                    SELECT s.name AS student_name, c.name AS class_name 
+                    FROM students s 
+                    LEFT JOIN classes c ON c.id = s.class_id 
+                    WHERE s.id = :id LIMIT 1
+                ");
+                $stmtSt->execute([':id' => $req['student_id']]);
+                $stInfo = $stmtSt->fetch(PDO::FETCH_ASSOC);
+
+                $studentName = $stInfo['student_name'] ?? 'Student';
+                $className = $stInfo['class_name'] ?? '';
+                $discAmount = number_format((float)$req['discount_amount'], 0);
+
+                $stmtRole = $pdo->prepare("SELECT role FROM users WHERE id = :uid LIMIT 1");
+                $stmtRole->execute([':uid' => $collectorUserId]);
+                $collectorRole = $stmtRole->fetchColumn() ?: 'TEACHER';
+
+                $notifTitle = 'Discount Request Approved';
+                $notifBody = "The discount request of ₹{$discAmount} for {$studentName}" . ($className ? " ({$className})" : "") . " has been approved by School Admin.";
+
+                $dispatcher = new \App\Shared\Notifications\PushDispatcher(
+                    $pdo,
+                    new \App\Shared\Notifications\FcmClient($pdo)
+                );
+                $dispatcher->toUser(
+                    $schoolId,
+                    $collectorUserId,
+                    (string)$collectorRole,
+                    'DISCOUNT_REQUEST_APPROVED',
+                    $notifTitle,
+                    $notifBody,
+                    '/fees-portal?student_id=' . $req['student_id'],
+                    (int)$req['student_id']
+                );
+            } catch (\Throwable $t) {
+                // Ignore push failure
+            }
+        }
+
+        return [
+            'request_id' => $id,
+            'status' => 'APPROVED',
+            'payment_result' => $paymentResult,
+        ];
+    }
+
+    public function rejectDiscountRequest(array $user, int $id, array $data = []): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->feeRepo->getPdo();
+
+        $stmt = $pdo->prepare("SELECT * FROM fee_discount_requests WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmt->execute([':id' => $id, ':sid' => $schoolId]);
+        $req = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$req) {
+            throw new NotFoundException('Discount request not found');
+        }
+
+        if ($req['status'] === 'CANCELLED') {
+            throw new ValidationException(['fields' => 'Cannot reject a cancelled discount request. The fee collector has cancelled this request.']);
+        }
+
+        if ($req['status'] === 'APPROVED') {
+            throw new ValidationException(['fields' => 'This discount request has already been approved.']);
+        }
+
+        if ($req['status'] === 'REJECTED') {
+            throw new ValidationException(['fields' => 'This discount request has already been rejected.']);
+        }
+
+        $adminName = !empty($user['name']) ? $user['name'] : 'School Admin';
+        $reason = !empty($data['reason']) ? trim($data['reason']) : 'Rejected by School Admin';
+
+        $stmtUp = $pdo->prepare("
+            UPDATE fee_discount_requests 
+            SET status = 'REJECTED', rejection_reason = :reason, approved_by = :approved_by, approved_at = NOW(), updated_at = NOW()
+            WHERE id = :id AND school_id = :sid
+        ");
+        $stmtUp->execute([':reason' => $reason, ':approved_by' => $adminName, ':id' => $id, ':sid' => $schoolId]);
+
+        // Dispatch push & in-app notification to the Fee Collector who submitted the request
+        $collectorUserId = (int)($req['requested_by_id'] ?? 0);
+        if ($collectorUserId > 0) {
+            try {
+                $stmtSt = $pdo->prepare("
+                    SELECT s.name AS student_name, c.name AS class_name 
+                    FROM students s 
+                    LEFT JOIN classes c ON c.id = s.class_id 
+                    WHERE s.id = :id LIMIT 1
+                ");
+                $stmtSt->execute([':id' => $req['student_id']]);
+                $stInfo = $stmtSt->fetch(PDO::FETCH_ASSOC);
+
+                $studentName = $stInfo['student_name'] ?? 'Student';
+                $className = $stInfo['class_name'] ?? '';
+                $discAmount = number_format((float)$req['discount_amount'], 0);
+
+                $stmtRole = $pdo->prepare("SELECT role FROM users WHERE id = :uid LIMIT 1");
+                $stmtRole->execute([':uid' => $collectorUserId]);
+                $collectorRole = $stmtRole->fetchColumn() ?: 'TEACHER';
+
+                $notifTitle = 'Discount Request Rejected';
+                $notifBody = "The discount request of ₹{$discAmount} for {$studentName}" . ($className ? " ({$className})" : "") . " has been rejected by School Admin.";
+                if (!empty($reason) && $reason !== 'Rejected by School Admin') {
+                    $notifBody .= " Reason: {$reason}";
+                }
+
+                $dispatcher = new \App\Shared\Notifications\PushDispatcher(
+                    $pdo,
+                    new \App\Shared\Notifications\FcmClient($pdo)
+                );
+                $dispatcher->toUser(
+                    $schoolId,
+                    $collectorUserId,
+                    (string)$collectorRole,
+                    'DISCOUNT_REQUEST_REJECTED',
+                    $notifTitle,
+                    $notifBody,
+                    '/fees-portal?student_id=' . $req['student_id'],
+                    (int)$req['student_id']
+                );
+            } catch (\Throwable $e) {
+                $this->logger->error('Failed to dispatch discount rejection notification: ' . $e->getMessage());
+            }
+        }
+
+        return [
+            'request_id' => $id,
+            'status' => 'REJECTED',
+        ];
+    }
+
+    public function cancelDiscountRequest(array $user, int $id): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->feeRepo->getPdo();
+
+        $stmt = $pdo->prepare("SELECT * FROM fee_discount_requests WHERE id = :id AND school_id = :sid LIMIT 1");
+        $stmt->execute([':id' => $id, ':sid' => $schoolId]);
+        $req = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$req) {
+            throw new NotFoundException('Discount request not found');
+        }
+
+        if ($req['status'] === 'CANCELLED') {
+            throw new ValidationException(['fields' => 'This discount request is already cancelled.']);
+        }
+
+        if ($req['status'] === 'APPROVED') {
+            throw new ValidationException(['fields' => 'Cannot cancel an approved discount request. The fee has already been collected.']);
+        }
+
+        if ($req['status'] === 'REJECTED') {
+            throw new ValidationException(['fields' => 'Cannot cancel a rejected discount request.']);
+        }
+
+        $userRole = strtoupper((string)($user['role'] ?? ''));
+        $isAdmin = in_array($userRole, ['SCHOOL_ADMIN', 'SUPER_ADMIN', 'ADMIN'], true);
+        $reqUserId = (int)($req['requested_by_id'] ?? 0);
+        $currentUserId = (int)($user['id'] ?? 0);
+
+        if (!$isAdmin && ($reqUserId <= 0 || $reqUserId !== $currentUserId)) {
+            throw new ValidationException(['fields' => 'Only the Fee Collector who submitted this discount request or the School Admin can cancel it.']);
+        }
+
+        $stmtUp = $pdo->prepare("
+            UPDATE fee_discount_requests 
+            SET status = 'CANCELLED', cancelled_at = NOW(), updated_at = NOW()
+            WHERE id = :id AND school_id = :sid
+        ");
+        $stmtUp->execute([':id' => $id, ':sid' => $schoolId]);
+
+        return [
+            'request_id' => $id,
+            'status' => 'CANCELLED',
+        ];
+    }
+
     public function getPendingFinancialReportCount(array $user): int
     {
         $schoolId = $this->getSchoolId($user);
@@ -13266,6 +13917,18 @@ Only approve the settlement after reviewing all financial records.
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->staffRepo->getPdo();
 
+        $discAmount = (float)($data['discount_amount'] ?? 0.0);
+        if ($discAmount > 0.001) {
+            $stmtDiscReq = $pdo->prepare("SELECT discount_approval_required FROM schools WHERE id = :sid LIMIT 1");
+            $stmtDiscReq->execute([':sid' => $schoolId]);
+            $isDiscApprovalRequired = (int)$stmtDiscReq->fetchColumn();
+
+            $userRole = strtoupper((string)($user['role'] ?? ''));
+            if ($isDiscApprovalRequired === 1 && $userRole !== 'SCHOOL_ADMIN' && $userRole !== 'SUPER_ADMIN') {
+                throw new ValidationException(['fields' => 'Admin approval is required for fee discounts. Please submit a discount request for School Admin approval.']);
+            }
+        }
+
         $stmtCheck = $pdo->prepare("SELECT id, amount, amount_paid, discount_amount, status FROM additional_fee_payments WHERE id = :id AND school_id = :sid LIMIT 1");
         $stmtCheck->execute([':id' => $id, ':sid' => $schoolId]);
         $currentRec = $stmtCheck->fetch(PDO::FETCH_ASSOC);
@@ -13334,7 +13997,9 @@ Only approve the settlement after reviewing all financial records.
         $userId = (int) ($user['id'] ?? 0);
         $userRole = strtoupper($user['role'] ?? '');
         $collectedBy = 'ADMIN';
-        if ($userRole === 'SCHOOL_ADMIN' || $userRole === 'ADMIN') {
+        if (!empty($data['collected_by'])) {
+            $collectedBy = trim((string)$data['collected_by']);
+        } elseif ($userRole === 'SCHOOL_ADMIN' || $userRole === 'ADMIN') {
             $collectedBy = 'ADMIN';
         } elseif ($userId > 0) {
             $stmtUser = $pdo->prepare("SELECT name, role FROM users WHERE id = :id LIMIT 1");
@@ -21373,6 +22038,13 @@ Only approve the settlement after reviewing all financial records.
             $pdo->exec("ALTER TABLE principal_assign_otps ADD COLUMN attempts INT DEFAULT 0");
         } catch (\Throwable $e) {}
 
+        // Mask email address
+        $parts = explode('@', $toEmail);
+        $namePart = $parts[0];
+        $domainPart = $parts[1] ?? '';
+        $maskedName = strlen($namePart) > 2 ? substr($namePart, 0, 2) . str_repeat('*', strlen($namePart) - 2) : $namePart . '***';
+        $maskedEmail = $maskedName . '@' . $domainPart;
+
         // Rate limiting check: 30 seconds
         $stmtRate = $pdo->prepare("
             SELECT created_at FROM principal_assign_otps
@@ -21384,8 +22056,12 @@ Only approve the settlement after reviewing all financial records.
         if ($lastOtpTime) {
             $diff = time() - strtotime((string)$lastOtpTime);
             if ($diff >= 0 && $diff < 30) {
-                $wait = 30 - $diff;
-                throw new ValidationException(['rate_limit' => "Please wait {$wait} seconds before requesting a new OTP."]);
+                // If requested within 30 seconds, an active OTP is already in flight. Return success with masked email so UI transitions to OTP entry smoothly!
+                return [
+                    'success' => true,
+                    'message' => 'OTP sent successfully to registered email address.',
+                    'email_masked' => $maskedEmail
+                ];
             }
         }
 
@@ -21665,6 +22341,13 @@ Only approve the settlement after reviewing all financial records.
             $pdo->exec("ALTER TABLE fee_collector_assign_otps ADD COLUMN attempts INT DEFAULT 0");
         } catch (\Throwable $e) {}
 
+        // Mask email address
+        $parts = explode('@', $toEmail);
+        $namePart = $parts[0];
+        $domainPart = $parts[1] ?? '';
+        $maskedName = strlen($namePart) > 2 ? substr($namePart, 0, 2) . str_repeat('*', strlen($namePart) - 2) : $namePart . '***';
+        $maskedEmail = $maskedName . '@' . $domainPart;
+
         // Rate limiting check: 30 seconds
         $stmtRate = $pdo->prepare("
             SELECT created_at FROM fee_collector_assign_otps
@@ -21676,8 +22359,12 @@ Only approve the settlement after reviewing all financial records.
         if ($lastOtpTime) {
             $diff = time() - strtotime((string)$lastOtpTime);
             if ($diff >= 0 && $diff < 30) {
-                $wait = 30 - $diff;
-                throw new ValidationException(['rate_limit' => "Please wait {$wait} seconds before requesting a new OTP."]);
+                // If requested within 30 seconds, an active OTP is already in flight. Return success with masked email so UI transitions to OTP entry smoothly!
+                return [
+                    'success' => true,
+                    'message' => 'OTP sent successfully to registered email address.',
+                    'email_masked' => $maskedEmail
+                ];
             }
         }
 

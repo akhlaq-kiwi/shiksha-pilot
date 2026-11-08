@@ -12,6 +12,8 @@ import 'full_screen_image_screen.dart';
 import 'academic_year_migration_screen.dart';
 import 'penalty_screen.dart';
 import 'restrictions_screen.dart';
+import '../widgets/verify_password_dialog.dart';
+import 'set_app_lock_pin_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -48,6 +50,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   bool _isFeeCollector = false;
   bool _isPrincipal = false;
+  bool _isAppLockEnabled = false;
   List<dynamic> _academicYears = [];
   int? _selectedAcademicYearId;
   String _selectedAcademicYearName = '';
@@ -122,6 +125,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _currentTheme = prefs.getString('theme_mode') ?? 'Light Mode';
         _activeStudentId = prefs.getInt('selected_student_id') ?? widget.selectedStudentId;
         _selectedAcademicYearStatus = prefs.getString('selected_academic_year_status') ?? 'ACTIVE';
+        final currentUid = prefs.getInt('user_id') ?? 0;
+        final currentPhone = (prefs.getString('user_phone') ?? '').trim();
+        final hasUserLock = (currentPhone.isNotEmpty && prefs.getBool('app_lock_enabled_$currentPhone') == true) ||
+            (currentUid > 0 && prefs.getBool('app_lock_enabled_user_$currentUid') == true);
+        _isAppLockEnabled = hasUserLock;
+        prefs.remove('is_app_lock_enabled');
+        prefs.remove('app_lock_pin');
       });
     }
 
@@ -139,10 +149,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   bool get _canManagePenaltyAndPermission {
-    final role = widget.userRole.toUpperCase();
-    if (role == 'SCHOOL_ADMIN' || role == 'SUPER_ADMIN') {
-      return true;
-    }
     return _isFeeCollector;
   }
 
@@ -1397,7 +1403,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _handleLogout() async {
     final prefs = await SharedPreferences.getInstance();
+    final allKeys = prefs.getKeys();
+    final preserved = <String, dynamic>{};
+    for (final k in allKeys) {
+      if (k.startsWith('app_lock_enabled_') || k.startsWith('app_lock_pin_') || k == 'base_url' || k == 'selected_base_url') {
+        preserved[k] = prefs.get(k);
+      }
+    }
     await prefs.clear();
+    for (final e in preserved.entries) {
+      if (e.value is bool) await prefs.setBool(e.key, e.value as bool);
+      else if (e.value is String) await prefs.setString(e.key, e.value as String);
+      else if (e.value is int) await prefs.setInt(e.key, e.value as int);
+    }
+
+    appThemeNotifier.value = ThemeMode.light;
 
     if (mounted) {
       Navigator.pushAndRemoveUntil(
@@ -1560,6 +1580,94 @@ class _SettingsScreenState extends State<SettingsScreen> {
       baseUrl: widget.leaveService.baseUrl,
       token: widget.leaveService.token,
     );
+  }
+
+  Future<void> _handleAppLockTapped() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = widget.leaveService.token;
+    final baseUrl = widget.leaveService.baseUrl;
+
+    if (!_isAppLockEnabled) {
+      final verified = await VerifyPasswordDialog.show(
+        context,
+        baseUrl: baseUrl,
+        token: token,
+        title: 'Verify Password to Set App Lock',
+        actionButtonText: 'Verify & Continue',
+      );
+      if (verified == true && mounted) {
+        final pinSet = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(builder: (_) => const SetAppLockPinScreen()),
+        );
+        if (pinSet == true && mounted) {
+          setState(() => _isAppLockEnabled = true);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: const [
+                  Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'App Lock enabled successfully.',
+                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: const Color(0xFFD97706),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          );
+        }
+      }
+    } else {
+      final verified = await VerifyPasswordDialog.show(
+        context,
+        baseUrl: baseUrl,
+        token: token,
+        title: 'Remove App Lock',
+        actionButtonText: 'Verify & Remove Lock',
+      );
+      if (verified == true && mounted) {
+        final uid = prefs.getInt('user_id') ?? 0;
+        final phone = (prefs.getString('user_phone') ?? '').trim();
+        await prefs.remove('is_app_lock_enabled');
+        await prefs.remove('app_lock_pin');
+        if (uid > 0) {
+          await prefs.setBool('app_lock_enabled_user_$uid', false);
+          await prefs.remove('app_lock_pin_user_$uid');
+        }
+        if (phone.isNotEmpty) {
+          await prefs.setBool('app_lock_enabled_$phone', false);
+          await prefs.remove('app_lock_pin_$phone');
+        }
+        if (mounted) {
+          setState(() => _isAppLockEnabled = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: const [
+                  Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'App Lock removed successfully.',
+                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: const Color(0xFFD97706),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          );
+        }
+      }
+    }
   }
 
   void _showProfileDetails() {
@@ -2234,6 +2342,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: 'Change Password',
                     subtitle: 'Update account password',
                     onTap: _showChangePasswordDialog,
+                  ),
+                  Divider(height: 1, thickness: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9), indent: 64, endIndent: 16),
+
+                  // App Lock
+                  _buildSettingsTile(
+                    icon: Icons.security_rounded,
+                    iconColor: const Color(0xFF0F766E),
+                    iconBgColor: const Color(0xFFCCFBF1),
+                    title: 'App Lock',
+                    subtitle: _isAppLockEnabled ? '4-Digit PIN Security Active' : 'Protect app with 4-digit PIN',
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_isAppLockEnabled) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDCFCE7),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFF86EFAC)),
+                            ),
+                            child: const Text(
+                              'Active',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF15803D),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                        Icon(
+                          Icons.arrow_forward_ios_rounded,
+                          size: 13,
+                          color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                        ),
+                      ],
+                    ),
+                    onTap: _handleAppLockTapped,
                   ),
                   Divider(height: 1, thickness: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9), indent: 64, endIndent: 16),
 

@@ -10,6 +10,7 @@ export 'package:http/http.dart' hide get, post, put, delete;
 
 const String _kUsbBaseUrl = 'http://127.0.0.1:8000';
 const String _kWifiBaseUrl = 'http://10.144.32.71:8000';
+const String _kWifiBaseUrlPrev = 'http://10.56.244.71:8000';
 const String _kWifiBaseUrlOld = 'http://10.22.6.71:8000';
 
 String? _inMemoryWorkingBase;
@@ -40,11 +41,12 @@ Future<http.Response> _executeWithFallback(
   final List<String> candidateBaseUrls = isProductionOrQa
       ? [origin]
       : [
-          if (_inMemoryWorkingBase != null && _inMemoryWorkingBase!.isNotEmpty) _inMemoryWorkingBase!,
-          if (savedBase != null && savedBase.isNotEmpty && !savedBase.contains('10.57.197.71') && !savedBase.contains('10.184.196.71') && !savedBase.contains('10.155.82.71') && !savedBase.contains('10.22.6.71')) savedBase,
-          _kWifiBaseUrl,
           _kUsbBaseUrl,
+          if (_inMemoryWorkingBase != null && _inMemoryWorkingBase!.isNotEmpty && !_inMemoryWorkingBase!.contains('10.22.6.71')) _inMemoryWorkingBase!,
+          _kWifiBaseUrl,
+          if (savedBase != null && savedBase.isNotEmpty && !savedBase.contains('10.57.197.71') && !savedBase.contains('10.184.196.71') && !savedBase.contains('10.155.82.71') && !savedBase.contains('10.22.6.71')) savedBase,
           origin,
+          _kWifiBaseUrlPrev,
           _kWifiBaseUrlOld,
         ];
 
@@ -63,12 +65,15 @@ Future<http.Response> _executeWithFallback(
       final pathAndQuery = originalUrl.hasQuery ? '${originalUrl.path}?${originalUrl.query}' : originalUrl.path;
       final targetUri = Uri.parse('$base$pathAndQuery');
 
-      final isKnownBase = (base == _inMemoryWorkingBase || base == savedBase || base == _kWifiBaseUrl);
-      final timeoutDuration = isKnownBase
-          ? const Duration(seconds: 45)
-          : (base.contains('127.0.0.1') || base.contains('localhost'))
-              ? const Duration(milliseconds: 1500)
-              : (base.contains('10.'))
+      final isLoopback = (base.contains('127.0.0.1') || base.contains('localhost'));
+      final isLocalLan = base.contains('10.') || base.contains('192.168.') || base.contains('172.');
+      final isKnownWorking = (base == _inMemoryWorkingBase);
+
+      final timeoutDuration = isLoopback
+          ? const Duration(milliseconds: 1500)
+          : isKnownWorking
+              ? const Duration(seconds: 15)
+              : isLocalLan
                   ? const Duration(seconds: 4)
                   : const Duration(seconds: 25);
 

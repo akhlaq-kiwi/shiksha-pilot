@@ -9,7 +9,7 @@ use App\Database\Connection;
 
 class TokenService
 {
-    private const TOKEN_TTL = 30 * 86400; // 30 days in seconds
+    private const TOKEN_TTL = 180 * 86400; // 180 days in seconds
 
     public function __construct(private readonly Connection $connection) {}
 

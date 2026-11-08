@@ -330,8 +330,11 @@ class _OutstandingScreenState extends State<OutstandingScreen> {
       );
     }
 
-    return Column(
-      children: [
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Column(
+        children: [
         // Class Selection Dropdown if teacher has multiple classes assigned
         if (_assignedClasses.length > 1)
           Container(
@@ -396,6 +399,7 @@ class _OutstandingScreenState extends State<OutstandingScreen> {
             ),
             child: TextField(
               controller: _searchController,
+              onTapOutside: (_) => FocusScope.of(context).unfocus(),
               style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
               decoration: InputDecoration(
                 hintText: 'Search by student name or roll no...',
@@ -421,6 +425,7 @@ class _OutstandingScreenState extends State<OutstandingScreen> {
             color: const Color(0xFFD97706),
             child: _filteredStudents.isEmpty
                 ? SingleChildScrollView(
+                    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                     physics: const AlwaysScrollableScrollPhysics(),
                     child: Container(
                       height: MediaQuery.of(context).size.height * 0.5,
@@ -443,6 +448,7 @@ class _OutstandingScreenState extends State<OutstandingScreen> {
                     ),
                   )
                 : ListView.builder(
+                    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                     physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
                     itemCount: _filteredStudents.length,
@@ -552,6 +558,7 @@ class _OutstandingScreenState extends State<OutstandingScreen> {
           ),
         ),
       ],
-    );
+    ),
+  );
   }
 }

@@ -1805,8 +1805,11 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
   // ---------------------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
-    final Widget bodyContent = Column(
-      children: [
+    final Widget bodyContent = GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Column(
+        children: [
         // Modern Clean Search Bar matching TAR style (No Indigo/Blue)
         Container(
           color: Colors.white,
@@ -1820,6 +1823,7 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
             ),
             child: TextField(
               controller: _searchController,
+              onTapOutside: (_) => FocusScope.of(context).unfocus(),
               style: const TextStyle(fontSize: 14, color: _kDarkSlate, fontWeight: FontWeight.w500),
               decoration: InputDecoration(
                 hintText: 'Search notices...',
@@ -1933,6 +1937,7 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
                             builder: (context) {
                               final groupedItems = _getGroupedNotices();
                               return ListView.builder(
+                                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                                 controller: _scrollController,
                                 physics: const AlwaysScrollableScrollPhysics(),
                                 padding: const EdgeInsets.only(left: 14, right: 14, top: 8, bottom: 20),
@@ -1953,7 +1958,8 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
         // Principal Bottom Action Bar (Only for Principal)
         if (_isPrincipal && !widget.isEmbedded) _buildPrincipalBottomBar(),
       ],
-    );
+    ),
+  );
 
     if (widget.isEmbedded) {
       return bodyContent;

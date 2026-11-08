@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:school_hub/main.dart';
 
 class TeacherAttendanceHistoryScreen extends StatefulWidget {
   final String baseUrl;
@@ -42,6 +43,25 @@ class _TeacherAttendanceHistoryScreenState extends State<TeacherAttendanceHistor
     _manualQrController.dispose();
     _pageController.dispose();
     super.dispose();
+  }
+
+  void _handleSessionExpired() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('auth_token');
+    await prefs.remove('user_role');
+    await prefs.remove('user_name');
+    await prefs.remove('user_phone');
+    await prefs.remove('user_id');
+    if (mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => const LoginScreen(
+            initialErrorMessage: 'Your session has expired. Please sign in again.',
+          ),
+        ),
+        (route) => false,
+      );
+    }
   }
 
   Future<void> _loadHistory() async {
@@ -101,6 +121,10 @@ class _TeacherAttendanceHistoryScreenState extends State<TeacherAttendanceHistor
           }
         }
       } else {
+        if (response.statusCode == 401) {
+          _handleSessionExpired();
+          return;
+        }
         if (mounted) {
           setState(() {
             _isLoading = false;
@@ -196,6 +220,10 @@ class _TeacherAttendanceHistoryScreenState extends State<TeacherAttendanceHistor
           );
         }
       } else {
+        if (response.statusCode == 401) {
+          _handleSessionExpired();
+          return;
+        }
         final errorMsg = body['message'] ?? 'Invalid or unverified QR Code.';
         if (mounted) {
           _showErrorDialog(errorMsg);
@@ -575,15 +603,17 @@ class _TeacherAttendanceHistoryScreenState extends State<TeacherAttendanceHistor
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final currentMonthName = _months.isNotEmpty && _selectedMonthIndex < _months.length
         ? _months[_selectedMonthIndex]['month_name']
         : 'Month';
 
     return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
       appBar: AppBar(
         title: const Text("Teacher Attendance", style: TextStyle(fontWeight: FontWeight.w900)),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF1E293B),
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        foregroundColor: isDark ? Colors.white : const Color(0xFF1E293B),
         elevation: 0,
         actions: [
           IconButton(
@@ -603,12 +633,12 @@ class _TeacherAttendanceHistoryScreenState extends State<TeacherAttendanceHistor
                   // Month Navigation & Title Header
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    color: Colors.indigo.shade50,
+                    color: isDark ? const Color(0xFF1E293B) : Colors.indigo.shade50,
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.chevron_left_rounded, size: 28),
+                          icon: Icon(Icons.chevron_left_rounded, size: 28, color: isDark ? Colors.white : Colors.indigo.shade900),
                           onPressed: _selectedMonthIndex > 0
                               ? () {
                                   _pageController.previousPage(
@@ -622,15 +652,15 @@ class _TeacherAttendanceHistoryScreenState extends State<TeacherAttendanceHistor
                           child: Text(
                             "Attendance for $currentMonthName",
                             textAlign: TextAlign.center,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.bold,
-                              color: Colors.indigo,
+                              color: isDark ? Colors.white : Colors.indigo,
                             ),
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.chevron_right_rounded, size: 28),
+                          icon: Icon(Icons.chevron_right_rounded, size: 28, color: isDark ? Colors.white : Colors.indigo.shade900),
                           onPressed: _selectedMonthIndex < _months.length - 1
                               ? () {
                                   _pageController.nextPage(
@@ -722,12 +752,12 @@ class _TeacherAttendanceHistoryScreenState extends State<TeacherAttendanceHistor
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                                       decoration: BoxDecoration(
-                                        color: Colors.white,
+                                        color: isDark ? const Color(0xFF1E293B) : Colors.white,
                                         borderRadius: BorderRadius.circular(14),
-                                        border: Border.all(color: Colors.grey.shade200),
+                                        border: Border.all(color: isDark ? const Color(0xFF334155) : Colors.grey.shade200),
                                         boxShadow: [
                                           BoxShadow(
-                                            color: Colors.black.withOpacity(0.03),
+                                            color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
                                             blurRadius: 6,
                                             offset: const Offset(0, 2),
                                           ),
@@ -740,8 +770,8 @@ class _TeacherAttendanceHistoryScreenState extends State<TeacherAttendanceHistor
                                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                             decoration: BoxDecoration(
                                               color: statusType == 'sunday' || statusType == 'holiday'
-                                                  ? Colors.purple.shade50
-                                                  : Colors.indigo.shade50,
+                                                  ? (isDark ? Colors.purple.shade900.withOpacity(0.4) : Colors.purple.shade50)
+                                                  : (isDark ? Colors.indigo.shade900.withOpacity(0.4) : Colors.indigo.shade50),
                                               borderRadius: BorderRadius.circular(10),
                                             ),
                                             child: Column(
@@ -752,8 +782,8 @@ class _TeacherAttendanceHistoryScreenState extends State<TeacherAttendanceHistor
                                                     fontSize: 18,
                                                     fontWeight: FontWeight.bold,
                                                     color: statusType == 'sunday' || statusType == 'holiday'
-                                                        ? Colors.purple.shade900
-                                                        : Colors.indigo.shade900,
+                                                        ? (isDark ? Colors.purple.shade200 : Colors.purple.shade900)
+                                                        : (isDark ? Colors.indigo.shade200 : Colors.indigo.shade900),
                                                   ),
                                                 ),
                                                 Text(
@@ -761,8 +791,8 @@ class _TeacherAttendanceHistoryScreenState extends State<TeacherAttendanceHistor
                                                   style: TextStyle(
                                                     fontSize: 10,
                                                     color: statusType == 'sunday' || statusType == 'holiday'
-                                                        ? Colors.purple.shade700
-                                                        : Colors.indigo.shade700,
+                                                        ? (isDark ? Colors.purple.shade300 : Colors.purple.shade700)
+                                                        : (isDark ? Colors.indigo.shade300 : Colors.indigo.shade700),
                                                   ),
                                                 ),
                                               ],
@@ -774,7 +804,7 @@ class _TeacherAttendanceHistoryScreenState extends State<TeacherAttendanceHistor
                                           Expanded(
                                             child: Text(
                                               dayName,
-                                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87),
                                             ),
                                           ),
 

@@ -188,11 +188,13 @@ class _RestrictionsScreenState extends State<RestrictionsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFFBF8F2),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFFBF8F2),
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF1E293B), size: 18),
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: isDark ? Colors.white : const Color(0xFF1E293B), size: 18),
           onPressed: () => Navigator.pop(context),
         ),
         titleSpacing: 0,
@@ -201,17 +203,17 @@ class _RestrictionsScreenState extends State<RestrictionsScreen> {
             Container(
               padding: const EdgeInsets.all(7),
               decoration: BoxDecoration(
-                color: const Color(0xFFE0E7FF),
+                color: isDark ? const Color(0xFF1E1B4B) : const Color(0xFFE0E7FF),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFC7D2FE)),
+                border: Border.all(color: isDark ? const Color(0xFF3730A3) : const Color(0xFFC7D2FE)),
               ),
               child: const Icon(Icons.lock_person_outlined, color: Color(0xFF4F46E5), size: 18),
             ),
             const SizedBox(width: 10),
-            const Text(
+            Text(
               'RESTRICTIONS',
               style: TextStyle(
-                color: Color(0xFF0F172A),
+                color: isDark ? Colors.white : const Color(0xFF0F172A),
                 fontWeight: FontWeight.w800,
                 fontSize: 16,
                 letterSpacing: 0.3,
@@ -219,7 +221,7 @@ class _RestrictionsScreenState extends State<RestrictionsScreen> {
             ),
           ],
         ),
-        backgroundColor: Colors.white,
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
         elevation: 0.5,
       ),
       body: GestureDetector(
@@ -244,7 +246,7 @@ class _RestrictionsScreenState extends State<RestrictionsScreen> {
                           Text(
                             _errorMessage!,
                             textAlign: TextAlign.center,
-                            style: const TextStyle(fontSize: 14, color: Color(0xFF475569), fontWeight: FontWeight.w600),
+                            style: TextStyle(fontSize: 14, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569), fontWeight: FontWeight.w600),
                           ),
                           const SizedBox(height: 16),
                           ElevatedButton.icon(
@@ -271,7 +273,7 @@ class _RestrictionsScreenState extends State<RestrictionsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildDocumentRestrictionSection(),
+                          _buildDocumentRestrictionSection(isDark),
                           const SizedBox(height: 24),
                         ],
                       ),
@@ -281,17 +283,17 @@ class _RestrictionsScreenState extends State<RestrictionsScreen> {
     );
   }
 
-  Widget _buildDocumentRestrictionSection() {
+  Widget _buildDocumentRestrictionSection(bool isDark) {
     final bool canSubmit = _canSave;
 
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFDF8),
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFFFFDF8),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFF1EDE4), width: 1.2),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFF1EDE4), width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
             blurRadius: 6,
             offset: const Offset(0, 3),
           ),
@@ -307,7 +309,7 @@ class _RestrictionsScreenState extends State<RestrictionsScreen> {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE0E7FF),
+                  color: isDark ? const Color(0xFF1E1B4B) : const Color(0xFFE0E7FF),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(Icons.lock_person_outlined, color: Color(0xFF4F46E5), size: 16),
@@ -316,22 +318,22 @@ class _RestrictionsScreenState extends State<RestrictionsScreen> {
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
+                  children: [
                     Text(
                       'STUDENT DOCUMENT RESTRICTION',
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF0F172A),
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
                         letterSpacing: 0.3,
                       ),
                     ),
-                    SizedBox(height: 2),
+                    const SizedBox(height: 2),
                     Text(
                       'Control access to student documents based on outstanding fee amount.',
                       style: TextStyle(
                         fontSize: 11,
-                        color: Color(0xFF64748B),
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                       ),
                     ),
                   ],
@@ -341,37 +343,37 @@ class _RestrictionsScreenState extends State<RestrictionsScreen> {
           ),
 
           const SizedBox(height: 14),
-          const Divider(color: Color(0xFFF1EDE4), height: 1),
+          Divider(color: isDark ? const Color(0xFF334155) : const Color(0xFFF1EDE4), height: 1),
           const SizedBox(height: 14),
 
           // Toggle Box
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
+              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
             ),
             child: Row(
               children: [
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
+                    children: [
                       Text(
                         'ENABLE DUE AMOUNT RESTRICTION',
                         style: TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w800,
-                          color: Color(0xFF0F172A),
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
                         ),
                       ),
-                      SizedBox(height: 2),
+                      const SizedBox(height: 2),
                       Text(
                         'Toggle to block access to selected student documents when dues exceed the allowed limit.',
                         style: TextStyle(
                           fontSize: 10.5,
-                          color: Color(0xFF64748B),
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                           height: 1.3,
                         ),
                       ),
@@ -381,7 +383,7 @@ class _RestrictionsScreenState extends State<RestrictionsScreen> {
                 const SizedBox(width: 10),
                 Switch.adaptive(
                   value: _enableDueRestriction,
-                  activeThumbColor: const Color(0xFFD97706),
+                  activeColor: const Color(0xFFD97706),
                   onChanged: (val) {
                     setState(() {
                       _enableDueRestriction = val;
@@ -395,7 +397,7 @@ class _RestrictionsScreenState extends State<RestrictionsScreen> {
           const SizedBox(height: 14),
 
           // Maximum Allowed Due Amount (₹) *
-            _buildFieldLabel('MAXIMUM ALLOWED DUE AMOUNT (₹) *'),
+            _buildFieldLabel('MAXIMUM ALLOWED DUE AMOUNT (₹) *', isDark),
             const SizedBox(height: 6),
             TextFormField(
               controller: _maxAllowedDueController,
@@ -403,37 +405,39 @@ class _RestrictionsScreenState extends State<RestrictionsScreen> {
               inputFormatters: [
                 FilteringTextInputFormatter.digitsOnly,
               ],
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
               decoration: InputDecoration(
                 hintText: 'e.g. 1000',
-                hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8), fontWeight: FontWeight.normal),
+                hintStyle: TextStyle(fontSize: 13, color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8), fontWeight: FontWeight.normal),
                 prefixText: '₹ ',
-                prefixStyle: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                prefixStyle: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                filled: isDark,
+                fillColor: isDark ? const Color(0xFF0F172A) : Colors.white,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                  borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                  borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
                 ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: Color(0xFFD97706), width: 1.5),
+                focusedBorder: const OutlineInputBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(10)),
+                  borderSide: BorderSide(color: Color(0xFFD97706), width: 1.5),
                 ),
               ),
             ),
             const SizedBox(height: 4),
-            const Text(
+            Text(
               'Students whose outstanding dues are greater than this amount will not be able to access the selected documents.',
-              style: TextStyle(fontSize: 10.5, color: Color(0xFF94A3B8)),
+              style: TextStyle(fontSize: 10.5, color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
             ),
 
             const SizedBox(height: 14),
 
             // Restriction Applies To Checkboxes
-            _buildFieldLabel('RESTRICTION APPLIES TO'),
+            _buildFieldLabel('RESTRICTION APPLIES TO', isDark),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -448,10 +452,14 @@ class _RestrictionsScreenState extends State<RestrictionsScreen> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: _restrictAdmitCard ? const Color(0xFFFFFBEB) : const Color(0xFFF8FAFC),
+                        color: _restrictAdmitCard
+                            ? (isDark ? const Color(0xFF2E2415) : const Color(0xFFFFFBEB))
+                            : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: _restrictAdmitCard ? const Color(0xFFFDE68A) : const Color(0xFFE2E8F0),
+                          color: _restrictAdmitCard
+                              ? (isDark ? const Color(0xFF78350F) : const Color(0xFFFDE68A))
+                              : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                         ),
                       ),
                       child: Row(
@@ -468,10 +476,10 @@ class _RestrictionsScreenState extends State<RestrictionsScreen> {
                             },
                           ),
                           const SizedBox(width: 4),
-                          const Expanded(
+                          Expanded(
                             child: Text(
                               'Admit Card',
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF0F172A)),
                             ),
                           ),
                         ],
@@ -491,10 +499,14 @@ class _RestrictionsScreenState extends State<RestrictionsScreen> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: _restrictExamResult ? const Color(0xFFFFFBEB) : const Color(0xFFF8FAFC),
+                        color: _restrictExamResult
+                            ? (isDark ? const Color(0xFF2E2415) : const Color(0xFFFFFBEB))
+                            : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: _restrictExamResult ? const Color(0xFFFDE68A) : const Color(0xFFE2E8F0),
+                          color: _restrictExamResult
+                              ? (isDark ? const Color(0xFF78350F) : const Color(0xFFFDE68A))
+                              : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                         ),
                       ),
                       child: Row(
@@ -511,10 +523,10 @@ class _RestrictionsScreenState extends State<RestrictionsScreen> {
                             },
                           ),
                           const SizedBox(width: 4),
-                          const Expanded(
+                          Expanded(
                             child: Text(
                               'Exam Result',
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF0F172A)),
                             ),
                           ),
                         ],
@@ -531,9 +543,9 @@ class _RestrictionsScreenState extends State<RestrictionsScreen> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFFBEB),
+              color: isDark ? const Color(0xFF2E2415) : const Color(0xFFFFFBEB),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFFDE68A)),
+              border: Border.all(color: isDark ? const Color(0xFF78350F) : const Color(0xFFFDE68A)),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -543,22 +555,22 @@ class _RestrictionsScreenState extends State<RestrictionsScreen> {
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
+                    children: [
                       Text(
                         'HOW THIS WORKS',
                         style: TextStyle(
                           fontSize: 10.5,
                           fontWeight: FontWeight.w800,
-                          color: Color(0xFFB45309),
+                          color: isDark ? const Color(0xFFF59E0B) : const Color(0xFFB45309),
                           letterSpacing: 0.3,
                         ),
                       ),
-                      SizedBox(height: 4),
+                      const SizedBox(height: 4),
                       Text(
                         "If a student's outstanding fee is greater than the amount you enter above, they will not be able to view their Admit Card or Exam Result in the mobile application.\n\nOnce the pending amount is paid and comes within the allowed limit, access will be restored automatically.\n\nNote: This restriction does not apply to the Scheme section.",
                         style: TextStyle(
                           fontSize: 11,
-                          color: Color(0xFF92400E),
+                          color: isDark ? const Color(0xFFFCD34D) : const Color(0xFF92400E),
                           height: 1.4,
                         ),
                       ),
@@ -577,8 +589,8 @@ class _RestrictionsScreenState extends State<RestrictionsScreen> {
             child: ElevatedButton(
               onPressed: canSubmit ? _saveDocumentRestrictions : null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: canSubmit ? const Color(0xFFD97706) : const Color(0xFFE2E8F0),
-                foregroundColor: canSubmit ? Colors.white : const Color(0xFF94A3B8),
+                backgroundColor: canSubmit ? const Color(0xFFD97706) : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                foregroundColor: canSubmit ? Colors.white : (isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(vertical: 13),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -600,13 +612,13 @@ class _RestrictionsScreenState extends State<RestrictionsScreen> {
     );
   }
 
-  Widget _buildFieldLabel(String label) {
+  Widget _buildFieldLabel(String label, [bool isDark = false]) {
     return Text(
       label,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 11,
         fontWeight: FontWeight.w800,
-        color: Color(0xFF64748B),
+        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
         letterSpacing: 0.3,
       ),
     );

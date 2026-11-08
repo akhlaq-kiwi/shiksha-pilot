@@ -468,6 +468,7 @@ class _ClassTeacherAssignmentScreenState extends State<ClassTeacherAssignmentScr
                             Expanded(
                               child: TextField(
                                 controller: sheetSearchController,
+                                onTapOutside: (_) => FocusScope.of(context).unfocus(),
                                 onChanged: (_) => setModalState(() {}),
                                 style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
                                 decoration: const InputDecoration(
@@ -497,6 +498,7 @@ class _ClassTeacherAssignmentScreenState extends State<ClassTeacherAssignmentScr
                     // Teacher list
                     Expanded(
                       child: ListView(
+                        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                         children: [
                           // 1. Unassign Option
@@ -684,6 +686,7 @@ class _ClassTeacherAssignmentScreenState extends State<ClassTeacherAssignmentScr
               onRefresh: _loadData,
               color: const Color(0xFFD97706),
               child: SingleChildScrollView(
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 child: Column(

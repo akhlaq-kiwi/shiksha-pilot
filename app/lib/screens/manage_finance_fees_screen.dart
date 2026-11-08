@@ -466,32 +466,36 @@ class _ManageFinanceFeesScreenState extends State<ManageFinanceFeesScreen> with 
 
   Widget _buildAdditionalFeeTab() {
     final fees = _filteredAdditionalFees;
-    return RefreshIndicator(
-      onRefresh: _reloadFeeTypes,
-      color: const Color(0xFFD97706),
-      child: Column(
-        children: [
-          // Search & Add Action Header
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.03),
-                          blurRadius: 4,
-                          offset: const Offset(0, 1),
-                        ),
-                      ],
-                    ),
-                    child: TextField(
-                      onChanged: (val) {
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: RefreshIndicator(
+        onRefresh: _reloadFeeTypes,
+        color: const Color(0xFFD97706),
+        child: Column(
+          children: [
+            // Search & Add Action Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.03),
+                            blurRadius: 4,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                      child: TextField(
+                        onTapOutside: (_) => FocusScope.of(context).unfocus(),
+                        onChanged: (val) {
                         setState(() {
                           _additionalFeeSearch = val;
                         });
@@ -529,6 +533,7 @@ class _ManageFinanceFeesScreenState extends State<ManageFinanceFeesScreen> with 
           Expanded(
             child: fees.isEmpty
                 ? ListView(
+                    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                     physics: const AlwaysScrollableScrollPhysics(),
                     children: [
                       Padding(
@@ -551,6 +556,7 @@ class _ManageFinanceFeesScreenState extends State<ManageFinanceFeesScreen> with 
                     ],
                   )
                 : ListView.separated(
+                    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                     itemCount: fees.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 12),
@@ -562,7 +568,8 @@ class _ManageFinanceFeesScreenState extends State<ManageFinanceFeesScreen> with 
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildAdditionalFeeCard(dynamic ft) {
@@ -1070,33 +1077,37 @@ class _ManageFinanceFeesScreenState extends State<ManageFinanceFeesScreen> with 
   Widget _buildTransportFeeTab() {
     final list = _filteredTransportFees;
 
-    return RefreshIndicator(
-      onRefresh: _reloadTransportFees,
-      color: const Color(0xFFD97706),
-      child: Column(
-        children: [
-          // Filter Row & Action
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(30),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.02),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: TextField(
-                      controller: _transportSearchController,
-                      onChanged: (val) {
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: RefreshIndicator(
+        onRefresh: _reloadTransportFees,
+        color: const Color(0xFFD97706),
+        child: Column(
+          children: [
+            // Filter Row & Action
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(30),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.02),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: TextField(
+                        controller: _transportSearchController,
+                        onTapOutside: (_) => FocusScope.of(context).unfocus(),
+                        onChanged: (val) {
                         setState(() {
                           _transportSearch = val;
                         });
@@ -1188,6 +1199,7 @@ class _ManageFinanceFeesScreenState extends State<ManageFinanceFeesScreen> with 
           Expanded(
             child: list.isEmpty
                 ? ListView(
+                    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                     physics: const AlwaysScrollableScrollPhysics(),
                     children: [
                       Padding(
@@ -1210,6 +1222,7 @@ class _ManageFinanceFeesScreenState extends State<ManageFinanceFeesScreen> with 
                     ],
                   )
                 : ListView.separated(
+                    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                     itemCount: list.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 12),
@@ -1221,7 +1234,8 @@ class _ManageFinanceFeesScreenState extends State<ManageFinanceFeesScreen> with 
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildTransportFeeCard(dynamic tf) {
@@ -1631,6 +1645,7 @@ class _ManageFinanceFeesScreenState extends State<ManageFinanceFeesScreen> with 
                             border: Border.all(color: const Color(0xFFCBD5E1)),
                           ),
                           child: TextField(
+                            onTapOutside: (_) => FocusScope.of(context).unfocus(),
                             onChanged: (val) => setModalState(() => studentQuery = val),
                             style: const TextStyle(fontSize: 13),
                             decoration: const InputDecoration(
@@ -2857,6 +2872,7 @@ class _ManageFinanceFeesScreenState extends State<ManageFinanceFeesScreen> with 
                           border: Border.all(color: const Color(0xFFCBD5E1)),
                         ),
                         child: TextField(
+                          onTapOutside: (_) => FocusScope.of(context).unfocus(),
                           onChanged: (val) => setModalState(() => studentQuery = val),
                           style: const TextStyle(fontSize: 13),
                           decoration: const InputDecoration(

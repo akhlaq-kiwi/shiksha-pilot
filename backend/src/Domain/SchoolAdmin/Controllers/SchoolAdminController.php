@@ -1368,6 +1368,8 @@ class SchoolAdminController extends BaseController
             str_contains($uri, '/api/school/expenses') ||
             str_contains($uri, '/api/school/academic-years') ||
             str_contains($uri, '/api/school/financial-reports') ||
+            str_contains($uri, '/api/school/discount') ||
+            str_contains($uri, '/api/school/discount-requests') ||
             (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && (str_contains($uri, '/api/school/students') || str_contains($uri, '/api/school/classes') || str_contains($uri, '/api/school/staff')))) {
             if ($userRole === 'SCHOOL_ADMIN' || $this->service->isFeeCollector($user)) {
                 if ($this->service->checkSubscriptionExpired($user)) {
@@ -2143,6 +2145,76 @@ class SchoolAdminController extends BaseController
         $id = (int)$args['id'];
         $data = $this->service->rejectSchoolExpense($user, $id);
         return $this->success($response, $data, 'School expense rejected successfully');
+    }
+
+    public function getDiscountSettings(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'TEACHER', 'PRINCIPAL', 'STAFF']);
+
+        $data = $this->service->getDiscountSettings($user);
+        return $this->success($response, $data);
+    }
+
+    public function updateDiscountSettings(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body = RequestParser::body($request);
+        $data = $this->service->updateDiscountSettings($user, $body);
+        return $this->success($response, $data, 'Discount settings updated successfully');
+    }
+
+    public function getDiscountRequests(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'TEACHER', 'PRINCIPAL', 'STAFF']);
+
+        $params = $request->getQueryParams();
+        $data = $this->service->getDiscountRequests($user, $params);
+        return $this->success($response, $data);
+    }
+
+    public function createDiscountRequest(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'TEACHER', 'PRINCIPAL', 'STAFF']);
+
+        $body = RequestParser::body($request);
+        $data = $this->service->createDiscountRequest($user, $body);
+        return $this->success($response, $data, 'Discount request submitted successfully', 201);
+    }
+
+    public function approveDiscountRequest(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int)$args['id'];
+        $data = $this->service->approveDiscountRequest($user, $id);
+        return $this->success($response, $data, 'Discount request approved successfully');
+    }
+
+    public function rejectDiscountRequest(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $id = (int)$args['id'];
+        $body = RequestParser::body($request);
+        $data = $this->service->rejectDiscountRequest($user, $id, $body);
+        return $this->success($response, $data, 'Discount request rejected successfully');
+    }
+
+    public function cancelDiscountRequest(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'TEACHER', 'PRINCIPAL', 'STAFF']);
+
+        $id = (int)$args['id'];
+        $data = $this->service->cancelDiscountRequest($user, $id);
+        return $this->success($response, $data, 'Discount request cancelled successfully');
     }
 
     public function getPendingFinancialReportCount(Request $request, Response $response): Response

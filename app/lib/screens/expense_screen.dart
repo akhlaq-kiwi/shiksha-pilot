@@ -1352,6 +1352,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
       ),
       child: TextField(
         controller: _searchController,
+        onTapOutside: (_) => FocusScope.of(context).unfocus(),
         style: const TextStyle(fontSize: 13.5, color: Color(0xFF0F172A)),
         decoration: InputDecoration(
           hintText: 'Search by Description...',

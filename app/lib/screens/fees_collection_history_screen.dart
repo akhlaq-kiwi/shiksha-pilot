@@ -301,7 +301,7 @@ class _FeesCollectionHistoryScreenState extends State<FeesCollectionHistoryScree
                           color: isSelected ? const Color(0xFFB45309) : const Color(0xFF0F172A),
                         ),
                       ),
-                      subtitle: phone.isNotEmpty && phone != label
+                      subtitle: phone.isNotEmpty && phone != label && !label.contains(phone)
                           ? Text(
                               phone,
                               style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
@@ -589,9 +589,12 @@ class _FeesCollectionHistoryScreenState extends State<FeesCollectionHistoryScree
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Top Stats Summary Bar
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Column(
+          children: [
+            // Top Stats Summary Bar
           _buildSummaryBar(totalCollected, periodCollection, totalCount),
 
           // Filters Section (Search + Deposit By + Period)
@@ -613,6 +616,7 @@ class _FeesCollectionHistoryScreenState extends State<FeesCollectionHistoryScree
                             onRefresh: () => _loadHistory(reset: true),
                             color: const Color(0xFFD97706),
                             child: ListView.separated(
+                              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                               controller: _scrollController,
                               padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
                               itemCount: _transactions.length + (_isLoadingMore ? 1 : 0),
@@ -640,7 +644,8 @@ class _FeesCollectionHistoryScreenState extends State<FeesCollectionHistoryScree
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildSummaryBar(num totalCollected, num periodCollection, int totalCount) {
@@ -748,6 +753,7 @@ class _FeesCollectionHistoryScreenState extends State<FeesCollectionHistoryScree
             ),
             child: TextField(
               controller: _searchController,
+              onTapOutside: (_) => FocusScope.of(context).unfocus(),
               onChanged: _onSearchChanged,
               textInputAction: TextInputAction.search,
               textAlignVertical: TextAlignVertical.center,
