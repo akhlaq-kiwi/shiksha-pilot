@@ -12759,14 +12759,18 @@ Only approve the settlement after reviewing all financial records.
                 $queryParams[':req_clean_name'] = $cleanName;
                 $queryParams[':req_clean_phone'] = $cleanPhone;
             } else {
-                $sql .= " AND (fdr.requested_by = :req_by OR u.phone = :req_by)";
-                $queryParams[':req_by'] = $requestedBy;
+                $sql .= " AND (fdr.requested_by = :req_by_name OR u.phone = :req_by_phone)";
+                $queryParams[':req_by_name'] = $requestedBy;
+                $queryParams[':req_by_phone'] = $requestedBy;
             }
         }
 
         if ($search !== '') {
-            $sql .= " AND (s.name LIKE :search OR s.roll_no LIKE :search OR fdr.requested_by LIKE :search)";
-            $queryParams[':search'] = '%' . $search . '%';
+            $sql .= " AND (s.name LIKE :search_name OR s.roll_no LIKE :search_roll OR fdr.requested_by LIKE :search_req_by)";
+            $searchLike = '%' . $search . '%';
+            $queryParams[':search_name'] = $searchLike;
+            $queryParams[':search_roll'] = $searchLike;
+            $queryParams[':search_req_by'] = $searchLike;
         }
 
         $sql .= " ORDER BY fdr.id DESC";
