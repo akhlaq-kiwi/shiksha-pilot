@@ -189,7 +189,7 @@ function DiscountApprovalNoticeDialog({ isOpen, onCancel, onConfirm, submitting 
 function DepositModal({ student, payments = [], classFeeConfig, pendingMonths = {}, initialApprovalRequired = false, onSave, onClose }) {
   const toast = useToast();
   const currentUser = authService.getCurrentUser();
-  const userRole = (authService.getUserRole() || '').toUpperCase();
+  const userRole = (authService.getUserRole() || currentUser?.role || '').toUpperCase();
   const isAdminRole = userRole === 'SCHOOL_ADMIN' || userRole === 'SUPER_ADMIN';
   const requestedByName = (currentUser?.name || '').trim();
 
@@ -356,6 +356,10 @@ function DepositModal({ student, payments = [], classFeeConfig, pendingMonths = 
     setApplyDiscount(checked);
     if (!checked) {
       setDiscountAmount('');
+    } else if (!isAdminRole) {
+      schoolService.getDiscountSettings()
+        .then(res => setApprovalRequired(!!res?.discount_approval_required))
+        .catch(() => {});
     }
     setError('');
     const newAmounts = {};
@@ -422,29 +426,41 @@ function DepositModal({ student, payments = [], classFeeConfig, pendingMonths = 
 
     setSaving(true);
     setError('');
+    const orderedMonths = [...selectedMonths].sort(
+      (a, b) => academicMonths.indexOf(a) - academicMonths.indexOf(b)
+    );
+    const monthAmountsPayload = {};
+    const isSingleMonth = orderedMonths.length === 1;
+    const discApplied = getDiscAmount();
+
+    orderedMonths.forEach(m => {
+      const val = depositAmounts[m];
+      const userTypedAmt = isSingleMonth ? (parseFloat(val) || getRemainingFee(m)) : getRemainingFee(m);
+      const netCashPaid = Math.max(0, userTypedAmt - discApplied);
+      monthAmountsPayload[m] = netCashPaid;
+    });
+
+    const depositPayload = {
+      student_id: student.id,
+      months: orderedMonths,
+      month_amounts: monthAmountsPayload,
+      discount_amount: discApplied,
+      payment_method: paymentMethod
+    };
+
+    const buildDiscountRequestPayload = () => ({
+      student_id: student.id,
+      fee_type: 'MONTHLY',
+      fee_items_summary: orderedMonths.join(', '),
+      total_amount: calculateGrossTotal(),
+      paid_amount: calculateTotalDeposit(),
+      discount_amount: discApplied,
+      payment_method: paymentMethod,
+      deposit_payload: depositPayload,
+      requested_by: requestedByName
+    });
+
     try {
-      const orderedMonths = [...selectedMonths].sort(
-        (a, b) => academicMonths.indexOf(a) - academicMonths.indexOf(b)
-      );
-      const monthAmountsPayload = {};
-      const isSingleMonth = orderedMonths.length === 1;
-      const discApplied = getDiscAmount();
-
-      orderedMonths.forEach(m => {
-        const val = depositAmounts[m];
-        const userTypedAmt = isSingleMonth ? (parseFloat(val) || getRemainingFee(m)) : getRemainingFee(m);
-        const netCashPaid = Math.max(0, userTypedAmt - discApplied);
-        monthAmountsPayload[m] = netCashPaid;
-      });
-
-      const depositPayload = {
-        student_id: student.id,
-        months: orderedMonths,
-        month_amounts: monthAmountsPayload,
-        discount_amount: discApplied,
-        payment_method: paymentMethod
-      };
-
       if (!isAdminRole && discApplied > 0) {
         let isApprovalRequired = approvalRequired;
         try {
@@ -454,19 +470,7 @@ function DepositModal({ student, payments = [], classFeeConfig, pendingMonths = 
         } catch (_) {}
 
         if (isApprovalRequired) {
-          const gross = calculateGrossTotal();
-          const net = calculateTotalDeposit();
-          setPendingDiscountRequestPayload({
-            student_id: student.id,
-            fee_type: 'MONTHLY',
-            fee_items_summary: orderedMonths.join(', '),
-            total_amount: gross,
-            paid_amount: net,
-            discount_amount: discApplied,
-            payment_method: paymentMethod,
-            deposit_payload: depositPayload,
-            requested_by: requestedByName
-          });
+          setPendingDiscountRequestPayload(buildDiscountRequestPayload());
           setShowApprovalConfirm(true);
           setSaving(false);
           return;
@@ -480,6 +484,12 @@ function DepositModal({ student, payments = [], classFeeConfig, pendingMonths = 
       console.error(err);
       const errRes = err.data || err.response?.data;
       const msg = errRes?.errors?.fields || errRes?.errors?.months || errRes?.errors?.fee_structure || errRes?.errors?.class_id || errRes?.message || err.message || 'Failed to deposit fees.';
+      if (!isAdminRole && discApplied > 0 && String(msg).toLowerCase().includes('admin approval is required')) {
+        setApprovalRequired(true);
+        setPendingDiscountRequestPayload(buildDiscountRequestPayload());
+        setShowApprovalConfirm(true);
+        return;
+      }
       setError(msg);
     } finally {
       setSaving(false);
@@ -748,7 +758,7 @@ function AdditionalDepositModal({
 }) {
   const toast = useToast();
   const currentUser = authService.getCurrentUser();
-  const userRole = (authService.getUserRole() || '').toUpperCase();
+  const userRole = (authService.getUserRole() || currentUser?.role || '').toUpperCase();
   const isAdminRole = userRole === 'SCHOOL_ADMIN' || userRole === 'SUPER_ADMIN';
   const requestedByName = (currentUser?.name || '').trim();
 
@@ -868,6 +878,10 @@ function AdditionalDepositModal({
     setApplyDiscount(checked);
     if (!checked) {
       setDiscountAmount('');
+    } else if (!isAdminRole) {
+      schoolService.getDiscountSettings()
+        .then(res => setApprovalRequired(!!res?.discount_approval_required))
+        .catch(() => {});
     }
     setError('');
     const newAmounts = {};
@@ -940,44 +954,56 @@ function AdditionalDepositModal({
 
     setSaving(true);
     setError('');
-    try {
-      const totalDiscount = getDiscAmount();
-      let remainingDiscount = totalDiscount;
+    const totalDiscount = getDiscAmount();
+    let remainingDiscount = totalDiscount;
 
-      const nowSec = Math.floor(Date.now() / 1000);
-      const rnd = Math.floor(10 + Math.random() * 90);
-      const sharedReceiptNo = `${nowSec}${rnd}`;
+    const nowSec = Math.floor(Date.now() / 1000);
+    const rnd = Math.floor(10 + Math.random() * 90);
+    const sharedReceiptNo = `${nowSec}${rnd}`;
 
-      const feesPayload = [];
-      const feeNames = [];
+    const feesPayload = [];
+    const feeNames = [];
 
-      for (let i = 0; i < selectedIds.length; i++) {
-        const id = selectedIds[i];
-        const fee = unpaidFees.find(f => f.id === id);
-        if (!fee) continue;
-        feeNames.push(fee.fee_name || 'Additional Fee');
-        const remaining = getFeeRemaining(fee);
-        const userTypedAmt = isSingleFee ? (parseFloat(depositAmounts[id]) || remaining) : remaining;
+    for (let i = 0; i < selectedIds.length; i++) {
+      const id = selectedIds[i];
+      const fee = unpaidFees.find(f => f.id === id);
+      if (!fee) continue;
+      feeNames.push(fee.fee_name || 'Additional Fee');
+      const remaining = getFeeRemaining(fee);
+      const userTypedAmt = isSingleFee ? (parseFloat(depositAmounts[id]) || remaining) : remaining;
 
-        let feeDisc = 0;
-        if (isSingleFee) {
-          feeDisc = Math.min(totalDiscount, userTypedAmt);
-        } else {
-          feeDisc = Math.min(remainingDiscount, userTypedAmt);
-          remainingDiscount -= feeDisc;
-        }
-
-        const netCashPaid = Math.max(0, userTypedAmt - feeDisc);
-
-        feesPayload.push({
-          id,
-          payment_method: paymentMethod,
-          amount_paid: netCashPaid,
-          discount_amount: feeDisc,
-          receipt_no: sharedReceiptNo
-        });
+      let feeDisc = 0;
+      if (isSingleFee) {
+        feeDisc = Math.min(totalDiscount, userTypedAmt);
+      } else {
+        feeDisc = Math.min(remainingDiscount, userTypedAmt);
+        remainingDiscount -= feeDisc;
       }
 
+      const netCashPaid = Math.max(0, userTypedAmt - feeDisc);
+
+      feesPayload.push({
+        id,
+        payment_method: paymentMethod,
+        amount_paid: netCashPaid,
+        discount_amount: feeDisc,
+        receipt_no: sharedReceiptNo
+      });
+    }
+
+    const buildDiscountRequestPayload = () => ({
+      student_id: student.id,
+      fee_type: 'ADDITIONAL',
+      fee_items_summary: feeNames.join(', '),
+      total_amount: calculateGrossTotal(),
+      paid_amount: calculateTotalDeposit(),
+      discount_amount: totalDiscount,
+      payment_method: paymentMethod,
+      deposit_payload: { fees: feesPayload },
+      requested_by: requestedByName
+    });
+
+    try {
       if (!isAdminRole && totalDiscount > 0) {
         let isApprovalRequired = approvalRequired;
         try {
@@ -987,17 +1013,7 @@ function AdditionalDepositModal({
         } catch (_) {}
 
         if (isApprovalRequired) {
-          setPendingDiscountRequestPayload({
-            student_id: student.id,
-            fee_type: 'ADDITIONAL',
-            fee_items_summary: feeNames.join(', '),
-            total_amount: calculateGrossTotal(),
-            paid_amount: calculateTotalDeposit(),
-            discount_amount: totalDiscount,
-            payment_method: paymentMethod,
-            deposit_payload: { fees: feesPayload },
-            requested_by: requestedByName
-          });
+          setPendingDiscountRequestPayload(buildDiscountRequestPayload());
           setShowApprovalConfirm(true);
           setSaving(false);
           return;
@@ -1014,6 +1030,12 @@ function AdditionalDepositModal({
       console.error(err);
       const errRes = err.data || err.response?.data;
       const msg = errRes?.errors?.fields || errRes?.message || err.message || 'Failed to deposit fees.';
+      if (!isAdminRole && totalDiscount > 0 && String(msg).toLowerCase().includes('admin approval is required')) {
+        setApprovalRequired(true);
+        setPendingDiscountRequestPayload(buildDiscountRequestPayload());
+        setShowApprovalConfirm(true);
+        return;
+      }
       setError(msg);
     } finally {
       setSaving(false);
@@ -1304,7 +1326,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
   });
   const [discountApprovalRequired, setDiscountApprovalRequired] = useState(false);
 
-  const currentUserRole = (authService.getUserRole() || '').toUpperCase();
+  const currentUserRole = (authService.getUserRole() || authService.getCurrentUser()?.role || '').toUpperCase();
   const isAdminRole = currentUserRole === 'SCHOOL_ADMIN' || currentUserRole === 'SUPER_ADMIN';
 
   useEffect(() => {

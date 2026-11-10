@@ -419,7 +419,7 @@ export default function CollectionHistoryPage() {
                         key={rowKey}
                         onClick={() => {
                           if (t.student_id) {
-                            navigate(`/school-admin/classes?studentId=${t.student_id}`, {
+                            navigate(`/school-admin/finance?studentId=${t.student_id}`, {
                               state: { from: location.pathname + location.search }
                             });
                           }
@@ -482,7 +482,7 @@ export default function CollectionHistoryPage() {
                     key={cardKey} 
                     onClick={() => {
                       if (t.student_id) {
-                        navigate(`/school-admin/classes?studentId=${t.student_id}`, {
+                        navigate(`/school-admin/finance?studentId=${t.student_id}`, {
                           state: { from: location.pathname + location.search }
                         });
                       }

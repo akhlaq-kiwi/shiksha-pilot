@@ -21097,9 +21097,9 @@ Only approve the settlement after reviewing all financial records.
     {
         $pdo = $this->classRepo->getPdo();
         $schoolId = (int)$user['school_id'];
-        $role = $user['role'] ?? '';
+        $role = strtoupper((string)($user['role'] ?? ''));
 
-        if ($role === 'SCHOOL_ADMIN') {
+        if ($role === 'SCHOOL_ADMIN' || $role === 'SUPER_ADMIN') {
             // SCHOOL_ADMIN has full permissions
             return [
                 'role' => $role,
@@ -21111,7 +21111,7 @@ Only approve the settlement after reviewing all financial records.
             ];
         }
 
-        if ($role === 'TEACHER') {
+        if ($role === 'TEACHER' || $role === 'PRINCIPAL') {
             // Find staff record
             $stmtUser = $pdo->prepare("SELECT phone FROM users WHERE id = :id LIMIT 1");
             $stmtUser->execute([':id' => $user['id']]);

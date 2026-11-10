@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Search, ChevronRight, AlertCircle, Landmark, ChevronDown } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../common/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
@@ -114,6 +114,7 @@ const SkeletonRow = () => (
 export default function FinancePage() {
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [students, setStudents] = useState([]);
   const [classes, setClasses] = useState([]);
   const [feePayments, setFeePayments] = useState([]);
@@ -175,6 +176,17 @@ export default function FinancePage() {
     loadData();
   }, []);
 
+  useEffect(() => {
+    const studentIdParam = searchParams.get('studentId');
+    if (studentIdParam) {
+      setSelectedStudentId(parseInt(studentIdParam, 10));
+      setView('details');
+    } else {
+      setSelectedStudentId(null);
+      setView('list');
+    }
+  }, [searchParams]);
+
   // Reset pagination when filter selections change
   useEffect(() => {
     setVisibleCount(25);
@@ -188,8 +200,15 @@ export default function FinancePage() {
       <StudentDetailsPage 
         studentId={selectedStudentId} 
         onBack={() => {
+          if (location.state && location.state.from && !location.state.from.startsWith('/school-admin/finance')) {
+            navigate(location.state.from);
+            return;
+          }
           setSelectedStudentId(null);
           setView('list');
+          if (searchParams.get('studentId')) {
+            setSearchParams({}, { replace: true });
+          }
           loadData(); // reload in case payments were collected
         }} 
         onEdit={(id) => {
@@ -560,7 +579,7 @@ export default function FinancePage() {
                     <TableCell className="text-right py-3.5">
                       <button 
                         onClick={() => {
-                          navigate(`/school-admin/classes?studentId=${s.id}`, { state: { from: location.pathname + location.search } });
+                          navigate(`/school-admin/finance?studentId=${s.id}`, { state: { from: location.pathname + location.search } });
                         }}
                         className="px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30 transition-all inline-flex items-center gap-1 leading-none h-[22px] shadow-2xs"
                       >

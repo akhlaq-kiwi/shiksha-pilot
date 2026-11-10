@@ -1340,6 +1340,7 @@ class SchoolAdminController extends BaseController
     {
         $userRole = strtoupper((string)($user['role'] ?? ''));
         $uri = $_SERVER['REQUEST_URI'] ?? '';
+        $method = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
 
         // Strict School Admin authorization for Principal & Fee Collector role management
         if (str_contains($uri, 'request-principal-otp') || 
@@ -1348,6 +1349,18 @@ class SchoolAdminController extends BaseController
             str_contains($uri, 'assign-fee-collector')) {
             if ($userRole !== 'SCHOOL_ADMIN' && $userRole !== 'SUPER_ADMIN') {
                 throw new \App\Shared\Exceptions\ForbiddenException('Access Denied. Only School Admin can assign or unassign Principal and Fee Collector roles.');
+            }
+            if ($this->service->checkSubscriptionExpired($user)) {
+                throw new \App\Shared\Exceptions\ForbiddenException('Subscription Expired. Access Denied.');
+            }
+            return;
+        }
+
+        // Strict School Admin authorization for discount approval settings & approve/reject actions
+        if ((str_contains($uri, '/api/school/discount/settings') && $method !== 'GET') ||
+            (str_contains($uri, '/api/school/discount-requests') && (str_contains($uri, '/approve') || str_contains($uri, '/reject')))) {
+            if ($userRole !== 'SCHOOL_ADMIN' && $userRole !== 'SUPER_ADMIN') {
+                throw new \App\Shared\Exceptions\ForbiddenException('Access Denied. Only School Admin can manage discount settings or approve/reject discount requests.');
             }
             if ($this->service->checkSubscriptionExpired($user)) {
                 throw new \App\Shared\Exceptions\ForbiddenException('Subscription Expired. Access Denied.');
@@ -1458,9 +1471,6 @@ class SchoolAdminController extends BaseController
         }
 
         if ($userRole === 'TEACHER' || $userRole === 'PRINCIPAL') {
-            $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-
-
             // 1. Shared/Bootstrap endpoints (always allowed for teachers)
             $isShared = false;
             $sharedPaths = [
@@ -1529,6 +1539,21 @@ class SchoolAdminController extends BaseController
                     return;
                 }
                 throw new \App\Shared\Exceptions\ForbiddenException('Access Denied. Upload permission required.');
+            }
+
+            // Discount approval settings (read) & discount request submission/listing for Fees Portal staff
+            if (str_contains($uri, '/api/school/discount/settings') || str_contains($uri, '/api/school/discount-requests')) {
+                $hasDiscountPerm = in_array('Fees Portal', $permissions, true) || $this->service->isFeeCollector($user);
+                if ($method === 'GET' && in_array('Classes', $permissions, true)) {
+                    $hasDiscountPerm = true;
+                }
+                if (!$hasDiscountPerm) {
+                    throw new \App\Shared\Exceptions\ForbiddenException('Access Denied. You do not have permission to perform this action.');
+                }
+                if ($this->service->checkSubscriptionExpired($user)) {
+                    throw new \App\Shared\Exceptions\ForbiddenException('Subscription Expired. Access Denied.');
+                }
+                return;
             }
 
             // 2. Specific module authorization check
