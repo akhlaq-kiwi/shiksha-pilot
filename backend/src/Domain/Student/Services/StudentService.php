@@ -13,6 +13,8 @@ use PDO;
 
 class StudentService extends BaseService
 {
+    private bool $announcementsSchemaEnsured = false;
+
     public function __construct(
         private StudentDataRepository $repo,
         ?LoggerInterface $logger = null,
@@ -1704,15 +1706,154 @@ class StudentService extends BaseService
         return ['success' => true];
     }
 
+    private function ensureAnnouncementsSchema(PDO $pdo): void
+    {
+        if ($this->announcementsSchemaEnsured) {
+            return;
+        }
+
+        $stmtUrl = $pdo->query("SHOW COLUMNS FROM announcements LIKE 'audio_url'");
+        $hasAudioUrl = $stmtUrl && (bool)$stmtUrl->fetch(PDO::FETCH_ASSOC);
+        if ($stmtUrl) {
+            $stmtUrl->closeCursor();
+        }
+        if (!$hasAudioUrl) {
+            try {
+                $pdo->exec("ALTER TABLE announcements ADD COLUMN audio_url VARCHAR(500) NULL DEFAULT NULL AFTER description");
+            } catch (\PDOException $e) {
+                if ((int)($e->errorInfo[1] ?? 0) !== 1060) {
+                    throw $e;
+                }
+            }
+        }
+
+        $stmtDur = $pdo->query("SHOW COLUMNS FROM announcements LIKE 'audio_duration'");
+        $hasAudioDuration = $stmtDur && (bool)$stmtDur->fetch(PDO::FETCH_ASSOC);
+        if ($stmtDur) {
+            $stmtDur->closeCursor();
+        }
+        if (!$hasAudioDuration) {
+            try {
+                $pdo->exec("ALTER TABLE announcements ADD COLUMN audio_duration INT NULL DEFAULT NULL AFTER audio_url");
+            } catch (\PDOException $e) {
+                if ((int)($e->errorInfo[1] ?? 0) !== 1060) {
+                    throw $e;
+                }
+            }
+        }
+
+        $stmtReads = $pdo->query("SHOW TABLES LIKE 'announcement_reads'");
+        $hasReadsTable = $stmtReads && (bool)$stmtReads->fetch(PDO::FETCH_NUM);
+        if ($stmtReads) {
+            $stmtReads->closeCursor();
+        }
+        if (!$hasReadsTable) {
+            $pdo->exec("
+                CREATE TABLE IF NOT EXISTS announcement_reads (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    announcement_id INT NOT NULL,
+                    user_id INT NOT NULL,
+                    read_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE KEY unique_announcement_user (announcement_id, user_id),
+                    KEY user_id (user_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
+        }
+
+        $this->announcementsSchemaEnsured = true;
+    }
+
+    private function isUserPrincipal(PDO $pdo, array $user): bool
+    {
+        $role = strtoupper((string)($user['role'] ?? ''));
+        if ($role === 'PRINCIPAL' || !empty($user['is_principal'])) {
+            return true;
+        }
+        $schoolId = (int)($user['school_id'] ?? 0);
+        $userId = (int)($user['id'] ?? 0);
+        if ($schoolId <= 0 || ($userId <= 0 && empty($user['phone']))) {
+            return false;
+        }
+        $phone = trim((string)($user['phone'] ?? ''));
+        if ($phone === '' && $userId > 0) {
+            $stmt = $pdo->prepare("SELECT phone FROM users WHERE id = :id LIMIT 1");
+            $stmt->execute([':id' => $userId]);
+            $phone = trim((string)($stmt->fetchColumn() ?: ''));
+        }
+        if ($phone === '') {
+            return false;
+        }
+        $phone10 = substr(preg_replace('/[^0-9]/', '', $phone), -10);
+        $params = [':sid' => $schoolId, ':phone' => $phone];
+        $phoneCond = "phone = :phone";
+        if (strlen($phone10) === 10) {
+            $phoneCond .= " OR RIGHT(phone, 10) = :phone10";
+            $params[':phone10'] = $phone10;
+        }
+
+        try {
+            $stmtStaff = $pdo->prepare("
+                SELECT is_principal, role
+                FROM staff
+                WHERE school_id = :sid
+                  AND ($phoneCond)
+                  AND (status IS NULL OR status = '' OR UPPER(status) = 'ACTIVE')
+                ORDER BY id DESC
+            ");
+            $stmtStaff->execute($params);
+            $rows = $stmtStaff->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            foreach ($rows as $staff) {
+                if ((int)($staff['is_principal'] ?? 0) === 1 || strtoupper((string)($staff['role'] ?? '')) === 'PRINCIPAL') {
+                    return true;
+                }
+            }
+            return false;
+        } catch (\PDOException $e) {
+            $stmtStaff = $pdo->prepare("
+                SELECT role
+                FROM staff
+                WHERE school_id = :sid
+                  AND ($phoneCond)
+                  AND (status IS NULL OR status = '' OR UPPER(status) = 'ACTIVE')
+                ORDER BY id DESC
+            ");
+            $stmtStaff->execute($params);
+            $rows = $stmtStaff->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            foreach ($rows as $staff) {
+                if (strtoupper((string)($staff['role'] ?? '')) === 'PRINCIPAL') {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
+    private function resolveUserDisplayName(PDO $pdo, array $user): string
+    {
+        $name = trim((string)($user['name'] ?? ''));
+        if ($name !== '') {
+            return $name;
+        }
+        $userId = (int)($user['id'] ?? 0);
+        if ($userId > 0) {
+            $stmt = $pdo->prepare("SELECT name FROM users WHERE id = :id LIMIT 1");
+            $stmt->execute([':id' => $userId]);
+            $name = trim((string)($stmt->fetchColumn() ?: ''));
+        }
+        return $name;
+    }
+
     public function getActiveNotices(array $user): array
     {
         $schoolId = (int)($user['school_id'] ?? 0);
         $userId = (int)($user['id'] ?? 0);
         $role = strtoupper($user['role'] ?? '');
         $pdo = $this->repo->getPdo();
+        $this->ensureAnnouncementsSchema($pdo);
+        $isPrincipalOrAdmin = ($role === 'SCHOOL_ADMIN' || $role === 'SUPER_ADMIN' || $this->isUserPrincipal($pdo, $user));
 
         $allowedAud = [];
-        if ($role === 'SCHOOL_ADMIN' || $role === 'PRINCIPAL' || !empty($user['is_principal'])) {
+        if ($isPrincipalOrAdmin) {
             $allowedAud = ['Teachers', 'Students', 'Both'];
         } elseif ($role === 'TEACHER') {
             $allowedAud = ['Teachers', 'Both'];
@@ -1722,7 +1863,6 @@ class StudentService extends BaseService
             return []; // Unauthorized roles see nothing
         }
 
-        $isPrincipalOrAdmin = ($role === 'SCHOOL_ADMIN' || $role === 'PRINCIPAL' || !empty($user['is_principal']));
         $statusClause = $isPrincipalOrAdmin ? "1=1" : "a.status = 'Published'";
 
         // Build in clause query
@@ -1786,7 +1926,7 @@ class StudentService extends BaseService
             }
         }
 
-        $userName = trim($user['name'] ?? '');
+        $userName = $this->resolveUserDisplayName($pdo, $user);
         $userPhone = trim($user['phone'] ?? '');
 
         foreach ($announcements as &$a) {
@@ -1819,9 +1959,11 @@ class StudentService extends BaseService
         $userId = (int)($user['id'] ?? 0);
         $role = strtoupper($user['role'] ?? '');
         $pdo = $this->repo->getPdo();
+        $this->ensureAnnouncementsSchema($pdo);
+        $isPrincipalOrAdmin = ($role === 'SCHOOL_ADMIN' || $role === 'SUPER_ADMIN' || $this->isUserPrincipal($pdo, $user));
 
         $allowedAud = [];
-        if ($role === 'SCHOOL_ADMIN' || $role === 'PRINCIPAL' || !empty($user['is_principal'])) {
+        if ($isPrincipalOrAdmin) {
             $allowedAud = ['Teachers', 'Students', 'Both'];
         } elseif ($role === 'TEACHER') {
             $allowedAud = ['Teachers', 'Both'];
@@ -1831,7 +1973,7 @@ class StudentService extends BaseService
             return ['unread_count' => 0];
         }
 
-        $userName = trim($user['name'] ?? '');
+        $userName = $this->resolveUserDisplayName($pdo, $user);
         $userPhone = trim($user['phone'] ?? '');
 
         $inQuery = implode(',', array_fill(0, count($allowedAud), '?'));
@@ -1870,13 +2012,15 @@ class StudentService extends BaseService
         $userId = (int)($user['id'] ?? 0);
         $role = strtoupper($user['role'] ?? '');
         $pdo = $this->repo->getPdo();
+        $this->ensureAnnouncementsSchema($pdo);
 
         if (empty($userId)) {
             return ['success' => false, 'message' => 'Invalid user'];
         }
 
+        $isPrincipalOrAdmin = ($role === 'SCHOOL_ADMIN' || $role === 'SUPER_ADMIN' || $this->isUserPrincipal($pdo, $user));
         $allowedAud = [];
-        if ($role === 'SCHOOL_ADMIN' || $role === 'PRINCIPAL' || !empty($user['is_principal'])) {
+        if ($isPrincipalOrAdmin) {
             $allowedAud = ['Teachers', 'Students', 'Both'];
         } elseif ($role === 'TEACHER') {
             $allowedAud = ['Teachers', 'Both'];
@@ -1921,6 +2065,7 @@ class StudentService extends BaseService
             return ['success' => false];
         }
         $pdo = $this->repo->getPdo();
+        $this->ensureAnnouncementsSchema($pdo);
 
         $stmt = $pdo->prepare("
             INSERT IGNORE INTO announcement_reads (announcement_id, user_id)

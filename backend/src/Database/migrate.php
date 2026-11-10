@@ -145,7 +145,6 @@ try {
                 $stmt->execute();
                 $stmt->closeCursor();
             } catch (PDOException $e) {
-            } catch (PDOException $e) {
                 // $e->getCode() is the SQLSTATE string; MySQL-specific error number is in errorInfo[1]
                 // Ignorable: 1050 table exists, 1060 duplicate column, 1061 duplicate key name, 1062 duplicate entry
                 $mysqlCode = (int) ($e->errorInfo[1] ?? 0);

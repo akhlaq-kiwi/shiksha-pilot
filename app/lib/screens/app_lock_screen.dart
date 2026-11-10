@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:school_hub/widgets/verify_password_dialog.dart';
+import '../config.dart';
+import '../services/app_lock_helper.dart';
+import '../services/auth_service.dart';
 
 class AppLockScreen extends StatefulWidget {
   final VoidCallback onUnlockSuccess;
@@ -119,9 +122,68 @@ class _AppLockScreenState extends State<AppLockScreen> with SingleTickerProvider
     });
 
     // Small delay to let the last dot fill visually
-    await Future.delayed(const Duration(milliseconds: 200));
+    await Future.delayed(const Duration(milliseconds: 180));
 
-    if (_savedPin.isNotEmpty && _enteredPin == _savedPin) {
+    final prefs = await SharedPreferences.getInstance();
+    final uid = prefs.getInt('user_id') ?? 0;
+    final phone = (prefs.getString('user_phone') ?? '').trim();
+    final token = (widget.token != null && widget.token!.isNotEmpty)
+        ? widget.token!
+        : (prefs.getString('auth_token') ?? '');
+    final baseUrl = (widget.baseUrl != null && widget.baseUrl!.isNotEmpty)
+        ? widget.baseUrl!
+        : resolveBaseUrlFrom(prefs);
+
+    bool verified = false;
+    String failMsg = 'Incorrect PIN. Please try again.';
+
+    if (token.isNotEmpty && baseUrl.isNotEmpty) {
+      try {
+        verified = await AuthService(baseUrl: baseUrl)
+            .verifyAppLockPin(token, _enteredPin)
+            .timeout(const Duration(seconds: 10));
+        if (verified) {
+          await AppLockHelper.saveLocalDigestAfterVerify(
+            prefs,
+            userId: uid,
+            phone: phone,
+            pin: _enteredPin,
+          );
+        }
+      } on InvalidAppLockPinException catch (e) {
+        verified = false;
+        failMsg = e.message;
+      } catch (_) {
+        // Offline / transient network failure: allow ONLY if this device
+        // previously verified/set this PIN locally (never possible on new device or reinstall).
+        if (AppLockHelper.hasLocalDigest(prefs, userId: uid, phone: phone)) {
+          verified = AppLockHelper.verifyLocalDigestOffline(
+            prefs,
+            userId: uid,
+            phone: phone,
+            pin: _enteredPin,
+          );
+        } else if (_savedPin.isNotEmpty) {
+          verified = (_enteredPin == _savedPin);
+        } else {
+          verified = false;
+          failMsg = 'Internet connection required to verify PIN.';
+        }
+      }
+    } else if (AppLockHelper.hasLocalDigest(prefs, userId: uid, phone: phone)) {
+      verified = AppLockHelper.verifyLocalDigestOffline(
+        prefs,
+        userId: uid,
+        phone: phone,
+        pin: _enteredPin,
+      );
+    } else if (_savedPin.isNotEmpty) {
+      verified = (_enteredPin == _savedPin);
+    } else {
+      failMsg = 'Session unavailable. Please re-login.';
+    }
+
+    if (verified) {
       // Correct PIN: Trigger security loader animation
       HapticFeedback.mediumImpact();
       if (!mounted) return;
@@ -131,18 +193,18 @@ class _AppLockScreenState extends State<AppLockScreen> with SingleTickerProvider
       });
 
       // Smooth security verification delay for psychological impact
-      await Future.delayed(const Duration(milliseconds: 700));
+      await Future.delayed(const Duration(milliseconds: 650));
       if (!mounted) return;
 
       widget.onUnlockSuccess();
     } else {
-      // Incorrect PIN
+      // Incorrect PIN or offline on unverified device
       HapticFeedback.heavyImpact();
       if (!mounted) return;
 
       setState(() {
         _isVerifying = false;
-        _errorMessage = 'Incorrect PIN. Please try again.';
+        _errorMessage = failMsg;
       });
 
       // Brief red pause then clear dots
@@ -157,8 +219,12 @@ class _AppLockScreenState extends State<AppLockScreen> with SingleTickerProvider
 
   Future<void> _handleForgotPin() async {
     final prefs = await SharedPreferences.getInstance();
-    final token = widget.token ?? prefs.getString('auth_token') ?? '';
-    final baseUrl = widget.baseUrl ?? prefs.getString('base_url') ?? '';
+    final token = (widget.token != null && widget.token!.isNotEmpty)
+        ? widget.token!
+        : (prefs.getString('auth_token') ?? '');
+    final baseUrl = (widget.baseUrl != null && widget.baseUrl!.isNotEmpty)
+        ? widget.baseUrl!
+        : resolveBaseUrlFrom(prefs);
 
     if (!mounted) return;
     if (token.isEmpty || baseUrl.isEmpty) {
@@ -168,27 +234,33 @@ class _AppLockScreenState extends State<AppLockScreen> with SingleTickerProvider
       return;
     }
 
+    String capturedPassword = '';
     final verified = await VerifyPasswordDialog.show(
       context,
       baseUrl: baseUrl,
       token: token,
       title: 'Reset Security PIN',
       actionButtonText: 'Verify & Unlock',
+      onPasswordVerified: (pwd) {
+        capturedPassword = pwd;
+      },
     );
 
     if (verified == true) {
+      try {
+        await AuthService(baseUrl: baseUrl).disableAppLock(token, capturedPassword);
+      } catch (e) {
+        if (!mounted) return;
+        final msg = e.toString().replaceFirst(RegExp(r'^[A-Za-z0-9_]*Exception:\s*'), '');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(msg.isNotEmpty ? msg : 'Failed to reset App Lock.')),
+        );
+        return;
+      }
+
       final uid = prefs.getInt('user_id') ?? 0;
       final phone = (prefs.getString('user_phone') ?? '').trim();
-      await prefs.remove('is_app_lock_enabled');
-      await prefs.remove('app_lock_pin');
-      if (phone.isNotEmpty) {
-        await prefs.setBool('app_lock_enabled_$phone', false);
-        await prefs.remove('app_lock_pin_$phone');
-      }
-      if (uid > 0) {
-        await prefs.setBool('app_lock_enabled_user_$uid', false);
-        await prefs.remove('app_lock_pin_user_$uid');
-      }
+      await AppLockHelper.clearAllForUser(prefs, userId: uid, phone: phone);
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -231,8 +303,10 @@ class _AppLockScreenState extends State<AppLockScreen> with SingleTickerProvider
       greetingText = 'Welcome, $displayName';
     }
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF0B1120),
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0B1120),
       body: Stack(
         children: [
           // Ambient background glow effects
@@ -481,6 +555,7 @@ class _AppLockScreenState extends State<AppLockScreen> with SingleTickerProvider
             ),
           ),
         ],
+      ),
       ),
     );
   }

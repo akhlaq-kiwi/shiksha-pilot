@@ -23,6 +23,9 @@ return function (App $app) {
     $app->post('/api/auth/login', [AuthController::class, 'login']);
     $app->post('/api/auth/change-password', [AuthController::class, 'changePassword']);
     $app->post('/api/auth/verify-password', [AuthController::class, 'verifyPassword']);
+    $app->post('/api/auth/app-lock', [AuthController::class, 'enableAppLock']);
+    $app->post('/api/auth/app-lock/verify', [AuthController::class, 'verifyAppLock']);
+    $app->post('/api/auth/app-lock/disable', [AuthController::class, 'disableAppLock']);
     $app->get('/api/auth/profile', [AuthController::class, 'getProfile']);
     
     // Platform / Super Admin Domain

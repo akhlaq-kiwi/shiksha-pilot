@@ -706,34 +706,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         if (data.isNotEmpty) {
           int lastNotifiedId = prefs.getInt('last_notified_id_${widget.userRole}') ?? 0;
           int maxId = lastNotifiedId;
-
-          final unreadNotifs = data.where((n) {
-            final isUnread = n['is_read'] == 0 || n['is_read'] == false || n['is_read'] == '0';
-            final linkStr = (n['link'] ?? '').toString().toLowerCase();
-            final catStr = (n['category'] ?? '').toString().toUpperCase();
-            final evtStr = (n['event_key'] ?? '').toString().toUpperCase();
-            if (linkStr == '/notice' || linkStr.contains('notice') || catStr == 'ANNOUNCEMENT' || evtStr == 'ANNOUNCEMENT_PUBLISHED') {
-              return false;
+          for (final n in data) {
+            final int? nId = n['id'] is int ? n['id'] as int : int.tryParse(n['id']?.toString() ?? '');
+            if (nId != null && nId > maxId) {
+              maxId = nId;
             }
-            if (roleUpper == 'SCHOOL_ADMIN' && isLeaveNotif(n)) {
-              return false;
-            }
-            final int nId = n['id'] is int ? n['id'] : int.parse(n['id'].toString());
-            return isUnread && nId > lastNotifiedId;
-          }).toList();
-
-          unreadNotifs.sort((a, b) {
-            final int aId = a['id'] is int ? a['id'] : int.parse(a['id'].toString());
-            final int bId = b['id'] is int ? b['id'] : int.parse(b['id'].toString());
-            return aId.compareTo(bId);
-          });
-
-          if (unreadNotifs.isNotEmpty) {
-            for (final notif in unreadNotifs) {
-              final int nId = notif['id'] is int ? notif['id'] : int.parse(notif['id'].toString());
-              if (nId > maxId) maxId = nId;
-              await NotificationHelper.showNotification(notif, badgeCount: count);
-            }
+          }
+          if (maxId > lastNotifiedId) {
             await prefs.setInt('last_notified_id_${widget.userRole}', maxId);
           }
         }
@@ -1392,7 +1371,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final allKeys = prefs.getKeys();
     final preserved = <String, dynamic>{};
     for (final k in allKeys) {
-      if (k.startsWith('app_lock_enabled_') || k.startsWith('app_lock_pin_') || k == 'base_url' || k == 'selected_base_url') {
+      if (k.startsWith('app_lock_enabled_') || k.startsWith('app_lock_digest_') || k == 'base_url' || k == 'selected_base_url') {
         preserved[k] = prefs.get(k);
       }
     }
@@ -1448,12 +1427,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           children: _children,
           activeStudentId: _activeStudentId,
           baseUrl: effectiveBase,
-          onSwitchChild: (newId) {
-            setState(() {
-              _activeStudentId = newId;
-              _resolveActiveStudentName();
-            });
+          onSwitchChild: (newId) async {
+            _activeStudentId = newId;
+            _resolveActiveStudentName();
             _fetchUnreadNotificationsCount();
+            _fetchUnreadNoticesCount();
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Switched profile to $_activeStudentName'),
+                  behavior: SnackBarBehavior.floating,
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            }
           },
         ),
       ),

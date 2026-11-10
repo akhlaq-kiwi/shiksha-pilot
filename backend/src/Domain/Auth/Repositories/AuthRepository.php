@@ -9,12 +9,37 @@ use App\Shared\BaseRepository;
 class AuthRepository extends BaseRepository
 {
     protected string $table = 'users';
+    private bool $appLockSchemaEnsured = false;
+
+    /**
+     * Ensure account-level App Lock columns exist on the users table.
+     */
+    public function ensureAppLockSchema(): void
+    {
+        if ($this->appLockSchemaEnsured) {
+            return;
+        }
+        try {
+            $stmtEnabled = $this->pdo->query("SHOW COLUMNS FROM users LIKE 'app_lock_enabled'");
+            if ($stmtEnabled !== false && $stmtEnabled->rowCount() === 0) {
+                $this->pdo->exec("ALTER TABLE users ADD COLUMN app_lock_enabled TINYINT(1) NOT NULL DEFAULT 0");
+            }
+            $stmtHash = $this->pdo->query("SHOW COLUMNS FROM users LIKE 'app_lock_pin_hash'");
+            if ($stmtHash !== false && $stmtHash->rowCount() === 0) {
+                $this->pdo->exec("ALTER TABLE users ADD COLUMN app_lock_pin_hash VARCHAR(255) NULL DEFAULT NULL");
+            }
+        } catch (\Throwable $e) {
+            // Ignore if columns already exist or schema cannot be inspected in restricted mode
+        }
+        $this->appLockSchemaEnsured = true;
+    }
 
     /**
      * Find a user row by phone number, or return null when not found.
      */
     public function findByPhone(string $phone): ?array
     {
+        $this->ensureAppLockSchema();
         $stmt = $this->pdo->prepare(
             "SELECT u.*, s.portal_theme AS school_portal_theme, s.status AS school_status, s.name AS school_name, st.photo_path AS staff_photo_path
                FROM users u
@@ -76,6 +101,7 @@ class AuthRepository extends BaseRepository
      */
     public function findById(string|int $id): ?array
     {
+        $this->ensureAppLockSchema();
         $stmt = $this->pdo->prepare(
             "SELECT u.*, s.portal_theme AS school_portal_theme, s.status AS school_status, s.name AS school_name, st.photo_path AS staff_photo_path
                FROM users u
@@ -112,6 +138,30 @@ class AuthRepository extends BaseRepository
             'plain_password'        => $newPassword,
             'force_password_change' => 0,
         ]);
+    }
+
+    /**
+     * Persist account-level App Lock state and hashed 4-digit PIN.
+     */
+    public function setAppLock(int $userId, string $pinHash): void
+    {
+        $this->ensureAppLockSchema();
+        $this->update($userId, [
+            'app_lock_enabled'  => 1,
+            'app_lock_pin_hash' => $pinHash,
+        ]);
+    }
+
+    /**
+     * Disable account-level App Lock and clear stored PIN hash.
+     */
+    public function disableAppLock(int $userId): void
+    {
+        $this->ensureAppLockSchema();
+        $stmt = $this->pdo->prepare(
+            "UPDATE users SET app_lock_enabled = 0, app_lock_pin_hash = NULL WHERE id = :id"
+        );
+        $stmt->execute([':id' => $userId]);
     }
 
     // ---------------------------------------------------------------------

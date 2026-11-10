@@ -11,6 +11,15 @@ class AuthValidationException implements Exception {
   String toString() => message;
 }
 
+class InvalidAppLockPinException implements Exception {
+  final String message;
+
+  InvalidAppLockPinException([this.message = 'Incorrect PIN. Please try again.']);
+
+  @override
+  String toString() => message;
+}
+
 class AuthService {
   final String baseUrl;
 
@@ -122,6 +131,70 @@ class AuthService {
       return resData['data']; // User profile map
     } else {
       throw Exception(resData['message'] ?? 'Failed to fetch profile.');
+    }
+  }
+
+  Future<void> enableAppLock(String token, String pin, String password) async {
+    final uri = Uri.parse('$baseUrl/api/auth/app-lock');
+    final response = await http.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: json.encode({
+        'pin': pin,
+        'password': password,
+      }),
+    );
+
+    final resData = json.decode(response.body);
+    if (response.statusCode != 200) {
+      throw Exception(resData['message'] ?? 'Failed to enable App Lock.');
+    }
+  }
+
+  Future<bool> verifyAppLockPin(String token, String pin) async {
+    final uri = Uri.parse('$baseUrl/api/auth/app-lock/verify');
+    final response = await http.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: json.encode({
+        'pin': pin,
+      }),
+    );
+
+    final resData = json.decode(response.body);
+    if (response.statusCode == 200) {
+      return true;
+    }
+    if (response.statusCode == 400 || response.statusCode == 401 || response.statusCode == 403 || response.statusCode == 422) {
+      throw InvalidAppLockPinException(
+        (resData['message'] as String?) ?? 'Incorrect PIN. Please try again.',
+      );
+    }
+    throw Exception(resData['message'] ?? 'Unable to verify PIN.');
+  }
+
+  Future<void> disableAppLock(String token, String password) async {
+    final uri = Uri.parse('$baseUrl/api/auth/app-lock/disable');
+    final response = await http.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: json.encode({
+        'password': password,
+      }),
+    );
+
+    final resData = json.decode(response.body);
+    if (response.statusCode != 200) {
+      throw Exception(resData['message'] ?? 'Failed to disable App Lock.');
     }
   }
 }

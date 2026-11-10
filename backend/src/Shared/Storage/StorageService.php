@@ -429,6 +429,11 @@ class StorageService
             'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'csv'  => 'text/csv',
             'txt'  => 'text/plain',
+            'm4a'  => 'audio/mp4',
+            'aac'  => 'audio/aac',
+            'mp3'  => 'audio/mpeg',
+            'wav'  => 'audio/wav',
+            'ogg'  => 'audio/ogg',
         ];
 
         if (isset($map[$extension])) {

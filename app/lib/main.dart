@@ -10,6 +10,7 @@ import 'screens/home_screen.dart';
 import 'screens/app_lock_screen.dart';
 import 'services/leave_service.dart';
 import 'services/auth_service.dart';
+import 'services/app_lock_helper.dart';
 import 'services/notification_helper.dart';
 import 'services/push_notification_service.dart';
 import 'config.dart';
@@ -61,33 +62,49 @@ void callbackDispatcher() {
             if (data.isNotEmpty) {
               int lastNotifiedId = prefs.getInt('last_notified_id_$userRole') ?? 0;
               int maxId = lastNotifiedId;
+              for (final n in data) {
+                final int? nId = n['id'] is int ? n['id'] as int : int.tryParse(n['id']?.toString() ?? '');
+                if (nId != null && nId > maxId) maxId = nId;
+              }
 
-              final unreadNotifs = data.where((n) {
-                final isUnread = n['is_read'] == 0 || n['is_read'] == false || n['is_read'] == '0';
-                final linkStr = (n['link'] ?? '').toString().toLowerCase();
-                final catStr = (n['category'] ?? '').toString().toUpperCase();
-                final evtStr = (n['event_key'] ?? '').toString().toUpperCase();
-                if (linkStr == '/notice' || linkStr.contains('notice') || catStr == 'ANNOUNCEMENT' || evtStr == 'ANNOUNCEMENT_PUBLISHED') {
-                  return false;
+              // On fresh session where last_notified_id is unset, baseline to current maxId
+              // rather than re-emitting historical unread notifications already pushed via FCM.
+              if (lastNotifiedId == 0) {
+                if (maxId > 0) {
+                  await prefs.setInt('last_notified_id_$userRole', maxId);
                 }
-                final int nId = n['id'] is int ? n['id'] : int.parse(n['id'].toString());
-                return isUnread && nId > lastNotifiedId;
-              }).toList();
+              } else {
+                final unreadNotifs = data.where((n) {
+                  final isUnread = n['is_read'] == 0 || n['is_read'] == false || n['is_read'] == '0';
+                  final linkStr = (n['link'] ?? '').toString().toLowerCase();
+                  final catStr = (n['category'] ?? '').toString().toUpperCase();
+                  final evtStr = (n['event_key'] ?? '').toString().toUpperCase();
+                  if (linkStr == '/notice' || linkStr.contains('notice') || catStr == 'ANNOUNCEMENT' || evtStr == 'ANNOUNCEMENT_PUBLISHED') {
+                    return false;
+                  }
+                  if (roleUpper == 'SCHOOL_ADMIN' &&
+                      (catStr == 'LEAVE' || catStr == 'LEAVE_MANAGEMENT' || evtStr.contains('LEAVE') || linkStr.contains('leave'))) {
+                    return false;
+                  }
+                  final int nId = n['id'] is int ? n['id'] : int.parse(n['id'].toString());
+                  return isUnread && nId > lastNotifiedId;
+                }).toList();
 
-              unreadNotifs.sort((a, b) {
-                final int aId = a['id'] is int ? a['id'] : int.parse(a['id'].toString());
-                final int bId = b['id'] is int ? b['id'] : int.parse(b['id'].toString());
-                return aId.compareTo(bId);
-              });
+                unreadNotifs.sort((a, b) {
+                  final int aId = a['id'] is int ? a['id'] : int.parse(a['id'].toString());
+                  final int bId = b['id'] is int ? b['id'] : int.parse(b['id'].toString());
+                  return aId.compareTo(bId);
+                });
 
-              if (unreadNotifs.isNotEmpty) {
-                await NotificationHelper.init();
-                for (final notif in unreadNotifs) {
-                  final int nId = notif['id'] is int ? notif['id'] : int.parse(notif['id'].toString());
-                  if (nId > maxId) maxId = nId;
-                  await NotificationHelper.showNotification(notif, badgeCount: unreadNotifs.length);
+                if (unreadNotifs.isNotEmpty) {
+                  await NotificationHelper.init();
+                  for (final notif in unreadNotifs) {
+                    final int nId = notif['id'] is int ? notif['id'] : int.parse(notif['id'].toString());
+                    if (nId > maxId) maxId = nId;
+                    await NotificationHelper.showNotification(notif, badgeCount: unreadNotifs.length);
+                  }
+                  await prefs.setInt('last_notified_id_$userRole', maxId);
                 }
-                await prefs.setInt('last_notified_id_$userRole', maxId);
               }
             }
           }
@@ -322,21 +339,40 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       }
 
       final leaveService = LeaveService(baseUrl: baseUrl, token: token);
-      
-      // Ensure school_name is loaded before navigating to HomeScreen so header never shows blank!
+
+      // Sync latest account-level security state (App Lock) & school_name from backend when online
       String schoolName = (prefs.getString('school_name') ?? '').trim();
-      if (schoolName.isEmpty) {
-        try {
-          final authService = AuthService(baseUrl: baseUrl);
-          final profile = await authService.fetchProfile(token);
-          final sName = ((profile['school_name'] as String?) ?? '').trim();
-          if (sName.isNotEmpty) {
-            schoolName = sName.toUpperCase();
-            await prefs.setString('school_name', schoolName);
-          }
-        } catch (e) {
-          debugPrint('Error fetching school name in SplashScreen: $e');
+      try {
+        final authService = AuthService(baseUrl: baseUrl);
+        final profile = await authService.fetchProfile(token).timeout(const Duration(seconds: 4));
+        final sName = ((profile['school_name'] as String?) ?? '').trim();
+        if (sName.isNotEmpty) {
+          schoolName = sName.toUpperCase();
+          await prefs.setString('school_name', schoolName);
         }
+        final int profileUid = profile['id'] is int
+            ? profile['id'] as int
+            : int.tryParse(profile['id']?.toString() ?? '') ?? (prefs.getInt('user_id') ?? 0);
+        final String profilePhone = ((profile['phone'] as String?) ?? (prefs.getString('user_phone') ?? '')).trim();
+        if (profileUid > 0 && (prefs.getInt('user_id') ?? 0) <= 0) {
+          await prefs.setInt('user_id', profileUid);
+        }
+        if (profilePhone.isNotEmpty && (prefs.getString('user_phone') ?? '').isEmpty) {
+          await prefs.setString('user_phone', profilePhone);
+        }
+        if (profile.containsKey('app_lock_enabled')) {
+          final bool serverLockEnabled = profile['app_lock_enabled'] == true ||
+              profile['app_lock_enabled'] == 1 ||
+              profile['app_lock_enabled'] == '1';
+          await AppLockHelper.syncFromServerState(
+            prefs,
+            userId: profileUid,
+            phone: profilePhone,
+            enabled: serverLockEnabled,
+          );
+        }
+      } catch (e) {
+        debugPrint('Profile/AppLock sync skipped in SplashScreen (offline or timeout): $e');
       }
       if (schoolName.isEmpty) {
         schoolName = 'SHIKSHA PILOT ACADEMY';
@@ -350,39 +386,27 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       void navigateToHome(Widget homeScreenWidget) {
         final uid = prefs.getInt('user_id') ?? 0;
         final phone = (prefs.getString('user_phone') ?? '').trim();
-
-        // Remove legacy global keys so they never cross-contaminate users
-        prefs.remove('is_app_lock_enabled');
-        prefs.remove('app_lock_pin');
-
-        bool isAppLockEnabled = false;
-        String? appLockPin;
-
-        if (phone.isNotEmpty) {
-          isAppLockEnabled = prefs.getBool('app_lock_enabled_$phone') ?? false;
-          appLockPin = prefs.getString('app_lock_pin_$phone');
-        }
-        if (!isAppLockEnabled && uid > 0) {
-          isAppLockEnabled = prefs.getBool('app_lock_enabled_user_$uid') ?? false;
-          appLockPin = prefs.getString('app_lock_pin_user_$uid');
-        }
+        final bool isAppLockEnabled = AppLockHelper.isEnabledLocally(
+          prefs,
+          userId: uid,
+          phone: phone,
+        );
         final String userName = prefs.getString('user_name') ?? '';
 
-        if (isAppLockEnabled && appLockPin != null && appLockPin.isNotEmpty) {
+        if (isAppLockEnabled) {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (context) => AppLockScreen(
+              builder: (lockContext) => AppLockScreen(
                 userName: userName,
                 userRole: role,
                 schoolName: schoolName,
                 baseUrl: baseUrl,
                 token: token,
-                expectedPin: appLockPin,
                 onUnlockSuccess: () {
                   Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (context) => homeScreenWidget),
+                    lockContext,
+                    MaterialPageRoute(builder: (_) => homeScreenWidget),
                   );
                 },
               ),
@@ -391,7 +415,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         } else {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => homeScreenWidget),
+            MaterialPageRoute(builder: (_) => homeScreenWidget),
           );
         }
       }
@@ -637,23 +661,29 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       final inputPhone = _phoneController.text.trim();
+      final String userPhone = (user['phone']?.toString().trim().isNotEmpty == true)
+          ? user['phone'].toString().trim()
+          : inputPhone;
       final loginUid = user['id'] is int ? user['id'] : int.tryParse(user['id']?.toString() ?? '') ?? 0;
 
-      // Always clear any legacy un-scoped keys so they never cross-contaminate users
-      await prefs.remove('is_app_lock_enabled');
-      await prefs.remove('app_lock_pin');
+      // Authoritative account-level App Lock flag returned by backend on every login
+      final bool isAppLockEnabled = user['app_lock_enabled'] == true ||
+          user['app_lock_enabled'] == 1 ||
+          user['app_lock_enabled'] == '1';
 
-      // Check App Lock ONLY for this logging in user
-      bool isAppLockEnabled = false;
-      String? appLockPin;
-
-      if (inputPhone.isNotEmpty) {
-        isAppLockEnabled = prefs.getBool('app_lock_enabled_$inputPhone') ?? false;
-        appLockPin = prefs.getString('app_lock_pin_$inputPhone');
-      }
-      if (!isAppLockEnabled && loginUid > 0) {
-        isAppLockEnabled = prefs.getBool('app_lock_enabled_user_$loginUid') ?? false;
-        appLockPin = prefs.getString('app_lock_pin_user_$loginUid');
+      await AppLockHelper.syncFromServerState(
+        prefs,
+        userId: loginUid,
+        phone: userPhone,
+        enabled: isAppLockEnabled,
+      );
+      if (inputPhone.isNotEmpty && inputPhone != userPhone) {
+        await AppLockHelper.syncFromServerState(
+          prefs,
+          userId: loginUid,
+          phone: inputPhone,
+          enabled: isAppLockEnabled,
+        );
       }
 
       // Activate user's saved appearance theme after successful login
@@ -666,23 +696,23 @@ class _LoginScreenState extends State<LoginScreen> {
         appThemeNotifier.value = ThemeMode.light;
       }
 
-      void navigateAfterLogin(Widget targetScreen) {
-        if (isAppLockEnabled && appLockPin != null && appLockPin.isNotEmpty) {
+      void navigateAfterLogin(Widget targetScreen, {VoidCallback? onUnlocked}) {
+        if (isAppLockEnabled) {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (context) => AppLockScreen(
+              builder: (lockContext) => AppLockScreen(
                 userName: name,
                 userRole: role,
                 schoolName: schoolName,
                 baseUrl: workingBaseUrl,
                 token: token,
-                expectedPin: appLockPin,
                 onUnlockSuccess: () {
                   Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (context) => targetScreen),
+                    lockContext,
+                    MaterialPageRoute(builder: (_) => targetScreen),
                   );
+                  onUnlocked?.call();
                 },
               ),
             ),
@@ -690,8 +720,9 @@ class _LoginScreenState extends State<LoginScreen> {
         } else {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => targetScreen),
+            MaterialPageRoute(builder: (_) => targetScreen),
           );
+          onUnlocked?.call();
         }
       }
 
@@ -709,8 +740,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 selectedStudentId: selId,
                 schoolName: schoolName,
               ),
+              onUnlocked: () {
+                NotificationHelper.navigateToTarget(notif, activeBaseUrl, token, role, selId);
+              },
             );
-            NotificationHelper.navigateToTarget(notif, activeBaseUrl, token, role, selId);
             return;
           }
         } catch (_) {}
@@ -754,26 +787,15 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             );
           } else {
-            // Multiple children, verify App Lock first if enabled, then show selector
-            if (isAppLockEnabled && appLockPin != null && appLockPin.isNotEmpty) {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => AppLockScreen(
-                    userName: name,
-                    userRole: role,
-                    schoolName: schoolName,
-                    baseUrl: workingBaseUrl,
-                    token: token,
-                    onUnlockSuccess: () {
-                      _showChildrenSelector(children, leaveService, role, schoolName);
-                    },
-                  ),
-                ),
-              );
-            } else {
-              _showChildrenSelector(children, leaveService, role, schoolName);
-            }
+            // Multiple children: always pass through App Lock first if enabled, then child selector
+            navigateAfterLogin(
+              _SelectStudentProfileScreen(
+                children: children,
+                leaveService: leaveService,
+                role: role,
+                schoolName: schoolName,
+              ),
+            );
           }
         }
       } else {
@@ -842,76 +864,6 @@ class _LoginScreenState extends State<LoginScreen> {
         });
       }
     }
-  }
-
-  void _showChildrenSelector(List<dynamic> children, LeaveService leaveService, String role, [String? schoolName]) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text(
-            'Select Student Profile',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: children.length,
-              itemBuilder: (BuildContext context, int index) {
-                final student = children[index];
-                final studentName = student['name'] ?? '';
-                final className = student['class_name'] ?? '';
-                final sectionName = student['section_name'] ?? '';
-                final rollNo = student['roll_no'] ?? '';
-                
-                return Card(
-                  margin: const EdgeInsets.symmetric(vertical: 6),
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: Colors.indigo.shade50,
-                      child: Icon(Icons.person, color: Colors.indigo.shade800),
-                    ),
-                    title: Text(
-                      studentName,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    subtitle: Text('Class $className $sectionName | Roll: $rollNo'),
-                    onTap: () async {
-                      final prefs = await SharedPreferences.getInstance();
-                      final childId = student['id'] as int;
-                      await prefs.setInt('selected_student_id', childId);
-                      final resolvedSchool = (schoolName != null && schoolName.isNotEmpty)
-                          ? schoolName
-                          : (prefs.getString('school_name') ?? 'SHIKSHA PILOT ACADEMY').toUpperCase();
-                      if (context.mounted) {
-                        Navigator.pop(context); // Close dialog
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder: (ctx) => HomeScreen(
-                              leaveService: leaveService,
-                              userRole: role,
-                              selectedStudentId: childId,
-                              schoolName: resolvedSchool,
-                            ),
-                          ),
-                        );
-                      }
-                    },
-                  ),
-                );
-              },
-            ),
-          ),
-        );
-      },
-    );
   }
 
   @override
@@ -1170,4 +1122,98 @@ class _LoginScreenState extends State<LoginScreen> {
     ),
   );
 }
+}
+
+class _SelectStudentProfileScreen extends StatelessWidget {
+  final List<dynamic> children;
+  final LeaveService leaveService;
+  final String role;
+  final String? schoolName;
+
+  const _SelectStudentProfileScreen({
+    required this.children,
+    required this.leaveService,
+    required this.role,
+    this.schoolName,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        title: const Text(
+          'Select Student Profile',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
+        ),
+        backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFF2196F3),
+        automaticallyImplyLeading: false,
+        elevation: 0,
+      ),
+      body: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: children.length,
+        itemBuilder: (BuildContext ctx, int index) {
+          final student = children[index];
+          final studentName = (student['name'] ?? '').toString();
+          final className = (student['class_name'] ?? '').toString();
+          final sectionName = (student['section_name'] ?? '').toString();
+          final rollNo = (student['roll_no'] ?? '').toString();
+
+          return Card(
+            margin: const EdgeInsets.symmetric(vertical: 6),
+            elevation: 1,
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+            ),
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              leading: CircleAvatar(
+                backgroundColor: isDark ? const Color(0xFF1E3A8A).withValues(alpha: 0.35) : const Color(0xFFE3F2FD),
+                child: const Icon(Icons.person, color: Color(0xFF2196F3)),
+              ),
+              title: Text(
+                studentName,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+              subtitle: Text(
+                'Class $className $sectionName | Roll: $rollNo',
+                style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade600),
+              ),
+              trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Color(0xFF2196F3)),
+              onTap: () async {
+                final prefs = await SharedPreferences.getInstance();
+                final childId = student['id'] is int
+                    ? student['id'] as int
+                    : int.parse(student['id'].toString());
+                await prefs.setInt('selected_student_id', childId);
+                final resolvedSchool = (schoolName != null && schoolName!.isNotEmpty)
+                    ? schoolName!
+                    : (prefs.getString('school_name') ?? 'SHIKSHA PILOT ACADEMY').toUpperCase();
+                if (ctx.mounted) {
+                  Navigator.pushReplacement(
+                    ctx,
+                    MaterialPageRoute(
+                      builder: (_) => HomeScreen(
+                        leaveService: leaveService,
+                        userRole: role,
+                        selectedStudentId: childId,
+                        schoolName: resolvedSchool,
+                      ),
+                    ),
+                  );
+                }
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
 }

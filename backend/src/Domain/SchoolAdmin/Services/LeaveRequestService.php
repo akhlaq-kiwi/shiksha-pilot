@@ -214,13 +214,24 @@ class LeaveRequestService extends BaseService
             $eventKey
         );
 
-        // Also notify all Principals (role='PRINCIPAL' or staff with is_principal=1)
+        // Notify only Principals on mobile (no push to School Admin; single personal push per Principal)
         try {
             $stmtPrincipals = $pdo->prepare("
                 SELECT DISTINCT u.id, u.role
                 FROM users u
-                LEFT JOIN staff st ON (u.phone = st.phone AND u.school_id = st.school_id)
+                LEFT JOIN staff st ON (
+                    u.school_id = st.school_id
+                    AND (
+                        (u.phone IS NOT NULL AND u.phone != '' AND u.phone = st.phone)
+                        OR (
+                            u.phone IS NOT NULL AND st.phone IS NOT NULL
+                            AND LENGTH(REGEXP_REPLACE(u.phone, '[^0-9]', '')) >= 10
+                            AND RIGHT(REGEXP_REPLACE(u.phone, '[^0-9]', ''), 10) = RIGHT(REGEXP_REPLACE(st.phone, '[^0-9]', ''), 10)
+                        )
+                    )
+                )
                 WHERE u.school_id = :sid
+                  AND (u.status IS NULL OR UPPER(u.status) = 'ACTIVE')
                   AND (
                       UPPER(COALESCE(u.role, '')) = 'PRINCIPAL'
                       OR st.is_principal = 1
@@ -233,7 +244,7 @@ class LeaveRequestService extends BaseService
             $notifiedUserIds = [];
             foreach ($principals as $pr) {
                 $pUid = (int)$pr['id'];
-                if (isset($notifiedUserIds[$pUid])) {
+                if ($pUid <= 0 || isset($notifiedUserIds[$pUid])) {
                     continue;
                 }
                 $notifiedUserIds[$pUid] = true;
@@ -255,9 +266,6 @@ class LeaveRequestService extends BaseService
 
                 PushDispatcher::pushOnly($pdo, $schoolId, $pRole, $pUid, $eventKey, $notifTitle, $notifMsg, $notifLink);
             }
-
-            // Also broadcast to PRINCIPAL role topic
-            PushDispatcher::pushOnly($pdo, $schoolId, 'PRINCIPAL', null, $eventKey, $notifTitle, $notifMsg, $notifLink);
         } catch (\Throwable $e) {
             error_log('[leave] Failed to notify principals: ' . $e->getMessage());
         }
@@ -663,25 +671,51 @@ class LeaveRequestService extends BaseService
     {
         $recipients = [];
         $addedUserIds = [];
+        $addedPhones = [];
+
+        $normalizePhone = static function (?string $raw): string {
+            $digits = preg_replace('/[^0-9]/', '', (string)$raw);
+            return strlen($digits) >= 10 ? substr($digits, -10) : $digits;
+        };
+
+        $addRecipient = static function (array $row) use (&$recipients, &$addedUserIds, &$addedPhones, $normalizePhone): void {
+            $uid = (int)($row['id'] ?? 0);
+            if ($uid <= 0 || isset($addedUserIds[$uid])) {
+                return;
+            }
+            $normPhone = $normalizePhone($row['phone'] ?? '');
+            if ($normPhone !== '' && isset($addedPhones[$normPhone])) {
+                return;
+            }
+            $addedUserIds[$uid] = true;
+            if ($normPhone !== '') {
+                $addedPhones[$normPhone] = true;
+            }
+            $recipients[] = [
+                'user_id' => $uid,
+                'role' => strtoupper((string)($row['role'] ?? '')),
+            ];
+        };
 
         $schoolId = (int)($leave['school_id'] ?? 0);
         $createdBy = (int)($leave['created_by'] ?? 0);
 
-        // 1. Creator user
+        // 1. Primary recipient: the exact user account that submitted the leave request
         if ($createdBy > 0) {
-            $stmt = $pdo->prepare("SELECT id, role FROM users WHERE id = :id AND school_id = :sid LIMIT 1");
+            $stmt = $pdo->prepare("
+                SELECT id, role, phone FROM users
+                WHERE id = :id AND school_id = :sid AND (status IS NULL OR UPPER(status) = 'ACTIVE')
+                LIMIT 1
+            ");
             $stmt->execute([':id' => $createdBy, ':sid' => $schoolId]);
             $creator = $stmt->fetch(PDO::FETCH_ASSOC);
             if ($creator) {
-                $recipients[] = [
-                    'user_id' => (int)$creator['id'],
-                    'role' => $creator['role']
-                ];
-                $addedUserIds[(int)$creator['id']] = true;
+                $addRecipient($creator);
+                return $recipients;
             }
         }
 
-        // 2. If TEACHER leave request, also match staff details to user
+        // 2. Fallback for TEACHER leave request if creator account is unavailable
         if (($leave['applicant_role'] ?? '') === 'TEACHER' && !empty($leave['teacher_id'])) {
             $stmtStaff = $pdo->prepare("SELECT phone, email FROM staff WHERE id = :id LIMIT 1");
             $stmtStaff->execute([':id' => (int)$leave['teacher_id']]);
@@ -700,25 +734,18 @@ class LeaveRequestService extends BaseService
                         $conds[] = "email = :email";
                         $params[':email'] = $email;
                     }
-                    $sql = "SELECT id, role FROM users WHERE school_id = :sid AND UPPER(role) = 'TEACHER' AND (" . implode(' OR ', $conds) . ")";
+                    $sql = "SELECT id, role, phone FROM users WHERE school_id = :sid AND (status IS NULL OR UPPER(status) = 'ACTIVE') AND UPPER(role) = 'TEACHER' AND (" . implode(' OR ', $conds) . ") LIMIT 1";
                     $stmtUser = $pdo->prepare($sql);
                     $stmtUser->execute($params);
-                    $teachers = $stmtUser->fetchAll(PDO::FETCH_ASSOC);
-                    foreach ($teachers as $t) {
-                        $tId = (int)$t['id'];
-                        if (!isset($addedUserIds[$tId])) {
-                            $recipients[] = [
-                                'user_id' => $tId,
-                                'role' => $t['role']
-                            ];
-                            $addedUserIds[$tId] = true;
-                        }
+                    $teacher = $stmtUser->fetch(PDO::FETCH_ASSOC);
+                    if ($teacher) {
+                        $addRecipient($teacher);
                     }
                 }
             }
         }
 
-        // 3. If STUDENT leave request, resolve specific student & parent user accounts ONLY
+        // 3. Fallback for STUDENT leave request if creator account is unavailable
         if (($leave['applicant_role'] ?? '') === 'STUDENT' && !empty($leave['student_id'])) {
             $studentId = (int)$leave['student_id'];
             $stmtSt = $pdo->prepare("
@@ -742,7 +769,7 @@ class LeaveRequestService extends BaseService
                     $st['email'] ?? ''
                 ])));
 
-                // A. Match PARENT user accounts
+                // A. Match PARENT user account first
                 if (!empty($parentPhones) || !empty($studentEmails)) {
                     $pConds = [];
                     $pParams = [':sid' => $schoolId];
@@ -766,24 +793,17 @@ class LeaveRequestService extends BaseService
                         $pConds[] = "(" . implode(' OR ', $ePlaceholders) . ")";
                     }
 
-                    $sqlParent = "SELECT id, role FROM users WHERE school_id = :sid AND UPPER(role) = 'PARENT' AND (" . implode(' OR ', $pConds) . ")";
+                    $sqlParent = "SELECT id, role, phone FROM users WHERE school_id = :sid AND (status IS NULL OR UPPER(status) = 'ACTIVE') AND UPPER(role) = 'PARENT' AND (" . implode(' OR ', $pConds) . ") ORDER BY id ASC LIMIT 1";
                     $stmtP = $pdo->prepare($sqlParent);
                     $stmtP->execute($pParams);
-                    $parents = $stmtP->fetchAll(PDO::FETCH_ASSOC);
-                    foreach ($parents as $p) {
-                        $pId = (int)$p['id'];
-                        if (!isset($addedUserIds[$pId])) {
-                            $recipients[] = [
-                                'user_id' => $pId,
-                                'role' => $p['role']
-                            ];
-                            $addedUserIds[$pId] = true;
-                        }
+                    $parent = $stmtP->fetch(PDO::FETCH_ASSOC);
+                    if ($parent) {
+                        $addRecipient($parent);
                     }
                 }
 
-                // B. Match STUDENT user account ONLY if student_mobile or student_email matches specifically for THIS student
-                if (!empty($studentPhones) || !empty($studentEmails)) {
+                // B. Match STUDENT user account only if no parent recipient was resolved
+                if (empty($recipients) && (!empty($studentPhones) || !empty($studentEmails))) {
                     $sConds = [];
                     $sParams = [':sid' => $schoolId];
 
@@ -806,19 +826,12 @@ class LeaveRequestService extends BaseService
                         $sConds[] = "(" . implode(' OR ', $sePlaceholders) . ")";
                     }
 
-                    $sqlStudent = "SELECT id, role FROM users WHERE school_id = :sid AND UPPER(role) = 'STUDENT' AND (" . implode(' OR ', $sConds) . ")";
+                    $sqlStudent = "SELECT id, role, phone FROM users WHERE school_id = :sid AND (status IS NULL OR UPPER(status) = 'ACTIVE') AND UPPER(role) = 'STUDENT' AND (" . implode(' OR ', $sConds) . ") ORDER BY id ASC LIMIT 1";
                     $stmtS = $pdo->prepare($sqlStudent);
                     $stmtS->execute($sParams);
-                    $students = $stmtS->fetchAll(PDO::FETCH_ASSOC);
-                    foreach ($students as $s) {
-                        $sId = (int)$s['id'];
-                        if (!isset($addedUserIds[$sId])) {
-                            $recipients[] = [
-                                'user_id' => $sId,
-                                'role' => $s['role']
-                            ];
-                            $addedUserIds[$sId] = true;
-                        }
+                    $student = $stmtS->fetch(PDO::FETCH_ASSOC);
+                    if ($student) {
+                        $addRecipient($student);
                     }
                 }
             }

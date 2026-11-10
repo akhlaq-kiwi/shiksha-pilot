@@ -6,6 +6,7 @@ class VerifyPasswordDialog extends StatefulWidget {
   final String token;
   final String title;
   final String actionButtonText;
+  final ValueChanged<String>? onPasswordVerified;
 
   const VerifyPasswordDialog({
     super.key,
@@ -13,6 +14,7 @@ class VerifyPasswordDialog extends StatefulWidget {
     required this.token,
     this.title = 'Verify Password',
     this.actionButtonText = 'Verify',
+    this.onPasswordVerified,
   });
 
   static Future<bool?> show(
@@ -21,6 +23,7 @@ class VerifyPasswordDialog extends StatefulWidget {
     required String token,
     String title = 'Verify Password',
     String actionButtonText = 'Verify',
+    ValueChanged<String>? onPasswordVerified,
   }) {
     return showModalBottomSheet<bool>(
       context: context,
@@ -31,6 +34,7 @@ class VerifyPasswordDialog extends StatefulWidget {
         token: token,
         title: title,
         actionButtonText: actionButtonText,
+        onPasswordVerified: onPasswordVerified,
       ),
     );
   }
@@ -66,6 +70,7 @@ class _VerifyPasswordDialogState extends State<VerifyPasswordDialog> {
     try {
       final authService = AuthService(baseUrl: widget.baseUrl);
       await authService.verifyPassword(widget.token, password);
+      widget.onPasswordVerified?.call(password);
       if (mounted) {
         Navigator.pop(context, true);
       }

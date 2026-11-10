@@ -39,6 +39,36 @@ class NotificationHelper {
   static Uint8List? _lastDownloadedBytes;
   static String? _lastDownloadedFileName;
   static bool _channelsCreated = false;
+  static const String _deliveredIdsKey = 'delivered_notif_ids';
+
+  static Future<bool> isDelivered(int notifId) async {
+    if (notifId <= 0) return false;
+    final prefs = await SharedPreferences.getInstance();
+    final delivered = prefs.getStringList(_deliveredIdsKey) ?? const [];
+    return delivered.contains(notifId.toString());
+  }
+
+  static Future<void> markDelivered(int notifId, {String? userRole}) async {
+    if (notifId <= 0) return;
+    final prefs = await SharedPreferences.getInstance();
+    final delivered = List<String>.from(prefs.getStringList(_deliveredIdsKey) ?? const []);
+    final idStr = notifId.toString();
+    if (!delivered.contains(idStr)) {
+      delivered.add(idStr);
+      if (delivered.length > 250) {
+        delivered.removeRange(0, delivered.length - 250);
+      }
+      await prefs.setStringList(_deliveredIdsKey, delivered);
+    }
+    final role = (userRole ?? prefs.getString('user_role') ?? '').trim();
+    if (role.isNotEmpty) {
+      final lastKey = 'last_notified_id_$role';
+      final currentLast = prefs.getInt(lastKey) ?? 0;
+      if (notifId > currentLast) {
+        await prefs.setInt(lastKey, notifId);
+      }
+    }
+  }
 
   static Future<void> init() async {
     // zonedSchedule needs the timezone database loaded, and Asia/Kolkata set
@@ -203,10 +233,22 @@ class NotificationHelper {
       }
     }
 
+    final int? remoteNotifId = int.tryParse(
+      (data['notification_id'] ?? data['id'] ?? '').toString(),
+    );
+    if (remoteNotifId != null && remoteNotifId > 0) {
+      if (await isDelivered(remoteNotifId)) {
+        return;
+      }
+      await markDelivered(remoteNotifId, userRole: prefs.getString('user_role'));
+    }
+
     final category = NotificationCategory.byId(data['category']);
 
     await _flutterLocalNotificationsPlugin.show(
-      id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      id: (remoteNotifId != null && remoteNotifId > 0)
+          ? remoteNotifId
+          : DateTime.now().millisecondsSinceEpoch ~/ 1000,
       title: title,
       body: body,
       notificationDetails: NotificationDetails(android: androidDetailsFor(category)),
@@ -654,9 +696,19 @@ class NotificationHelper {
     final title = rawTitle.isNotEmpty ? rawTitle : schoolName;
     final message = notif['message'] ?? '';
 
-    final int id = notif['id'] is int 
-        ? notif['id'] 
-        : int.tryParse(notif['id'].toString()) ?? DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    final int? parsedNotifId = notif['id'] is int
+        ? notif['id'] as int
+        : int.tryParse(notif['id']?.toString() ?? '');
+    if (parsedNotifId != null && parsedNotifId > 0) {
+      if (await isDelivered(parsedNotifId)) {
+        return;
+      }
+      await markDelivered(parsedNotifId, userRole: prefs.getString('user_role'));
+    }
+
+    final int id = (parsedNotifId != null && parsedNotifId > 0)
+        ? parsedNotifId
+        : DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
     final category = NotificationCategory.byId(notif['category']?.toString());
     final NotificationDetails platformChannelSpecifics =

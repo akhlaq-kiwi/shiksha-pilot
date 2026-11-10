@@ -1,9 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../config.dart';
+import '../services/app_lock_helper.dart';
+import '../services/auth_service.dart';
 
 class SetAppLockPinScreen extends StatefulWidget {
-  const SetAppLockPinScreen({super.key});
+  final String? baseUrl;
+  final String? token;
+  final String verifiedPassword;
+
+  const SetAppLockPinScreen({
+    super.key,
+    this.baseUrl,
+    this.token,
+    this.verifiedPassword = '',
+  });
 
   @override
   State<SetAppLockPinScreen> createState() => _SetAppLockPinScreenState();
@@ -14,9 +26,10 @@ class _SetAppLockPinScreenState extends State<SetAppLockPinScreen> {
   String _firstPin = '';
   String _currentInput = '';
   String? _errorMessage;
+  bool _isSaving = false;
 
   void _onDigitPressed(String digit) {
-    if (_currentInput.length >= 4) return;
+    if (_isSaving || _currentInput.length >= 4) return;
     HapticFeedback.lightImpact();
 
     setState(() {
@@ -30,7 +43,7 @@ class _SetAppLockPinScreenState extends State<SetAppLockPinScreen> {
   }
 
   void _onBackspacePressed() {
-    if (_currentInput.isEmpty) return;
+    if (_isSaving || _currentInput.isEmpty) return;
     HapticFeedback.selectionClick();
     setState(() {
       _errorMessage = null;
@@ -50,27 +63,60 @@ class _SetAppLockPinScreenState extends State<SetAppLockPinScreen> {
       });
     } else {
       if (_currentInput == _firstPin) {
-        // Success: Save PIN strictly for the current user
-        final prefs = await SharedPreferences.getInstance();
-        final userId = prefs.getInt('user_id') ?? 0;
-        final phone = (prefs.getString('user_phone') ?? '').trim();
+        setState(() {
+          _isSaving = true;
+          _errorMessage = null;
+        });
 
-        // Remove legacy global keys so they never leak across accounts
-        await prefs.remove('is_app_lock_enabled');
-        await prefs.remove('app_lock_pin');
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final userId = prefs.getInt('user_id') ?? 0;
+          final phone = (prefs.getString('user_phone') ?? '').trim();
+          final token = (widget.token != null && widget.token!.isNotEmpty)
+              ? widget.token!
+              : (prefs.getString('auth_token') ?? '');
+          final baseUrl = (widget.baseUrl != null && widget.baseUrl!.isNotEmpty)
+              ? widget.baseUrl!
+              : resolveBaseUrlFrom(prefs);
 
-        if (userId > 0) {
-          await prefs.setBool('app_lock_enabled_user_$userId', true);
-          await prefs.setString('app_lock_pin_user_$userId', _currentInput);
+          if (token.isEmpty || baseUrl.isEmpty || widget.verifiedPassword.isEmpty) {
+            throw Exception('Session verification expired. Please try again.');
+          }
+
+          await AuthService(baseUrl: baseUrl).enableAppLock(
+            token,
+            _currentInput,
+            widget.verifiedPassword,
+          );
+
+          await AppLockHelper.saveLocalDigestAfterVerify(
+            prefs,
+            userId: userId,
+            phone: phone,
+            pin: _currentInput,
+          );
+
+          HapticFeedback.mediumImpact();
+          if (!mounted) return;
+          Navigator.pop(context, true);
+        } catch (e) {
+          HapticFeedback.heavyImpact();
+          if (!mounted) return;
+          final rawErr = e.toString().replaceFirst(RegExp(r'^[A-Za-z0-9_]*Exception:\s*'), '');
+          final isNetwork = rawErr.contains('SocketException') ||
+              rawErr.contains('ClientException') ||
+              rawErr.contains('Connection refused') ||
+              rawErr.toLowerCase().contains('timeout');
+          setState(() {
+            _isSaving = false;
+            _errorMessage = isNetwork
+                ? 'Network error. Please check internet connection and try again.'
+                : (rawErr.isNotEmpty ? rawErr : 'Failed to save App Lock PIN.');
+            _currentInput = '';
+            _step = 1;
+            _firstPin = '';
+          });
         }
-        if (phone.isNotEmpty) {
-          await prefs.setBool('app_lock_enabled_$phone', true);
-          await prefs.setString('app_lock_pin_$phone', _currentInput);
-        }
-
-        HapticFeedback.mediumImpact();
-        if (!mounted) return;
-        Navigator.pop(context, true);
       } else {
         HapticFeedback.heavyImpact();
         setState(() {
@@ -201,21 +247,50 @@ class _SetAppLockPinScreenState extends State<SetAppLockPinScreen> {
               }),
             ),
 
-            // Error text if any
+            // Error / Saving indicator
             SizedBox(
               height: 40,
-              child: _errorMessage != null
+              child: _isSaving
                   ? Center(
-                      child: Text(
-                        _errorMessage!,
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFFDC2626),
-                        ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFD97706)),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Enabling account security...',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? Colors.grey.shade300 : const Color(0xFF475569),
+                            ),
+                          ),
+                        ],
                       ),
                     )
-                  : const SizedBox.shrink(),
+                  : (_errorMessage != null
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            child: Text(
+                              _errorMessage!,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFDC2626),
+                              ),
+                            ),
+                          ),
+                        )
+                      : const SizedBox.shrink()),
             ),
 
             const Spacer(flex: 1),

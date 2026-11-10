@@ -568,7 +568,9 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                             builder: (context) => NoticeScreen(
                                               baseUrl: widget.baseUrl,
                                               token: widget.token,
-                                              userRole: widget.studentId != null ? 'PARENT' : 'STUDENT',
+                                              userRole: (widget.userRole != null && widget.userRole!.isNotEmpty)
+                                                  ? widget.userRole!
+                                                  : (widget.studentId != null ? 'PARENT' : 'STUDENT'),
                                               studentId: widget.studentId,
                                             ),
                                           ),
@@ -587,7 +589,9 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                         builder: (context) => NoticeScreen(
                                           baseUrl: widget.baseUrl,
                                           token: widget.token,
-                                          userRole: widget.studentId != null ? 'PARENT' : 'STUDENT',
+                                          userRole: (widget.userRole != null && widget.userRole!.isNotEmpty)
+                                              ? widget.userRole!
+                                              : (widget.studentId != null ? 'PARENT' : 'STUDENT'),
                                           studentId: widget.studentId,
                                         ),
                                       ),
@@ -852,7 +856,9 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                           builder: (context) => NoticeScreen(
                                             baseUrl: widget.baseUrl,
                                             token: widget.token,
-                                            userRole: widget.studentId != null ? 'PARENT' : 'STUDENT',
+                                            userRole: (widget.userRole != null && widget.userRole!.isNotEmpty)
+                                                ? widget.userRole!
+                                                : (widget.studentId != null ? 'PARENT' : 'STUDENT'),
                                             studentId: widget.studentId,
                                           ),
                                         ),
@@ -871,7 +877,9 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                       builder: (context) => NoticeScreen(
                                         baseUrl: widget.baseUrl,
                                         token: widget.token,
-                                        userRole: widget.studentId != null ? 'PARENT' : 'STUDENT',
+                                        userRole: (widget.userRole != null && widget.userRole!.isNotEmpty)
+                                            ? widget.userRole!
+                                            : (widget.studentId != null ? 'PARENT' : 'STUDENT'),
                                         studentId: widget.studentId,
                                       ),
                                     ),

@@ -176,45 +176,25 @@ class AuthService extends BaseService
             }
         }
 
-        $safeUser = array_diff_key($user, ['password' => true]);
+        $safeUser = array_diff_key($user, ['password' => true, 'app_lock_pin_hash' => true]);
+        $safeUser['app_lock_enabled'] = (bool)($user['app_lock_enabled'] ?? false) && !empty($user['app_lock_pin_hash']);
         if (in_array(strtoupper((string)($user['role'] ?? '')), ['ADMIN', 'SCHOOL_ADMIN'], true)) {
             $safeUser['name'] = 'Admin';
         }
         $isPrincipal = (strtoupper((string)($user['role'] ?? '')) === 'PRINCIPAL');
         $isFeeCollector = false;
         if (in_array(strtoupper((string)($user['role'] ?? '')), ['TEACHER', 'STAFF', 'PRINCIPAL'], true)) {
-            try {
-                $phoneClean = (string)($user['phone'] ?? '');
-                $phone10 = substr(preg_replace('/[^0-9]/', '', $phoneClean), -10);
-                $params = [':phone' => $phoneClean, ':sid' => $user['school_id']];
-                $phoneCond = "phone = :phone";
-                if (strlen($phone10) === 10) {
-                    $phoneCond .= " OR RIGHT(phone, 10) = :phone10";
-                    $params[':phone10'] = $phone10;
-                }
-                $stmtPr = $this->repo->getPdo()->prepare("
-                    SELECT is_principal, is_fee_collector, photo_path 
-                    FROM staff 
-                    WHERE school_id = :sid 
-                      AND ($phoneCond)
-                    ORDER BY is_fee_collector DESC, (photo_path IS NOT NULL AND photo_path != '') DESC, id DESC 
-                    LIMIT 1
-                ");
-                $stmtPr->execute($params);
-                $staffRow = $stmtPr->fetch(\PDO::FETCH_ASSOC);
-                if ($staffRow) {
-                    if ((int)($staffRow['is_principal'] ?? 0) === 1) {
-                        $isPrincipal = true;
-                    }
-                    if ((int)($staffRow['is_fee_collector'] ?? 0) === 1) {
-                        $isFeeCollector = true;
-                    }
-                    if (!empty($staffRow['photo_path'])) {
-                        $safeUser['photo_path'] = $staffRow['photo_path'];
-                        $safeUser['staff_photo_path'] = $staffRow['photo_path'];
-                    }
-                }
-            } catch (\Throwable $e) {}
+            $staffFlags = $this->resolveStaffFlags((int)($user['school_id'] ?? 0), (string)($user['phone'] ?? ''));
+            if ($staffFlags['is_principal']) {
+                $isPrincipal = true;
+            }
+            if ($staffFlags['is_fee_collector']) {
+                $isFeeCollector = true;
+            }
+            if (!empty($staffFlags['photo_path'])) {
+                $safeUser['photo_path'] = $staffFlags['photo_path'];
+                $safeUser['staff_photo_path'] = $staffFlags['photo_path'];
+            }
         }
         if (empty($safeUser['photo_path']) && !empty($user['staff_photo_path'])) {
             $safeUser['photo_path'] = $user['staff_photo_path'];
@@ -290,6 +270,97 @@ class AuthService extends BaseService
             throw new \App\Shared\Exceptions\NotFoundException('User not found.');
         }
         return password_verify($password, (string) ($user['password'] ?? ''));
+    }
+
+    /**
+     * Enable account-level 4-digit App Lock PIN after password verification.
+     *
+     * @return array{app_lock_enabled: bool}
+     */
+    public function enableAppLock(int $userId, string $pin, string $password): array
+    {
+        $user = $this->repo->findById($userId);
+        if ($user === null) {
+            throw new NotFoundException('User not found.');
+        }
+
+        if (!password_verify($password, (string) ($user['password'] ?? ''))) {
+            throw new ValidationException(
+                ['password' => 'Current password is incorrect.'],
+                'Current password is incorrect.'
+            );
+        }
+
+        $cleanPin = trim($pin);
+        if (preg_match('/^\d{4}$/', $cleanPin) !== 1) {
+            throw new ValidationException(
+                ['pin' => 'PIN must be exactly 4 numeric digits.'],
+                'PIN must be exactly 4 numeric digits.'
+            );
+        }
+
+        $pinHash = password_hash($cleanPin, PASSWORD_BCRYPT);
+        $this->repo->setAppLock($userId, $pinHash);
+
+        $this->log('App Lock enabled', ['id' => $userId]);
+        $this->logAuditDirect($user, 'Security', 'App Lock Enabled', 'Account-level App Lock enabled for "' . ($user['name'] ?? $user['phone'] ?? $user['email']) . '"');
+
+        return ['app_lock_enabled' => true];
+    }
+
+    /**
+     * Verify the user's 4-digit App Lock PIN server-side.
+     */
+    public function verifyAppLockPin(int $userId, string $pin): bool
+    {
+        $user = $this->repo->findById($userId);
+        if ($user === null) {
+            throw new NotFoundException('User not found.');
+        }
+
+        $isEnabled = (bool)($user['app_lock_enabled'] ?? false);
+        if (!$isEnabled) {
+            return true;
+        }
+
+        $cleanPin = trim($pin);
+        if (preg_match('/^\d{4}$/', $cleanPin) !== 1) {
+            return false;
+        }
+
+        $pinHash = (string)($user['app_lock_pin_hash'] ?? '');
+        if ($pinHash === '') {
+            return false;
+        }
+
+        return password_verify($cleanPin, $pinHash);
+    }
+
+    /**
+     * Disable account-level App Lock after password verification (also used by Forgot PIN).
+     *
+     * @return array{app_lock_enabled: bool}
+     */
+    public function disableAppLock(int $userId, string $password): array
+    {
+        $user = $this->repo->findById($userId);
+        if ($user === null) {
+            throw new NotFoundException('User not found.');
+        }
+
+        if (!password_verify($password, (string) ($user['password'] ?? ''))) {
+            throw new ValidationException(
+                ['password' => 'Current password is incorrect.'],
+                'Current password is incorrect.'
+            );
+        }
+
+        $this->repo->disableAppLock($userId);
+
+        $this->log('App Lock disabled', ['id' => $userId]);
+        $this->logAuditDirect($user, 'Security', 'App Lock Disabled', 'Account-level App Lock disabled for "' . ($user['name'] ?? $user['phone'] ?? $user['email']) . '"');
+
+        return ['app_lock_enabled' => false];
     }
 
     private function logAuditDirect(
@@ -376,7 +447,8 @@ class AuthService extends BaseService
             throw new NotFoundException('User not found.');
         }
 
-        $profile = array_diff_key($user, ['password' => true]);
+        $profile = array_diff_key($user, ['password' => true, 'app_lock_pin_hash' => true]);
+        $profile['app_lock_enabled'] = (bool)($user['app_lock_enabled'] ?? false) && !empty($user['app_lock_pin_hash']);
         if (in_array(strtoupper((string)($user['role'] ?? '')), ['ADMIN', 'SCHOOL_ADMIN'], true)) {
             $profile['name'] = 'Admin';
         }
@@ -384,32 +456,16 @@ class AuthService extends BaseService
         $isPrincipal = (strtoupper((string)($user['role'] ?? '')) === 'PRINCIPAL');
         $isFeeCollector = false;
         if (in_array(strtoupper((string)($user['role'] ?? '')), ['TEACHER', 'PRINCIPAL', 'STAFF'], true)) {
-            $phoneClean = (string)($user['phone'] ?? '');
-            $phone10 = substr(preg_replace('/[^0-9]/', '', $phoneClean), -10);
-            $params = [':phone' => $phoneClean, ':sid' => $user['school_id']];
-            $phoneCond = "phone = :phone";
-            if (strlen($phone10) === 10) {
-                $phoneCond .= " OR RIGHT(phone, 10) = :phone10";
-                $params[':phone10'] = $phone10;
-            }
-            $stmt = $this->repo->getPdo()->prepare("
-                SELECT department, employee_id, photo_path, is_principal, is_fee_collector FROM staff 
-                WHERE school_id = :sid 
-                  AND ($phoneCond)
-                ORDER BY is_fee_collector DESC, (photo_path IS NOT NULL AND photo_path != '') DESC, id DESC
-                LIMIT 1
-            ");
-            $stmt->execute($params);
-            $staff = $stmt->fetch(\PDO::FETCH_ASSOC);
-            if ($staff) {
-                $profile['department'] = $staff['department'] ?? null;
-                $profile['employee_id'] = $staff['employee_id'] ?? null;
-                $profile['photo_path'] = $staff['photo_path'] ?? null;
-                $profile['staff_photo_path'] = $staff['photo_path'] ?? null;
-                if ((int)($staff['is_principal'] ?? 0) === 1) {
+            $staffFlags = $this->resolveStaffFlags((int)($user['school_id'] ?? 0), (string)($user['phone'] ?? ''));
+            if ($staffFlags['matched']) {
+                $profile['department'] = $staffFlags['department'];
+                $profile['employee_id'] = $staffFlags['employee_id'];
+                $profile['photo_path'] = $staffFlags['photo_path'];
+                $profile['staff_photo_path'] = $staffFlags['photo_path'];
+                if ($staffFlags['is_principal']) {
                     $isPrincipal = true;
                 }
-                if ((int)($staff['is_fee_collector'] ?? 0) === 1) {
+                if ($staffFlags['is_fee_collector']) {
                     $isFeeCollector = true;
                 }
             }
@@ -418,6 +474,87 @@ class AuthService extends BaseService
         $profile['is_fee_collector'] = $isFeeCollector;
 
         return $profile;
+    }
+
+    /**
+     * Aggregate Principal & Fee Collector flags across matching active staff records
+     * for the same school & phone so having both roles (even across academic years)
+     * never hides Principal or Fee Collector capabilities.
+     *
+     * @return array{matched:bool,is_principal:bool,is_fee_collector:bool,photo_path:?string,department:?string,employee_id:?string}
+     */
+    private function resolveStaffFlags(int $schoolId, string $phone): array
+    {
+        $result = [
+            'matched'          => false,
+            'is_principal'     => false,
+            'is_fee_collector' => false,
+            'photo_path'       => null,
+            'department'       => null,
+            'employee_id'      => null,
+        ];
+
+        $phoneClean = trim($phone);
+        if ($schoolId <= 0 || $phoneClean === '') {
+            return $result;
+        }
+
+        $phone10 = substr(preg_replace('/[^0-9]/', '', $phoneClean), -10);
+        $params = [':phone' => $phoneClean, ':sid' => $schoolId];
+        $phoneCond = "phone = :phone";
+        if (strlen($phone10) === 10) {
+            $phoneCond .= " OR RIGHT(phone, 10) = :phone10";
+            $params[':phone10'] = $phone10;
+        }
+
+        try {
+            $stmt = $this->repo->getPdo()->prepare("
+                SELECT role, department, employee_id, photo_path, is_principal, is_fee_collector
+                FROM staff
+                WHERE school_id = :sid
+                  AND ($phoneCond)
+                  AND (status IS NULL OR status = '' OR UPPER(status) = 'ACTIVE')
+                ORDER BY id DESC
+            ");
+            $stmt->execute($params);
+            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Throwable $e) {
+            try {
+                $stmt = $this->repo->getPdo()->prepare("
+                    SELECT role, department, employee_id, photo_path
+                    FROM staff
+                    WHERE school_id = :sid
+                      AND ($phoneCond)
+                      AND (status IS NULL OR status = '' OR UPPER(status) = 'ACTIVE')
+                    ORDER BY id DESC
+                ");
+                $stmt->execute($params);
+                $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Throwable $ignored) {
+                return $result;
+            }
+        }
+
+        foreach ($rows as $row) {
+            $result['matched'] = true;
+            if ((int)($row['is_principal'] ?? 0) === 1 || strtoupper((string)($row['role'] ?? '')) === 'PRINCIPAL') {
+                $result['is_principal'] = true;
+            }
+            if ((int)($row['is_fee_collector'] ?? 0) === 1) {
+                $result['is_fee_collector'] = true;
+            }
+            if ($result['photo_path'] === null && !empty($row['photo_path'])) {
+                $result['photo_path'] = (string)$row['photo_path'];
+            }
+            if ($result['department'] === null && isset($row['department']) && $row['department'] !== '') {
+                $result['department'] = (string)$row['department'];
+            }
+            if ($result['employee_id'] === null && isset($row['employee_id']) && $row['employee_id'] !== '') {
+                $result['employee_id'] = (string)$row['employee_id'];
+            }
+        }
+
+        return $result;
     }
 
     // ---------------------------------------------------------------------

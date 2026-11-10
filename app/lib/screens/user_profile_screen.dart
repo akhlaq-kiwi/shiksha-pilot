@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -13,7 +14,7 @@ class UserProfileScreen extends StatefulWidget {
   final String photoUrl;
   final List<dynamic> children;
   final int? activeStudentId;
-  final Function(int)? onSwitchChild;
+  final FutureOr<void> Function(int)? onSwitchChild;
   final String? baseUrl;
 
   const UserProfileScreen({
@@ -69,7 +70,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       barrierDismissible: false,
       builder: (BuildContext dialogContext) {
         return StatefulBuilder(
-          builder: (context, setDialogState) {
+          builder: (innerContext, setDialogState) {
             return PopScope(
               canPop: !isLoggingOut,
               child: Dialog(
@@ -209,7 +210,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     final allKeys = prefs.getKeys();
     final preserved = <String, dynamic>{};
     for (final k in allKeys) {
-      if (k.startsWith('app_lock_enabled_') || k.startsWith('app_lock_pin_') || k == 'base_url' || k == 'selected_base_url') {
+      if (k.startsWith('app_lock_enabled_') || k.startsWith('app_lock_digest_') || k == 'base_url' || k == 'selected_base_url') {
         preserved[k] = prefs.get(k);
       }
     }
@@ -226,6 +227,258 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         (route) => false,
       );
     }
+  }
+
+  Future<void> _confirmAndSwitchStudent(Map<String, dynamic> targetChild) async {
+    final dynamic rawId = targetChild['id'];
+    final int? targetId = rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '');
+    if (targetId == null || targetId == _currentActiveChildId) return;
+
+    final String targetName = (targetChild['name'] ?? 'Student').toString().trim();
+    final String className = (targetChild['class_name'] ?? '').toString().trim();
+    final String sectionName = (targetChild['section_name'] ?? targetChild['section'] ?? '').toString().trim();
+    final String classSubtitle = sectionName.isNotEmpty
+        ? '$className - $sectionName'
+        : className;
+
+    bool isSwitching = false;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        final isDark = Theme.of(dialogContext).brightness == Brightness.dark;
+        const primaryColor = Color(0xFF2196F3);
+        const onPrimaryColor = Colors.white;
+        final iconBgColor = isDark
+            ? const Color(0xFF1E3A8A).withValues(alpha: 0.35)
+            : const Color(0xFFE3F2FD);
+        final dialogBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+        final surfaceTintBg = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+        final titleColor = isDark ? Colors.white : const Color(0xFF0F172A);
+        final bodyColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569);
+        final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+
+        return StatefulBuilder(
+          builder: (innerContext, setDialogState) {
+            return PopScope(
+              canPop: !isSwitching,
+              child: Dialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                  side: isDark ? BorderSide(color: borderColor) : BorderSide.none,
+                ),
+                backgroundColor: dialogBg,
+                surfaceTintColor: Colors.transparent,
+                insetPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
+                child: Padding(
+                  padding: const EdgeInsets.all(22),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: iconBgColor,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.swap_horiz_rounded,
+                              color: primaryColor,
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Switch Profile',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: titleColor,
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        'Are you sure you want to switch student profile to $targetName?',
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          color: bodyColor,
+                          height: 1.45,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: surfaceTintBg,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: borderColor),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.person_rounded, size: 18, color: primaryColor),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    targetName,
+                                    style: TextStyle(
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: titleColor,
+                                    ),
+                                  ),
+                                  if (classSubtitle.isNotEmpty) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      classSubtitle,
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: bodyColor,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      Divider(color: borderColor, height: 1),
+                      const SizedBox(height: 18),
+                      if (isSwitching)
+                        Container(
+                          width: double.infinity,
+                          height: 46,
+                          decoration: BoxDecoration(
+                            color: primaryColor.withValues(alpha: isDark ? 0.18 : 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.4,
+                                  valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Switching profile...',
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: titleColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        Row(
+                          children: [
+                            Expanded(
+                              child: SizedBox(
+                                height: 44,
+                                child: OutlinedButton(
+                                  style: OutlinedButton.styleFrom(
+                                    side: BorderSide(color: borderColor),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    foregroundColor: bodyColor,
+                                  ),
+                                  onPressed: () => Navigator.of(dialogContext).pop(),
+                                  child: const Text(
+                                    'Cancel',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: SizedBox(
+                                height: 44,
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: primaryColor,
+                                    foregroundColor: onPrimaryColor,
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                  onPressed: () async {
+                                    setDialogState(() {
+                                      isSwitching = true;
+                                    });
+
+                                    try {
+                                      final prefs = await SharedPreferences.getInstance();
+                                      await prefs.setInt('selected_student_id', targetId);
+                                      if (targetName.isNotEmpty) {
+                                        await prefs.setString('user_name', targetName);
+                                      }
+                                      final targetPhoto = (targetChild['photo_path'] ?? targetChild['photo'] ?? '').toString();
+                                      await prefs.setString('user_photo', targetPhoto);
+
+                                      if (widget.onSwitchChild != null) {
+                                        await Future.sync(() => widget.onSwitchChild!(targetId));
+                                      }
+
+                                      await Future.delayed(const Duration(milliseconds: 650));
+                                    } finally {
+                                      if (dialogContext.mounted) {
+                                        Navigator.of(dialogContext).pop();
+                                      }
+                                    }
+
+                                    if (mounted) {
+                                      setState(() {
+                                        _currentActiveChildId = targetId;
+                                      });
+                                      if (Navigator.of(context).canPop()) {
+                                        Navigator.of(context).pop();
+                                      }
+                                    }
+                                  },
+                                  child: const Text(
+                                    'Switch',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -393,14 +646,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                         final childId = child['id'];
                         final isSelected = childId == _currentActiveChildId;
                         return InkWell(
-                          onTap: () {
-                            setState(() {
-                              _currentActiveChildId = childId;
-                            });
-                            if (widget.onSwitchChild != null) {
-                              widget.onSwitchChild!(childId);
-                            }
-                          },
+                          onTap: isSelected
+                              ? null
+                              : () => _confirmAndSwitchStudent(
+                                    Map<String, dynamic>.from(child as Map),
+                                  ),
                           child: Container(
                             margin: const EdgeInsets.symmetric(vertical: 4),
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),

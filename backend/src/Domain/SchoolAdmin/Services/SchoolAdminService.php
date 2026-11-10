@@ -38,6 +38,7 @@ class SchoolAdminService extends BaseService
     }
 
     private readonly StorageService $storage;
+    private bool $announcementsSchemaEnsured = false;
 
     private function isDateHoliday(int $schoolId, string $date): bool
     {
@@ -20421,7 +20422,7 @@ Only approve the settlement after reviewing all financial records.
     private function sendStudentNotification(PDO $pdo, int $schoolId, int $studentId, string $title, string $message): void
     {
         // 1. Get student and parent information
-        $stmtInfo = $pdo->prepare("SELECT email, parent_phone, father_phone, guardian_phone, student_mobile FROM students WHERE id = :stid LIMIT 1");
+        $stmtInfo = $pdo->prepare("SELECT email, student_email, parent_phone, father_phone, guardian_phone, student_mobile FROM students WHERE id = :stid LIMIT 1");
         $stmtInfo->execute([':stid' => $studentId]);
         $studentInfo = $stmtInfo->fetch(PDO::FETCH_ASSOC);
 
@@ -20429,97 +20430,140 @@ Only approve the settlement after reviewing all financial records.
             return;
         }
 
-        $studentEmail = !empty($studentInfo['email']) ? trim((string)$studentInfo['email']) : null;
-        $rawPhones = [
-            $studentInfo['parent_phone'] ?? null,
-            $studentInfo['father_phone'] ?? null,
-            $studentInfo['guardian_phone'] ?? null,
-            $studentInfo['student_mobile'] ?? null
-        ];
-        $phones = [];
-        foreach ($rawPhones as $p) {
-            if ($p !== null && trim((string)$p) !== '') {
-                $cleaned = trim((string)$p);
-                $phones[] = $cleaned;
-            }
-        }
-        $phones = array_unique(array_filter($phones));
+        $emails = array_values(array_unique(array_filter(array_map('trim', [
+            $studentInfo['email'] ?? '',
+            $studentInfo['student_email'] ?? '',
+        ]))));
 
-        // 2. Notify Student User accounts (match by email or mobile phone)
-        $studentUserIds = [];
-        if ($studentEmail !== null || !empty($phones)) {
-            $conditions = [];
-            $params = [':sid' => $schoolId];
-            if ($studentEmail !== null) {
-                $conditions[] = "email = :semail";
-                $params[':semail'] = $studentEmail;
+        $parentPhones = array_values(array_unique(array_filter(array_map('trim', [
+            $studentInfo['parent_phone'] ?? '',
+            $studentInfo['father_phone'] ?? '',
+            $studentInfo['guardian_phone'] ?? '',
+        ]))));
+
+        $studentPhones = array_values(array_unique(array_filter(array_map('trim', [
+            $studentInfo['student_mobile'] ?? '',
+        ]))));
+
+        $allPhones = array_values(array_unique(array_merge($parentPhones, $studentPhones)));
+
+        $normalizePhone = static function (?string $raw): string {
+            $digits = preg_replace('/[^0-9]/', '', (string)$raw);
+            return strlen($digits) >= 10 ? substr($digits, -10) : $digits;
+        };
+
+        $notifiedUserIds = [];
+        $notifiedPhones = [];
+
+        $dispatchToRecipient = static function (int $uid, string $role, ?string $phone) use (
+            $pdo,
+            $schoolId,
+            $studentId,
+            $title,
+            $message,
+            $normalizePhone,
+            &$notifiedUserIds,
+            &$notifiedPhones
+        ): void {
+            if ($uid <= 0 || isset($notifiedUserIds[$uid])) {
+                return;
             }
-            if (!empty($phones)) {
-                $placeholders = [];
-                foreach (array_values($phones) as $idx => $ph) {
-                    $k = ":sph_" . $idx;
-                    $placeholders[] = $k;
-                    $params[$k] = $ph;
-                }
-                $conditions[] = "phone IN (" . implode(',', $placeholders) . ")";
+            $normPhone = $normalizePhone($phone);
+            if ($normPhone !== '' && isset($notifiedPhones[$normPhone])) {
+                return;
+            }
+            $notifiedUserIds[$uid] = true;
+            if ($normPhone !== '') {
+                $notifiedPhones[$normPhone] = true;
             }
 
-            $sqlStudent = "SELECT DISTINCT id FROM users WHERE school_id = :sid AND role = 'STUDENT' AND (" . implode(' OR ', $conditions) . ")";
-            $stmtStudentUsers = $pdo->prepare($sqlStudent);
-            $stmtStudentUsers->execute($params);
-            $studentUserIds = array_map('intval', $stmtStudentUsers->fetchAll(PDO::FETCH_COLUMN) ?: []);
+            $stmtInsert = $pdo->prepare("
+                INSERT INTO dashboard_notifications (school_id, user_role, user_id, student_id, title, message, link, category, event_key, is_read)
+                VALUES (:school_id, :user_role, :user_id, :student_id, :title, :message, :link, 'FEES', 'FEE_PAYMENT_RECORDED', 0)
+            ");
+            $stmtInsert->execute([
+                ':school_id'  => $schoolId,
+                ':user_role'  => $role,
+                ':user_id'    => $uid,
+                ':student_id' => $studentId,
+                ':title'      => $title,
+                ':message'    => $message,
+                ':link'       => '/student/fees',
+            ]);
+            $notifId = (int)$pdo->lastInsertId();
 
-            if (!empty($studentUserIds)) {
-                $stmtInsert = $pdo->prepare("
-                    INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, category, event_key, is_read)
-                    VALUES (:school_id, 'STUDENT', :user_id, :title, :message, :link, 'FEES', 'FEE_PAYMENT_RECORDED', 0)
-                ");
-                foreach ($studentUserIds as $suId) {
-                    $stmtInsert->execute([
-                        ':school_id' => $schoolId,
-                        ':user_id' => $suId,
-                        ':title' => $title,
-                        ':message' => $message,
-                        ':link' => "/student/fees"
-                    ]);
-                    \App\Shared\Notifications\PushDispatcher::pushOnly(
-                        $pdo, $schoolId, 'STUDENT', (int)$suId, 'FEE_PAYMENT_RECORDED', $title, $message, '/student/fees'
-                    );
-                }
-            }
-        }
+            \App\Shared\Notifications\PushDispatcher::pushOnly(
+                $pdo,
+                $schoolId,
+                $role,
+                $uid,
+                'FEE_PAYMENT_RECORDED',
+                $title,
+                $message,
+                '/student/fees',
+                $notifId > 0 ? $notifId : null
+            );
+        };
 
-        // 3. Notify Parent User accounts (match by phone)
-        if (!empty($phones)) {
+        // 2. Notify Parent User accounts first (deduplicated by user_id and phone)
+        if (!empty($allPhones)) {
             $placeholders = [];
             $params = [':sid' => $schoolId];
-            foreach (array_values($phones) as $idx => $ph) {
+            foreach ($allPhones as $idx => $ph) {
                 $k = ":pph_" . $idx;
                 $placeholders[] = $k;
                 $params[$k] = $ph;
             }
-            $sqlParent = "SELECT DISTINCT id FROM users WHERE school_id = :sid AND role = 'PARENT' AND phone IN (" . implode(',', $placeholders) . ")";
+            $sqlParent = "
+                SELECT DISTINCT id, phone FROM users
+                WHERE school_id = :sid
+                  AND (status IS NULL OR UPPER(status) = 'ACTIVE')
+                  AND UPPER(role) = 'PARENT'
+                  AND phone IN (" . implode(',', $placeholders) . ")
+                ORDER BY id ASC
+            ";
             $stmtParentUsers = $pdo->prepare($sqlParent);
             $stmtParentUsers->execute($params);
-            $parentUserIds = array_map('intval', $stmtParentUsers->fetchAll(PDO::FETCH_COLUMN) ?: []);
+            foreach ($stmtParentUsers->fetchAll(PDO::FETCH_ASSOC) ?: [] as $pu) {
+                $dispatchToRecipient((int)$pu['id'], 'PARENT', $pu['phone'] ?? null);
+            }
+        }
 
-            if (!empty($parentUserIds)) {
-                $stmtInsert = $pdo->prepare("
-                    INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, category, event_key, is_read)
-                    VALUES (:school_id, 'PARENT', :user_id, :title, :message, :link, 'FEES', 'FEE_PAYMENT_RECORDED', 0)
-                ");
-                foreach ($parentUserIds as $puId) {
-                    $stmtInsert->execute([
-                        ':school_id' => $schoolId,
-                        ':user_id' => $puId,
-                        ':title' => $title,
-                        ':message' => $message,
-                        ':link' => "/student/fees"
-                    ]);
-                    \App\Shared\Notifications\PushDispatcher::pushOnly(
-                        $pdo, $schoolId, 'PARENT', (int)$puId, 'FEE_PAYMENT_RECORDED', $title, $message, '/student/fees'
-                    );
+        // 3. Notify Student User accounts (skipping any user/phone already notified as Parent)
+        if (!empty($emails) || !empty($allPhones)) {
+            $conditions = [];
+            $params = [':sid' => $schoolId];
+            if (!empty($emails)) {
+                $ePlaceholders = [];
+                foreach ($emails as $idx => $em) {
+                    $k = ":semail_" . $idx;
+                    $ePlaceholders[] = $k;
+                    $params[$k] = $em;
                 }
+                $conditions[] = "email IN (" . implode(',', $ePlaceholders) . ")";
+            }
+            if (!empty($allPhones)) {
+                $pPlaceholders = [];
+                foreach ($allPhones as $idx => $ph) {
+                    $k = ":sph_" . $idx;
+                    $pPlaceholders[] = $k;
+                    $params[$k] = $ph;
+                }
+                $conditions[] = "phone IN (" . implode(',', $pPlaceholders) . ")";
+            }
+
+            $sqlStudent = "
+                SELECT DISTINCT id, phone FROM users
+                WHERE school_id = :sid
+                  AND (status IS NULL OR UPPER(status) = 'ACTIVE')
+                  AND UPPER(role) = 'STUDENT'
+                  AND (" . implode(' OR ', $conditions) . ")
+                ORDER BY id ASC
+            ";
+            $stmtStudentUsers = $pdo->prepare($sqlStudent);
+            $stmtStudentUsers->execute($params);
+            foreach ($stmtStudentUsers->fetchAll(PDO::FETCH_ASSOC) ?: [] as $su) {
+                $dispatchToRecipient((int)$su['id'], 'STUDENT', $su['phone'] ?? null);
             }
         }
     }
@@ -21153,10 +21197,68 @@ Only approve the settlement after reviewing all financial records.
         return ['role' => $role, 'permissions' => []];
     }
 
+    private function ensureAnnouncementsSchema(PDO $pdo): void
+    {
+        if ($this->announcementsSchemaEnsured) {
+            return;
+        }
+
+        $stmtUrl = $pdo->query("SHOW COLUMNS FROM announcements LIKE 'audio_url'");
+        $hasAudioUrl = $stmtUrl && (bool)$stmtUrl->fetch(PDO::FETCH_ASSOC);
+        if ($stmtUrl) {
+            $stmtUrl->closeCursor();
+        }
+        if (!$hasAudioUrl) {
+            try {
+                $pdo->exec("ALTER TABLE announcements ADD COLUMN audio_url VARCHAR(500) NULL DEFAULT NULL AFTER description");
+            } catch (\PDOException $e) {
+                if ((int)($e->errorInfo[1] ?? 0) !== 1060) {
+                    throw $e;
+                }
+            }
+        }
+
+        $stmtDur = $pdo->query("SHOW COLUMNS FROM announcements LIKE 'audio_duration'");
+        $hasAudioDuration = $stmtDur && (bool)$stmtDur->fetch(PDO::FETCH_ASSOC);
+        if ($stmtDur) {
+            $stmtDur->closeCursor();
+        }
+        if (!$hasAudioDuration) {
+            try {
+                $pdo->exec("ALTER TABLE announcements ADD COLUMN audio_duration INT NULL DEFAULT NULL AFTER audio_url");
+            } catch (\PDOException $e) {
+                if ((int)($e->errorInfo[1] ?? 0) !== 1060) {
+                    throw $e;
+                }
+            }
+        }
+
+        $stmtReads = $pdo->query("SHOW TABLES LIKE 'announcement_reads'");
+        $hasReadsTable = $stmtReads && (bool)$stmtReads->fetch(PDO::FETCH_NUM);
+        if ($stmtReads) {
+            $stmtReads->closeCursor();
+        }
+        if (!$hasReadsTable) {
+            $pdo->exec("
+                CREATE TABLE IF NOT EXISTS announcement_reads (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    announcement_id INT NOT NULL,
+                    user_id INT NOT NULL,
+                    read_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE KEY unique_announcement_user (announcement_id, user_id),
+                    KEY user_id (user_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
+        }
+
+        $this->announcementsSchemaEnsured = true;
+    }
+
     public function getAnnouncements(array $user): array
     {
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->studentRepo->getPdo();
+        $this->ensureAnnouncementsSchema($pdo);
         $stmt = $pdo->prepare("
             SELECT * FROM announcements 
             WHERE school_id = :sid 
@@ -21221,13 +21323,19 @@ Only approve the settlement after reviewing all financial records.
     {
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->studentRepo->getPdo();
+        $this->ensureAnnouncementsSchema($pdo);
 
         $subject = isset($data['subject']) ? trim((string)$data['subject']) : '';
         $description = isset($data['description']) ? trim((string)$data['description']) : '';
         $audience = isset($data['audience']) ? trim((string)$data['audience']) : '';
         $status = isset($data['status']) ? trim((string)$data['status']) : 'Draft';
         $audioUrl = isset($data['audio_url']) ? trim((string)$data['audio_url']) : null;
-        $audioDuration = isset($data['audio_duration']) && $data['audio_duration'] !== '' ? (int)$data['audio_duration'] : null;
+        if ($audioUrl === '') {
+            $audioUrl = null;
+        }
+        $audioDuration = ($audioUrl !== null && isset($data['audio_duration']) && $data['audio_duration'] !== '')
+            ? (int)$data['audio_duration']
+            : null;
 
         if ($audioUrl !== null && $audioUrl !== '') {
             if ($subject === '') {
@@ -21285,17 +21393,52 @@ Only approve the settlement after reviewing all financial records.
                 $stmtUser->execute([':id' => $user['id']]);
                 $uRow = $stmtUser->fetch(PDO::FETCH_ASSOC);
                 if (!empty($uRow['name'])) {
-                    $roleLabel = ($uRow['role'] === 'PRINCIPAL') ? 'Principal' : 'Teacher';
+                    $uRoleUpper = strtoupper((string)($uRow['role'] ?? ''));
+                    $roleLabel = ($uRoleUpper === 'PRINCIPAL' || $this->isPrincipal($user)) ? 'Principal' : 'Teacher';
                     $actorName = $uRow['name'] . ' (' . $roleLabel . ')';
                 }
             }
             if (empty($actorName) && !empty($user['phone'])) {
-                $stmtStaff = $pdo->prepare("SELECT name, role, is_principal FROM staff WHERE phone = :phone AND school_id = :sid ORDER BY id DESC LIMIT 1");
-                $stmtStaff->execute([':phone' => $user['phone'], ':sid' => $schoolId]);
-                $sRow = $stmtStaff->fetch(PDO::FETCH_ASSOC);
-                if (!empty($sRow['name'])) {
-                    $roleLabel = (!empty($sRow['is_principal']) || strtoupper($sRow['role'] ?? '') === 'PRINCIPAL') ? 'Principal' : 'Teacher';
-                    $actorName = $sRow['name'] . ' (' . $roleLabel . ')';
+                $phoneClean = trim((string)$user['phone']);
+                $phone10 = substr(preg_replace('/[^0-9]/', '', $phoneClean), -10);
+                $staffParams = [':phone' => $phoneClean, ':sid' => $schoolId];
+                $phoneCond = "phone = :phone";
+                if (strlen($phone10) === 10) {
+                    $phoneCond .= " OR RIGHT(phone, 10) = :phone10";
+                    $staffParams[':phone10'] = $phone10;
+                }
+                try {
+                    $stmtStaff = $pdo->prepare("
+                        SELECT name, role, is_principal
+                        FROM staff
+                        WHERE ($phoneCond)
+                          AND school_id = :sid
+                          AND (status IS NULL OR status = '' OR UPPER(status) = 'ACTIVE')
+                        ORDER BY (COALESCE(is_principal, 0) = 1 OR UPPER(role) = 'PRINCIPAL') DESC, id DESC
+                        LIMIT 1
+                    ");
+                    $stmtStaff->execute($staffParams);
+                    $sRow = $stmtStaff->fetch(PDO::FETCH_ASSOC);
+                    if (!empty($sRow['name'])) {
+                        $roleLabel = (!empty($sRow['is_principal']) || strtoupper($sRow['role'] ?? '') === 'PRINCIPAL') ? 'Principal' : 'Teacher';
+                        $actorName = $sRow['name'] . ' (' . $roleLabel . ')';
+                    }
+                } catch (\PDOException $e) {
+                    $stmtStaff = $pdo->prepare("
+                        SELECT name, role
+                        FROM staff
+                        WHERE ($phoneCond)
+                          AND school_id = :sid
+                          AND (status IS NULL OR status = '' OR UPPER(status) = 'ACTIVE')
+                        ORDER BY (UPPER(role) = 'PRINCIPAL') DESC, id DESC
+                        LIMIT 1
+                    ");
+                    $stmtStaff->execute($staffParams);
+                    $sRow = $stmtStaff->fetch(PDO::FETCH_ASSOC);
+                    if (!empty($sRow['name'])) {
+                        $roleLabel = (strtoupper($sRow['role'] ?? '') === 'PRINCIPAL') ? 'Principal' : 'Teacher';
+                        $actorName = $sRow['name'] . ' (' . $roleLabel . ')';
+                    }
                 }
             }
             if (empty($actorName)) {
@@ -21342,6 +21485,7 @@ Only approve the settlement after reviewing all financial records.
     {
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->studentRepo->getPdo();
+        $this->ensureAnnouncementsSchema($pdo);
 
         // Check if exists
         $stmtCheck = $pdo->prepare("SELECT * FROM announcements WHERE id = :id AND school_id = :sid LIMIT 1");
@@ -21434,6 +21578,7 @@ Only approve the settlement after reviewing all financial records.
     {
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->studentRepo->getPdo();
+        $this->ensureAnnouncementsSchema($pdo);
 
         // Check if exists
         $stmtCheck = $pdo->prepare("SELECT * FROM announcements WHERE id = :id AND school_id = :sid LIMIT 1");
@@ -22271,22 +22416,66 @@ Only approve the settlement after reviewing all financial records.
         $pdo = $this->classRepo->getPdo();
         $schoolId = (int)($user['school_id'] ?? 0);
         $userId = (int)($user['id'] ?? 0);
-        if ($schoolId <= 0 || $userId <= 0) {
+        if ($schoolId <= 0 || ($userId <= 0 && empty($user['phone']))) {
             return false;
         }
-        $stmt = $pdo->prepare("SELECT phone FROM users WHERE id = :id LIMIT 1");
-        $stmt->execute([':id' => $userId]);
-        $phone = $stmt->fetchColumn();
-        if (!$phone) {
+        $phone = '';
+        if ($userId > 0) {
+            $stmt = $pdo->prepare("SELECT phone FROM users WHERE id = :id LIMIT 1");
+            $stmt->execute([':id' => $userId]);
+            $phone = (string)($stmt->fetchColumn() ?: '');
+        }
+        if ($phone === '' && !empty($user['phone'])) {
+            $phone = (string)$user['phone'];
+        }
+        if ($phone === '') {
             return false;
         }
-        $stmtStaff = $pdo->prepare("SELECT is_principal, role FROM staff WHERE school_id = :sid AND phone = :phone AND status = 'ACTIVE' LIMIT 1");
-        $stmtStaff->execute([':sid' => $schoolId, ':phone' => $phone]);
-        $staff = $stmtStaff->fetch(\PDO::FETCH_ASSOC);
-        if (!$staff) {
+
+        $phoneClean = trim($phone);
+        $phone10 = substr(preg_replace('/[^0-9]/', '', $phoneClean), -10);
+        $params = [':sid' => $schoolId, ':phone' => $phoneClean];
+        $phoneCond = "phone = :phone";
+        if (strlen($phone10) === 10) {
+            $phoneCond .= " OR RIGHT(phone, 10) = :phone10";
+            $params[':phone10'] = $phone10;
+        }
+
+        try {
+            $stmtStaff = $pdo->prepare("
+                SELECT is_principal, role
+                FROM staff
+                WHERE school_id = :sid
+                  AND ($phoneCond)
+                  AND (status IS NULL OR status = '' OR UPPER(status) = 'ACTIVE')
+                ORDER BY id DESC
+            ");
+            $stmtStaff->execute($params);
+            $rows = $stmtStaff->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            foreach ($rows as $staff) {
+                if ((int)($staff['is_principal'] ?? 0) === 1 || strtoupper((string)($staff['role'] ?? '')) === 'PRINCIPAL') {
+                    return true;
+                }
+            }
+            return false;
+        } catch (\PDOException $e) {
+            $stmtStaff = $pdo->prepare("
+                SELECT role
+                FROM staff
+                WHERE school_id = :sid
+                  AND ($phoneCond)
+                  AND (status IS NULL OR status = '' OR UPPER(status) = 'ACTIVE')
+                ORDER BY id DESC
+            ");
+            $stmtStaff->execute($params);
+            $rows = $stmtStaff->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            foreach ($rows as $staff) {
+                if (strtoupper((string)($staff['role'] ?? '')) === 'PRINCIPAL') {
+                    return true;
+                }
+            }
             return false;
         }
-        return ((int)($staff['is_principal'] ?? 0) === 1 || strtoupper((string)($staff['role'] ?? '')) === 'PRINCIPAL');
     }
 
     public function requestFeeCollectorOtp(array $user, int $teacherId, string $action = 'assign'): array
@@ -22548,16 +22737,22 @@ Only approve the settlement after reviewing all financial records.
         $pdo = $this->classRepo->getPdo();
         $schoolId = (int)($user['school_id'] ?? 0);
         $userId = (int)($user['id'] ?? 0);
-        if ($schoolId <= 0 || $userId <= 0) {
+        if ($schoolId <= 0 || ($userId <= 0 && empty($user['phone']))) {
             return false;
         }
-        $stmt = $pdo->prepare("SELECT phone FROM users WHERE id = :id LIMIT 1");
-        $stmt->execute([':id' => $userId]);
-        $phone = $stmt->fetchColumn();
-        if (!$phone) {
+        $phone = '';
+        if ($userId > 0) {
+            $stmt = $pdo->prepare("SELECT phone FROM users WHERE id = :id LIMIT 1");
+            $stmt->execute([':id' => $userId]);
+            $phone = (string)($stmt->fetchColumn() ?: '');
+        }
+        if ($phone === '' && !empty($user['phone'])) {
+            $phone = (string)$user['phone'];
+        }
+        $phoneClean = trim($phone);
+        if ($phoneClean === '') {
             return false;
         }
-        $phoneClean = (string)$phone;
         $phone10 = substr(preg_replace('/[^0-9]/', '', $phoneClean), -10);
         $params = [':sid' => $schoolId, ':phone' => $phoneClean];
         $phoneCond = "phone = :phone";
@@ -22566,20 +22761,25 @@ Only approve the settlement after reviewing all financial records.
             $params[':phone10'] = $phone10;
         }
 
-        $stmtStaff = $pdo->prepare("
-            SELECT is_fee_collector 
-            FROM staff 
-            WHERE school_id = :sid 
-              AND ($phoneCond)
-            ORDER BY is_fee_collector DESC, id DESC 
-            LIMIT 1
-        ");
-        $stmtStaff->execute($params);
-        $staff = $stmtStaff->fetch(\PDO::FETCH_ASSOC);
-        if (!$staff) {
+        try {
+            $stmtStaff = $pdo->prepare("
+                SELECT is_fee_collector 
+                FROM staff 
+                WHERE school_id = :sid 
+                  AND ($phoneCond)
+                  AND (status IS NULL OR status = '' OR UPPER(status) = 'ACTIVE')
+                ORDER BY is_fee_collector DESC, id DESC 
+                LIMIT 1
+            ");
+            $stmtStaff->execute($params);
+            $staff = $stmtStaff->fetch(\PDO::FETCH_ASSOC);
+            if (!$staff) {
+                return false;
+            }
+            return ((int)($staff['is_fee_collector'] ?? 0) === 1);
+        } catch (\PDOException $e) {
             return false;
         }
-        return ((int)($staff['is_fee_collector'] ?? 0) === 1);
     }
 
     public function checkAndSendFeeReminderDueTodayNotifications(?int $schoolId = null, bool $force = false): array

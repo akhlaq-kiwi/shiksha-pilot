@@ -503,6 +503,7 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
   void _showVoiceAnnouncementPreviewDialog(String localAudioPath, int durationSeconds) {
     String selectedAudience = 'Both';
     bool isUploading = false;
+    String? modalError;
     final localPlayer = AudioPlayer();
     bool isPreviewPlaying = false;
     Duration previewPosition = Duration.zero;
@@ -662,6 +663,31 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
                     ),
                     const SizedBox(height: 20),
 
+                    if (modalError != null) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF2F2),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFFECACA)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.error_outline_rounded, color: Colors.red.shade700, size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                modalError!,
+                                style: TextStyle(color: Colors.red.shade800, fontSize: 12.5, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
                     // Action buttons
                     Row(
                       children: [
@@ -690,26 +716,35 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
                             onPressed: isUploading
                                 ? null
                                 : () async {
-                                    setModalState(() => isUploading = true);
-                                    localPlayer.stop();
+                                    setModalState(() {
+                                      isUploading = true;
+                                      modalError = null;
+                                    });
+                                    await localPlayer.stop();
 
-                                    final success = await _uploadAndPublishVoiceAnnouncement(
+                                    final err = await _uploadAndPublishVoiceAnnouncement(
                                       audioFile: File(localAudioPath),
                                       durationSeconds: durationSeconds,
                                       subject: 'Voice Note',
                                       audience: selectedAudience,
                                     );
 
-                                    localPlayer.dispose();
-                                    if (modalCtx.mounted) {
-                                      Navigator.pop(modalCtx);
-                                    }
-
-                                    if (success) {
+                                    if (err == null) {
+                                      localPlayer.dispose();
+                                      if (modalCtx.mounted) {
+                                        Navigator.pop(modalCtx);
+                                      }
                                       _showSnackBar('Voice announcement published successfully!');
                                       _fetchNotices();
                                     } else {
-                                      _showSnackBar('Failed to publish voice announcement', isError: true);
+                                      if (modalCtx.mounted) {
+                                        setModalState(() {
+                                          isUploading = false;
+                                          modalError = err;
+                                        });
+                                      } else {
+                                        _showSnackBar(err, isError: true);
+                                      }
                                     }
                                   },
                             icon: isUploading
@@ -744,7 +779,27 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
     );
   }
 
-  Future<bool> _uploadAndPublishVoiceAnnouncement({
+  String _extractApiErrorMessage(String body, String fallback) {
+    try {
+      final decoded = json.decode(body);
+      if (decoded is Map) {
+        final errors = decoded['errors'];
+        if (errors is Map && errors.isNotEmpty) {
+          final firstErr = errors.values.first;
+          if (firstErr != null && firstErr.toString().trim().isNotEmpty) {
+            return firstErr.toString().trim();
+          }
+        }
+        final msg = decoded['message']?.toString().trim();
+        if (msg != null && msg.isNotEmpty) {
+          return msg;
+        }
+      }
+    } catch (_) {}
+    return fallback;
+  }
+
+  Future<String?> _uploadAndPublishVoiceAnnouncement({
     required File audioFile,
     required int durationSeconds,
     required String subject,
@@ -773,15 +828,15 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
       final response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode != 200 && response.statusCode != 201) {
-        return false;
+        return _extractApiErrorMessage(response.body, 'Failed to upload voice note');
       }
 
       final decodedUpload = json.decode(response.body);
-      final data = decodedUpload['data'] ?? {};
-      final String? audioUrl = data['audio_url'] ?? data['url'];
+      final data = (decodedUpload is Map ? decodedUpload['data'] : null) ?? {};
+      final String? audioUrl = data is Map ? (data['audio_url'] ?? data['url'])?.toString() : null;
 
       if (audioUrl == null || audioUrl.isEmpty) {
-        return false;
+        return 'Audio upload succeeded but no URL was returned';
       }
 
       // 2. Create Announcement with audio_url and audio_duration
@@ -805,9 +860,12 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
         body: createBody,
       );
 
-      return createRes.statusCode == 200 || createRes.statusCode == 201;
-    } catch (_) {
-      return false;
+      if (createRes.statusCode == 200 || createRes.statusCode == 201) {
+        return null;
+      }
+      return _extractApiErrorMessage(createRes.body, 'Failed to publish voice announcement');
+    } catch (e) {
+      return 'Failed to publish voice announcement: $e';
     }
   }
 
@@ -819,6 +877,7 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
     final TextEditingController descCtrl = TextEditingController();
     String selectedAudience = 'Both';
     bool isSubmitting = false;
+    String? modalError;
 
     void insertHtmlTag(String openTag, String closeTag) {
       final text = descCtrl.text;
@@ -1072,6 +1131,31 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
                     ),
                     const SizedBox(height: 22),
 
+                    if (modalError != null) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF2F2),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFFECACA)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.error_outline_rounded, color: Colors.red.shade700, size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                modalError!,
+                                style: TextStyle(color: Colors.red.shade800, fontSize: 12.5, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
                     // Bottom Actions: CANCEL, PUBLISH
                     Row(
                       children: [
@@ -1096,22 +1180,32 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
                                     final subj = subjectCtrl.text.trim();
                                     final desc = descCtrl.text.trim();
                                     if (subj.isEmpty || desc.isEmpty) {
-                                      _showSnackBar('Subject and description are required', isError: true);
+                                      setModalState(() => modalError = 'Subject and description are required');
                                       return;
                                     }
-                                    setModalState(() => isSubmitting = true);
-                                    final ok = await _submitTextAnnouncement(
+                                    setModalState(() {
+                                      isSubmitting = true;
+                                      modalError = null;
+                                    });
+                                    final err = await _submitTextAnnouncement(
                                       subject: subj,
                                       description: desc,
                                       audience: selectedAudience,
                                       status: 'Published',
                                     );
-                                    if (modalCtx.mounted) Navigator.pop(modalCtx);
-                                    if (ok) {
+                                    if (err == null) {
+                                      if (modalCtx.mounted) Navigator.pop(modalCtx);
                                       _showSnackBar('Announcement published successfully');
                                       _fetchNotices();
                                     } else {
-                                      _showSnackBar('Failed to publish announcement', isError: true);
+                                      if (modalCtx.mounted) {
+                                        setModalState(() {
+                                          isSubmitting = false;
+                                          modalError = err;
+                                        });
+                                      } else {
+                                        _showSnackBar(err, isError: true);
+                                      }
                                     }
                                   },
                             style: ElevatedButton.styleFrom(
@@ -1138,7 +1232,7 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
     );
   }
 
-  Future<bool> _submitTextAnnouncement({
+  Future<String?> _submitTextAnnouncement({
     required String subject,
     required String description,
     required String audience,
@@ -1167,9 +1261,12 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
         body: body,
       );
 
-      return res.statusCode == 200 || res.statusCode == 201;
-    } catch (_) {
-      return false;
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        return null;
+      }
+      return _extractApiErrorMessage(res.body, 'Failed to publish announcement');
+    } catch (e) {
+      return 'Failed to publish announcement: $e';
     }
   }
 
@@ -1215,12 +1312,10 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
         body: body,
       );
 
-      final data = json.decode(res.body);
       if (res.statusCode == 200 || res.statusCode == 201) {
         return null;
-      } else {
-        return data['message'] ?? 'Failed to update announcement';
       }
+      return _extractApiErrorMessage(res.body, 'Failed to update announcement');
     } catch (e) {
       return 'An error occurred while updating announcement: $e';
     }
@@ -1237,12 +1332,10 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
         },
       );
 
-      final data = json.decode(res.body);
       if (res.statusCode == 200 || res.statusCode == 204) {
         return null;
-      } else {
-        return data['message'] ?? 'Failed to delete announcement';
       }
+      return _extractApiErrorMessage(res.body, 'Failed to delete announcement');
     } catch (e) {
       return 'An error occurred while deleting announcement: $e';
     }

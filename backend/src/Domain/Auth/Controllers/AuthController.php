@@ -118,6 +118,70 @@ class AuthController extends BaseController
     }
 
     /**
+     * POST /api/auth/app-lock
+     *
+     * Body: { "pin": "1234", "password": "..." }
+     * Requires a valid auth token.
+     */
+    public function enableAppLock(Request $request, Response $response): Response
+    {
+        $claims = $this->authenticate($request);
+        $body = RequestParser::body($request);
+        RequestParser::required($body, ['pin', 'password']);
+
+        $result = $this->authService->enableAppLock(
+            (int) $claims['id'],
+            (string) $body['pin'],
+            (string) $body['password']
+        );
+
+        return $this->success($response, $result, 'App Lock enabled successfully.');
+    }
+
+    /**
+     * POST /api/auth/app-lock/verify
+     *
+     * Body: { "pin": "1234" }
+     * Requires a valid auth token.
+     */
+    public function verifyAppLock(Request $request, Response $response): Response
+    {
+        $claims = $this->authenticate($request);
+        $body = RequestParser::body($request);
+        RequestParser::required($body, ['pin']);
+
+        $isValid = $this->authService->verifyAppLockPin((int) $claims['id'], (string) $body['pin']);
+        if (!$isValid) {
+            throw new \App\Shared\Exceptions\ValidationException(
+                ['pin' => 'Incorrect PIN. Please try again.'],
+                'Incorrect PIN. Please try again.'
+            );
+        }
+
+        return $this->success($response, ['verified' => true], 'PIN verified successfully.');
+    }
+
+    /**
+     * POST /api/auth/app-lock/disable
+     *
+     * Body: { "password": "..." }
+     * Requires a valid auth token.
+     */
+    public function disableAppLock(Request $request, Response $response): Response
+    {
+        $claims = $this->authenticate($request);
+        $body = RequestParser::body($request);
+        RequestParser::required($body, ['password']);
+
+        $result = $this->authService->disableAppLock(
+            (int) $claims['id'],
+            (string) $body['password']
+        );
+
+        return $this->success($response, $result, 'App Lock disabled successfully.');
+    }
+
+    /**
      * GET /api/auth/profile
      *
      * Requires a valid auth token.

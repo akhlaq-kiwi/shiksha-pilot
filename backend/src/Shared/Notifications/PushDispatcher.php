@@ -157,7 +157,8 @@ final class PushDispatcher
         string $eventKey,
         string $title,
         string $message,
-        ?string $link = null
+        ?string $link = null,
+        ?int $notifId = null
     ): void {
         try {
             $dispatcher = new self($pdo, new FcmClient($pdo));
@@ -166,7 +167,7 @@ final class PushDispatcher
             }
 
             $notification = ['title' => $title, 'body' => $message];
-            $data         = $dispatcher->dataPayload($eventKey, $link);
+            $data         = $dispatcher->dataPayload($eventKey, $link, $notifId);
             $priority     = NotificationCatalog::priorityFor($eventKey);
 
             if ($userId === null) {
@@ -178,7 +179,7 @@ final class PushDispatcher
                 $stmt->execute([':sid' => $schoolId, ':role' => strtoupper($role)]);
                 $tokens = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
                 if (!empty($tokens)) {
-                    $dispatcher->fanOut($tokens, $eventKey, $title, $message, $link);
+                    $dispatcher->fanOut($tokens, $eventKey, $title, $message, $link, $notifId);
                 }
                 return;
             }
@@ -188,7 +189,8 @@ final class PushDispatcher
                 $eventKey,
                 $title,
                 $message,
-                $link
+                $link,
+                $notifId
             );
         } catch (Throwable $e) {
             error_log('[push] pushOnly failed: ' . $e->getMessage());
@@ -282,7 +284,7 @@ final class PushDispatcher
     private function activeTokensForUser(int $schoolId, int $userId): array
     {
         $stmt = $this->pdo->prepare("
-            SELECT token FROM device_tokens
+            SELECT DISTINCT token FROM device_tokens
             WHERE school_id = :sid AND user_id = :uid AND is_active = 1
         ");
         $stmt->execute([':sid' => $schoolId, ':uid' => $userId]);
@@ -305,7 +307,7 @@ final class PushDispatcher
         $safe = implode(',', array_map('intval', $userIds));
 
         $stmt = $this->pdo->prepare("
-            SELECT token FROM device_tokens
+            SELECT DISTINCT token FROM device_tokens
             WHERE school_id = :sid AND is_active = 1 AND user_id IN ({$safe})
             LIMIT " . self::MAX_TOKEN_FANOUT
         );

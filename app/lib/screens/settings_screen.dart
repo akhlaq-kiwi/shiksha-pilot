@@ -5,6 +5,7 @@ import 'dart:convert';
 import '../services/http_service.dart' as http;
 import '../services/leave_service.dart';
 import '../services/auth_service.dart';
+import '../services/app_lock_helper.dart';
 import '../services/account_service.dart';
 import '../main.dart';
 import '../widgets/change_password_dialog.dart';
@@ -127,19 +128,57 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _selectedAcademicYearStatus = prefs.getString('selected_academic_year_status') ?? 'ACTIVE';
         final currentUid = prefs.getInt('user_id') ?? 0;
         final currentPhone = (prefs.getString('user_phone') ?? '').trim();
-        final hasUserLock = (currentPhone.isNotEmpty && prefs.getBool('app_lock_enabled_$currentPhone') == true) ||
-            (currentUid > 0 && prefs.getBool('app_lock_enabled_user_$currentUid') == true);
-        _isAppLockEnabled = hasUserLock;
-        prefs.remove('is_app_lock_enabled');
-        prefs.remove('app_lock_pin');
+        _isAppLockEnabled = AppLockHelper.isEnabledLocally(
+          prefs,
+          userId: currentUid,
+          phone: currentPhone,
+        );
       });
     }
+    await AppLockHelper.removeLegacyPlaintextKeys(
+      prefs,
+      userId: prefs.getInt('user_id') ?? 0,
+      phone: (prefs.getString('user_phone') ?? '').trim(),
+    );
+
+    _syncAppLockFromServer();
 
     if (role == 'PARENT' || role == 'STUDENT') {
       await _fetchChildrenList();
     }
     if (_canSwitchAcademicYear) {
       await _fetchAcademicYears();
+    }
+  }
+
+  Future<void> _syncAppLockFromServer() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = widget.leaveService.token;
+      final baseUrl = widget.leaveService.baseUrl;
+      if (token.isEmpty || baseUrl.isEmpty) return;
+
+      final profile = await AuthService(baseUrl: baseUrl)
+          .fetchProfile(token)
+          .timeout(const Duration(seconds: 6));
+      final bool serverEnabled = profile['app_lock_enabled'] == true ||
+          profile['app_lock_enabled'] == 1 ||
+          profile['app_lock_enabled'] == '1';
+      final uid = prefs.getInt('user_id') ?? 0;
+      final phone = (prefs.getString('user_phone') ?? '').trim();
+
+      await AppLockHelper.syncFromServerState(
+        prefs,
+        userId: uid,
+        phone: phone,
+        enabled: serverEnabled,
+      );
+
+      if (mounted && _isAppLockEnabled != serverEnabled) {
+        setState(() => _isAppLockEnabled = serverEnabled);
+      }
+    } catch (_) {
+      // Offline / transient error: keep cached state
     }
   }
 
@@ -1406,7 +1445,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final allKeys = prefs.getKeys();
     final preserved = <String, dynamic>{};
     for (final k in allKeys) {
-      if (k.startsWith('app_lock_enabled_') || k.startsWith('app_lock_pin_') || k == 'base_url' || k == 'selected_base_url') {
+      if (k.startsWith('app_lock_enabled_') || k.startsWith('app_lock_digest_') || k == 'base_url' || k == 'selected_base_url') {
         preserved[k] = prefs.get(k);
       }
     }
@@ -1588,17 +1627,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final baseUrl = widget.leaveService.baseUrl;
 
     if (!_isAppLockEnabled) {
+      String capturedPassword = '';
       final verified = await VerifyPasswordDialog.show(
         context,
         baseUrl: baseUrl,
         token: token,
         title: 'Verify Password to Set App Lock',
         actionButtonText: 'Verify & Continue',
+        onPasswordVerified: (pwd) => capturedPassword = pwd,
       );
       if (verified == true && mounted) {
         final pinSet = await Navigator.push<bool>(
           context,
-          MaterialPageRoute(builder: (_) => const SetAppLockPinScreen()),
+          MaterialPageRoute(
+            builder: (_) => SetAppLockPinScreen(
+              baseUrl: baseUrl,
+              token: token,
+              verifiedPassword: capturedPassword,
+            ),
+          ),
         );
         if (pinSet == true && mounted) {
           setState(() => _isAppLockEnabled = true);
@@ -1624,26 +1671,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
         }
       }
     } else {
+      String capturedPassword = '';
       final verified = await VerifyPasswordDialog.show(
         context,
         baseUrl: baseUrl,
         token: token,
         title: 'Remove App Lock',
         actionButtonText: 'Verify & Remove Lock',
+        onPasswordVerified: (pwd) => capturedPassword = pwd,
       );
       if (verified == true && mounted) {
+        try {
+          await AuthService(baseUrl: baseUrl).disableAppLock(token, capturedPassword);
+        } catch (e) {
+          if (!mounted) return;
+          final msg = e.toString().replaceFirst(RegExp(r'^[A-Za-z0-9_]*Exception:\s*'), '');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(msg.isNotEmpty ? msg : 'Failed to disable App Lock.')),
+          );
+          return;
+        }
+
         final uid = prefs.getInt('user_id') ?? 0;
         final phone = (prefs.getString('user_phone') ?? '').trim();
-        await prefs.remove('is_app_lock_enabled');
-        await prefs.remove('app_lock_pin');
-        if (uid > 0) {
-          await prefs.setBool('app_lock_enabled_user_$uid', false);
-          await prefs.remove('app_lock_pin_user_$uid');
-        }
-        if (phone.isNotEmpty) {
-          await prefs.setBool('app_lock_enabled_$phone', false);
-          await prefs.remove('app_lock_pin_$phone');
-        }
+        await AppLockHelper.clearAllForUser(prefs, userId: uid, phone: phone);
+
         if (mounted) {
           setState(() => _isAppLockEnabled = false);
           ScaffoldMessenger.of(context).showSnackBar(
