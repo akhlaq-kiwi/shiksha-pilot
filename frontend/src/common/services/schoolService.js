@@ -673,6 +673,18 @@ export const schoolService = {
 
   revertAdditionalFeePayment(id, otpCode) {
     return apiClient.post(`/api/school/additional-fees/payments/${id}/revert`, { otp_code: otpCode });
+  },
+
+  getDiscountSettings() {
+    return apiClient.get('/api/school/discount/settings');
+  },
+
+  getDiscountRequests(params = {}) {
+    return apiClient.get(buildUrl('/api/school/discount-requests', params));
+  },
+
+  createDiscountRequest(data) {
+    return apiClient.post('/api/school/discount-requests', data);
   }
 };
 

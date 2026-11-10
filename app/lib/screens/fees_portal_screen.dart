@@ -2444,7 +2444,11 @@ class _StudentLedgerSheetState extends State<StudentLedgerSheet> {
                                                 _showReceiptBottomSheet(
                                                   studentInfo: studentInfo,
                                                   title: '$monthName Tuition Fee',
-                                                  payments: cleanMonthPayments,
+                                                  payments: _expandMonthlyPaymentsByReceipt(
+                                                    cleanMonthPayments,
+                                                    payments,
+                                                    monthRows,
+                                                  ),
                                                   isAdditional: false,
                                                 );
                                               },
@@ -2464,7 +2468,11 @@ class _StudentLedgerSheetState extends State<StudentLedgerSheet> {
                                                   _showReceiptBottomSheet(
                                                     studentInfo: studentInfo,
                                                     title: '$monthName Tuition Fee (Part ${idx + 1})',
-                                                    payments: [p],
+                                                    payments: _expandMonthlyPaymentsByReceipt(
+                                                      [p],
+                                                      payments,
+                                                      monthRows,
+                                                    ),
                                                     isAdditional: false,
                                                   );
                                                 },
@@ -2679,28 +2687,7 @@ class _StudentLedgerSheetState extends State<StudentLedgerSheet> {
                                         ),
                                       if (!isWaitingApproval && (isPaid || isPartial)) ...[
                                         () {
-                                          final rawMap = af['raw'] is Map ? Map<String, dynamic>.from(af['raw']) : Map<String, dynamic>.from(af);
-                                          final afPayments = ((rawMap['payments'] ?? af['payments']) as List<dynamic>?) ?? [];
-                                          final cleanAfPayments = afPayments.where((p) {
-                                            if (p is Map) {
-                                              final r = p['receipt_no']?.toString().trim();
-                                              final pid = p['id'];
-                                              return (r != null && r.isNotEmpty) || (pid != null && pid != 0);
-                                            }
-                                            return false;
-                                          }).toList();
-                                          if (cleanAfPayments.isEmpty) {
-                                            final curRno = (rawMap['receipt_no'] ?? af['receipt_no'] ?? '').toString().trim();
-                                            if (curRno.isNotEmpty || (af['id'] != null && af['id'] != 0)) {
-                                              cleanAfPayments.add({
-                                                ...rawMap,
-                                                'fee_name': title,
-                                                'remaining': af['remaining'],
-                                                'fee': af['amount'] ?? af['fee'],
-                                              });
-                                            }
-                                          }
-                                          cleanAfPayments.sort((a, b) => ((a['id'] ?? 0) as num).compareTo((b['id'] ?? 0) as num));
+                                          final cleanAfPayments = _extractCleanAfPayments(af);
 
                                           if (cleanAfPayments.isEmpty) {
                                             return const SizedBox.shrink();
@@ -2715,14 +2702,10 @@ class _StudentLedgerSheetState extends State<StudentLedgerSheet> {
                                                   _showReceiptBottomSheet(
                                                     studentInfo: studentInfo,
                                                     title: title,
-                                                    payments: [
-                                                      {
-                                                        if (p is Map) ...Map<String, dynamic>.from(p),
-                                                        'fee_name': title,
-                                                        'remaining': af['remaining'],
-                                                        'fee': af['amount'] ?? af['fee'],
-                                                      }
-                                                    ],
+                                                    payments: _expandAdditionalPaymentsByReceipt(
+                                                      [p],
+                                                      processedAdditional,
+                                                    ),
                                                     isAdditional: true,
                                                   );
                                                 },
@@ -2742,14 +2725,10 @@ class _StudentLedgerSheetState extends State<StudentLedgerSheet> {
                                                     _showReceiptBottomSheet(
                                                       studentInfo: studentInfo,
                                                       title: '$title (Part ${idx + 1})',
-                                                      payments: [
-                                                        {
-                                                          if (p is Map) ...Map<String, dynamic>.from(p),
-                                                          'fee_name': title,
-                                                          'remaining': af['remaining'],
-                                                          'fee': af['amount'] ?? af['fee'],
-                                                        }
-                                                      ],
+                                                      payments: _expandAdditionalPaymentsByReceipt(
+                                                        [p],
+                                                        processedAdditional,
+                                                      ),
                                                       isAdditional: true,
                                                     );
                                                   },
@@ -3041,6 +3020,145 @@ class _StudentLedgerSheetState extends State<StudentLedgerSheet> {
     );
   }
 
+  List<Map<String, dynamic>> _expandMonthlyPaymentsByReceipt(
+    List<dynamic> seedPayments,
+    List<dynamic> allPayments,
+    List<Map<String, dynamic>> monthRows,
+  ) {
+    final Map<String, dynamic> remainingByMonth = {};
+    final Map<String, dynamic> feeByMonth = {};
+    for (final m in monthRows) {
+      final key = (m['month'] ?? '').toString().trim().toLowerCase();
+      if (key.isNotEmpty) {
+        remainingByMonth[key] = m['remaining'];
+        feeByMonth[key] = m['fee'];
+      }
+    }
+
+    final Set<String> targetReceipts = {};
+    for (final p in seedPayments) {
+      if (p is Map) {
+        final rno = (p['receipt_no'] ?? '').toString().trim();
+        if (rno.isNotEmpty && rno != '—' && !rno.startsWith('REC-0')) {
+          targetReceipts.add(rno);
+        }
+      }
+    }
+
+    final List<Map<String, dynamic>> combined = [];
+    final Set<String> seenKeys = {};
+
+    void addRow(dynamic raw) {
+      if (raw is! Map) return;
+      final p = Map<String, dynamic>.from(raw);
+      final key = '${p['id'] ?? ''}_${p['fee_month'] ?? ''}_${p['receipt_no'] ?? ''}';
+      if (seenKeys.contains(key)) return;
+      seenKeys.add(key);
+
+      final mKey = (p['fee_month'] ?? '').toString().trim().toLowerCase();
+      if (remainingByMonth.containsKey(mKey)) {
+        p['remaining'] = remainingByMonth[mKey];
+      }
+      if (feeByMonth.containsKey(mKey)) {
+        p['fee'] = feeByMonth[mKey];
+      }
+      combined.add(p);
+    }
+
+    for (final p in seedPayments) {
+      addRow(p);
+    }
+    if (targetReceipts.isNotEmpty) {
+      for (final p in allPayments) {
+        if (p is Map) {
+          final rno = (p['receipt_no'] ?? '').toString().trim();
+          if (targetReceipts.contains(rno)) {
+            addRow(p);
+          }
+        }
+      }
+    }
+
+    return combined;
+  }
+
+  List<Map<String, dynamic>> _extractCleanAfPayments(Map<String, dynamic> af) {
+    final title = (af['fee_name'] ?? 'Additional Fee').toString();
+    final rawMap = af['raw'] is Map ? Map<String, dynamic>.from(af['raw']) : Map<String, dynamic>.from(af);
+    final afPayments = ((rawMap['payments'] ?? af['payments']) as List<dynamic>?) ?? [];
+    final clean = <Map<String, dynamic>>[];
+
+    for (final p in afPayments) {
+      if (p is Map) {
+        final r = p['receipt_no']?.toString().trim();
+        final pid = p['id'];
+        if ((r != null && r.isNotEmpty) || (pid != null && pid != 0)) {
+          clean.add({
+            ...Map<String, dynamic>.from(p),
+            'fee_name': title,
+            'remaining': af['remaining'],
+            'fee': af['amount'] ?? af['fee'],
+          });
+        }
+      }
+    }
+
+    if (clean.isEmpty) {
+      final curRno = (rawMap['receipt_no'] ?? af['receipt_no'] ?? '').toString().trim();
+      if (curRno.isNotEmpty || (af['id'] != null && af['id'] != 0)) {
+        clean.add({
+          ...rawMap,
+          'fee_name': title,
+          'remaining': af['remaining'],
+          'fee': af['amount'] ?? af['fee'],
+        });
+      }
+    }
+
+    clean.sort((a, b) => ((a['id'] ?? 0) as num).compareTo((b['id'] ?? 0) as num));
+    return clean;
+  }
+
+  List<Map<String, dynamic>> _expandAdditionalPaymentsByReceipt(
+    List<Map<String, dynamic>> seedPayments,
+    List<Map<String, dynamic>> processedAdditional,
+  ) {
+    final Set<String> targetReceipts = {};
+    for (final p in seedPayments) {
+      final rno = (p['receipt_no'] ?? '').toString().trim();
+      if (rno.isNotEmpty && rno != '—' && !rno.startsWith('REC-0')) {
+        targetReceipts.add(rno);
+      }
+    }
+
+    final List<Map<String, dynamic>> combined = [];
+    final Set<String> seenKeys = {};
+
+    void addRow(Map<String, dynamic> raw) {
+      final p = Map<String, dynamic>.from(raw);
+      final key = '${p['id'] ?? ''}_${p['fee_name'] ?? ''}_${p['receipt_no'] ?? ''}';
+      if (seenKeys.contains(key)) return;
+      seenKeys.add(key);
+      combined.add(p);
+    }
+
+    for (final p in seedPayments) {
+      addRow(p);
+    }
+    if (targetReceipts.isNotEmpty) {
+      for (final af in processedAdditional) {
+        for (final p in _extractCleanAfPayments(af)) {
+          final rno = (p['receipt_no'] ?? '').toString().trim();
+          if (targetReceipts.contains(rno)) {
+            addRow(p);
+          }
+        }
+      }
+    }
+
+    return combined;
+  }
+
   void _showReceiptBottomSheet({
     required Map<String, dynamic> studentInfo,
     required String title,
@@ -3323,7 +3441,21 @@ class _ReceiptShareSheetState extends State<_ReceiptShareSheet> {
         .trim();
     final hasValidPhone = phone.isNotEmpty && phone != '—' && phone != 'null';
 
-    // Consolidate payments by receipt_no so multiple additional fees deposited in 1 transaction form 1 single receipt slip!
+    // Consolidate payments by receipt_no so multiple months / additional fees deposited in 1 transaction form 1 single receipt slip!
+    const academicMonths = [
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+      'January',
+      'February',
+      'March',
+    ];
     final List<Map<String, dynamic>> consolidatedSlips = [];
     final Map<String, List<Map<String, dynamic>>> byReceipt = {};
     final List<Map<String, dynamic>> noReceipt = [];
@@ -3352,9 +3484,18 @@ class _ReceiptShareSheetState extends State<_ReceiptShareSheet> {
       final totalDisc = group.fold<double>(0.0, (sum, item) {
         return sum + (double.tryParse(item['discount_amount']?.toString() ?? '0') ?? 0.0);
       });
-      final totalRem = group.fold<double>(0.0, (sum, item) {
-        return sum + (double.tryParse(item['remaining']?.toString() ?? '0') ?? 0.0);
-      });
+
+      final Map<String, double> remByItem = {};
+      for (final item in group) {
+        final itemKey = widget.isAdditional
+            ? (item['fee_name'] ?? item['name'] ?? item['id'] ?? '').toString().trim().toLowerCase()
+            : (item['fee_month'] ?? item['month'] ?? item['id'] ?? '').toString().trim().toLowerCase();
+        final remVal = double.tryParse(item['remaining']?.toString() ?? '0') ?? 0.0;
+        if (!remByItem.containsKey(itemKey) || remVal > remByItem[itemKey]!) {
+          remByItem[itemKey] = remVal;
+        }
+      }
+      final totalRem = remByItem.values.fold<double>(0.0, (sum, v) => sum + v);
 
       String desc = '';
       if (widget.isAdditional) {
@@ -3370,22 +3511,46 @@ class _ReceiptShareSheetState extends State<_ReceiptShareSheet> {
             .where((m) => m.isNotEmpty)
             .toSet()
             .toList();
-        desc = months.isNotEmpty ? months.join(', ') : widget.title;
+        months.sort((a, b) {
+          final idxA = academicMonths.indexWhere((m) => m.toLowerCase() == a.toLowerCase());
+          final idxB = academicMonths.indexWhere((m) => m.toLowerCase() == b.toLowerCase());
+          return (idxA == -1 ? 99 : idxA).compareTo(idxB == -1 ? 99 : idxB);
+        });
+
+        if (months.length > 1) {
+          final indices = months
+              .map((m) => academicMonths.indexWhere((am) => am.toLowerCase() == m.toLowerCase()))
+              .where((idx) => idx != -1)
+              .toList();
+          final isConsecutive = indices.length == months.length &&
+              List.generate(indices.length - 1, (i) => indices[i + 1] == indices[i] + 1).every((ok) => ok);
+          desc = isConsecutive ? '${months.first} to ${months.last}' : months.join(', ');
+        } else if (months.length == 1) {
+          desc = months.first;
+        } else {
+          desc = widget.title;
+        }
       }
 
       final hasPartial = group.any((item) {
-        final st = (item['status'] ?? '').toString().toUpperCase();
-        return st.contains('PART');
-      });
+            final st = (item['status'] ?? '').toString().toUpperCase();
+            return st.contains('PART');
+          }) ||
+          totalRem > 0.01;
+
+      final collectedByRaw = group
+          .map((item) => (item['collected_by'] ?? '').toString().trim())
+          .firstWhere((c) => c.isNotEmpty, orElse: () => 'ADMIN');
 
       consolidatedSlips.add({
         'id': primaryPid,
         'receipt_no': rno,
+        'raw_receipt_no': rno,
         'amount_paid': totalAmt,
         'discount_amount': totalDisc,
         'remaining': totalRem,
         'status': hasPartial ? 'PARTIAL' : 'PAID',
-        'collected_by': first['collected_by'] ?? 'ADMIN',
+        'collected_by': collectedByRaw,
         'payment_date': first['payment_date'] ?? first['created_at'],
         'created_at': first['created_at'],
         'description': desc,
@@ -3584,6 +3749,7 @@ class _ReceiptShareSheetState extends State<_ReceiptShareSheet> {
                   else
                     ...consolidatedSlips.map((p) {
                       final pid = int.tryParse(p['id']?.toString() ?? '0') ?? 0;
+                      final rawReceiptNo = (p['raw_receipt_no'] ?? p['receipt_no'] ?? '').toString().trim();
                       var receiptNo = (p['receipt_no'] ?? (pid > 0 ? 'REC-$pid' : '—')).toString();
                       if (receiptNo.length == 15 && RegExp(r'^\d{15}$').hasMatch(receiptNo)) {
                         receiptNo = receiptNo.substring(0, 12);
@@ -3811,7 +3977,11 @@ class _ReceiptShareSheetState extends State<_ReceiptShareSheet> {
                                     child: ElevatedButton.icon(
                                       onPressed: (pid <= 0 || isSharing)
                                           ? null
-                                          : () => _shareReceipt(pid, receiptNo, itemDescription.isNotEmpty ? itemDescription : widget.title),
+                                          : () => _shareReceipt(
+                                                pid,
+                                                rawReceiptNo.isNotEmpty ? rawReceiptNo : receiptNo,
+                                                itemDescription.isNotEmpty ? itemDescription : widget.title,
+                                              ),
                                       icon: isSharing
                                           ? const SizedBox(
                                               width: 16,

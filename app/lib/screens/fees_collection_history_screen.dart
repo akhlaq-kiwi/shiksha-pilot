@@ -29,6 +29,7 @@ class _FeesCollectionHistoryScreenState extends State<FeesCollectionHistoryScree
     'total_collected': 0,
     'today_collection': 0,
     'this_month_collection': 0,
+    'total_discount': 0,
     'total_transactions': 0,
   };
 
@@ -544,6 +545,13 @@ class _FeesCollectionHistoryScreenState extends State<FeesCollectionHistoryScree
   Widget build(BuildContext context) {
     final num totalCollected = _stats['total_collected'] ?? 0;
     final num periodCollection = _stats['this_month_collection'] ?? totalCollected;
+    final num totalDiscount = (_stats['total_discount'] is num)
+        ? _stats['total_discount'] as num
+        : (num.tryParse(_stats['total_discount']?.toString() ?? '') ??
+            _transactions.fold<double>(
+              0.0,
+              (sum, tx) => sum + (double.tryParse((tx is Map ? tx['discount_amount'] : null)?.toString() ?? '0') ?? 0.0),
+            ));
     final int totalCount = _stats['total_transactions'] ?? _transactions.length;
 
     return Scaffold(
@@ -595,7 +603,7 @@ class _FeesCollectionHistoryScreenState extends State<FeesCollectionHistoryScree
         child: Column(
           children: [
             // Top Stats Summary Bar
-          _buildSummaryBar(totalCollected, periodCollection, totalCount),
+          _buildSummaryBar(totalCollected, periodCollection, totalDiscount, totalCount),
 
           // Filters Section (Search + Deposit By + Period)
           _buildFilterControls(),
@@ -648,7 +656,7 @@ class _FeesCollectionHistoryScreenState extends State<FeesCollectionHistoryScree
   );
   }
 
-  Widget _buildSummaryBar(num totalCollected, num periodCollection, int totalCount) {
+  Widget _buildSummaryBar(num totalCollected, num periodCollection, num totalDiscount, int totalCount) {
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.fromLTRB(14, 12, 14, 8),
@@ -672,7 +680,7 @@ class _FeesCollectionHistoryScreenState extends State<FeesCollectionHistoryScree
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Total Collection stat
+          // Total Collection / Total Discount stat
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -680,7 +688,7 @@ class _FeesCollectionHistoryScreenState extends State<FeesCollectionHistoryScree
               children: [
                 Text(
                   _isDiscountedOnly
-                      ? 'DISCOUNTED COLLECTION'
+                      ? 'TOTAL DISCOUNT'
                       : (_selectedPeriod == 'ALL TIME' ? 'TOTAL COLLECTION' : 'PERIOD COLLECTION'),
                   style: const TextStyle(
                     fontSize: 10,
@@ -694,7 +702,11 @@ class _FeesCollectionHistoryScreenState extends State<FeesCollectionHistoryScree
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    _formatCurrency(_isDiscountedOnly || _selectedPeriod != 'ALL TIME' ? periodCollection : totalCollected),
+                    _formatCurrency(
+                      _isDiscountedOnly
+                          ? totalDiscount
+                          : (_selectedPeriod != 'ALL TIME' ? periodCollection : totalCollected),
+                    ),
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
@@ -1185,13 +1197,14 @@ class _FeesCollectionHistoryScreenState extends State<FeesCollectionHistoryScree
                 height: 1.4,
               ),
             ),
-            if (_selectedPeriod != 'ALL TIME' || _selectedCollector != 'All Users' || _searchQuery.isNotEmpty) ...[
+            if (_selectedPeriod != 'ALL TIME' || _selectedCollector != 'All Users' || _isDiscountedOnly || _searchQuery.isNotEmpty) ...[
               const SizedBox(height: 18),
               OutlinedButton.icon(
                 onPressed: () {
                   setState(() {
                     _selectedPeriod = 'ALL TIME';
                     _selectedCollector = 'All Users';
+                    _isDiscountedOnly = false;
                     _searchQuery = '';
                     _searchController.clear();
                   });

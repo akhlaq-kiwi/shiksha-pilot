@@ -5,7 +5,9 @@ import { Dialog } from '../../../common/ui/dialog';
 import { Card, CardContent } from '../../../common/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../../common/ui/table';
 import { schoolService } from '../../../common/services/schoolService';
+import { authService } from '../../../common/services/authService';
 import { apiClient } from '../../../common/services/apiClient';
+import { useToast } from '../../../common/components/Toast';
 import html2pdf from 'html2pdf.js';
 import { useAcademicYear } from '../../../common/contexts/AcademicYearContext';
 import { FeeReceiptModal } from '../components/FeeReceiptModal';
@@ -14,7 +16,7 @@ import { formatCurrency } from '../../../common/utils/format';
 import { resolveFileUrl } from '../../../common/utils/fileUrl';
 import {
   User, BookOpen, Users, Home, Calendar, FileText,
-  Download, Printer, AlertCircle, Eye, ChevronDown, ChevronUp, X, ShieldAlert, Phone
+  Download, Printer, AlertCircle, Eye, ChevronDown, ChevronUp, X, ShieldAlert, Shield, Info, Phone
 } from 'lucide-react';
 
 // Self-healing avatar image component to handle loading errors gracefully
@@ -123,13 +125,94 @@ function DocumentViewerModal({ docName, docPath, onClose }) {
   );
 }
 
+// Admin Approval Required Confirmation Popup (matches mobile fee discount notice dialog)
+function DiscountApprovalNoticeDialog({ isOpen, onCancel, onConfirm, submitting = false }) {
+  return (
+    <Dialog
+      isOpen={isOpen}
+      onClose={() => {
+        if (!submitting) onCancel();
+      }}
+      closeOnBackdropClick={false}
+      hideHeader
+      showClose={false}
+      maxWidth="max-w-md"
+      containerClassName="!z-[60]"
+      className="animate-in fade-in duration-200"
+      footer={
+        <div className="flex justify-end gap-2.5 w-full">
+          <Button variant="secondary" onClick={onCancel} disabled={submitting}>
+            Cancel
+          </Button>
+          <Button
+            onClick={onConfirm}
+            loading={submitting}
+            loadingText="Sending..."
+            className="font-bold"
+          >
+            Send Request
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex-shrink-0">
+            <Shield className="h-5 w-5" />
+          </div>
+          <h3 className="font-bold text-text-primary text-base tracking-tight font-display">
+            Admin Approval Required
+          </h3>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-sm font-bold text-text-primary leading-snug">
+            Applying a discount requires School Admin permission.
+          </p>
+          <p className="text-xs text-text-secondary leading-relaxed">
+            Once submitted, this fee deposit will remain pending and will not reflect in fee collections, collection history, or financial reports until approved by the School Admin.
+          </p>
+        </div>
+
+        <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/50 border border-border flex items-start gap-2.5">
+          <Info className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+          <span className="text-xs font-semibold text-text-primary leading-snug">
+            Status will remain &quot;Waiting for approval&quot; until approved.
+          </span>
+        </div>
+      </div>
+    </Dialog>
+  );
+}
+
 // Deposit Modal Component (Supports partial payment & consecutive sequence)
-function DepositModal({ student, payments = [], classFeeConfig, onSave, onClose }) {
+function DepositModal({ student, payments = [], classFeeConfig, pendingMonths = {}, initialApprovalRequired = false, onSave, onClose }) {
+  const toast = useToast();
+  const currentUser = authService.getCurrentUser();
+  const userRole = (authService.getUserRole() || '').toUpperCase();
+  const isAdminRole = userRole === 'SCHOOL_ADMIN' || userRole === 'SUPER_ADMIN';
+  const requestedByName = (currentUser?.name || '').trim();
+
   const [selectedMonths, setSelectedMonths] = useState([]);
   const [depositAmounts, setDepositAmounts] = useState({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
+  const [approvalRequired, setApprovalRequired] = useState(initialApprovalRequired);
+  const [showApprovalConfirm, setShowApprovalConfirm] = useState(false);
+  const [pendingDiscountRequestPayload, setPendingDiscountRequestPayload] = useState(null);
+  const [sendingRequest, setSendingRequest] = useState(false);
+
+  useEffect(() => {
+    if (isAdminRole) return;
+    let active = true;
+    schoolService.getDiscountSettings()
+      .then(res => {
+        if (active) setApprovalRequired(!!res?.discount_approval_required);
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [isAdminRole]);
 
   const academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
 
@@ -161,6 +244,10 @@ function DepositModal({ student, payments = [], classFeeConfig, onSave, onClose 
     return getRemainingFee(m) <= 0.01;
   };
 
+  const isMonthWaitingApproval = (m) => {
+    return !isMonthFullyPaid(m) && !!pendingMonths[m];
+  };
+
   // Earliest unpaid month in sequence
   const getEarliestUnpaid = () => {
     return academicMonths.find(m => !isMonthFullyPaid(m));
@@ -170,10 +257,14 @@ function DepositModal({ student, payments = [], classFeeConfig, onSave, onClose 
   const partialMonth = academicMonths.find(m => !isMonthFullyPaid(m) && getPaidSoFar(m) > 0 && getRemainingFee(m) > 0.01);
 
   const handleMonthToggle = (month) => {
-    if (isMonthFullyPaid(month)) return;
+    if (isMonthFullyPaid(month) || isMonthWaitingApproval(month)) return;
 
     // If a partially paid month exists, it MUST be deposited separately!
     if (partialMonth) {
+      if (isMonthWaitingApproval(partialMonth)) {
+        setError(`Cannot collect fees for ${month} while ${partialMonth} is waiting for discount approval.`);
+        return;
+      }
       if (month !== partialMonth) {
         setError(`Month ${partialMonth} has a remaining balance of ₹${getRemainingFee(partialMonth).toLocaleString()} and must be deposited separately first.`);
         return;
@@ -216,6 +307,14 @@ function DepositModal({ student, payments = [], classFeeConfig, onSave, onClose 
       // Checking month: ensure all months from earliestUnpaid to month are checked
       if (idxOfToggle < idxOfEarliest) {
         setError('Invalid month selection.');
+        return;
+      }
+
+      const blockingWaitingMonth = academicMonths
+        .slice(idxOfEarliest, idxOfToggle + 1)
+        .find(mName => !isMonthFullyPaid(mName) && isMonthWaitingApproval(mName));
+      if (blockingWaitingMonth) {
+        setError(`Cannot collect fees for ${month} while ${blockingWaitingMonth} is waiting for discount approval.`);
         return;
       }
 
@@ -324,37 +423,94 @@ function DepositModal({ student, payments = [], classFeeConfig, onSave, onClose 
     setSaving(true);
     setError('');
     try {
+      const orderedMonths = [...selectedMonths].sort(
+        (a, b) => academicMonths.indexOf(a) - academicMonths.indexOf(b)
+      );
       const monthAmountsPayload = {};
-      const isSingleMonth = selectedMonths.length === 1;
+      const isSingleMonth = orderedMonths.length === 1;
       const discApplied = getDiscAmount();
 
-      selectedMonths.forEach(m => {
+      orderedMonths.forEach(m => {
         const val = depositAmounts[m];
         const userTypedAmt = isSingleMonth ? (parseFloat(val) || getRemainingFee(m)) : getRemainingFee(m);
         const netCashPaid = Math.max(0, userTypedAmt - discApplied);
         monthAmountsPayload[m] = netCashPaid;
       });
 
-      await schoolService.createFeePayment({
+      const depositPayload = {
         student_id: student.id,
-        months: selectedMonths,
+        months: orderedMonths,
         month_amounts: monthAmountsPayload,
         discount_amount: discApplied,
         payment_method: paymentMethod
-      });
+      };
+
+      if (!isAdminRole && discApplied > 0) {
+        let isApprovalRequired = approvalRequired;
+        try {
+          const settingsRes = await schoolService.getDiscountSettings();
+          isApprovalRequired = !!settingsRes?.discount_approval_required;
+          setApprovalRequired(isApprovalRequired);
+        } catch (_) {}
+
+        if (isApprovalRequired) {
+          const gross = calculateGrossTotal();
+          const net = calculateTotalDeposit();
+          setPendingDiscountRequestPayload({
+            student_id: student.id,
+            fee_type: 'MONTHLY',
+            fee_items_summary: orderedMonths.join(', '),
+            total_amount: gross,
+            paid_amount: net,
+            discount_amount: discApplied,
+            payment_method: paymentMethod,
+            deposit_payload: depositPayload,
+            requested_by: requestedByName
+          });
+          setShowApprovalConfirm(true);
+          setSaving(false);
+          return;
+        }
+      }
+
+      await schoolService.createFeePayment(depositPayload);
       window.dispatchEvent(new Event('fee-payment-updated'));
       onSave();
     } catch (err) {
       console.error(err);
       const errRes = err.data || err.response?.data;
-      const msg = errRes?.errors?.months || errRes?.errors?.fee_structure || errRes?.errors?.class_id || errRes?.message || err.message || 'Failed to deposit fees.';
+      const msg = errRes?.errors?.fields || errRes?.errors?.months || errRes?.errors?.fee_structure || errRes?.errors?.class_id || errRes?.message || err.message || 'Failed to deposit fees.';
       setError(msg);
     } finally {
       setSaving(false);
     }
   };
 
+  const handleConfirmSendRequest = async () => {
+    if (!pendingDiscountRequestPayload) return;
+    setSendingRequest(true);
+    setError('');
+    try {
+      await schoolService.createDiscountRequest(pendingDiscountRequestPayload);
+      setShowApprovalConfirm(false);
+      setPendingDiscountRequestPayload(null);
+      toast.success('Discount request sent for Admin approval.');
+      window.dispatchEvent(new Event('fee-payment-updated'));
+      onSave();
+    } catch (err) {
+      console.error(err);
+      const errRes = err.data || err.response?.data;
+      const msg = errRes?.errors?.fields || errRes?.message || err.message || 'Failed to submit discount request.';
+      setShowApprovalConfirm(false);
+      setPendingDiscountRequestPayload(null);
+      setError(msg);
+    } finally {
+      setSendingRequest(false);
+    }
+  };
+
   const isSingleMonth = selectedMonths.length === 1;
+  const requiresApprovalSubmit = !isAdminRole && approvalRequired && getDiscAmount() > 0;
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
@@ -362,53 +518,68 @@ function DepositModal({ student, payments = [], classFeeConfig, onSave, onClose 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-zinc-50 dark:bg-zinc-900/50">
           <h3 className="font-bold text-text-primary text-base tracking-tight">Deposit Fees</h3>
-          <button onClick={onClose} className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg transition-colors">
+          <button
+            onClick={onClose}
+            disabled={saving || sendingRequest}
+            className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg transition-colors disabled:opacity-50"
+          >
             <X className="h-4 w-4 text-text-secondary" />
           </button>
         </div>
 
         <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
           {/* Apply Discount Toggle Row */}
-          <div className="flex items-center justify-between gap-3 p-3 bg-zinc-50 dark:bg-zinc-900/40 rounded-xl border border-border">
-            <label className="flex items-center gap-2.5 cursor-pointer select-none">
-              <input 
-                type="checkbox"
-                checked={applyDiscount}
-                onChange={(e) => handleToggleApplyDiscount(e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-9 h-5 bg-zinc-300 peer-focus:outline-none rounded-full peer dark:bg-zinc-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-zinc-600 peer-checked:bg-primary relative"></div>
-              <span className="text-xs font-bold text-text-primary uppercase tracking-wider">Apply Discount</span>
-            </label>
-
-            {applyDiscount && (
-              <div className="relative flex-1 max-w-[160px]">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-text-muted">₹</span>
+          <div className="p-3 bg-zinc-50 dark:bg-zinc-900/40 rounded-xl border border-border space-y-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <label className="flex items-center gap-2.5 cursor-pointer select-none">
                 <input 
-                  type="number"
-                  min="0"
-                  placeholder="Discount Amount"
-                  value={discountAmount}
-                  onKeyDown={(e) => {
-                    if (['.', '-', 'e', '+', ','].includes(e.key)) {
-                      e.preventDefault();
-                    }
-                  }}
-                  onChange={(e) => {
-                    const sanitized = e.target.value.replace(/[^0-9]/g, '');
-                    if (sanitized === '') {
-                      setDiscountAmount('');
-                    } else {
-                      const num = parseInt(sanitized, 10);
-                      const gross = calculateGrossTotal();
-                      if (num <= gross) {
-                        setDiscountAmount(num);
-                      }
-                    }
-                    setError('');
-                  }}
-                  className="w-full rounded-lg border border-border bg-surface text-text-primary pl-7 pr-3 py-1.5 text-xs font-bold outline-none focus:border-primary focus:ring-primary"
+                  type="checkbox"
+                  checked={applyDiscount}
+                  onChange={(e) => handleToggleApplyDiscount(e.target.checked)}
+                  className="sr-only peer"
                 />
+                <div className="w-9 h-5 bg-zinc-300 peer-focus:outline-none rounded-full peer dark:bg-zinc-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-zinc-600 peer-checked:bg-primary relative"></div>
+                <span className="text-xs font-bold text-text-primary uppercase tracking-wider">Apply Discount</span>
+              </label>
+
+              {applyDiscount && (
+                <div className="relative flex-1 max-w-[160px]">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-text-muted">₹</span>
+                  <input 
+                    type="number"
+                    min="0"
+                    placeholder="Discount Amount"
+                    value={discountAmount}
+                    onKeyDown={(e) => {
+                      if (['.', '-', 'e', '+', ','].includes(e.key)) {
+                        e.preventDefault();
+                      }
+                    }}
+                    onChange={(e) => {
+                      const sanitized = e.target.value.replace(/[^0-9]/g, '');
+                      if (sanitized === '') {
+                        setDiscountAmount('');
+                      } else {
+                        const num = parseInt(sanitized, 10);
+                        const gross = calculateGrossTotal();
+                        if (num <= gross) {
+                          setDiscountAmount(num);
+                        }
+                      }
+                      setError('');
+                    }}
+                    className="w-full rounded-lg border border-border bg-surface text-text-primary pl-7 pr-3 py-1.5 text-xs font-bold outline-none focus:border-primary focus:ring-primary"
+                  />
+                </div>
+              )}
+            </div>
+
+            {applyDiscount && !isAdminRole && approvalRequired && (
+              <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-start gap-2 text-amber-800 dark:text-amber-300">
+                <Shield className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                <span className="text-[11px] font-semibold leading-snug">
+                  Admin approval is enabled. Submitting will send a discount request to the School Admin.
+                </span>
               </div>
             )}
           </div>
@@ -442,9 +613,11 @@ function DepositModal({ student, payments = [], classFeeConfig, onSave, onClose 
               const paidSoFar = getPaidSoFar(m);
               const remaining = getRemainingFee(m);
               const isPaid = isMonthFullyPaid(m);
+              const isWaitingApproval = isMonthWaitingApproval(m);
               const isPartial = paidSoFar > 0 && remaining > 0;
-              const isChecked = selectedMonths.includes(m);
-              const shouldExpand = isSingleMonth && isChecked && !isPaid && !applyDiscount;
+              const isChecked = !isWaitingApproval && selectedMonths.includes(m);
+              const isRowDisabled = isPaid || isWaitingApproval || (partialMonth !== undefined && m !== partialMonth);
+              const shouldExpand = isSingleMonth && isChecked && !isPaid && !isWaitingApproval && !applyDiscount;
 
               const currentAmt = depositAmounts[m] !== undefined ? depositAmounts[m] : remaining;
               const numAmt = parseFloat(currentAmt) || 0;
@@ -458,31 +631,35 @@ function DepositModal({ student, payments = [], classFeeConfig, onSave, onClose 
                   className={`border transition-colors ${
                     isPaid 
                       ? 'bg-zinc-100 border-zinc-200 dark:bg-zinc-900/50 text-text-muted p-2.5 rounded-lg flex items-center justify-between text-xs' 
-                      : shouldExpand 
-                        ? 'bg-surface border-primary/50 shadow-2xs p-3 space-y-3 rounded-xl' 
-                        : 'bg-surface border-border hover:bg-zinc-50/50 p-2.5 rounded-lg flex items-center justify-between text-xs'
+                      : isWaitingApproval
+                        ? 'bg-amber-50/70 dark:bg-amber-950/20 border-amber-500/30 text-text-muted p-2.5 rounded-lg flex items-center justify-between text-xs'
+                        : shouldExpand 
+                          ? 'bg-surface border-primary/50 shadow-2xs p-3 space-y-3 rounded-xl' 
+                          : 'bg-surface border-border hover:bg-zinc-50/50 p-2.5 rounded-lg flex items-center justify-between text-xs'
                   }`}
                 >
-                  <div className="flex items-center justify-between w-full">
-                    <label className="flex items-center gap-2.5 font-bold uppercase select-none cursor-pointer text-text-primary text-xs w-full">
+                  <div className="flex items-center justify-between w-full gap-2">
+                    <label className={`flex items-center gap-2.5 font-bold uppercase select-none text-text-primary text-xs min-w-0 flex-1 ${isRowDisabled ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'}`}>
                       <input 
                         type="checkbox"
-                        disabled={isPaid || (partialMonth !== undefined && m !== partialMonth)}
+                        disabled={isRowDisabled}
                         checked={isPaid || isChecked}
                         onChange={() => handleMonthToggle(m)}
-                        className="rounded border-zinc-300 text-primary focus:ring-primary h-4 w-4 disabled:opacity-50"
+                        className="rounded border-zinc-300 text-primary focus:ring-primary h-4 w-4 disabled:opacity-50 flex-shrink-0"
                       />
-                      <span>
+                      <span className="truncate">
                         {m} <span className="text-[11px] text-text-muted font-normal lowercase">(₹{totalFee.toLocaleString()}{isPartial ? ` | Remaining ₹${remaining.toLocaleString()}` : ''})</span>
                       </span>
                     </label>
                     <div className="flex-shrink-0">
                       {isPaid ? (
-                        <span className="text-[11px] font-bold bg-green-500/10 text-green-600 px-2 py-0.5 rounded uppercase">Paid</span>
+                        <span className="text-[11px] font-bold bg-green-500/10 text-green-600 px-2 py-0.5 rounded uppercase whitespace-nowrap">Paid</span>
+                      ) : isWaitingApproval ? (
+                        <span className="text-[11px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded uppercase whitespace-nowrap">Waiting for approval</span>
                       ) : isPartial ? (
-                        <span className="text-[11px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded uppercase">Partially Paid</span>
+                        <span className="text-[11px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded uppercase whitespace-nowrap">Partially Paid</span>
                       ) : (
-                        <span className="text-[11px] font-bold text-text-muted">Pending</span>
+                        <span className="text-[11px] font-bold text-text-muted whitespace-nowrap">Pending</span>
                       )}
                     </div>
                   </div>
@@ -530,27 +707,84 @@ function DepositModal({ student, payments = [], classFeeConfig, onSave, onClose 
 
         {/* Footer controls */}
         <div className="px-6 py-4 border-t border-border bg-surface flex justify-end gap-3">
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="secondary" onClick={onClose} disabled={saving || sendingRequest}>Cancel</Button>
           <Button 
             className="font-bold" 
-            disabled={saving || selectedMonths.length === 0 || validateForm() !== null} 
+            disabled={saving || sendingRequest || selectedMonths.length === 0 || validateForm() !== null} 
             onClick={handleSave}
           >
-            {saving ? 'Depositing...' : `Deposit ${selectedMonths.length > 0 ? `(₹${calculateTotalDeposit().toLocaleString()})` : ''}`}
+            {saving || sendingRequest
+              ? (sendingRequest ? 'Sending...' : 'Depositing...')
+              : requiresApprovalSubmit
+                ? `Request Approval ${selectedMonths.length > 0 ? `(₹${calculateTotalDeposit().toLocaleString()})` : ''}`
+                : `Deposit ${selectedMonths.length > 0 ? `(₹${calculateTotalDeposit().toLocaleString()})` : ''}`}
           </Button>
         </div>
       </div>
+
+      <DiscountApprovalNoticeDialog
+        isOpen={showApprovalConfirm}
+        onCancel={() => {
+          setShowApprovalConfirm(false);
+          setPendingDiscountRequestPayload(null);
+        }}
+        onConfirm={handleConfirmSendRequest}
+        submitting={sendingRequest}
+      />
     </div>
   );
 }
 
 // Additional Fees Deposit Modal (Matches design guidelines of tuition DepositModal)
-function AdditionalDepositModal({ student, unpaidFees, initialSelectedIds = [], onSave, onClose }) {
-  const [selectedIds, setSelectedIds] = useState(initialSelectedIds);
+function AdditionalDepositModal({
+  student,
+  unpaidFees,
+  initialSelectedIds = [],
+  pendingAdditionalIds = {},
+  pendingAdditionalNames = {},
+  initialApprovalRequired = false,
+  onSave,
+  onClose
+}) {
+  const toast = useToast();
+  const currentUser = authService.getCurrentUser();
+  const userRole = (authService.getUserRole() || '').toUpperCase();
+  const isAdminRole = userRole === 'SCHOOL_ADMIN' || userRole === 'SUPER_ADMIN';
+  const requestedByName = (currentUser?.name || '').trim();
+
+  const isFeeWaitingApproval = (fee) => {
+    if (!fee) return false;
+    const fid = Number(fee.id);
+    if (fid && pendingAdditionalIds[fid]) return true;
+    const fname = (fee.fee_name || '').trim().toUpperCase();
+    return !!(fname && pendingAdditionalNames[fname]);
+  };
+
+  const [selectedIds, setSelectedIds] = useState(() =>
+    (initialSelectedIds || []).filter(id => {
+      const f = unpaidFees.find(x => x.id === id);
+      return f && !isFeeWaitingApproval(f);
+    })
+  );
   const [depositAmounts, setDepositAmounts] = useState({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
+  const [approvalRequired, setApprovalRequired] = useState(initialApprovalRequired);
+  const [showApprovalConfirm, setShowApprovalConfirm] = useState(false);
+  const [pendingDiscountRequestPayload, setPendingDiscountRequestPayload] = useState(null);
+  const [sendingRequest, setSendingRequest] = useState(false);
+
+  useEffect(() => {
+    if (isAdminRole) return;
+    let active = true;
+    schoolService.getDiscountSettings()
+      .then(res => {
+        if (active) setApprovalRequired(!!res?.discount_approval_required);
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [isAdminRole]);
 
   const getFeeTotal = (fee) => parseFloat(fee.amount || 0);
   const getFeePaid = (fee) => parseFloat(fee.amount_paid || 0) + parseFloat(fee.discount_amount || 0);
@@ -571,7 +805,7 @@ function AdditionalDepositModal({ student, unpaidFees, initialSelectedIds = [], 
 
   const handleToggle = (id) => {
     const targetFee = unpaidFees.find(x => x.id === id);
-    if (!targetFee) return;
+    if (!targetFee || isFeeWaitingApproval(targetFee)) return;
 
     if (isFeePartial(targetFee)) {
       // Partial fee MUST be deposited separately!
@@ -714,9 +948,14 @@ function AdditionalDepositModal({ student, unpaidFees, initialSelectedIds = [], 
       const rnd = Math.floor(10 + Math.random() * 90);
       const sharedReceiptNo = `${nowSec}${rnd}`;
 
+      const feesPayload = [];
+      const feeNames = [];
+
       for (let i = 0; i < selectedIds.length; i++) {
         const id = selectedIds[i];
         const fee = unpaidFees.find(f => f.id === id);
+        if (!fee) continue;
+        feeNames.push(fee.fee_name || 'Additional Fee');
         const remaining = getFeeRemaining(fee);
         const userTypedAmt = isSingleFee ? (parseFloat(depositAmounts[id]) || remaining) : remaining;
 
@@ -730,23 +969,81 @@ function AdditionalDepositModal({ student, unpaidFees, initialSelectedIds = [], 
 
         const netCashPaid = Math.max(0, userTypedAmt - feeDisc);
 
-        await schoolService.collectAdditionalFeePayment(id, { 
+        feesPayload.push({
+          id,
           payment_method: paymentMethod,
           amount_paid: netCashPaid,
           discount_amount: feeDisc,
           receipt_no: sharedReceiptNo
         });
       }
+
+      if (!isAdminRole && totalDiscount > 0) {
+        let isApprovalRequired = approvalRequired;
+        try {
+          const settingsRes = await schoolService.getDiscountSettings();
+          isApprovalRequired = !!settingsRes?.discount_approval_required;
+          setApprovalRequired(isApprovalRequired);
+        } catch (_) {}
+
+        if (isApprovalRequired) {
+          setPendingDiscountRequestPayload({
+            student_id: student.id,
+            fee_type: 'ADDITIONAL',
+            fee_items_summary: feeNames.join(', '),
+            total_amount: calculateGrossTotal(),
+            paid_amount: calculateTotalDeposit(),
+            discount_amount: totalDiscount,
+            payment_method: paymentMethod,
+            deposit_payload: { fees: feesPayload },
+            requested_by: requestedByName
+          });
+          setShowApprovalConfirm(true);
+          setSaving(false);
+          return;
+        }
+      }
+
+      for (const fItem of feesPayload) {
+        const { id, ...paymentData } = fItem;
+        await schoolService.collectAdditionalFeePayment(id, paymentData);
+      }
       window.dispatchEvent(new Event('fee-payment-updated'));
       onSave();
     } catch (err) {
       console.error(err);
-      const msg = err.data?.message || err.response?.data?.message || err.message || 'Failed to deposit fees.';
+      const errRes = err.data || err.response?.data;
+      const msg = errRes?.errors?.fields || errRes?.message || err.message || 'Failed to deposit fees.';
       setError(msg);
     } finally {
       setSaving(false);
     }
   };
+
+  const handleConfirmSendRequest = async () => {
+    if (!pendingDiscountRequestPayload) return;
+    setSendingRequest(true);
+    setError('');
+    try {
+      await schoolService.createDiscountRequest(pendingDiscountRequestPayload);
+      setShowApprovalConfirm(false);
+      setPendingDiscountRequestPayload(null);
+      toast.success('Discount request sent for Admin approval.');
+      window.dispatchEvent(new Event('fee-payment-updated'));
+      onSave();
+    } catch (err) {
+      console.error(err);
+      const errRes = err.data || err.response?.data;
+      const msg = errRes?.errors?.fields || errRes?.message || err.message || 'Failed to submit discount request.';
+      setShowApprovalConfirm(false);
+      setPendingDiscountRequestPayload(null);
+      setError(msg);
+    } finally {
+      setSendingRequest(false);
+    }
+  };
+
+  const requiresApprovalSubmit = !isAdminRole && approvalRequired && getDiscAmount() > 0;
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
@@ -754,53 +1051,68 @@ function AdditionalDepositModal({ student, unpaidFees, initialSelectedIds = [], 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-zinc-50 dark:bg-zinc-900/50">
           <h3 className="font-bold text-text-primary text-base tracking-tight font-display">Deposit Fees</h3>
-          <button onClick={onClose} className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg transition-colors">
+          <button
+            onClick={onClose}
+            disabled={saving || sendingRequest}
+            className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg transition-colors disabled:opacity-50"
+          >
             <X className="h-4 w-4 text-text-secondary" />
           </button>
         </div>
 
         <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
           {/* Apply Discount Toggle Row */}
-          <div className="flex items-center justify-between gap-3 p-3 bg-zinc-50 dark:bg-zinc-900/40 rounded-xl border border-border">
-            <label className="flex items-center gap-2.5 cursor-pointer select-none">
-              <input 
-                type="checkbox"
-                checked={applyDiscount}
-                onChange={(e) => handleToggleApplyDiscount(e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-9 h-5 bg-zinc-300 peer-focus:outline-none rounded-full peer dark:bg-zinc-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-zinc-600 peer-checked:bg-primary relative"></div>
-              <span className="text-xs font-bold text-text-primary uppercase tracking-wider">Apply Discount</span>
-            </label>
-
-            {applyDiscount && (
-              <div className="relative flex-1 max-w-[160px]">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-text-muted">₹</span>
+          <div className="p-3 bg-zinc-50 dark:bg-zinc-900/40 rounded-xl border border-border space-y-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <label className="flex items-center gap-2.5 cursor-pointer select-none">
                 <input 
-                  type="number"
-                  min="0"
-                  placeholder="Discount Amount"
-                  value={discountAmount}
-                  onKeyDown={(e) => {
-                    if (['.', '-', 'e', '+', ','].includes(e.key)) {
-                      e.preventDefault();
-                    }
-                  }}
-                  onChange={(e) => {
-                    const sanitized = e.target.value.replace(/[^0-9]/g, '');
-                    if (sanitized === '') {
-                      setDiscountAmount('');
-                    } else {
-                      const num = parseInt(sanitized, 10);
-                      const gross = calculateGrossTotal();
-                      if (num <= gross) {
-                        setDiscountAmount(num);
-                      }
-                    }
-                    setError('');
-                  }}
-                  className="w-full rounded-lg border border-border bg-surface text-text-primary pl-7 pr-3 py-1.5 text-xs font-bold outline-none focus:border-primary focus:ring-primary"
+                  type="checkbox"
+                  checked={applyDiscount}
+                  onChange={(e) => handleToggleApplyDiscount(e.target.checked)}
+                  className="sr-only peer"
                 />
+                <div className="w-9 h-5 bg-zinc-300 peer-focus:outline-none rounded-full peer dark:bg-zinc-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-zinc-600 peer-checked:bg-primary relative"></div>
+                <span className="text-xs font-bold text-text-primary uppercase tracking-wider">Apply Discount</span>
+              </label>
+
+              {applyDiscount && (
+                <div className="relative flex-1 max-w-[160px]">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-text-muted">₹</span>
+                  <input 
+                    type="number"
+                    min="0"
+                    placeholder="Discount Amount"
+                    value={discountAmount}
+                    onKeyDown={(e) => {
+                      if (['.', '-', 'e', '+', ','].includes(e.key)) {
+                        e.preventDefault();
+                      }
+                    }}
+                    onChange={(e) => {
+                      const sanitized = e.target.value.replace(/[^0-9]/g, '');
+                      if (sanitized === '') {
+                        setDiscountAmount('');
+                      } else {
+                        const num = parseInt(sanitized, 10);
+                        const gross = calculateGrossTotal();
+                        if (num <= gross) {
+                          setDiscountAmount(num);
+                        }
+                      }
+                      setError('');
+                    }}
+                    className="w-full rounded-lg border border-border bg-surface text-text-primary pl-7 pr-3 py-1.5 text-xs font-bold outline-none focus:border-primary focus:ring-primary"
+                  />
+                </div>
+              )}
+            </div>
+
+            {applyDiscount && !isAdminRole && approvalRequired && (
+              <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-start gap-2 text-amber-800 dark:text-amber-300">
+                <Shield className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                <span className="text-[11px] font-semibold leading-snug">
+                  Admin approval is enabled. Submitting will send a discount request to the School Admin.
+                </span>
               </div>
             )}
           </div>
@@ -829,13 +1141,14 @@ function AdditionalDepositModal({ student, unpaidFees, initialSelectedIds = [], 
 
           <div className="space-y-2.5 border border-border rounded-xl p-3 bg-zinc-50/50 dark:bg-zinc-900/10">
             {unpaidFees.map(fee => {
-              const isSelected = selectedIds.includes(fee.id);
+              const isWaitingApproval = isFeeWaitingApproval(fee);
+              const isSelected = !isWaitingApproval && selectedIds.includes(fee.id);
               const totalFee = getFeeTotal(fee);
               const paidSoFar = getFeePaid(fee);
               const remaining = getFeeRemaining(fee);
               const isPartial = isFeePartial(fee);
-              const isOtherFeeDisabled = (selectedPartialId && fee.id !== selectedPartialId) || (selectedIds.length > 0 && !selectedIds.includes(fee.id) && isPartial);
-              const shouldExpand = isSingleFee && isSelected && !applyDiscount;
+              const isOtherFeeDisabled = isWaitingApproval || (selectedPartialId && fee.id !== selectedPartialId) || (selectedIds.length > 0 && !selectedIds.includes(fee.id) && isPartial);
+              const shouldExpand = isSingleFee && isSelected && !isWaitingApproval && !applyDiscount;
 
               const currentAmt = depositAmounts[fee.id] !== undefined ? depositAmounts[fee.id] : remaining;
               const numAmt = parseFloat(currentAmt) || 0;
@@ -847,29 +1160,33 @@ function AdditionalDepositModal({ student, unpaidFees, initialSelectedIds = [], 
                 <div 
                   key={fee.id}
                   className={`border transition-colors ${
-                    shouldExpand
-                      ? 'bg-surface border-primary/50 shadow-2xs p-3 space-y-3 rounded-xl'
-                      : isSelected
-                        ? 'border-primary bg-primary/5 text-text-primary font-bold p-2.5 rounded-lg flex items-center justify-between text-xs'
-                        : 'border-border bg-surface text-text-secondary hover:border-zinc-300 p-2.5 rounded-lg flex items-center justify-between text-xs'
+                    isWaitingApproval
+                      ? 'bg-amber-50/70 dark:bg-amber-950/20 border-amber-500/30 text-text-muted p-2.5 rounded-lg flex items-center justify-between text-xs'
+                      : shouldExpand
+                        ? 'bg-surface border-primary/50 shadow-2xs p-3 space-y-3 rounded-xl'
+                        : isSelected
+                          ? 'border-primary bg-primary/5 text-text-primary font-bold p-2.5 rounded-lg flex items-center justify-between text-xs'
+                          : 'border-border bg-surface text-text-secondary hover:border-zinc-300 p-2.5 rounded-lg flex items-center justify-between text-xs'
                   }`}
                 >
-                  <div className="flex items-center justify-between w-full">
-                    <label className="flex items-center gap-2.5 font-bold uppercase select-none cursor-pointer text-text-primary text-xs w-full">
+                  <div className="flex items-center justify-between w-full gap-2">
+                    <label className={`flex items-center gap-2.5 font-bold uppercase select-none text-text-primary text-xs min-w-0 flex-1 ${isOtherFeeDisabled ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'}`}>
                       <input 
                         type="checkbox" 
                         disabled={isOtherFeeDisabled}
                         checked={isSelected}
                         onChange={() => handleToggle(fee.id)}
-                        className="rounded border-border text-primary focus:ring-primary cursor-pointer h-4 w-4 disabled:opacity-50"
+                        className="rounded border-border text-primary focus:ring-primary cursor-pointer h-4 w-4 disabled:opacity-50 flex-shrink-0"
                       />
-                      <span>
+                      <span className="truncate">
                         {fee.fee_name} <span className="text-[11px] text-text-muted font-normal lowercase">(₹{totalFee.toLocaleString()}{isPartial ? ` | Remaining ₹${remaining.toLocaleString()}` : ''})</span>
                       </span>
                     </label>
                     <div className="flex-shrink-0 font-bold font-sans">
-                      {isPartial ? (
-                        <span className="text-[11px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded uppercase">Partially Paid</span>
+                      {isWaitingApproval ? (
+                        <span className="text-[11px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded uppercase whitespace-nowrap">Waiting for approval</span>
+                      ) : isPartial ? (
+                        <span className="text-[11px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded uppercase whitespace-nowrap">Partially Paid</span>
                       ) : (
                         `₹${remaining.toLocaleString()}`
                       )}
@@ -919,16 +1236,30 @@ function AdditionalDepositModal({ student, unpaidFees, initialSelectedIds = [], 
 
         {/* Footer actions */}
         <div className="px-6 py-4 border-t border-border bg-surface flex justify-end gap-3">
-          <Button variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button variant="secondary" onClick={onClose} disabled={saving || sendingRequest}>Cancel</Button>
           <Button 
             className="flex items-center gap-1.5 font-bold" 
             onClick={handleSave} 
-            disabled={saving || selectedIds.length === 0 || validateForm() !== null}
+            disabled={saving || sendingRequest || selectedIds.length === 0 || validateForm() !== null}
           >
-            {saving ? 'Depositing...' : `Deposit ${selectedIds.length > 0 ? `(₹${calculateTotalDeposit().toLocaleString()})` : ''}`}
+            {saving || sendingRequest
+              ? (sendingRequest ? 'Sending...' : 'Depositing...')
+              : requiresApprovalSubmit
+                ? `Request Approval ${selectedIds.length > 0 ? `(₹${calculateTotalDeposit().toLocaleString()})` : ''}`
+                : `Deposit ${selectedIds.length > 0 ? `(₹${calculateTotalDeposit().toLocaleString()})` : ''}`}
           </Button>
         </div>
       </div>
+
+      <DiscountApprovalNoticeDialog
+        isOpen={showApprovalConfirm}
+        onCancel={() => {
+          setShowApprovalConfirm(false);
+          setPendingDiscountRequestPayload(null);
+        }}
+        onConfirm={handleConfirmSendRequest}
+        submitting={sendingRequest}
+      />
     </div>
   );
 }
@@ -966,6 +1297,15 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
   const [revertOtpCode, setRevertOtpCode] = useState('');
   const [revertMaskedEmail, setRevertMaskedEmail] = useState('');
   const [revertTimer, setRevertTimer] = useState(0);
+  const [pendingDiscountItems, setPendingDiscountItems] = useState({
+    months: {},
+    additionalIds: {},
+    additionalNames: {}
+  });
+  const [discountApprovalRequired, setDiscountApprovalRequired] = useState(false);
+
+  const currentUserRole = (authService.getUserRole() || '').toUpperCase();
+  const isAdminRole = currentUserRole === 'SCHOOL_ADMIN' || currentUserRole === 'SUPER_ADMIN';
 
   useEffect(() => {
     let interval = null;
@@ -1026,12 +1366,89 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
     setLoading(true);
     setError('');
     try {
-      const [details, profile] = await Promise.all([
+      const [details, profile, discountReqsRes, discountSettingsRes] = await Promise.all([
         schoolService.getStudentById(studentId),
-        schoolService.getSchoolProfile()
+        schoolService.getSchoolProfile(),
+        schoolService.getDiscountRequests({ status: 'PENDING' }).catch(() => null),
+        !isAdminRole ? schoolService.getDiscountSettings().catch(() => null) : Promise.resolve(null)
       ]);
       setData(details);
       setSchoolProfile(profile);
+
+      if (!isAdminRole && discountSettingsRes) {
+        setDiscountApprovalRequired(!!discountSettingsRes.discount_approval_required);
+      }
+
+      const academicMonths = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
+      const pendingMonthsMap = {};
+      const pendingAddIdsMap = {};
+      const pendingAddNamesMap = {};
+
+      const reqList = discountReqsRes?.requests || [];
+      reqList.forEach(r => {
+        if (Number(r.student_id) !== Number(studentId)) return;
+        const reqId = Number(r.id) || true;
+        const feeType = (r.fee_type || '').toString().toUpperCase();
+
+        let payload = r.deposit_payload;
+        if (typeof payload === 'string') {
+          try {
+            payload = JSON.parse(payload);
+          } catch {
+            payload = null;
+          }
+        }
+
+        if (feeType === 'MONTHLY') {
+          let months = [];
+          if (payload && Array.isArray(payload.months)) {
+            months = payload.months.map(m => String(m).trim());
+          } else if (r.fee_items_summary) {
+            months = String(r.fee_items_summary)
+              .split(',')
+              .map(m => m.trim())
+              .filter(Boolean);
+          }
+          months.forEach(m => {
+            const canonical = academicMonths.find(am => am.toLowerCase() === m.toLowerCase()) || m;
+            if (canonical) {
+              pendingMonthsMap[canonical] = reqId;
+            }
+          });
+        } else if (feeType === 'ADDITIONAL') {
+          let matchedById = false;
+          if (payload && Array.isArray(payload.fees)) {
+            payload.fees.forEach(f => {
+              const fid = Number(f?.id ?? f?.additional_fee_id);
+              if (fid > 0) {
+                pendingAddIdsMap[fid] = reqId;
+                matchedById = true;
+              }
+            });
+          } else if (payload && payload.additional_fee_id) {
+            const fid = Number(payload.additional_fee_id);
+            if (fid > 0) {
+              pendingAddIdsMap[fid] = reqId;
+              matchedById = true;
+            }
+          }
+          if (!matchedById && r.fee_items_summary) {
+            String(r.fee_items_summary)
+              .split(',')
+              .map(s => s.trim().toUpperCase())
+              .filter(Boolean)
+              .forEach(name => {
+                pendingAddNamesMap[name] = reqId;
+              });
+          }
+        }
+      });
+
+      setPendingDiscountItems({
+        months: pendingMonthsMap,
+        additionalIds: pendingAddIdsMap,
+        additionalNames: pendingAddNamesMap
+      });
     } catch (err) {
       console.error(err);
       setError('Failed to load student profile details.');
@@ -1335,15 +1752,21 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
       const totalPaid = paidByMonth[m] || 0;
       const remaining = Math.max(0, totalFee - totalPaid);
       const receipt = latestReceiptByMonth[m];
+      const isMonthPaid = totalPaid >= totalFee - 0.01 && totalFee > 0;
+      const isWaitingApproval = !isMonthPaid && !!pendingDiscountItems.months[m];
 
       let status = 'UNPAID';
       let statusText = 'Pending';
       let statusClass = 'bg-red-500/10 text-red-600 border-red-500/20';
 
-      if (totalPaid >= totalFee - 0.01 && totalFee > 0) {
+      if (isMonthPaid) {
         status = 'PAID';
         statusText = 'Paid';
         statusClass = 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30';
+      } else if (isWaitingApproval) {
+        status = totalPaid > 0 ? 'PARTIAL' : 'UNPAID';
+        statusText = 'Waiting for approval';
+        statusClass = 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/40';
       } else if (totalPaid > 0) {
         status = 'PARTIAL';
         statusText = 'Partially';
@@ -1359,12 +1782,21 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
         status,
         statusText,
         statusClass,
+        isWaitingApproval,
         receipt,
         amount: totalFee,
         totalPaid,
         remaining
       };
     });
+  };
+
+  const isAdditionalFeeWaitingApproval = (af) => {
+    if (!af) return false;
+    const fid = Number(af.id);
+    if (fid && pendingDiscountItems.additionalIds[fid]) return true;
+    const fname = (af.fee_name || '').trim().toUpperCase();
+    return !!(fname && pendingDiscountItems.additionalNames[fname]);
   };
 
   const monthWiseList = getMonthWiseFees();
@@ -1834,7 +2266,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                                   {mw.receipt?.payment_date ? formatDate(mw.receipt.payment_date) : '—'}
                                 </TableCell>
                                 <TableCell>
-                                  <span className={`inline-flex items-center justify-center w-[74px] py-0.5 rounded-full text-[11px] font-bold uppercase border ${mw.statusClass}`}>
+                                  <span className={`inline-flex items-center justify-center ${mw.isWaitingApproval ? 'px-2.5 whitespace-nowrap' : 'w-[74px]'} py-0.5 rounded-full text-[11px] font-bold uppercase border ${mw.statusClass}`}>
                                     {mw.statusText}
                                   </span>
                                 </TableCell>
@@ -1862,7 +2294,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                                     <div className="flex justify-end gap-2">
                                       {mw.receipt && (
                                         <>
-                                          {!data?.is_ledger_locked && !isReadOnly && (
+                                          {!data?.is_ledger_locked && !isReadOnly && !mw.isWaitingApproval && (
                                             <Button 
                                               variant="secondary" 
                                               className="h-7 w-20 text-[11px] px-0 font-bold"
@@ -1880,7 +2312,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                                           </Button>
                                         </>
                                       )}
-                                      {!data?.is_ledger_locked && (
+                                      {!data?.is_ledger_locked && !mw.isWaitingApproval && (
                                         <Button 
                                           className="h-7 w-20 text-[11px] px-0 font-bold"
                                           onClick={() => setShowDepositModal(true)}
@@ -1919,6 +2351,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                                 const clearedAmt = paidAmt + discountAmt;
                                 const remAmt = Math.max(0, totalAmt - clearedAmt);
                                 const isPaid = af.status === 'Paid' || remAmt <= 0.01;
+                                const isWaitingApproval = !isPaid && isAdditionalFeeWaitingApproval(af);
                                 const isPartial = clearedAmt > 0 && remAmt > 0.01;
 
                                 return (
@@ -1939,14 +2372,16 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                                       {af.payment_date ? formatDate(af.payment_date) : '—'}
                                     </TableCell>
                                     <TableCell>
-                                      <span className={`inline-flex items-center justify-center w-[74px] py-0.5 rounded-full text-[11px] font-bold uppercase border ${
+                                      <span className={`inline-flex items-center justify-center ${isWaitingApproval ? 'px-2.5 whitespace-nowrap' : 'w-[74px]'} py-0.5 rounded-full text-[11px] font-bold uppercase border ${
                                         isPaid
                                           ? 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30'
-                                          : isPartial
-                                            ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/30 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900/30'
-                                            : 'bg-amber-100 text-amber-800 dark:bg-amber-950/30 dark:text-amber-400 border-amber-200 dark:border-amber-900/30'
+                                          : isWaitingApproval
+                                            ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/40'
+                                            : isPartial
+                                              ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/30 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900/30'
+                                              : 'bg-amber-100 text-amber-800 dark:bg-amber-950/30 dark:text-amber-400 border-amber-200 dark:border-amber-900/30'
                                       }`}>
-                                        {isPaid ? 'Paid' : isPartial ? 'Partially' : 'Pending'}
+                                        {isPaid ? 'Paid' : isWaitingApproval ? 'Waiting for approval' : isPartial ? 'Partially' : 'Pending'}
                                       </span>
                                     </TableCell>
                                     <TableCell className="text-right">
@@ -1973,7 +2408,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                                         <div className="flex justify-end gap-2">
                                           {(paidAmt > 0 || clearedAmt > 0) && (
                                             <>
-                                              {!data?.is_ledger_locked && !isReadOnly && (
+                                              {!data?.is_ledger_locked && !isReadOnly && !isWaitingApproval && (
                                                 <Button 
                                                   variant="secondary" 
                                                   className="h-7 w-20 text-[11px] px-0 font-bold"
@@ -1991,7 +2426,7 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
                                               </Button>
                                             </>
                                           )}
-                                          {((() => {
+                                          {(!isWaitingApproval && (() => {
                                             const today = new Date();
                                             const yyyy = today.getFullYear();
                                             const mm = String(today.getMonth() + 1).padStart(2, '0');
@@ -2057,6 +2492,8 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
           student={student} 
           payments={fee_summary.payments || []} 
           classFeeConfig={data?.class_fee_config}
+          pendingMonths={pendingDiscountItems.months}
+          initialApprovalRequired={discountApprovalRequired}
           onSave={async () => {
             setShowDepositModal(false);
             await loadDetails();
@@ -2071,6 +2508,9 @@ export default function StudentDetailsPage({ studentId, onBack, onEdit }) {
           student={student} 
           unpaidFees={unpaidAdditionalFeesList} 
           initialSelectedIds={preselectedAdditionalIds}
+          pendingAdditionalIds={pendingDiscountItems.additionalIds}
+          pendingAdditionalNames={pendingDiscountItems.additionalNames}
+          initialApprovalRequired={discountApprovalRequired}
           onSave={async () => {
             setShowAdditionalDepositModal(false);
             setPreselectedAdditionalIds([]);

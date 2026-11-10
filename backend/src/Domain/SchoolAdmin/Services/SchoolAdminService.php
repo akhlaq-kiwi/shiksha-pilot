@@ -8626,10 +8626,12 @@ class SchoolAdminService extends BaseService
             }
         }
 
-        // Period collection (Card 3 value) calculated strictly on filtered set
+        // Period collection (Card 3 value) and total discount calculated strictly on filtered set
         $periodCollection = 0.0;
+        $totalDiscount = 0.0;
         foreach ($filtered as $t) {
             $periodCollection += (float)$t['amount'];
+            $totalDiscount += (float)($t['discount_amount'] ?? 0.0);
         }
 
         // Sort chronologically descending (newest first, latest time first)
@@ -8661,6 +8663,7 @@ class SchoolAdminService extends BaseService
                 'total_collected' => $overallTotalCollected,
                 'today_collection' => $todayCollection,
                 'this_month_collection' => $periodCollection,
+                'total_discount' => $totalDiscount,
                 'total_transactions' => $totalFiltered
             ],
             'pagination' => [
