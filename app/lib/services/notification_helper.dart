@@ -62,7 +62,11 @@ class NotificationHelper {
     }
     final role = (userRole ?? prefs.getString('user_role') ?? '').trim();
     if (role.isNotEmpty) {
-      final lastKey = 'last_notified_id_$role';
+      final roleUpper = role.toUpperCase();
+      final selectedSid = prefs.getInt('selected_student_id');
+      final String lastKey = ((roleUpper == 'STUDENT' || roleUpper == 'PARENT') && selectedSid != null)
+          ? 'last_notified_id_${role}_$selectedSid'
+          : 'last_notified_id_$role';
       final currentLast = prefs.getInt(lastKey) ?? 0;
       if (notifId > currentLast) {
         await prefs.setInt(lastKey, notifId);
@@ -259,6 +263,7 @@ class NotificationHelper {
         'event_key': data['event_key'] ?? '',
         'category': category.id,
         'id': data['notification_id'] ?? data['id'] ?? '',
+        'student_id': data['student_id'] ?? '',
       }),
     );
   }
@@ -286,16 +291,25 @@ class NotificationHelper {
       final String link = (notif['link'] ?? '').toString();
       final String title = (notif['title'] ?? notif['message'] ?? '').toString();
 
-      final isSchoolStaff = userRole.toUpperCase() == 'SCHOOL_ADMIN' || userRole.toUpperCase() == 'SUPER_ADMIN';
-      final path = isSchoolStaff 
+      final roleUpper = userRole.toUpperCase();
+      final bool isTeacherOrPrincipal = roleUpper == 'TEACHER' || roleUpper == 'PRINCIPAL';
+      final bool isSchoolAdmin = roleUpper == 'SCHOOL_ADMIN' || roleUpper == 'SUPER_ADMIN';
+      final bool isStudentSide = !isTeacherOrPrincipal && !isSchoolAdmin;
+      final path = isSchoolAdmin
           ? '/api/school/notifications/${notifId ?? 0}/read'
-          : '/api/student/notifications/${notifId ?? 0}/read';
+          : (isTeacherOrPrincipal
+              ? '/api/teacher/notifications/${notifId ?? 0}/read'
+              : '/api/student/notifications/${notifId ?? 0}/read');
 
-      final uri = Uri.parse('$baseUrl$path');
+      final uri = Uri.parse('$baseUrl$path').replace(
+        queryParameters: (isStudentSide && studentId != null)
+            ? {'student_id': studentId.toString()}
+            : null,
+      );
       final headers = {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
-        if (studentId != null) 'X-Student-Id': studentId.toString(),
+        if (isStudentSide && studentId != null) 'X-Student-Id': studentId.toString(),
       };
 
       final bodyPayload = json.encode({
@@ -318,9 +332,6 @@ class NotificationHelper {
     String userRole,
     int? studentId,
   ) {
-    // Automatically mark the notification as read in the backend DB
-    _markNotificationAsRead(notif, baseUrl, token, userRole, studentId);
-
     final title = (notif['title'] ?? '').toString().toLowerCase();
     final message = (notif['message'] ?? '').toString().toLowerCase();
     final link = (notif['link'] ?? '').toString().toLowerCase();
@@ -336,6 +347,9 @@ class NotificationHelper {
       if (idStr != null) {
         notifStudentId = int.tryParse(idStr);
       }
+      if (notifStudentId == null && notif['student_id'] != null) {
+        notifStudentId = int.tryParse(notif['student_id'].toString());
+      }
       final dateStr = uri.queryParameters['date'] ?? notif['date'];
       if (dateStr != null) {
         notifDate = DateTime.tryParse(dateStr.toString());
@@ -343,6 +357,9 @@ class NotificationHelper {
     } catch (e) {
       debugPrint('Failed to parse query params from notification link: $e');
     }
+
+    // Automatically mark the notification as read in the backend DB scoped to target student
+    _markNotificationAsRead(notif, baseUrl, token, userRole, notifStudentId ?? studentId);
 
     final eventKey = (notif['event_key'] ?? '').toString();
     if (eventKey.isNotEmpty) {
@@ -464,6 +481,7 @@ class NotificationHelper {
         baseUrl: leaveService.baseUrl,
         token: leaveService.token,
         studentId: notifStudentId ?? studentId,
+        userRole: userRole,
       );
     }
 

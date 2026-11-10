@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:school_hub/services/http_service.dart' as http;
 import '../services/attendance_service.dart';
 import '../utils/class_formatter.dart';
 import '../widgets/profile_avatar_view.dart';
@@ -86,6 +88,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       _studentMonthPageIndex = 500;
       _studentMonthPageController = PageController(initialPage: 500);
 
+      _markAttendanceNotificationsRead();
       _loadStudentData();
     }
 
@@ -103,6 +106,31 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         }
       }
     });
+  }
+
+  Future<void> _markAttendanceNotificationsRead() async {
+    try {
+      final roleUpper = widget.userRole.toUpperCase();
+      if (roleUpper == 'TEACHER' || roleUpper == 'PRINCIPAL' || roleUpper == 'SCHOOL_ADMIN' || roleUpper == 'SUPER_ADMIN') {
+        return;
+      }
+      final token = widget.attendanceService.token;
+      if (token.isEmpty) return;
+      final uri = Uri.parse('${widget.attendanceService.baseUrl}/api/student/notifications/0/read').replace(
+        queryParameters: widget.selectedStudentId != null
+            ? {'student_id': widget.selectedStudentId.toString()}
+            : null,
+      );
+      await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          if (widget.selectedStudentId != null) 'X-Student-Id': widget.selectedStudentId.toString(),
+        },
+        body: json.encode({'module': 'attendance'}),
+      );
+    } catch (_) {}
   }
 
   @override
@@ -825,77 +853,105 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       color: const Color(0xFF2196F3),
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.chevron_left_rounded, color: Colors.white, size: 28),
-                onPressed: () {
-                  _studentMonthPageController.previousPage(
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeInOut,
-                  );
-                },
-              ),
-              InkWell(
-                onTap: () {
-                  _studentMonthPageController.animateToPage(
-                    500,
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeInOut,
-                  );
-                },
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                  child: Text(
-                    'Today',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
-                  ),
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 34, minHeight: 40),
+                      icon: const Icon(Icons.chevron_left_rounded, color: Colors.white, size: 28),
+                      onPressed: () {
+                        _studentMonthPageController.previousPage(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeInOut,
+                        );
+                      },
+                    ),
+                    InkWell(
+                      onTap: () {
+                        _studentMonthPageController.animateToPage(
+                          500,
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeInOut,
+                        );
+                      },
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                        child: Text(
+                          'Today',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                monthStr,
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              monthStr,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+          ),
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 34, minHeight: 40),
+                      icon: const Icon(Icons.calendar_month_rounded, color: Colors.white, size: 20),
+                      onPressed: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: month,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2030),
+                        );
+                        if (picked != null) {
+                          final targetMonth = DateTime(picked.year, picked.month, 1);
+                          final baseMonth = DateTime(_studentToday.year, _studentToday.month, 1);
+                          final diffInMonths = (targetMonth.year - baseMonth.year) * 12 + (targetMonth.month - baseMonth.month);
+                          _studentMonthPageController.animateToPage(
+                            500 + diffInMonths,
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeInOut,
+                          );
+                        }
+                      },
+                    ),
+                    IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 34, minHeight: 40),
+                      icon: const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 28),
+                      onPressed: () {
+                        _studentMonthPageController.nextPage(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeInOut,
+                        );
+                      },
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(width: 4),
-              IconButton(
-                icon: const Icon(Icons.calendar_month_rounded, color: Colors.white, size: 20),
-                onPressed: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: month,
-                    firstDate: DateTime(2020),
-                    lastDate: DateTime(2030),
-                  );
-                  if (picked != null) {
-                    final targetMonth = DateTime(picked.year, picked.month, 1);
-                    final baseMonth = DateTime(_studentToday.year, _studentToday.month, 1);
-                    final diffInMonths = (targetMonth.year - baseMonth.year) * 12 + (targetMonth.month - baseMonth.month);
-                    _studentMonthPageController.animateToPage(
-                      500 + diffInMonths,
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeInOut,
-                    );
-                  }
-                },
-              ),
-              IconButton(
-                icon: const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 28),
-                onPressed: () {
-                  _studentMonthPageController.nextPage(
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeInOut,
-                  );
-                },
-              ),
-            ],
+            ),
           ),
         ],
       ),

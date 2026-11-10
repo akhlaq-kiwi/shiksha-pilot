@@ -221,12 +221,13 @@ foreach ($queue as $row) {
                     
                     if ($studentUserId !== false) {
                         $stmtNotif = $pdo->prepare("
-                            INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, is_read)
-                            VALUES (:sid, 'STUDENT', :uid, 'Late Payment Penalty Added', :msg, 0)
+                            INSERT INTO dashboard_notifications (school_id, user_role, user_id, student_id, title, message, link, category, event_key, is_read)
+                            VALUES (:sid, 'STUDENT', :uid, :stid, 'Late Payment Penalty Added', :msg, '/student/fees', 'FEES', 'FEE_PENALTY_APPLIED', 0)
                         ");
                         $stmtNotif->execute([
                             ':sid' => $schoolId,
                             ':uid' => (int)$studentUserId,
+                            ':stid' => $studentId,
                             ':msg' => "A Late Payment Penalty of ₹" . number_format($penalty, 2) . " has been added to your account because outstanding fees were pending after Academic Year Migration."
                         ]);
                     }
@@ -242,12 +243,13 @@ foreach ($queue as $row) {
                     
                     if ($parentUserId !== false) {
                         $stmtNotif = $pdo->prepare("
-                            INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, is_read)
-                            VALUES (:sid, 'PARENT', :uid, 'Late Payment Penalty Added', :msg, 0)
+                            INSERT INTO dashboard_notifications (school_id, user_role, user_id, student_id, title, message, link, category, event_key, is_read)
+                            VALUES (:sid, 'PARENT', :uid, :stid, 'Late Payment Penalty Added', :msg, '/student/fees', 'FEES', 'FEE_PENALTY_APPLIED', 0)
                         ");
                         $stmtNotif->execute([
                             ':sid' => $schoolId,
                             ':uid' => (int)$parentUserId,
+                            ':stid' => $studentId,
                             ':msg' => "A Late Payment Penalty of ₹" . number_format($penalty, 2) . " has been added to your account because outstanding fees were pending after Academic Year Migration."
                         ]);
                     }

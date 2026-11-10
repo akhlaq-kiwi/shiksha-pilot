@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:school_hub/main.dart';
 import 'package:school_hub/services/push_notification_service.dart';
 import 'package:school_hub/services/local_notification_scheduler.dart';
+import 'package:school_hub/services/student_session_helper.dart';
 
 class UserProfileScreen extends StatefulWidget {
   final String userName;
@@ -42,24 +43,20 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   void initState() {
     super.initState();
     _currentActiveChildId = widget.activeStudentId;
-    _initBaseUrl();
+    _initProfilePrefs();
   }
 
-  Future<void> _initBaseUrl() async {
-    if (widget.baseUrl != null && widget.baseUrl!.isNotEmpty) {
-      if (mounted) {
-        setState(() {
-          _baseUrl = widget.baseUrl!;
-        });
-      }
-    } else {
-      final prefs = await SharedPreferences.getInstance();
-      final savedBaseUrl = prefs.getString('base_url') ?? '';
-      if (mounted) {
-        setState(() {
-          _baseUrl = savedBaseUrl;
-        });
-      }
+  Future<void> _initProfilePrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedBaseUrl = (widget.baseUrl != null && widget.baseUrl!.isNotEmpty)
+        ? widget.baseUrl!
+        : (prefs.getString('base_url') ?? '');
+    final resolvedActiveId = _currentActiveChildId ?? StudentSessionHelper.readSavedStudentId(prefs);
+    if (mounted) {
+      setState(() {
+        _baseUrl = savedBaseUrl;
+        _currentActiveChildId = resolvedActiveId;
+      });
     }
   }
 
@@ -431,12 +428,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
                                     try {
                                       final prefs = await SharedPreferences.getInstance();
-                                      await prefs.setInt('selected_student_id', targetId);
-                                      if (targetName.isNotEmpty) {
-                                        await prefs.setString('user_name', targetName);
-                                      }
-                                      final targetPhoto = (targetChild['photo_path'] ?? targetChild['photo'] ?? '').toString();
-                                      await prefs.setString('user_photo', targetPhoto);
+                                      await StudentSessionHelper.persistSelectedChild(
+                                        prefs,
+                                        targetChild,
+                                      );
 
                                       if (widget.onSwitchChild != null) {
                                         await Future.sync(() => widget.onSwitchChild!(targetId));
@@ -490,10 +485,13 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     // Resolve active student details if student/parent
     Map<String, dynamic>? activeStudent;
     if (isStudentOrParent && widget.children.isNotEmpty) {
-      activeStudent = widget.children.firstWhere(
-        (c) => c['id'] == _currentActiveChildId,
-        orElse: () => widget.children.first,
-      ) as Map<String, dynamic>?;
+      activeStudent = StudentSessionHelper.findChildById(
+            widget.children,
+            _currentActiveChildId,
+          ) ??
+          (widget.children.first is Map
+              ? Map<String, dynamic>.from(widget.children.first as Map)
+              : null);
     }
 
     final String displayName = isAdminRole
@@ -643,8 +641,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                     const SizedBox(height: 8),
                     Column(
                       children: widget.children.map((child) {
-                        final childId = child['id'];
-                        final isSelected = childId == _currentActiveChildId;
+                        final childId = StudentSessionHelper.parseId(child['id']);
+                        final isSelected = childId != null && childId == _currentActiveChildId;
                         return InkWell(
                           onTap: isSelected
                               ? null

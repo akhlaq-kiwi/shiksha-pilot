@@ -33,7 +33,11 @@ class HomeworkService {
     final isTeacher = roleUpper == 'TEACHER' || roleUpper == 'SCHOOL_ADMIN' || roleUpper == 'PRINCIPAL';
 
     final endpoint = isTeacher ? '/api/teacher/homework' : '/api/student/homework';
-    final uri = Uri.parse('$baseUrl$endpoint');
+    final uri = Uri.parse('$baseUrl$endpoint').replace(
+      queryParameters: (!isTeacher && selectedStudentId != null)
+          ? {'student_id': selectedStudentId.toString()}
+          : null,
+    );
 
     final response = await http.get(uri, headers: _getHeaders(selectedStudentId: selectedStudentId));
 

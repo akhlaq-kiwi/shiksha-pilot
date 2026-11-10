@@ -6,7 +6,7 @@ import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:http/http.dart' as http;
+import 'package:school_hub/services/http_service.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/homework_service.dart';
 import '../widgets/create_edit_homework_modal.dart';
@@ -142,7 +142,31 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
 
   Future<void> _initServiceAndFetch() async {
     _homeworkService = await HomeworkService.create();
+    _markHomeworkNotificationsRead();
     _fetchHomework();
+  }
+
+  Future<void> _markHomeworkNotificationsRead() async {
+    try {
+      if (_isTeacher) return;
+      final token = _homeworkService.token;
+      if (token.isEmpty) return;
+      final effectiveBase = widget.baseUrl.isNotEmpty ? widget.baseUrl : _homeworkService.baseUrl;
+      final uri = Uri.parse('$effectiveBase/api/student/notifications/0/read').replace(
+        queryParameters: widget.selectedStudentId != null
+            ? {'student_id': widget.selectedStudentId.toString()}
+            : null,
+      );
+      await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          if (widget.selectedStudentId != null) 'X-Student-Id': widget.selectedStudentId.toString(),
+        },
+        body: json.encode({'module': 'homework'}),
+      );
+    } catch (_) {}
   }
 
   Future<void> _fetchHomework() async {

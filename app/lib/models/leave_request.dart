@@ -20,6 +20,7 @@ class LeaveRequest {
   final String? teacherEmployeeId;
   final String? photoPath;
 
+
   LeaveRequest({
     required this.id,
     required this.schoolId,

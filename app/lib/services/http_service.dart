@@ -141,7 +141,10 @@ void _checkUnauthorized(http.Response response) async {
     await prefs.remove('auth_token');
     await prefs.remove('user_role');
     await prefs.remove('user_name');
+    await prefs.remove('user_photo');
     await prefs.remove('selected_student_id');
+    await prefs.remove('selected_student_name');
+    await prefs.remove('selected_student_admission_no');
     
     String errorMsg = 'This account is Inactive';
     try {

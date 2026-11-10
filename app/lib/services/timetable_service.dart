@@ -23,9 +23,10 @@ class TimetableService {
     final cacheKey = 'cached_student_timetable_${studentId}_$date';
     final queryParams = <String, String>{};
     if (date != null) queryParams['date'] = date;
+    if (studentId != null) queryParams['student_id'] = studentId.toString();
 
     final uri = Uri.parse('$baseUrl/api/student/timetable')
-        .replace(queryParameters: queryParams);
+        .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
 
     try {
       final response = await http

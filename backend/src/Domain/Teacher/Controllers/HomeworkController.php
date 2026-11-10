@@ -53,8 +53,13 @@ class HomeworkController extends BaseController
 
         $headerStudentId = null;
         $studentIdHeader = $request->getHeaderLine('X-Student-Id');
-        if (!empty($studentIdHeader)) {
+        if (!empty($studentIdHeader) && is_numeric($studentIdHeader)) {
             $headerStudentId = (int)$studentIdHeader;
+        } else {
+            $queryParams = $request->getQueryParams();
+            if (!empty($queryParams['student_id']) && is_numeric($queryParams['student_id'])) {
+                $headerStudentId = (int)$queryParams['student_id'];
+            }
         }
 
         $data = $this->service->getStudentHomework($user, $headerStudentId);

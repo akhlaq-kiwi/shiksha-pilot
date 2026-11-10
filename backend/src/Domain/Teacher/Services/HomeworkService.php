@@ -84,15 +84,24 @@ class HomeworkService extends BaseService
         $schoolId = (int)($user['school_id'] ?? 0);
         $userId = (int)($user['id'] ?? 0);
 
-        // Resolve student class_id
-        $classId = null;
+        // Resolve student class_id cleanly (scoping to active students linked to user)
         $stmtStudent = $this->pdo->prepare("
             SELECT s.class_id, s.id AS student_id
             FROM students s
             JOIN users u ON u.school_id = s.school_id AND (
-                u.phone = s.parent_phone OR u.phone = s.student_mobile OR u.phone = s.father_phone OR (u.email IS NOT NULL AND u.email = s.email)
+                (s.student_mobile IS NOT NULL AND s.student_mobile != '' AND u.phone = s.student_mobile) OR
+                (s.parent_phone IS NOT NULL AND s.parent_phone != '' AND u.phone = s.parent_phone) OR
+                (s.father_phone IS NOT NULL AND s.father_phone != '' AND u.phone = s.father_phone) OR
+                (s.mother_phone IS NOT NULL AND s.mother_phone != '' AND u.phone = s.mother_phone) OR
+                (s.guardian_phone IS NOT NULL AND s.guardian_phone != '' AND u.phone = s.guardian_phone) OR
+                (u.email IS NOT NULL AND u.email != '' AND (u.email = s.email OR u.email = s.student_email))
             )
-            WHERE u.id = :uid AND s.school_id = :sid " . ($headerStudentId ? "AND s.id = :header_sid " : "") . "
+            WHERE u.id = :uid
+              AND s.school_id = :sid
+              AND (s.status IS NULL OR UPPER(s.status) = 'ACTIVE')
+              AND s.exit_date IS NULL
+              " . ($headerStudentId ? "AND s.id = :header_sid " : "") . "
+            ORDER BY s.id DESC
             LIMIT 1
         ");
         $params = [':uid' => $userId, ':sid' => $schoolId];
@@ -101,17 +110,6 @@ class HomeworkService extends BaseService
         }
         $stmtStudent->execute($params);
         $studentInfo = $stmtStudent->fetch(PDO::FETCH_ASSOC);
-
-        if (!$studentInfo || empty($studentInfo['class_id'])) {
-            // Fallback direct check on students table if user is student
-            $stmtDirect = $this->pdo->prepare("SELECT class_id FROM students WHERE school_id = :sid " . ($headerStudentId ? "AND id = :header_sid " : "") . " LIMIT 1");
-            $paramsDirect = [':sid' => $schoolId];
-            if ($headerStudentId) {
-                $paramsDirect[':header_sid'] = $headerStudentId;
-            }
-            $stmtDirect->execute($paramsDirect);
-            $studentInfo = $stmtDirect->fetch(PDO::FETCH_ASSOC);
-        }
 
         $classId = $studentInfo['class_id'] ?? null;
 
@@ -338,20 +336,24 @@ class HomeworkService extends BaseService
         $subjectTitle = !empty($hw['title']) ? $hw['title'] : 'Homework';
         $className = !empty($hw['class_name']) ? $hw['class_name'] : '';
 
-        // Query target student/parent user IDs for this class
+        // Query target student/parent user IDs paired with their exact active student_id for this class
         $stmtUsers = $this->pdo->prepare("
-            SELECT DISTINCT u.id AS user_id, u.role
-            FROM users u
-            LEFT JOIN students s ON s.school_id = u.school_id AND (
+            SELECT DISTINCT s.id AS student_id, u.id AS user_id, u.role
+            FROM students s
+            JOIN users u ON u.school_id = s.school_id AND (
                 (s.student_mobile IS NOT NULL AND s.student_mobile != '' AND u.phone = s.student_mobile) OR
                 (s.parent_phone IS NOT NULL AND s.parent_phone != '' AND u.phone = s.parent_phone) OR
                 (s.father_phone IS NOT NULL AND s.father_phone != '' AND u.phone = s.father_phone) OR
+                (s.mother_phone IS NOT NULL AND s.mother_phone != '' AND u.phone = s.mother_phone) OR
                 (s.guardian_phone IS NOT NULL AND s.guardian_phone != '' AND u.phone = s.guardian_phone) OR
-                (s.email IS NOT NULL AND s.email != '' AND u.email = s.email)
+                (u.email IS NOT NULL AND u.email != '' AND (u.email = s.email OR u.email = s.student_email))
             )
-            WHERE u.school_id = :school_id
+            WHERE s.school_id = :school_id
+              AND s.class_id = :class_id
+              AND (s.status IS NULL OR UPPER(s.status) = 'ACTIVE')
+              AND s.exit_date IS NULL
+              AND (u.status IS NULL OR UPPER(u.status) = 'ACTIVE')
               AND u.role IN ('STUDENT', 'PARENT')
-              AND (s.class_id = :class_id OR s.id IS NULL)
         ");
         $stmtUsers->execute([':class_id' => $classId, ':school_id' => $schoolId]);
         $targetUsers = $stmtUsers->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -364,41 +366,34 @@ class HomeworkService extends BaseService
         $category = NotificationCatalog::categoryFor($eventKey);
 
         $stmtIns = $this->pdo->prepare("
-            INSERT INTO dashboard_notifications (school_id, user_id, user_role, title, message, link, category, event_key, is_read)
-            VALUES (:sid, :uid, :role, :title, :msg, :link, :cat, :ekey, 0)
+            INSERT INTO dashboard_notifications (school_id, user_id, user_role, student_id, title, message, link, category, event_key, is_read)
+            VALUES (:sid, :uid, :role, :stid, :title, :msg, :link, :cat, :ekey, 0)
         ");
 
-        if (!empty($targetUsers)) {
-            foreach ($targetUsers as $u) {
-                $stmtIns->execute([
-                    ':sid' => $schoolId,
-                    ':uid' => $u['user_id'],
-                    ':role' => $u['role'],
-                    ':title' => $title,
-                    ':msg' => $message,
-                    ':link' => $link,
-                    ':cat' => $category,
-                    ':ekey' => $eventKey,
-                ]);
+        $pushedUserIds = [];
+        foreach ($targetUsers as $u) {
+            $uid = (int)$u['user_id'];
+            $stId = (int)$u['student_id'];
+            $uRole = (string)$u['role'];
+
+            $stmtIns->execute([
+                ':sid' => $schoolId,
+                ':uid' => $uid,
+                ':role' => $uRole,
+                ':stid' => $stId,
+                ':title' => $title,
+                ':msg' => $message,
+                ':link' => $link,
+                ':cat' => $category,
+                ':ekey' => $eventKey,
+            ]);
+
+            if (!isset($pushedUserIds[$uid])) {
+                $pushedUserIds[$uid] = true;
                 PushDispatcher::pushOnly(
-                    $this->pdo, $schoolId, (string) $u['role'], (int) $u['user_id'],
+                    $this->pdo, $schoolId, $uRole, $uid,
                     $eventKey, $title, $message, $link
                 );
-            }
-        } else {
-            // Broadcast fallback only if no specific user mapping is found
-            foreach (['STUDENT', 'PARENT'] as $role) {
-                $stmtIns->execute([
-                    ':sid' => $schoolId,
-                    ':uid' => null,
-                    ':role' => $role,
-                    ':title' => $title,
-                    ':msg' => $message,
-                    ':link' => $link,
-                    ':cat' => $category,
-                    ':ekey' => $eventKey,
-                ]);
-                PushDispatcher::pushOnly($this->pdo, $schoolId, $role, null, $eventKey, $title, $message, $link);
             }
         }
     }

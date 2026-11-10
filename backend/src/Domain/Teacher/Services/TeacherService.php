@@ -2517,15 +2517,17 @@ class TeacherService extends BaseService
                 }
 
                 if ($module === 'timetable') {
-                    $query .= " AND (event_key LIKE '%TIMETABLE%' OR event_key = 'SUBSTITUTE_ASSIGNED' OR link LIKE '%timetable%' OR title LIKE '%Timetable%' OR title LIKE '%Time Table%' OR category = 'TIMETABLE')";
+                    $query .= " AND (event_key LIKE '%TIMETABLE%' OR event_key = 'SUBSTITUTE_ASSIGNED' OR category = 'TIMETABLE' OR (COALESCE(category, '') != 'EXAM' AND (event_key IS NULL OR event_key NOT LIKE '%EXAM%') AND (link LIKE '%timetable%' OR LOWER(COALESCE(title, '')) LIKE '%timetable%' OR LOWER(COALESCE(title, '')) LIKE '%time table%')))";
                 } elseif ($module === 'salary') {
                     $query .= " AND (event_key = 'SALARY_DISBURSED' OR link LIKE '%salary%' OR title LIKE '%Salary%' OR category = 'Finance' OR category = 'SALARY')";
                 } elseif ($module === 'fee_reminder' || $module === 'fee-reminder' || $module === 'fee_follow_up' || $module === 'fee-follow-up') {
                     $query .= " AND (event_key LIKE '%FEE_REMINDER%' OR event_key LIKE '%FEE_FOLLOWUP%' OR link LIKE '%fee-reminder%' OR link LIKE '%fee-follow-up%' OR title LIKE '%Fee Reminder%' OR title LIKE '%Fee Follow-up%')";
                 } elseif ($module === 'exams' || $module === 'exam') {
-                    $query .= " AND (event_key LIKE '%EXAM%' OR category = 'EXAM' OR link LIKE '%exam%' OR title LIKE '%exam%' OR title LIKE '%examination%' OR title LIKE '%admit card%' OR title LIKE '%report card%' OR title LIKE '%scheme%' OR title LIKE '%datesheet%')";
+                    $query .= " AND (event_key LIKE '%EXAM%' OR category = 'EXAM' OR (COALESCE(category, '') != 'TIMETABLE' AND (link LIKE '%exam%' OR LOWER(COALESCE(title, '')) LIKE '%exam%' OR LOWER(COALESCE(title, '')) LIKE '%examination%' OR LOWER(COALESCE(title, '')) LIKE '%admit card%' OR LOWER(COALESCE(title, '')) LIKE '%report card%' OR LOWER(COALESCE(title, '')) LIKE '%scheme%' OR LOWER(COALESCE(title, '')) LIKE '%datesheet%')))";
                 } elseif ($module === 'leave' || $module === 'leaves' || $module === 'leave_request' || $module === 'leave-request') {
-                    $query .= " AND (event_key LIKE '%LEAVE%' OR category = 'LEAVE' OR category = 'LEAVE_MANAGEMENT' OR link LIKE '%leave%' OR title LIKE '%Leave%')";
+                    $query .= " AND (event_key LIKE '%LEAVE%' OR event_key = 'HOLIDAY_ANNOUNCED' OR category = 'LEAVE' OR category = 'LEAVE_MANAGEMENT' OR (COALESCE(category, '') NOT IN ('EXAM', 'TIMETABLE', 'HOMEWORK', 'ACHIEVEMENT', 'FEES') AND (link LIKE '%leave%' OR LOWER(COALESCE(title, '')) LIKE '%leave%' OR LOWER(COALESCE(title, '')) LIKE '%holiday%')))";
+                } elseif ($module === 'all' || $module === 'notifications') {
+                    $query .= " AND (link != '/notice' OR link IS NULL) AND (event_key != 'ANNOUNCEMENT_PUBLISHED' OR event_key IS NULL) AND (category != 'ANNOUNCEMENT' OR category IS NULL)";
                 } elseif (!empty($eventKey)) {
                     $query .= " AND event_key = :ekey";
                     $params[':ekey'] = $eventKey;

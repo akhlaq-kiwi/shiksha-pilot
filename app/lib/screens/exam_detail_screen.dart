@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:school_hub/services/http_service.dart' as http_svc;
 import 'package:school_hub/services/exam_service.dart';
 import 'package:school_hub/services/notification_helper.dart';
 import 'package:pdf/pdf.dart';
@@ -63,14 +64,18 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
               : '/api/teacher/notifications/0/read')
           : '/api/student/notifications/0/read';
 
-      final uri = Uri.parse('${widget.examService.baseUrl}$path');
+      final uri = Uri.parse('${widget.examService.baseUrl}$path').replace(
+        queryParameters: (!isSchoolStaff && widget.studentId != null)
+            ? {'student_id': widget.studentId.toString()}
+            : null,
+      );
       final headers = {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ${widget.examService.token}',
         if (!isSchoolStaff && widget.studentId != null) 'X-Student-Id': widget.studentId.toString(),
       };
 
-      await http.post(
+      await http_svc.post(
         uri,
         headers: headers,
         body: json.encode({'module': 'exams'}),

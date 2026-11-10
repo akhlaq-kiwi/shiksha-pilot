@@ -19,9 +19,13 @@ class ExamService {
   }
 
   Future<List<dynamic>> getExamsList(String userRole, int? studentId, {int? classId}) async {
-    final query = (classId != null && classId > 0) ? '?class_id=$classId' : '';
-    final path = _isStaff(userRole) ? '/api/teacher/exams-new$query' : '/api/student/exams-new';
-    final uri = Uri.parse('$baseUrl$path');
+    final Map<String, String> qp = {};
+    if (classId != null && classId > 0) qp['class_id'] = classId.toString();
+    if (!_isStaff(userRole) && studentId != null) qp['student_id'] = studentId.toString();
+    final path = _isStaff(userRole) ? '/api/teacher/exams-new' : '/api/student/exams-new';
+    final uri = Uri.parse('$baseUrl$path').replace(
+      queryParameters: qp.isNotEmpty ? qp : null,
+    );
     final response = await http.get(uri, headers: _headers(studentId));
 
     if (response.statusCode == 200) {
@@ -43,11 +47,15 @@ class ExamService {
   }
 
   Future<Map<String, dynamic>> getExamDetails(int examId, String userRole, int? studentId, {int? classId}) async {
-    final query = (classId != null && classId > 0) ? '?class_id=$classId' : '';
-    final path = _isStaff(userRole) 
-        ? '/api/teacher/exams-new/$examId/details$query' 
+    final Map<String, String> qp = {};
+    if (classId != null && classId > 0) qp['class_id'] = classId.toString();
+    if (!_isStaff(userRole) && studentId != null) qp['student_id'] = studentId.toString();
+    final path = _isStaff(userRole)
+        ? '/api/teacher/exams-new/$examId/details'
         : '/api/student/exams-new/$examId/details';
-    final uri = Uri.parse('$baseUrl$path');
+    final uri = Uri.parse('$baseUrl$path').replace(
+      queryParameters: qp.isNotEmpty ? qp : null,
+    );
     final response = await http.get(uri, headers: _headers(studentId));
 
     if (response.statusCode == 200) {

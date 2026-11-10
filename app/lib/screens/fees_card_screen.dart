@@ -40,7 +40,28 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: _selectedTab);
+    _markFeesNotificationsRead();
     _fetchFeesData();
+  }
+
+  Future<void> _markFeesNotificationsRead() async {
+    try {
+      if (widget.token.isEmpty) return;
+      final uri = Uri.parse('${widget.baseUrl}/api/student/notifications/0/read').replace(
+        queryParameters: widget.studentId != null
+            ? {'student_id': widget.studentId.toString()}
+            : null,
+      );
+      await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${widget.token}',
+          if (widget.studentId != null) 'X-Student-Id': widget.studentId.toString(),
+        },
+        body: json.encode({'module': 'fees'}),
+      );
+    } catch (_) {}
   }
 
   @override
@@ -55,7 +76,11 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
       _errorText = '';
     });
     try {
-      final uri = Uri.parse('${widget.baseUrl}/api/student/fees/card');
+      final uri = Uri.parse('${widget.baseUrl}/api/student/fees/card').replace(
+        queryParameters: widget.studentId != null
+            ? {'student_id': widget.studentId.toString()}
+            : null,
+      );
       final response = await http.get(
         uri,
         headers: {
@@ -96,7 +121,8 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
     try {
       final addParam = isAdditional ? '1' : '0';
       final rParam = (receiptNo != null && receiptNo.trim().isNotEmpty) ? '&receipt_no=${Uri.encodeComponent(receiptNo.trim())}' : '';
-      final uri = Uri.parse('${widget.baseUrl}/api/student/fees/receipt?id=$paymentId&additional=$addParam$rParam');
+      final sParam = widget.studentId != null ? '&student_id=${widget.studentId}' : '';
+      final uri = Uri.parse('${widget.baseUrl}/api/student/fees/receipt?id=$paymentId&additional=$addParam$rParam$sParam');
       final response = await http.get(
         uri,
         headers: {

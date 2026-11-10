@@ -7,6 +7,7 @@ import '../services/leave_service.dart';
 import '../services/auth_service.dart';
 import '../services/app_lock_helper.dart';
 import '../services/account_service.dart';
+import '../services/student_session_helper.dart';
 import '../main.dart';
 import '../widgets/change_password_dialog.dart';
 import 'full_screen_image_screen.dart';
@@ -124,7 +125,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _workingBaseUrl = prefs.getString('base_url') ?? '';
         _notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
         _currentTheme = prefs.getString('theme_mode') ?? 'Light Mode';
-        _activeStudentId = prefs.getInt('selected_student_id') ?? widget.selectedStudentId;
+        _activeStudentId = StudentSessionHelper.readSavedStudentId(prefs) ?? widget.selectedStudentId;
         _selectedAcademicYearStatus = prefs.getString('selected_academic_year_status') ?? 'ACTIVE';
         final currentUid = prefs.getInt('user_id') ?? 0;
         final currentPhone = (prefs.getString('user_phone') ?? '').trim();
@@ -1382,22 +1383,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final childrenList = await widget.leaveService.getChildren();
       if (mounted) {
-        setState(() {
-          _children = childrenList;
-          if (_activeStudentId != null) {
-            final active = _children.firstWhere(
-              (c) {
-                final cId = c['id'] is int ? c['id'] as int : int.parse(c['id'].toString());
-                return cId == _activeStudentId;
-              },
-              orElse: () => null,
-            );
-            if (active != null) {
-              _userName = active['name']?.toString() ?? _userName;
-              _userPhoto = active['photo_path']?.toString() ?? _userPhoto;
+        final prefs = await SharedPreferences.getInstance();
+        final savedId = StudentSessionHelper.readSavedStudentId(prefs);
+        final savedAdmNo = prefs.getString(StudentSessionHelper.prefSelectedStudentAdmissionNo);
+        final savedName = prefs.getString(StudentSessionHelper.prefSelectedStudentName);
+        final active = StudentSessionHelper.resolveActiveChild(
+          childrenList,
+          preferredStudentId: savedId ?? _activeStudentId,
+          savedAdmissionNo: savedAdmNo,
+          savedName: savedName,
+        );
+        final resolvedId = StudentSessionHelper.parseId(active?['id']);
+
+        if (mounted) {
+          setState(() {
+            _children = childrenList;
+            if (active != null && resolvedId != null) {
+              _activeStudentId = resolvedId;
+              _userName = (active['name'] ?? _userName).toString();
+              _userPhoto = (active['photo_path'] ?? active['photo'] ?? '').toString().trim();
             }
-          }
-        });
+          });
+        }
+        if (active != null) {
+          await StudentSessionHelper.persistSelectedChild(prefs, active);
+        }
       }
     } catch (e) {
       debugPrint('Error loading children in settings: $e');
@@ -1406,27 +1416,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _handleSwitchStudent(int childId) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('selected_student_id', childId);
-    
-    final active = _children.firstWhere(
-      (c) {
-        final cId = c['id'] is int ? c['id'] as int : int.parse(c['id'].toString());
-        return cId == childId;
-      },
-      orElse: () => null,
-    );
-    
+    final active = StudentSessionHelper.findChildById(_children, childId);
+
     if (active != null) {
-      final name = active['name']?.toString() ?? '';
-      final photo = active['photo_path']?.toString() ?? '';
-      await prefs.setString('user_name', name);
-      await prefs.setString('user_photo', photo);
-      
-      setState(() {
-        _userName = name;
-        _userPhoto = photo;
-        _activeStudentId = childId;
-      });
+      await StudentSessionHelper.persistSelectedChild(prefs, active);
+      final name = (active['name'] ?? '').toString().trim();
+      final photo = (active['photo_path'] ?? active['photo'] ?? '').toString().trim();
+
+      if (mounted) {
+        setState(() {
+          _userName = name;
+          _userPhoto = photo;
+          _activeStudentId = childId;
+        });
+      }
+    } else {
+      await prefs.setInt('selected_student_id', childId);
+      if (mounted) {
+        setState(() {
+          _activeStudentId = childId;
+        });
+      }
     }
 
     if (mounted) {
@@ -1531,10 +1541,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: ListView.builder(
                     shrinkWrap: true,
                     itemCount: _children.length,
-                    itemBuilder: (context, index) {
+                    itemBuilder: (_, index) {
                       final child = _children[index];
-                      final childId = child['id'] as int;
-                      final isCurrent = childId == _activeStudentId;
+                      final childId = StudentSessionHelper.parseId(child['id']);
+                      final isCurrent = childId != null && childId == _activeStudentId;
 
                       final childPhoto = child['photo_path']?.toString() ?? '';
                       Widget leadingWidget;
@@ -1576,10 +1586,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ),
                           ),
                           trailing: isCurrent ? const Icon(Icons.check_circle_rounded, color: Color(0xFFD97706)) : null,
-                          onTap: () {
-                            Navigator.pop(context);
-                            _handleSwitchStudent(childId);
-                          },
+                          onTap: childId == null
+                              ? null
+                              : () async {
+                                  await _handleSwitchStudent(childId);
+                                  if (context.mounted) {
+                                    Navigator.pop(context);
+                                  }
+                                },
                         ),
                       );
                     },

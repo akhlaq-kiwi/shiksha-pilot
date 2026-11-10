@@ -14,6 +14,7 @@ use PDO;
 class StudentService extends BaseService
 {
     private bool $announcementsSchemaEnsured = false;
+    private bool $notificationIsolationSchemaEnsured = false;
 
     public function __construct(
         private StudentDataRepository $repo,
@@ -36,97 +37,180 @@ class StudentService extends BaseService
      * @throws NotFoundException when no matching student is found.
      * @return array<string, mixed>
      */
+    private function extractRequestedStudentId(array $user, array $params = [], array $body = []): ?int
+    {
+        $candidates = [
+            $params['student_id'] ?? null,
+            $body['student_id'] ?? null,
+            $user['_requested_student_id'] ?? null,
+            $_SERVER['HTTP_X_STUDENT_ID'] ?? null,
+            $_GET['student_id'] ?? null,
+        ];
+        foreach ($candidates as $raw) {
+            if ($raw !== null && is_numeric($raw) && (int)$raw > 0) {
+                return (int)$raw;
+            }
+        }
+        return null;
+    }
+
+    private function normalizePhoneLast10(string $phone): string
+    {
+        $digits = preg_replace('/[^0-9]/', '', $phone);
+        return strlen($digits) >= 10 ? substr($digits, -10) : $digits;
+    }
+
+    private function resolveUserContacts(PDO $pdo, array $user): array
+    {
+        $userPhone = trim((string)($user['phone'] ?? ''));
+        if ($userPhone === '' && !empty($user['id'])) {
+            $stmt = $pdo->prepare("SELECT phone FROM users WHERE id = :id LIMIT 1");
+            $stmt->execute([':id' => (int)$user['id']]);
+            $userPhone = trim((string)($stmt->fetchColumn() ?: ''));
+        }
+
+        $userEmail = trim((string)($user['email'] ?? ''));
+        if ($userEmail === '' && !empty($user['id'])) {
+            $stmt = $pdo->prepare("SELECT email FROM users WHERE id = :id LIMIT 1");
+            $stmt->execute([':id' => (int)$user['id']]);
+            $userEmail = trim((string)($stmt->fetchColumn() ?: ''));
+        }
+
+        return [
+            'phone' => $userPhone,
+            'phone10' => $userPhone !== '' ? $this->normalizePhoneLast10($userPhone) : '',
+            'email' => $userEmail,
+        ];
+    }
+
+    private function candidateMatchesUser(array $candidate, array $contacts): bool
+    {
+        $userPhone = $contacts['phone'];
+        $userPhone10 = $contacts['phone10'];
+        $userEmail = $contacts['email'];
+
+        if ($userPhone !== '') {
+            $candidatePhones = [
+                (string)($candidate['student_mobile'] ?? ''),
+                (string)($candidate['parent_phone'] ?? ''),
+                (string)($candidate['father_phone'] ?? ''),
+                (string)($candidate['mother_phone'] ?? ''),
+                (string)($candidate['guardian_phone'] ?? ''),
+            ];
+            foreach ($candidatePhones as $cp) {
+                $cpTrim = trim($cp);
+                if ($cpTrim === '') {
+                    continue;
+                }
+                if ($cpTrim === $userPhone) {
+                    return true;
+                }
+                if (strlen($userPhone10) === 10 && $this->normalizePhoneLast10($cpTrim) === $userPhone10) {
+                    return true;
+                }
+            }
+        }
+
+        if ($userEmail !== '') {
+            if (
+                strcasecmp((string)($candidate['email'] ?? ''), $userEmail) === 0 ||
+                strcasecmp((string)($candidate['student_email'] ?? ''), $userEmail) === 0
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public function resolveStudent(array $user): array
     {
         $schoolId = (int) ($user['school_id'] ?? 0);
-        $reqStudentId = $_SERVER['HTTP_X_STUDENT_ID'] ?? $_GET['student_id'] ?? null;
+        $reqStudentId = $this->extractRequestedStudentId($user);
 
         $student = null;
         $pdo = $this->repo->getPdo();
 
-        $userPhone = (string) ($user['phone'] ?? '');
-        if (empty($userPhone) && isset($user['id'])) {
-            $stmt = $pdo->prepare("SELECT phone FROM users WHERE id = :id LIMIT 1");
-            $stmt->execute([':id' => $user['id']]);
-            $userPhone = $stmt->fetchColumn() ?: '';
-        }
-
-        $userEmail = (string) ($user['email'] ?? '');
-        if (empty($userEmail) && isset($user['id'])) {
-            $stmt = $pdo->prepare("SELECT email FROM users WHERE id = :id LIMIT 1");
-            $stmt->execute([':id' => $user['id']]);
-            $userEmail = $stmt->fetchColumn() ?: '';
-        }
+        $contacts = $this->resolveUserContacts($pdo, $user);
+        $userPhone = $contacts['phone'];
+        $userPhone10 = $contacts['phone10'];
+        $userEmail = $contacts['email'];
 
         // 1. If explicit student_id is requested (e.g. account switching in mobile app)
-        if ($reqStudentId !== null && is_numeric($reqStudentId)) {
+        if ($reqStudentId !== null) {
             $candidate = $this->repo->findById((int)$reqStudentId);
-            if ($candidate && (int)$candidate['school_id'] === $schoolId) {
-                $matchesPhone = !empty($userPhone) && (
-                    (string)$candidate['student_mobile'] === $userPhone ||
-                    (string)$candidate['parent_phone'] === $userPhone ||
-                    (string)$candidate['father_phone'] === $userPhone ||
-                    (string)$candidate['guardian_phone'] === $userPhone
-                );
-                $matchesEmail = !empty($userEmail) && strcasecmp((string)$candidate['email'], $userEmail) === 0;
-
-                if ($matchesPhone || $matchesEmail) {
-                    // Check if candidate belongs to active current Academic Year (ay.is_current = 1)
+            if ($candidate && (int)$candidate['school_id'] === $schoolId && $this->candidateMatchesUser($candidate, $contacts)) {
+                $candidateAyId = (int)($candidate['academic_year_id'] ?? 0);
+                if ($candidateAyId <= 0) {
+                    $isCurrentActive = 1;
+                } else {
+                    // Treat either status = 'ACTIVE' or is_current = 1 as an active academic year
                     $stmtAy = $pdo->prepare("
-                        SELECT is_current FROM academic_years 
-                        WHERE id = :ayid AND school_id = :sid 
+                        SELECT (CASE WHEN UPPER(COALESCE(status, '')) = 'ACTIVE' OR is_current = 1 THEN 1 ELSE 0 END) AS is_active_year
+                        FROM academic_years
+                        WHERE id = :ayid AND school_id = :sid
                         LIMIT 1
                     ");
-                    $stmtAy->execute([':ayid' => (int)($candidate['academic_year_id'] ?? 0), ':sid' => $schoolId]);
-                    $isCurrent = (int)($stmtAy->fetchColumn() ?: 0);
+                    $stmtAy->execute([':ayid' => $candidateAyId, ':sid' => $schoolId]);
+                    $isCurrentActive = (int)($stmtAy->fetchColumn() ?: 0);
+                }
 
-                    if ($isCurrent === 1) {
-                        $student = $candidate;
-                    } else {
-                        // Candidate is from an old/archived Academic Year (e.g. stale cached mobile ID).
-                        // Check if a new active student record exists for this same student in current active Academic Year.
-                        $adm = trim((string)($candidate['admission_no'] ?? ''));
-                        $cName = trim((string)($candidate['name'] ?? ''));
-                        
-                        $matchConds = [];
-                        $paramsNewer = [':sid' => $schoolId];
-                        
-                        if ($adm !== '') {
-                            $matchConds[] = "s.admission_no = :adm";
-                            $paramsNewer[':adm'] = $adm;
-                        }
-                        if ($cName !== '' && $userPhone !== '') {
-                            $matchConds[] = "(s.name = :cname AND (s.student_mobile = :p1 OR s.parent_phone = :p2 OR s.father_phone = :p3))";
-                            $paramsNewer[':cname'] = $cName;
+                if ($isCurrentActive === 1) {
+                    $student = $candidate;
+                } else {
+                    // Candidate is from an old/archived Academic Year (e.g. stale cached mobile ID).
+                    // Check if a new active student record exists for this same student in an active Academic Year.
+                    $adm = trim((string)($candidate['admission_no'] ?? ''));
+                    $cName = trim((string)($candidate['name'] ?? ''));
+
+                    $matchConds = [];
+                    $paramsNewer = [':sid' => $schoolId];
+
+                    if ($adm !== '') {
+                        $matchConds[] = "s.admission_no = :adm";
+                        $paramsNewer[':adm'] = $adm;
+                    }
+                    if ($cName !== '' && ($userPhone !== '' || strlen($userPhone10) === 10)) {
+                        $phoneConds = [];
+                        if ($userPhone !== '') {
+                            $phoneConds[] = "s.student_mobile = :p1 OR s.parent_phone = :p2 OR s.father_phone = :p3 OR s.mother_phone = :p4 OR s.guardian_phone = :p5";
                             $paramsNewer[':p1'] = $userPhone;
                             $paramsNewer[':p2'] = $userPhone;
                             $paramsNewer[':p3'] = $userPhone;
+                            $paramsNewer[':p4'] = $userPhone;
+                            $paramsNewer[':p5'] = $userPhone;
                         }
-                        
-                        if (!empty($matchConds)) {
-                            $sqlNewer = "
-                                SELECT s.* 
-                                FROM students s
-                                JOIN academic_years ay ON s.academic_year_id = ay.id
-                                WHERE s.school_id = :sid
-                                  AND ay.is_current = 1
-                                  AND (s.status IS NULL OR UPPER(s.status) = 'ACTIVE')
-                                  AND s.exit_date IS NULL
-                                  AND (" . implode(' OR ', $matchConds) . ")
-                                ORDER BY s.id DESC
-                                LIMIT 1
-                            ";
-                            $stmtNewer = $pdo->prepare($sqlNewer);
-                            $stmtNewer->execute($paramsNewer);
-                            $newerStudent = $stmtNewer->fetch(PDO::FETCH_ASSOC);
-                            if ($newerStudent) {
-                                $student = $newerStudent;
-                            } else {
-                                $student = $candidate;
-                            }
-                        } else {
-                            $student = $candidate;
+                        if (strlen($userPhone10) === 10) {
+                            $phoneConds[] = "RIGHT(TRIM(COALESCE(s.student_mobile, '')), 10) = :q1 OR RIGHT(TRIM(COALESCE(s.parent_phone, '')), 10) = :q2 OR RIGHT(TRIM(COALESCE(s.father_phone, '')), 10) = :q3 OR RIGHT(TRIM(COALESCE(s.mother_phone, '')), 10) = :q4 OR RIGHT(TRIM(COALESCE(s.guardian_phone, '')), 10) = :q5";
+                            $paramsNewer[':q1'] = $userPhone10;
+                            $paramsNewer[':q2'] = $userPhone10;
+                            $paramsNewer[':q3'] = $userPhone10;
+                            $paramsNewer[':q4'] = $userPhone10;
+                            $paramsNewer[':q5'] = $userPhone10;
                         }
+                        $matchConds[] = "(LOWER(TRIM(s.name)) = LOWER(:cname) AND (" . implode(' OR ', $phoneConds) . "))";
+                        $paramsNewer[':cname'] = $cName;
+                    }
+
+                    if (!empty($matchConds)) {
+                        $sqlNewer = "
+                            SELECT s.*
+                            FROM students s
+                            JOIN academic_years ay ON s.academic_year_id = ay.id
+                            WHERE s.school_id = :sid
+                              AND (UPPER(COALESCE(ay.status, '')) = 'ACTIVE' OR ay.is_current = 1)
+                              AND (s.status IS NULL OR UPPER(s.status) = 'ACTIVE')
+                              AND s.exit_date IS NULL
+                              AND (" . implode(' OR ', $matchConds) . ")
+                            ORDER BY (CASE WHEN UPPER(COALESCE(ay.status, '')) = 'ACTIVE' THEN 2 WHEN ay.is_current = 1 THEN 1 ELSE 0 END) DESC, s.id DESC
+                            LIMIT 1
+                        ";
+                        $stmtNewer = $pdo->prepare($sqlNewer);
+                        $stmtNewer->execute($paramsNewer);
+                        $newerStudent = $stmtNewer->fetch(PDO::FETCH_ASSOC);
+                        $student = $newerStudent ?: $candidate;
+                    } else {
+                        $student = $candidate;
                     }
                 }
             }
@@ -134,29 +218,46 @@ class StudentService extends BaseService
 
         // 2. Default resolution by phone number (Prioritize current active Academic Year)
         if ($student === null && !empty($userPhone) && strlen($userPhone) >= 10) {
+            $phoneSql = "
+                (s.student_mobile = :p1 AND s.student_mobile IS NOT NULL AND s.student_mobile != '') OR 
+                (s.parent_phone = :p2 AND s.parent_phone IS NOT NULL AND s.parent_phone != '') OR 
+                (s.father_phone = :p3 AND s.father_phone IS NOT NULL AND s.father_phone != '') OR 
+                (s.mother_phone = :p4 AND s.mother_phone IS NOT NULL AND s.mother_phone != '') OR 
+                (s.guardian_phone = :p5 AND s.guardian_phone IS NOT NULL AND s.guardian_phone != '')
+            ";
+            $execParams = [
+                ':p1' => $userPhone,
+                ':p2' => $userPhone,
+                ':p3' => $userPhone,
+                ':p4' => $userPhone,
+                ':p5' => $userPhone,
+                ':school_id' => $schoolId
+            ];
+            if (strlen($userPhone10) === 10) {
+                $phoneSql .= " OR (s.student_mobile IS NOT NULL AND s.student_mobile != '' AND RIGHT(TRIM(s.student_mobile), 10) = :q1)
+                               OR (s.parent_phone IS NOT NULL AND s.parent_phone != '' AND RIGHT(TRIM(s.parent_phone), 10) = :q2)
+                               OR (s.father_phone IS NOT NULL AND s.father_phone != '' AND RIGHT(TRIM(s.father_phone), 10) = :q3)
+                               OR (s.mother_phone IS NOT NULL AND s.mother_phone != '' AND RIGHT(TRIM(s.mother_phone), 10) = :q4)
+                               OR (s.guardian_phone IS NOT NULL AND s.guardian_phone != '' AND RIGHT(TRIM(s.guardian_phone), 10) = :q5)";
+                $execParams[':q1'] = $userPhone10;
+                $execParams[':q2'] = $userPhone10;
+                $execParams[':q3'] = $userPhone10;
+                $execParams[':q4'] = $userPhone10;
+                $execParams[':q5'] = $userPhone10;
+            }
+
             $stmt = $pdo->prepare("
                 SELECT s.* 
                 FROM students s
                 LEFT JOIN academic_years ay ON s.academic_year_id = ay.id
                 WHERE s.school_id = :school_id
-                  AND (
-                    (s.student_mobile = :p1 AND s.student_mobile IS NOT NULL AND s.student_mobile != '') OR 
-                    (s.parent_phone = :p2 AND s.parent_phone IS NOT NULL AND s.parent_phone != '') OR 
-                    (s.father_phone = :p3 AND s.father_phone IS NOT NULL AND s.father_phone != '') OR 
-                    (s.guardian_phone = :p4 AND s.guardian_phone IS NOT NULL AND s.guardian_phone != '')
-                  )
+                  AND ($phoneSql)
                   AND (s.status IS NULL OR UPPER(s.status) = 'ACTIVE')
                   AND s.exit_date IS NULL
                 ORDER BY (CASE WHEN ay.status = 'ACTIVE' THEN 2 WHEN ay.is_current = 1 THEN 1 ELSE 0 END) DESC, s.id DESC
                 LIMIT 1
             ");
-            $stmt->execute([
-                ':p1' => $userPhone,
-                ':p2' => $userPhone,
-                ':p3' => $userPhone,
-                ':p4' => $userPhone,
-                ':school_id' => $schoolId
-            ]);
+            $stmt->execute($execParams);
             $student = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
         }
 
@@ -167,7 +268,7 @@ class StudentService extends BaseService
                 FROM students s
                 LEFT JOIN academic_years ay ON s.academic_year_id = ay.id
                 WHERE s.school_id = :school_id
-                  AND LOWER(s.email) = LOWER(:email)
+                  AND (LOWER(COALESCE(s.email, '')) = LOWER(:email1) OR LOWER(COALESCE(s.student_email, '')) = LOWER(:email2))
                   AND (s.status IS NULL OR UPPER(s.status) = 'ACTIVE')
                   AND s.exit_date IS NULL
                 ORDER BY (CASE WHEN ay.status = 'ACTIVE' THEN 2 WHEN ay.is_current = 1 THEN 1 ELSE 0 END) DESC, s.id DESC
@@ -175,7 +276,8 @@ class StudentService extends BaseService
             ");
             $stmt->execute([
                 ':school_id' => $schoolId,
-                ':email' => $userEmail
+                ':email1' => $userEmail,
+                ':email2' => $userEmail,
             ]);
             $student = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
         }
@@ -1636,6 +1738,244 @@ class StudentService extends BaseService
         ];
     }
 
+    private function ensureNotificationIsolationSchema(PDO $pdo): void
+    {
+        if ($this->notificationIsolationSchemaEnsured) {
+            return;
+        }
+
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS notification_student_states (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                notification_id INT NOT NULL,
+                student_id INT NOT NULL,
+                is_read TINYINT(1) NOT NULL DEFAULT 0,
+                is_deleted TINYINT(1) NOT NULL DEFAULT 0,
+                read_at TIMESTAMP NULL DEFAULT NULL,
+                updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY uniq_notif_student (notification_id, student_id),
+                KEY idx_student_id (student_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+
+        $this->notificationIsolationSchemaEnsured = true;
+    }
+
+    private function getLinkedStudentsContext(PDO $pdo, array $user): array
+    {
+        $schoolId = (int)($user['school_id'] ?? 0);
+        $contacts = $this->resolveUserContacts($pdo, $user);
+        $userPhone = $contacts['phone'];
+        $userPhone10 = $contacts['phone10'];
+        $userEmail = $contacts['email'];
+
+        $conds = [];
+        $params = [':school_id' => $schoolId];
+
+        if ($userPhone !== '') {
+            $conds[] = "((s.student_mobile = :p1 AND s.student_mobile IS NOT NULL AND s.student_mobile != '') OR (s.parent_phone = :p2 AND s.parent_phone IS NOT NULL AND s.parent_phone != '') OR (s.father_phone = :p3 AND s.father_phone IS NOT NULL AND s.father_phone != '') OR (s.mother_phone = :p4 AND s.mother_phone IS NOT NULL AND s.mother_phone != '') OR (s.guardian_phone = :p5 AND s.guardian_phone IS NOT NULL AND s.guardian_phone != ''))";
+            $params[':p1'] = $userPhone;
+            $params[':p2'] = $userPhone;
+            $params[':p3'] = $userPhone;
+            $params[':p4'] = $userPhone;
+            $params[':p5'] = $userPhone;
+            if (strlen($userPhone10) === 10) {
+                $conds[] = "((s.student_mobile IS NOT NULL AND s.student_mobile != '' AND RIGHT(TRIM(s.student_mobile), 10) = :q1) OR (s.parent_phone IS NOT NULL AND s.parent_phone != '' AND RIGHT(TRIM(s.parent_phone), 10) = :q2) OR (s.father_phone IS NOT NULL AND s.father_phone != '' AND RIGHT(TRIM(s.father_phone), 10) = :q3) OR (s.mother_phone IS NOT NULL AND s.mother_phone != '' AND RIGHT(TRIM(s.mother_phone), 10) = :q4) OR (s.guardian_phone IS NOT NULL AND s.guardian_phone != '' AND RIGHT(TRIM(s.guardian_phone), 10) = :q5))";
+                $params[':q1'] = $userPhone10;
+                $params[':q2'] = $userPhone10;
+                $params[':q3'] = $userPhone10;
+                $params[':q4'] = $userPhone10;
+                $params[':q5'] = $userPhone10;
+            }
+        }
+        if ($userEmail !== '') {
+            $conds[] = "(LOWER(COALESCE(s.email, '')) = LOWER(:em1) OR LOWER(COALESCE(s.student_email, '')) = LOWER(:em2))";
+            $params[':em1'] = $userEmail;
+            $params[':em2'] = $userEmail;
+        }
+
+        if (empty($conds)) {
+            return ['students' => [], 'sibling_count' => 0];
+        }
+
+        $stmt = $pdo->prepare("
+            SELECT s.id, s.admission_no, s.name
+            FROM students s
+            LEFT JOIN academic_years ay ON s.academic_year_id = ay.id
+            WHERE s.school_id = :school_id
+              AND (s.status IS NULL OR UPPER(s.status) = 'ACTIVE')
+              AND s.exit_date IS NULL
+              AND (" . implode(' OR ', $conds) . ")
+            ORDER BY (CASE WHEN ay.status = 'ACTIVE' THEN 2 WHEN ay.is_current = 1 THEN 1 ELSE 0 END) DESC, s.id DESC
+        ");
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        $deduped = [];
+        $seen = [];
+        foreach ($rows as $row) {
+            $adm = trim((string)($row['admission_no'] ?? ''));
+            $nm = mb_strtolower(trim((string)($row['name'] ?? '')));
+            $identity = $adm !== '' ? 'ADM_' . $adm : 'NAME_' . $nm;
+            if (!isset($seen[$identity])) {
+                $seen[$identity] = true;
+                $deduped[] = $row;
+            }
+        }
+
+        return [
+            'students' => $deduped,
+            'sibling_count' => count($deduped),
+        ];
+    }
+
+    private function resolveNotificationStudentScope(PDO $pdo, array $user, array $params = [], array $body = []): array
+    {
+        $role = strtoupper((string)($user['role'] ?? ''));
+        if ($role !== 'STUDENT' && $role !== 'PARENT') {
+            return [
+                'is_student_side' => false,
+                'active_student_id' => null,
+                'sibling_count' => 0,
+            ];
+        }
+
+        $scopedUser = $user;
+        $reqSid = $this->extractRequestedStudentId($user, $params, $body);
+        if ($reqSid !== null) {
+            $scopedUser['_requested_student_id'] = $reqSid;
+        }
+
+        $activeStudentId = null;
+        try {
+            $resolved = $this->resolveStudent($scopedUser);
+            $activeStudentId = (int)$resolved['id'];
+        } catch (\Throwable $e) {
+            $activeStudentId = null;
+        }
+
+        $ctx = $this->getLinkedStudentsContext($pdo, $user);
+
+        return [
+            'is_student_side' => true,
+            'active_student_id' => $activeStudentId,
+            'sibling_count' => (int)$ctx['sibling_count'],
+        ];
+    }
+
+    private function nonAnnouncementFilterSql(string $alias = 'dn'): string
+    {
+        $p = $alias !== '' ? $alias . '.' : '';
+        return "({$p}link != '/notice' OR {$p}link IS NULL) AND ({$p}event_key != 'ANNOUNCEMENT_PUBLISHED' OR {$p}event_key IS NULL) AND ({$p}category != 'ANNOUNCEMENT' OR {$p}category IS NULL)";
+    }
+
+    private function broadcastStudentScopeConditionSql(int $siblingCount, string $alias = 'dn'): string
+    {
+        $p = $alias !== '' ? $alias . '.' : '';
+        if ($siblingCount > 1) {
+            return "(
+                {$p}student_id IS NULL AND (
+                    ({$p}user_id IS NULL AND {$p}user_role = :role_b)
+                    OR (
+                        {$p}user_id = :uid_b AND (
+                            {$p}event_key IN ('HOLIDAY_ANNOUNCED', 'EXAM_SCHEDULED', 'ACHIEVEMENTS_UNLOCKED')
+                            OR {$p}title IN ('New School Holiday', 'Achievements Unlocked')
+                        )
+                    )
+                )
+            )";
+        }
+
+        return "(
+            {$p}student_id IS NULL AND (
+                {$p}user_id = :uid_b
+                OR ({$p}user_id IS NULL AND {$p}user_role = :role_b)
+            )
+        )";
+    }
+
+    private function buildNotificationModuleCondition(
+        string $module,
+        string $eventKey = '',
+        string $link = '',
+        string $title = '',
+        string $alias = 'dn'
+    ): ?array {
+        $p = $alias !== '' ? $alias . '.' : '';
+        $module = strtolower(trim($module));
+
+        $notAchievement = "(COALESCE({$p}category, '') != 'ACHIEVEMENT' AND ({$p}event_key IS NULL OR {$p}event_key NOT LIKE 'ACHIEVEMENT%') AND ({$p}link IS NULL OR {$p}link NOT LIKE '%achievement%'))";
+        $notExam = "(COALESCE({$p}category, '') != 'EXAM' AND ({$p}event_key IS NULL OR {$p}event_key NOT LIKE '%EXAM%') AND ({$p}link IS NULL OR {$p}link NOT LIKE '%/exam%'))";
+        $notHomework = "(COALESCE({$p}category, '') != 'HOMEWORK' AND ({$p}event_key IS NULL OR {$p}event_key NOT LIKE '%HOMEWORK%') AND ({$p}link IS NULL OR {$p}link NOT LIKE '%homework%'))";
+        $notFees = "(COALESCE({$p}category, '') != 'FEES' AND ({$p}event_key IS NULL OR ({$p}event_key NOT LIKE 'FEE_%' AND {$p}event_key != 'SALARY_DISBURSED')) AND ({$p}link IS NULL OR {$p}link NOT LIKE '%/student/fees%'))";
+        $notLeave = "(COALESCE({$p}category, '') NOT IN ('LEAVE', 'LEAVE_MANAGEMENT') AND ({$p}event_key IS NULL OR ({$p}event_key NOT LIKE '%LEAVE%' AND {$p}event_key != 'HOLIDAY_ANNOUNCED')) AND ({$p}link IS NULL OR {$p}link NOT LIKE '%leave%'))";
+        $notAttendance = "(COALESCE({$p}category, '') != 'ATTENDANCE' AND ({$p}event_key IS NULL OR {$p}event_key != 'ATTENDANCE_MARKED_ABSENT') AND ({$p}link IS NULL OR {$p}link NOT LIKE '%attendance%'))";
+        $notTimetable = "(COALESCE({$p}category, '') != 'TIMETABLE' AND ({$p}event_key IS NULL OR ({$p}event_key NOT LIKE '%TIMETABLE%' AND {$p}event_key != 'SUBSTITUTE_ASSIGNED')) AND ({$p}link IS NULL OR {$p}link NOT LIKE '%timetable%'))";
+
+        if ($module === 'all' || $module === 'notifications') {
+            return ['sql' => '1=1', 'params' => []];
+        }
+        if ($module === 'timetable') {
+            return [
+                'sql' => "({$p}event_key LIKE '%TIMETABLE%' OR {$p}event_key = 'SUBSTITUTE_ASSIGNED' OR {$p}category = 'TIMETABLE' OR ({$notExam} AND {$notAchievement} AND {$notHomework} AND {$notLeave} AND {$notAttendance} AND {$notFees} AND ({$p}link LIKE '%timetable%' OR LOWER(COALESCE({$p}title, '')) LIKE '%timetable%' OR LOWER(COALESCE({$p}title, '')) LIKE '%time table%')))",
+                'params' => [],
+            ];
+        }
+        if ($module === 'salary') {
+            return [
+                'sql' => "({$p}event_key = 'SALARY_DISBURSED' OR {$p}category IN ('Finance', 'SALARY') OR {$p}link LIKE '%salary%' OR LOWER(COALESCE({$p}title, '')) LIKE '%salary%')",
+                'params' => [],
+            ];
+        }
+        if ($module === 'exams' || $module === 'exam') {
+            return [
+                'sql' => "({$p}event_key LIKE '%EXAM%' OR {$p}category = 'EXAM' OR ({$notAchievement} AND {$notTimetable} AND {$notHomework} AND {$notLeave} AND {$notAttendance} AND {$notFees} AND ({$p}link LIKE '%exam%' OR LOWER(COALESCE({$p}title, '')) LIKE '%exam%' OR LOWER(COALESCE({$p}title, '')) LIKE '%examination%' OR LOWER(COALESCE({$p}title, '')) LIKE '%admit card%' OR LOWER(COALESCE({$p}title, '')) LIKE '%report card%' OR LOWER(COALESCE({$p}title, '')) LIKE '%scheme%' OR LOWER(COALESCE({$p}title, '')) LIKE '%datesheet%')))",
+                'params' => [],
+            ];
+        }
+        if ($module === 'leave' || $module === 'leaves' || $module === 'leave_request' || $module === 'leave-request') {
+            return [
+                'sql' => "({$p}event_key LIKE '%LEAVE%' OR {$p}event_key = 'HOLIDAY_ANNOUNCED' OR {$p}category IN ('LEAVE', 'LEAVE_MANAGEMENT') OR ({$notAchievement} AND {$notExam} AND {$notTimetable} AND {$notHomework} AND {$notAttendance} AND {$notFees} AND ({$p}link LIKE '%leave%' OR LOWER(COALESCE({$p}title, '')) LIKE '%leave%' OR LOWER(COALESCE({$p}title, '')) LIKE '%holiday%')))",
+                'params' => [],
+            ];
+        }
+        if ($module === 'attendance') {
+            return [
+                'sql' => "(COALESCE({$p}event_key, '') != 'LATE_TEACHERS_ALERT' AND ({$p}link IS NULL OR ({$p}link NOT LIKE '%teacher-attendance%' AND {$p}link NOT LIKE '%/tar%')) AND ({$p}event_key = 'ATTENDANCE_MARKED_ABSENT' OR {$p}category = 'ATTENDANCE' OR ({$notAchievement} AND {$notExam} AND {$notTimetable} AND {$notHomework} AND {$notLeave} AND {$notFees} AND ({$p}link LIKE '%attendance%' OR LOWER(COALESCE({$p}title, '')) LIKE '%absent%' OR LOWER(COALESCE({$p}title, '')) LIKE '%attendance%'))))",
+                'params' => [],
+            ];
+        }
+        if ($module === 'fees' || $module === 'fee' || $module === 'fees_card' || $module === 'fees-card') {
+            return [
+                'sql' => "(COALESCE({$p}event_key, '') NOT IN ('SALARY_DISBURSED','FEE_FOLLOWUP_DUE_TODAY','FEE_FOLLOWUP_OVERDUE','EXPENSE_APPROVAL_REQUEST','FINANCIAL_REPORT_APPROVAL_REQUEST','DISCOUNT_REQUEST_APPROVED','DISCOUNT_REQUEST_REJECTED') AND ({$p}event_key IN ('FEE_ADMISSION_ADDED','FEE_ANNUAL_ADDED','FEE_TRANSPORT_GENERATED','FEE_PAYMENT_RECORDED','FEE_PAYMENT_REVERTED','FEE_PENALTY_APPLIED','FEE_DUE_REMINDER') OR {$p}category = 'FEES' OR ({$notAchievement} AND {$notExam} AND {$notTimetable} AND {$notHomework} AND {$notLeave} AND {$notAttendance} AND ({$p}link LIKE '%/student/fees%' OR {$p}link LIKE '%fees-card%' OR LOWER(COALESCE({$p}title, '')) LIKE '%fee deposited%' OR LOWER(COALESCE({$p}title, '')) LIKE '%fee payment%' OR LOWER(COALESCE({$p}title, '')) LIKE '%late payment penalty%' OR LOWER(COALESCE({$p}title, '')) LIKE '%admission fee%' OR LOWER(COALESCE({$p}title, '')) LIKE '%annual fee%' OR LOWER(COALESCE({$p}title, '')) LIKE '%transport fee%'))))",
+                'params' => [],
+            ];
+        }
+        if ($module === 'homework' || $module === 'assignments') {
+            return [
+                'sql' => "({$p}event_key LIKE '%HOMEWORK%' OR {$p}category = 'HOMEWORK' OR ({$notAchievement} AND {$notExam} AND {$notTimetable} AND {$notLeave} AND {$notAttendance} AND {$notFees} AND ({$p}link LIKE '%homework%' OR LOWER(COALESCE({$p}title, '')) LIKE '%homework%')))",
+                'params' => [],
+            ];
+        }
+        if ($module === 'achievements' || $module === 'achievement') {
+            return [
+                'sql' => "({$p}event_key LIKE '%ACHIEVEMENT%' OR {$p}category = 'ACHIEVEMENT' OR ({$notExam} AND {$notTimetable} AND {$notHomework} AND {$notLeave} AND {$notAttendance} AND {$notFees} AND ({$p}link LIKE '%achievement%' OR LOWER(COALESCE({$p}title, '')) LIKE '%achievement%' OR LOWER(COALESCE({$p}title, '')) LIKE '%certificate%' OR LOWER(COALESCE({$p}title, '')) LIKE '%champion%' OR LOWER(COALESCE({$p}title, '')) LIKE '%topper%')))",
+                'params' => [],
+            ];
+        }
+        if ($eventKey !== '') {
+            return ['sql' => "{$p}event_key = :ekey", 'params' => [':ekey' => $eventKey]];
+        }
+        if ($link !== '') {
+            return ['sql' => "{$p}link = :link", 'params' => [':link' => $link]];
+        }
+        if ($title !== '') {
+            return ['sql' => "{$p}title = :title", 'params' => [':title' => $title]];
+        }
+
+        return null;
+    }
+
     public function getNotifications(array $user, array $params = []): array
     {
         $schoolId = (int)($user['school_id'] ?? 0);
@@ -1643,30 +1983,72 @@ class StudentService extends BaseService
         $role = strtoupper($user['role'] ?? '');
         $limit = isset($params['limit']) ? max(1, (int)$params['limit']) : 10;
         $offset = isset($params['offset']) ? max(0, (int)$params['offset']) : 0;
-        $studentId = isset($params['student_id']) ? (int)$params['student_id'] : (isset($_SERVER['HTTP_X_STUDENT_ID']) && is_numeric($_SERVER['HTTP_X_STUDENT_ID']) ? (int)$_SERVER['HTTP_X_STUDENT_ID'] : null);
         $pdo = $this->repo->getPdo();
+        $this->ensureNotificationIsolationSchema($pdo);
 
-        $query = "
-            SELECT * FROM dashboard_notifications
-            WHERE school_id = :school_id 
-              AND (user_id = :user_id OR (user_role = :role AND user_id IS NULL))
-              AND (link != '/notice' OR link IS NULL)
-              AND (event_key != 'ANNOUNCEMENT_PUBLISHED' OR event_key IS NULL)
-              AND (category != 'ANNOUNCEMENT' OR category IS NULL)
-        ";
-        if ($studentId !== null && $studentId > 0) {
-            $query .= " AND (student_id = :student_id OR student_id IS NULL)";
+        $scope = $this->resolveNotificationStudentScope($pdo, $user, $params);
+        $nonAnn = $this->nonAnnouncementFilterSql('dn');
+
+        if ($scope['is_student_side'] && !empty($scope['active_student_id'])) {
+            $activeStudentId = (int)$scope['active_student_id'];
+            $siblingCount = (int)$scope['sibling_count'];
+            $broadcastCond = $this->broadcastStudentScopeConditionSql($siblingCount, 'dn');
+
+            $sql = "
+                SELECT dn.*,
+                       CASE
+                           WHEN dn.student_id IS NOT NULL THEN dn.is_read
+                           ELSE GREATEST(COALESCE(dn.is_read, 0), COALESCE(nss.is_read, 0))
+                       END AS effective_is_read
+                FROM dashboard_notifications dn
+                LEFT JOIN notification_student_states nss
+                       ON nss.notification_id = dn.id AND nss.student_id = :nss_sid
+                WHERE dn.school_id = :school_id
+                  AND {$nonAnn}
+                  AND COALESCE(nss.is_deleted, 0) = 0
+                  AND (
+                      (dn.student_id = :active_sid AND (dn.user_id = :uid_p OR (dn.user_id IS NULL AND dn.user_role IN ('STUDENT', 'PARENT'))))
+                      OR {$broadcastCond}
+                  )
+                ORDER BY dn.id DESC
+                LIMIT :limit OFFSET :offset
+            ";
+
+            $stmt = $pdo->prepare($sql);
+            $stmt->bindValue(':nss_sid', $activeStudentId, PDO::PARAM_INT);
+            $stmt->bindValue(':school_id', $schoolId, PDO::PARAM_INT);
+            $stmt->bindValue(':active_sid', $activeStudentId, PDO::PARAM_INT);
+            $stmt->bindValue(':uid_p', $userId, PDO::PARAM_INT);
+            $stmt->bindValue(':uid_b', $userId, PDO::PARAM_INT);
+            $stmt->bindValue(':role_b', $role, PDO::PARAM_STR);
+            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+            $stmt->execute();
+
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            foreach ($rows as &$r) {
+                $r['is_read'] = (int)$r['effective_is_read'];
+                unset($r['effective_is_read']);
+            }
+            unset($r);
+            return $rows;
         }
 
-        $query .= " ORDER BY id DESC LIMIT :limit OFFSET :offset";
-
-        $stmt = $pdo->prepare($query);
+        // Fallback when user has no active student profile or is TEACHER
+        $extraStudentFilter = ($scope['is_student_side']) ? " AND dn.student_id IS NULL " : "";
+        $stmt = $pdo->prepare("
+            SELECT dn.*
+            FROM dashboard_notifications dn
+            WHERE dn.school_id = :school_id
+              AND (dn.user_id = :user_id OR (dn.user_role = :role AND dn.user_id IS NULL))
+              {$extraStudentFilter}
+              AND {$nonAnn}
+            ORDER BY dn.id DESC
+            LIMIT :limit OFFSET :offset
+        ");
         $stmt->bindValue(':school_id', $schoolId, PDO::PARAM_INT);
         $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
         $stmt->bindValue(':role', $role, PDO::PARAM_STR);
-        if ($studentId !== null && $studentId > 0) {
-            $stmt->bindValue(':student_id', $studentId, PDO::PARAM_INT);
-        }
         $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
         $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
         $stmt->execute();
@@ -1679,6 +2061,51 @@ class StudentService extends BaseService
         $userId = (int)($user['id'] ?? 0);
         $role = strtoupper($user['role'] ?? '');
         $pdo = $this->repo->getPdo();
+        $this->ensureNotificationIsolationSchema($pdo);
+
+        $scope = $this->resolveNotificationStudentScope($pdo, $user);
+
+        if ($scope['is_student_side'] && !empty($scope['active_student_id'])) {
+            $activeStudentId = (int)$scope['active_student_id'];
+
+            $stmtRow = $pdo->prepare("
+                SELECT id, user_id, user_role, student_id
+                FROM dashboard_notifications
+                WHERE id = :id AND school_id = :school_id
+                LIMIT 1
+            ");
+            $stmtRow->execute([':id' => $id, ':school_id' => $schoolId]);
+            $row = $stmtRow->fetch(PDO::FETCH_ASSOC);
+            if (!$row) {
+                return ['success' => true];
+            }
+
+            $rowRole = strtoupper((string)($row['user_role'] ?? ''));
+            $rowUid = $row['user_id'] !== null ? (int)$row['user_id'] : null;
+
+            if ($row['student_id'] !== null) {
+                if ((int)$row['student_id'] === $activeStudentId
+                    && ($rowUid === $userId || ($rowUid === null && in_array($rowRole, ['STUDENT', 'PARENT'], true)))) {
+                    $stmtDel = $pdo->prepare("
+                        DELETE FROM dashboard_notifications
+                        WHERE id = :id AND school_id = :school_id AND student_id = :stid
+                    ");
+                    $stmtDel->execute([':id' => $id, ':school_id' => $schoolId, ':stid' => $activeStudentId]);
+                }
+            } else {
+                // Shared broadcast notification: soft-delete per sibling only
+                if ($rowUid === $userId || ($rowUid === null && $rowRole === $role)) {
+                    $stmtState = $pdo->prepare("
+                        INSERT INTO notification_student_states (notification_id, student_id, is_deleted, is_read, read_at)
+                        VALUES (:nid, :stid, 1, 1, NOW())
+                        ON DUPLICATE KEY UPDATE is_deleted = 1, is_read = 1, read_at = COALESCE(read_at, NOW())
+                    ");
+                    $stmtState->execute([':nid' => $id, ':stid' => $activeStudentId]);
+                }
+            }
+
+            return ['success' => true];
+        }
 
         $stmt = $pdo->prepare("
             DELETE FROM dashboard_notifications
@@ -1695,11 +2122,24 @@ class StudentService extends BaseService
         $userId = (int)($user['id'] ?? 0);
         $role = strtoupper($user['role'] ?? '');
         $pdo = $this->repo->getPdo();
+        $this->ensureNotificationIsolationSchema($pdo);
+
+        $scope = $this->resolveNotificationStudentScope($pdo, $user);
+        if ($scope['is_student_side'] && !empty($scope['active_student_id'])) {
+            return $this->markNotificationRead($user, 0, ['module' => 'all']);
+        }
+
+        $nonAnn = $this->nonAnnouncementFilterSql('dn');
+        $extraStudentFilter = ($scope['is_student_side']) ? " AND dn.student_id IS NULL " : "";
 
         $stmt = $pdo->prepare("
-            UPDATE dashboard_notifications
-            SET is_read = 1
-            WHERE school_id = :school_id AND (user_id = :user_id OR (user_role = :role AND user_id IS NULL)) AND is_read = 0
+            UPDATE dashboard_notifications dn
+            SET dn.is_read = 1
+            WHERE dn.school_id = :school_id
+              AND (dn.user_id = :user_id OR (dn.user_role = :role AND dn.user_id IS NULL))
+              {$extraStudentFilter}
+              AND dn.is_read = 0
+              AND {$nonAnn}
         ");
         $stmt->execute([':school_id' => $schoolId, ':user_id' => $userId, ':role' => $role]);
 
@@ -1753,14 +2193,68 @@ class StudentService extends BaseService
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     announcement_id INT NOT NULL,
                     user_id INT NOT NULL,
+                    student_id INT NOT NULL DEFAULT 0,
                     read_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE KEY unique_announcement_user (announcement_id, user_id),
+                    UNIQUE KEY unique_announcement_user_student (announcement_id, user_id, student_id),
                     KEY user_id (user_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             ");
+        } else {
+            $stmtStCol = $pdo->query("SHOW COLUMNS FROM announcement_reads LIKE 'student_id'");
+            $hasStudentIdCol = $stmtStCol && (bool)$stmtStCol->fetch(PDO::FETCH_ASSOC);
+            if ($stmtStCol) {
+                $stmtStCol->closeCursor();
+            }
+            if (!$hasStudentIdCol) {
+                try {
+                    $pdo->exec("ALTER TABLE announcement_reads ADD COLUMN student_id INT NOT NULL DEFAULT 0 AFTER user_id");
+                } catch (\PDOException $e) {
+                    if ((int)($e->errorInfo[1] ?? 0) !== 1060) {
+                        throw $e;
+                    }
+                }
+            }
+
+            $stmtNewIdx = $pdo->query("SHOW INDEX FROM announcement_reads WHERE Key_name = 'unique_announcement_user_student'");
+            $hasNewIdx = $stmtNewIdx && (bool)$stmtNewIdx->fetch(PDO::FETCH_ASSOC);
+            if ($stmtNewIdx) {
+                $stmtNewIdx->closeCursor();
+            }
+            if (!$hasNewIdx) {
+                try {
+                    $pdo->exec("ALTER TABLE announcement_reads ADD UNIQUE INDEX unique_announcement_user_student (announcement_id, user_id, student_id)");
+                } catch (\PDOException $e) {
+                    if ((int)($e->errorInfo[1] ?? 0) !== 1061) {
+                        throw $e;
+                    }
+                }
+            }
+
+            $stmtOldIdx = $pdo->query("SHOW INDEX FROM announcement_reads WHERE Key_name = 'unique_announcement_user'");
+            $hasOldIdx = $stmtOldIdx && (bool)$stmtOldIdx->fetch(PDO::FETCH_ASSOC);
+            if ($stmtOldIdx) {
+                $stmtOldIdx->closeCursor();
+            }
+            if ($hasOldIdx) {
+                try {
+                    $pdo->exec("ALTER TABLE announcement_reads DROP INDEX unique_announcement_user");
+                } catch (\PDOException $e) {
+                    // Ignore if already dropped
+                }
+            }
         }
 
         $this->announcementsSchemaEnsured = true;
+    }
+
+    private function resolveNoticeStudentId(PDO $pdo, array $user): int
+    {
+        $role = strtoupper((string)($user['role'] ?? ''));
+        if ($role !== 'STUDENT' && $role !== 'PARENT') {
+            return 0;
+        }
+        $scope = $this->resolveNotificationStudentScope($pdo, $user);
+        return (int)($scope['active_student_id'] ?? 0);
     }
 
     private function isUserPrincipal(PDO $pdo, array $user): bool
@@ -1864,6 +2358,7 @@ class StudentService extends BaseService
         }
 
         $statusClause = $isPrincipalOrAdmin ? "1=1" : "a.status = 'Published'";
+        $noticeStudentId = $this->resolveNoticeStudentId($pdo, $user);
 
         // Build in clause query
         $inQuery = implode(',', array_fill(0, count($allowedAud), '?'));
@@ -1871,12 +2366,12 @@ class StudentService extends BaseService
             SELECT a.*, 
                    (CASE WHEN ar.id IS NOT NULL THEN 1 ELSE 0 END) AS is_read
             FROM announcements a
-            LEFT JOIN announcement_reads ar ON a.id = ar.announcement_id AND ar.user_id = ?
+            LEFT JOIN announcement_reads ar ON a.id = ar.announcement_id AND ar.user_id = ? AND ar.student_id = ?
             WHERE a.school_id = ? AND a.audience IN ({$inQuery}) AND {$statusClause}
             ORDER BY a.created_at DESC
         ");
 
-        $params = array_merge([$userId, $schoolId], $allowedAud);
+        $params = array_merge([$userId, $noticeStudentId, $schoolId], $allowedAud);
         $stmt->execute($params);
         $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
         if (empty($announcements)) {
@@ -1975,18 +2470,19 @@ class StudentService extends BaseService
 
         $userName = $this->resolveUserDisplayName($pdo, $user);
         $userPhone = trim($user['phone'] ?? '');
+        $noticeStudentId = $this->resolveNoticeStudentId($pdo, $user);
 
         $inQuery = implode(',', array_fill(0, count($allowedAud), '?'));
         $sql = "
             SELECT a.id, a.created_by
             FROM announcements a
-            LEFT JOIN announcement_reads ar ON a.id = ar.announcement_id AND ar.user_id = ?
+            LEFT JOIN announcement_reads ar ON a.id = ar.announcement_id AND ar.user_id = ? AND ar.student_id = ?
             WHERE a.school_id = ? 
               AND a.audience IN ({$inQuery}) 
               AND a.status = 'Published'
               AND ar.id IS NULL
         ";
-        $params = array_merge([$userId, $schoolId], $allowedAud);
+        $params = array_merge([$userId, $noticeStudentId, $schoolId], $allowedAud);
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -2030,28 +2526,30 @@ class StudentService extends BaseService
             return ['success' => true, 'marked_count' => 0];
         }
 
+        $noticeStudentId = $this->resolveNoticeStudentId($pdo, $user);
+
         $inQuery = implode(',', array_fill(0, count($allowedAud), '?'));
         $sql = "
             SELECT a.id 
             FROM announcements a
-            LEFT JOIN announcement_reads ar ON a.id = ar.announcement_id AND ar.user_id = ?
+            LEFT JOIN announcement_reads ar ON a.id = ar.announcement_id AND ar.user_id = ? AND ar.student_id = ?
             WHERE a.school_id = ? 
               AND a.audience IN ({$inQuery}) 
               AND a.status = 'Published'
               AND ar.id IS NULL
         ";
-        $params = array_merge([$userId, $schoolId], $allowedAud);
+        $params = array_merge([$userId, $noticeStudentId, $schoolId], $allowedAud);
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $annIds = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
 
         if (!empty($annIds)) {
             $insertStmt = $pdo->prepare("
-                INSERT IGNORE INTO announcement_reads (announcement_id, user_id)
-                VALUES (?, ?)
+                INSERT IGNORE INTO announcement_reads (announcement_id, user_id, student_id)
+                VALUES (?, ?, ?)
             ");
             foreach ($annIds as $annId) {
-                $insertStmt->execute([(int)$annId, $userId]);
+                $insertStmt->execute([(int)$annId, $userId, $noticeStudentId]);
             }
         }
 
@@ -2066,14 +2564,16 @@ class StudentService extends BaseService
         }
         $pdo = $this->repo->getPdo();
         $this->ensureAnnouncementsSchema($pdo);
+        $noticeStudentId = $this->resolveNoticeStudentId($pdo, $user);
 
         $stmt = $pdo->prepare("
-            INSERT IGNORE INTO announcement_reads (announcement_id, user_id)
-            VALUES (:ann, :uid)
+            INSERT IGNORE INTO announcement_reads (announcement_id, user_id, student_id)
+            VALUES (:ann, :uid, :stid)
         ");
         $stmt->execute([
             ':ann' => $announcementId,
-            ':uid' => $userId
+            ':uid' => $userId,
+            ':stid' => $noticeStudentId
         ]);
 
         return ['success' => true];
@@ -2874,7 +3374,123 @@ class StudentService extends BaseService
         $userId = (int)($user['id'] ?? 0);
         $role = strtoupper($user['role'] ?? 'STUDENT');
         $pdo = $this->repo->getPdo();
+        $this->ensureNotificationIsolationSchema($pdo);
 
+        $scope = $this->resolveNotificationStudentScope($pdo, $user, [], $body);
+        $nonAnn = $this->nonAnnouncementFilterSql('dn');
+
+        if ($scope['is_student_side'] && !empty($scope['active_student_id'])) {
+            $activeStudentId = (int)$scope['active_student_id'];
+            $siblingCount = (int)$scope['sibling_count'];
+
+            if ($id > 0) {
+                $stmtRow = $pdo->prepare("
+                    SELECT id, user_id, user_role, student_id
+                    FROM dashboard_notifications
+                    WHERE id = :id AND school_id = :school_id
+                    LIMIT 1
+                ");
+                $stmtRow->execute([':id' => $id, ':school_id' => $schoolId]);
+                $row = $stmtRow->fetch(PDO::FETCH_ASSOC);
+
+                if ($row) {
+                    $rowRole = strtoupper((string)($row['user_role'] ?? ''));
+                    $rowUid = $row['user_id'] !== null ? (int)$row['user_id'] : null;
+
+                    if ($row['student_id'] !== null) {
+                        if ((int)$row['student_id'] === $activeStudentId
+                            && ($rowUid === $userId || ($rowUid === null && in_array($rowRole, ['STUDENT', 'PARENT'], true)))) {
+                            $stmt = $pdo->prepare("
+                                UPDATE dashboard_notifications
+                                SET is_read = 1
+                                WHERE id = :id AND school_id = :school_id AND student_id = :stid
+                            ");
+                            $stmt->execute([
+                                ':id' => $id,
+                                ':school_id' => $schoolId,
+                                ':stid' => $activeStudentId,
+                            ]);
+                        }
+                    } else {
+                        if ($rowUid === $userId || ($rowUid === null && $rowRole === $role)) {
+                            $stmtState = $pdo->prepare("
+                                INSERT INTO notification_student_states (notification_id, student_id, is_read, read_at)
+                                VALUES (:nid, :stid, 1, NOW())
+                                ON DUPLICATE KEY UPDATE is_read = 1, read_at = COALESCE(read_at, NOW())
+                            ");
+                            $stmtState->execute([':nid' => $id, ':stid' => $activeStudentId]);
+                        }
+                    }
+                }
+            } else {
+                $module = strtolower((string)($body['module'] ?? ''));
+                $eventKey = (string)($body['event_key'] ?? '');
+                $link = (string)($body['link'] ?? '');
+                $title = (string)($body['title'] ?? '');
+
+                $mod = $this->buildNotificationModuleCondition($module, $eventKey, $link, $title, 'dn');
+                if ($mod !== null) {
+                    // 1. Mark personal student-scoped notifications read
+                    $personalSql = "
+                        UPDATE dashboard_notifications dn
+                        SET dn.is_read = 1
+                        WHERE dn.school_id = :sid
+                          AND dn.is_read = 0
+                          AND dn.student_id = :active_sid
+                          AND (dn.user_id = :uid_p OR (dn.user_id IS NULL AND dn.user_role IN ('STUDENT', 'PARENT')))
+                          AND {$nonAnn}
+                          AND {$mod['sql']}
+                    ";
+                    $personalParams = array_merge([
+                        ':sid' => $schoolId,
+                        ':active_sid' => $activeStudentId,
+                        ':uid_p' => $userId,
+                    ], $mod['params']);
+                    $stmtPersonal = $pdo->prepare($personalSql);
+                    $stmtPersonal->execute($personalParams);
+
+                    // 2. Mark matching broadcast notifications read ONLY for this sibling in notification_student_states
+                    $broadcastCond = $this->broadcastStudentScopeConditionSql($siblingCount, 'dn');
+                    $broadcastSelectSql = "
+                        SELECT dn.id
+                        FROM dashboard_notifications dn
+                        LEFT JOIN notification_student_states nss
+                               ON nss.notification_id = dn.id AND nss.student_id = :nss_sid
+                        WHERE dn.school_id = :sid
+                          AND dn.is_read = 0
+                          AND COALESCE(nss.is_read, 0) = 0
+                          AND COALESCE(nss.is_deleted, 0) = 0
+                          AND {$broadcastCond}
+                          AND {$nonAnn}
+                          AND {$mod['sql']}
+                    ";
+                    $broadcastParams = array_merge([
+                        ':nss_sid' => $activeStudentId,
+                        ':sid' => $schoolId,
+                        ':uid_b' => $userId,
+                        ':role_b' => $role,
+                    ], $mod['params']);
+                    $stmtBroadcast = $pdo->prepare($broadcastSelectSql);
+                    $stmtBroadcast->execute($broadcastParams);
+                    $broadcastIds = $stmtBroadcast->fetchAll(PDO::FETCH_COLUMN) ?: [];
+
+                    if (!empty($broadcastIds)) {
+                        $stmtUpsertState = $pdo->prepare("
+                            INSERT INTO notification_student_states (notification_id, student_id, is_read, read_at)
+                            VALUES (:nid, :stid, 1, NOW())
+                            ON DUPLICATE KEY UPDATE is_read = 1, read_at = COALESCE(read_at, NOW())
+                        ");
+                        foreach ($broadcastIds as $bnid) {
+                            $stmtUpsertState->execute([':nid' => (int)$bnid, ':stid' => $activeStudentId]);
+                        }
+                    }
+                }
+            }
+
+            return ['status' => 'success', 'success' => true];
+        }
+
+        // TEACHER or unlinked fallback path
         if ($id > 0) {
             $stmt = $pdo->prepare("
                 UPDATE dashboard_notifications
@@ -2886,40 +3502,29 @@ class StudentService extends BaseService
                 ':school_id' => $schoolId,
             ]);
         } else {
-            $module = strtolower($body['module'] ?? '');
-            $eventKey = $body['event_key'] ?? '';
-            $link = $body['link'] ?? '';
-            $title = $body['title'] ?? '';
+            $module = strtolower((string)($body['module'] ?? ''));
+            $eventKey = (string)($body['event_key'] ?? '');
+            $link = (string)($body['link'] ?? '');
+            $title = (string)($body['title'] ?? '');
 
-            if (!empty($module) || !empty($eventKey) || !empty($link) || !empty($title)) {
-                $query = "UPDATE dashboard_notifications SET is_read = 1 WHERE school_id = :sid AND is_read = 0";
-                $params = [':sid' => $schoolId, ':uid' => $userId];
-
-                if ($role === 'STUDENT' || $role === 'PARENT') {
-                    $query .= " AND (user_id = :uid OR (user_id IS NULL AND (user_role = 'STUDENT' OR user_role = 'PARENT')))";
-                } else {
-                    $query .= " AND (user_id = :uid OR (user_role = :role AND user_id IS NULL))";
-                    $params[':role'] = $role;
-                }
-
-                if ($module === 'timetable') {
-                    $query .= " AND (event_key LIKE '%TIMETABLE%' OR event_key = 'SUBSTITUTE_ASSIGNED' OR link LIKE '%timetable%' OR title LIKE '%Timetable%' OR title LIKE '%Time Table%' OR category = 'TIMETABLE')";
-                } elseif ($module === 'salary') {
-                    $query .= " AND (event_key = 'SALARY_DISBURSED' OR link LIKE '%salary%' OR title LIKE '%Salary%' OR category = 'Finance' OR category = 'SALARY')";
-                } elseif ($module === 'exams' || $module === 'exam') {
-                    $query .= " AND (event_key LIKE '%EXAM%' OR category = 'EXAM' OR link LIKE '%exam%' OR title LIKE '%exam%' OR title LIKE '%examination%' OR title LIKE '%admit card%' OR title LIKE '%report card%' OR title LIKE '%scheme%' OR title LIKE '%datesheet%')";
-                } elseif ($module === 'leave' || $module === 'leaves' || $module === 'leave_request' || $module === 'leave-request') {
-                    $query .= " AND (event_key LIKE '%LEAVE%' OR category = 'LEAVE' OR category = 'LEAVE_MANAGEMENT' OR link LIKE '%leave%' OR title LIKE '%Leave%')";
-                } elseif (!empty($eventKey)) {
-                    $query .= " AND event_key = :ekey";
-                    $params[':ekey'] = $eventKey;
-                } elseif (!empty($link)) {
-                    $query .= " AND link = :link";
-                    $params[':link'] = $link;
-                } elseif (!empty($title)) {
-                    $query .= " AND title = :title";
-                    $params[':title'] = $title;
-                }
+            $mod = $this->buildNotificationModuleCondition($module, $eventKey, $link, $title, 'dn');
+            if ($mod !== null) {
+                $extraStudentFilter = ($scope['is_student_side']) ? " AND dn.student_id IS NULL " : "";
+                $query = "
+                    UPDATE dashboard_notifications dn
+                    SET dn.is_read = 1
+                    WHERE dn.school_id = :sid
+                      AND dn.is_read = 0
+                      AND (dn.user_id = :uid OR (dn.user_role = :role AND dn.user_id IS NULL))
+                      {$extraStudentFilter}
+                      AND {$nonAnn}
+                      AND {$mod['sql']}
+                ";
+                $params = array_merge([
+                    ':sid' => $schoolId,
+                    ':uid' => $userId,
+                    ':role' => $role,
+                ], $mod['params']);
 
                 $stmt = $pdo->prepare($query);
                 $stmt->execute($params);

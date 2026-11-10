@@ -49,7 +49,11 @@ class _ExamListScreenState extends State<ExamListScreen> {
               : '/api/teacher/notifications/0/read')
           : '/api/student/notifications/0/read';
 
-      final uri = Uri.parse('${widget.examService.baseUrl}$path');
+      final uri = Uri.parse('${widget.examService.baseUrl}$path').replace(
+        queryParameters: (!isSchoolStaff && widget.selectedStudentId != null)
+            ? {'student_id': widget.selectedStudentId.toString()}
+            : null,
+      );
       final headers = {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ${widget.examService.token}',

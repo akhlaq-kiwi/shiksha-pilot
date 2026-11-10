@@ -13,6 +13,7 @@ import 'services/auth_service.dart';
 import 'services/app_lock_helper.dart';
 import 'services/notification_helper.dart';
 import 'services/push_notification_service.dart';
+import 'services/student_session_helper.dart';
 import 'config.dart';
 
 const String fetchNotificationsTask = "com.shikshapilot.schoolhub.fetchNotifications";
@@ -44,8 +45,15 @@ void callbackDispatcher() {
           }
               
           final studentId = prefs.getInt('selected_student_id');
+          final String lastNotifiedKey = (!isSchoolStaff && studentId != null)
+              ? 'last_notified_id_${userRole}_$studentId'
+              : 'last_notified_id_$userRole';
 
-          final uri = Uri.parse('$baseUrl$path');
+          final uri = Uri.parse('$baseUrl$path').replace(
+            queryParameters: (!isSchoolStaff && studentId != null)
+                ? {'student_id': studentId.toString()}
+                : null,
+          );
           final headers = {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer $token',
@@ -60,7 +68,7 @@ void callbackDispatcher() {
                 : (decodedBody['data'] ?? []);
 
             if (data.isNotEmpty) {
-              int lastNotifiedId = prefs.getInt('last_notified_id_$userRole') ?? 0;
+              int lastNotifiedId = prefs.getInt(lastNotifiedKey) ?? 0;
               int maxId = lastNotifiedId;
               for (final n in data) {
                 final int? nId = n['id'] is int ? n['id'] as int : int.tryParse(n['id']?.toString() ?? '');
@@ -71,7 +79,7 @@ void callbackDispatcher() {
               // rather than re-emitting historical unread notifications already pushed via FCM.
               if (lastNotifiedId == 0) {
                 if (maxId > 0) {
-                  await prefs.setInt('last_notified_id_$userRole', maxId);
+                  await prefs.setInt(lastNotifiedKey, maxId);
                 }
               } else {
                 final unreadNotifs = data.where((n) {
@@ -103,7 +111,7 @@ void callbackDispatcher() {
                     if (nId > maxId) maxId = nId;
                     await NotificationHelper.showNotification(notif, badgeCount: unreadNotifs.length);
                   }
-                  await prefs.setInt('last_notified_id_$userRole', maxId);
+                  await prefs.setInt(lastNotifiedKey, maxId);
                 }
               }
             }
@@ -325,6 +333,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         await prefs.remove('user_phone');
         await prefs.remove('user_id');
         await prefs.remove('selected_student_id');
+        await prefs.remove('selected_student_name');
+        await prefs.remove('selected_student_admission_no');
         if (mounted) {
           Navigator.pushReplacement(
             context,
@@ -421,54 +431,49 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       }
 
       if (roleUpper == 'PARENT' || roleUpper == 'STUDENT') {
-        final savedStudentId = prefs.getInt('selected_student_id');
+        final savedStudentId = StudentSessionHelper.readSavedStudentId(prefs);
+        final savedAdmNo = prefs.getString(StudentSessionHelper.prefSelectedStudentAdmissionNo);
+        final savedStudentName = prefs.getString(StudentSessionHelper.prefSelectedStudentName);
         try {
-          final children = await leaveService.getChildren();
+          final children = await leaveService.getChildren().timeout(const Duration(seconds: 8));
           if (children.isNotEmpty) {
-            // children[0] is guaranteed to be the active academic year student record by server ordering
-            int activeStudentId = children[0]['id'] is int 
-                ? children[0]['id'] 
-                : int.parse(children[0]['id'].toString());
-
-            if (roleUpper == 'PARENT' && savedStudentId != null) {
-              for (final child in children) {
-                final cId = child['id'] is int 
-                    ? child['id'] 
-                    : int.parse(child['id'].toString());
-                final isCurrent = child['is_current_academic_year'] == 1 || child['is_current_academic_year'] == true || child['is_current_academic_year'] == '1';
-                if (cId == savedStudentId && isCurrent) {
-                  activeStudentId = cId;
-                  break;
-                }
+            final resolved = StudentSessionHelper.resolveActiveChild(
+              children,
+              preferredStudentId: savedStudentId,
+              savedAdmissionNo: savedAdmNo,
+              savedName: savedStudentName,
+            );
+            final activeStudentId = StudentSessionHelper.parseId(resolved?['id']);
+            if (resolved != null && activeStudentId != null) {
+              await StudentSessionHelper.persistSelectedChild(prefs, resolved);
+              if (mounted) {
+                navigateToHome(
+                  HomeScreen(
+                    leaveService: leaveService,
+                    userRole: role,
+                    selectedStudentId: activeStudentId,
+                    userName: (resolved['name'] ?? '').toString().trim(),
+                    userPhoto: (resolved['photo_path'] ?? resolved['photo'] ?? '').toString().trim(),
+                    schoolName: schoolName,
+                  ),
+                );
+                return;
               }
-            }
-
-            await prefs.setInt('selected_student_id', activeStudentId);
-
-            if (mounted) {
-              navigateToHome(
-                HomeScreen(
-                  leaveService: leaveService,
-                  userRole: role,
-                  selectedStudentId: activeStudentId,
-                  schoolName: schoolName,
-                ),
-              );
-              return;
             }
           }
         } catch (e) {
-          if (savedStudentId != null && mounted) {
-            navigateToHome(
-              HomeScreen(
-                leaveService: leaveService,
-                userRole: role,
-                selectedStudentId: savedStudentId,
-                schoolName: schoolName,
-              ),
-            );
-            return;
-          }
+          debugPrint('Splash getChildren failed/timed out, using saved student: $e');
+        }
+        if (savedStudentId != null && mounted) {
+          navigateToHome(
+            HomeScreen(
+              leaveService: leaveService,
+              userRole: role,
+              selectedStudentId: savedStudentId,
+              schoolName: schoolName,
+            ),
+          );
+          return;
         }
       } else {
         // Teacher / School Admin
@@ -731,7 +736,7 @@ class _LoginScreenState extends State<LoginScreen> {
         await prefs.remove('pending_notification_payload');
         try {
           final notif = json.decode(pendingPayload);
-          final selId = prefs.getInt('selected_student_id');
+          final selId = StudentSessionHelper.readSavedStudentId(prefs);
           if (mounted) {
             navigateAfterLogin(
               HomeScreen(
@@ -754,8 +759,12 @@ class _LoginScreenState extends State<LoginScreen> {
         if (students.isEmpty) {
           throw Exception('No student profile found for this user.');
         }
-        final studentId = students[0]['id'] as int;
-        await prefs.setInt('selected_student_id', studentId);
+        final firstStudent = Map<String, dynamic>.from(students[0] as Map);
+        final studentId = StudentSessionHelper.parseId(firstStudent['id']);
+        if (studentId == null) {
+          throw Exception('Invalid student profile identifier.');
+        }
+        await StudentSessionHelper.persistSelectedChild(prefs, firstStudent);
         
         if (mounted) {
           navigateAfterLogin(
@@ -763,6 +772,8 @@ class _LoginScreenState extends State<LoginScreen> {
               leaveService: leaveService,
               userRole: role,
               selectedStudentId: studentId,
+              userName: (firstStudent['name'] ?? '').toString().trim(),
+              userPhoto: (firstStudent['photo_path'] ?? firstStudent['photo'] ?? '').toString().trim(),
               schoolName: schoolName,
             ),
           );
@@ -776,13 +787,19 @@ class _LoginScreenState extends State<LoginScreen> {
         if (mounted) {
           if (children.length == 1) {
             // Only one child, login directly
-            final childId = children[0]['id'] as int;
-            await prefs.setInt('selected_student_id', childId);
+            final onlyChild = Map<String, dynamic>.from(children[0] as Map);
+            final childId = StudentSessionHelper.parseId(onlyChild['id']);
+            if (childId == null) {
+              throw Exception('Invalid student profile identifier.');
+            }
+            await StudentSessionHelper.persistSelectedChild(prefs, onlyChild);
             navigateAfterLogin(
               HomeScreen(
                 leaveService: leaveService,
                 userRole: role,
                 selectedStudentId: childId,
+                userName: (onlyChild['name'] ?? '').toString().trim(),
+                userPhoto: (onlyChild['photo_path'] ?? onlyChild['photo'] ?? '').toString().trim(),
                 schoolName: schoolName,
               ),
             );
@@ -1189,10 +1206,10 @@ class _SelectStudentProfileScreen extends StatelessWidget {
               trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Color(0xFF2196F3)),
               onTap: () async {
                 final prefs = await SharedPreferences.getInstance();
-                final childId = student['id'] is int
-                    ? student['id'] as int
-                    : int.parse(student['id'].toString());
-                await prefs.setInt('selected_student_id', childId);
+                final studentMap = Map<String, dynamic>.from(student as Map);
+                final childId = StudentSessionHelper.parseId(studentMap['id']);
+                if (childId == null) return;
+                await StudentSessionHelper.persistSelectedChild(prefs, studentMap);
                 final resolvedSchool = (schoolName != null && schoolName!.isNotEmpty)
                     ? schoolName!
                     : (prefs.getString('school_name') ?? 'SHIKSHA PILOT ACADEMY').toUpperCase();
@@ -1204,6 +1221,8 @@ class _SelectStudentProfileScreen extends StatelessWidget {
                         leaveService: leaveService,
                         userRole: role,
                         selectedStudentId: childId,
+                        userName: (studentMap['name'] ?? '').toString().trim(),
+                        userPhoto: (studentMap['photo_path'] ?? studentMap['photo'] ?? '').toString().trim(),
                         schoolName: resolvedSchool,
                       ),
                     ),

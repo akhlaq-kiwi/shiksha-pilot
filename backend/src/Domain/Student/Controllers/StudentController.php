@@ -7,6 +7,7 @@ namespace App\Domain\Student\Controllers;
 use App\Domain\Student\Services\StudentService;
 use App\Shared\Auth\TokenService;
 use App\Shared\BaseController;
+use App\Shared\Http\RequestParser;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 
@@ -22,6 +23,32 @@ class StudentController extends BaseController
         parent::__construct($tokenService);
     }
 
+    private function withRequestedStudentId(Request $request, array $user, ?array $body = null): array
+    {
+        $queryParams = $request->getQueryParams();
+        $reqStudentId = $queryParams['student_id'] ?? null;
+
+        if ($reqStudentId === null || !is_numeric($reqStudentId)) {
+            $parsedBody = $body ?? (is_array($request->getParsedBody()) ? $request->getParsedBody() : []);
+            if (isset($parsedBody['student_id']) && is_numeric($parsedBody['student_id'])) {
+                $reqStudentId = $parsedBody['student_id'];
+            }
+        }
+
+        if ($reqStudentId === null || !is_numeric($reqStudentId)) {
+            $headerVal = trim($request->getHeaderLine('X-Student-Id'));
+            if ($headerVal !== '' && is_numeric($headerVal)) {
+                $reqStudentId = $headerVal;
+            }
+        }
+
+        if ($reqStudentId !== null && is_numeric($reqStudentId) && (int)$reqStudentId > 0) {
+            $user['_requested_student_id'] = (int)$reqStudentId;
+        }
+
+        return $user;
+    }
+
     // -------------------------------------------------------------------------
     // Endpoints
     // -------------------------------------------------------------------------
@@ -30,6 +57,7 @@ class StudentController extends BaseController
     {
         $user = $this->authenticate($request);
         $this->requireRole($user, self::ALLOWED_ROLES);
+        $user = $this->withRequestedStudentId($request, $user);
 
         $data = $this->service->getDashboard($user);
 
@@ -40,6 +68,7 @@ class StudentController extends BaseController
     {
         $user = $this->authenticate($request);
         $this->requireRole($user, self::ALLOWED_ROLES);
+        $user = $this->withRequestedStudentId($request, $user);
 
         $params = $request->getQueryParams();
         $date = $params['date'] ?? null;
@@ -53,6 +82,7 @@ class StudentController extends BaseController
     {
         $user = $this->authenticate($request);
         $this->requireRole($user, self::ALLOWED_ROLES);
+        $user = $this->withRequestedStudentId($request, $user);
 
         $data = $this->service->getAttendance($user);
 
@@ -63,6 +93,7 @@ class StudentController extends BaseController
     {
         $user = $this->authenticate($request);
         $this->requireRole($user, self::ALLOWED_ROLES);
+        $user = $this->withRequestedStudentId($request, $user);
 
         $data = $this->service->getExamResults($user);
 
@@ -73,6 +104,7 @@ class StudentController extends BaseController
     {
         $user = $this->authenticate($request);
         $this->requireRole($user, self::ALLOWED_ROLES);
+        $user = $this->withRequestedStudentId($request, $user);
 
         $data = $this->service->getAssignments($user);
 
@@ -83,6 +115,7 @@ class StudentController extends BaseController
     {
         $user = $this->authenticate($request);
         $this->requireRole($user, self::ALLOWED_ROLES);
+        $user = $this->withRequestedStudentId($request, $user);
 
         $data = $this->service->getFees($user);
 
@@ -93,6 +126,7 @@ class StudentController extends BaseController
     {
         $user = $this->authenticate($request);
         $this->requireRole($user, self::ALLOWED_ROLES);
+        $user = $this->withRequestedStudentId($request, $user);
 
         $data = $this->service->getFeePayments($user);
 
@@ -103,6 +137,7 @@ class StudentController extends BaseController
     {
         $user = $this->authenticate($request);
         $this->requireRole($user, self::ALLOWED_ROLES);
+        $user = $this->withRequestedStudentId($request, $user);
 
         $data = $this->service->getMaterials($user);
 
@@ -113,6 +148,7 @@ class StudentController extends BaseController
     {
         $user = $this->authenticate($request);
         $this->requireRole($user, self::ALLOWED_ROLES);
+        $user = $this->withRequestedStudentId($request, $user);
 
         $data = $this->service->getPublishedReportCards($user);
 
@@ -123,6 +159,7 @@ class StudentController extends BaseController
     {
         $user = $this->authenticate($request);
         $this->requireRole($user, self::ALLOWED_ROLES);
+        $user = $this->withRequestedStudentId($request, $user);
 
         $data = $this->service->getFeesCard($user);
 
@@ -133,6 +170,7 @@ class StudentController extends BaseController
     {
         $user = $this->authenticate($request);
         $this->requireRole($user, self::ALLOWED_ROLES);
+        $user = $this->withRequestedStudentId($request, $user);
 
         $params = $request->getQueryParams();
         $id = isset($params['id']) ? (int)$params['id'] : 0;
@@ -152,6 +190,7 @@ class StudentController extends BaseController
     {
         $user = $this->authenticate($request);
         $this->requireRole($user, ['STUDENT', 'PARENT', 'TEACHER']);
+        $user = $this->withRequestedStudentId($request, $user);
         $queryParams = $request->getQueryParams();
 
         $data = $this->service->getNotifications($user, $queryParams);
@@ -163,6 +202,7 @@ class StudentController extends BaseController
     {
         $user = $this->authenticate($request);
         $this->requireRole($user, ['STUDENT', 'PARENT', 'TEACHER']);
+        $user = $this->withRequestedStudentId($request, $user);
 
         $id = (int)$args['id'];
         $data = $this->service->deleteNotification($user, $id);
@@ -174,6 +214,8 @@ class StudentController extends BaseController
     {
         $user = $this->authenticate($request);
         $this->requireRole($user, ['STUDENT', 'PARENT', 'TEACHER']);
+        $body = RequestParser::body($request);
+        $user = $this->withRequestedStudentId($request, $user, $body);
 
         $data = $this->service->markAllNotificationsRead($user);
 
@@ -187,6 +229,7 @@ class StudentController extends BaseController
 
         $id = (int)($args['id'] ?? 0);
         $body = RequestParser::body($request);
+        $user = $this->withRequestedStudentId($request, $user, $body);
         $data = $this->service->markNotificationRead($user, $id, $body);
 
         return $this->success($response, $data);
@@ -196,6 +239,7 @@ class StudentController extends BaseController
     {
         $user = $this->authenticate($request);
         $this->requireRole($user, ['STUDENT', 'PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL']);
+        $user = $this->withRequestedStudentId($request, $user);
         $data = $this->service->getActiveNotices($user);
         return $this->success($response, $data);
     }
@@ -204,6 +248,7 @@ class StudentController extends BaseController
     {
         $user = $this->authenticate($request);
         $this->requireRole($user, ['STUDENT', 'PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL']);
+        $user = $this->withRequestedStudentId($request, $user);
         $data = $this->service->getUnreadNoticesCount($user);
         return $this->success($response, $data);
     }
@@ -212,6 +257,7 @@ class StudentController extends BaseController
     {
         $user = $this->authenticate($request);
         $this->requireRole($user, ['STUDENT', 'PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL']);
+        $user = $this->withRequestedStudentId($request, $user);
         $data = $this->service->markAllNoticesRead($user);
         return $this->success($response, $data, 'All notices marked as read');
     }
@@ -220,6 +266,7 @@ class StudentController extends BaseController
     {
         $user = $this->authenticate($request);
         $this->requireRole($user, ['STUDENT', 'PARENT', 'TEACHER', 'SCHOOL_ADMIN', 'PRINCIPAL']);
+        $user = $this->withRequestedStudentId($request, $user);
         $id = (int)$args['id'];
         $data = $this->service->markNoticeRead($user, $id);
         return $this->success($response, $data, 'Notice marked as read');
@@ -237,6 +284,7 @@ class StudentController extends BaseController
             return $this->success($response, $data);
         }
         $this->requireRole($user, self::ALLOWED_ROLES);
+        $user = $this->withRequestedStudentId($request, $user);
         $data = $this->service->getExamsList($user);
         return $this->success($response, $data);
     }
@@ -254,6 +302,7 @@ class StudentController extends BaseController
             return $this->success($response, $data);
         }
         $this->requireRole($user, self::ALLOWED_ROLES);
+        $user = $this->withRequestedStudentId($request, $user);
         $data = $this->service->getExamDetails($user, $examId);
         return $this->success($response, $data);
     }
@@ -262,6 +311,7 @@ class StudentController extends BaseController
     {
         $user = $this->authenticate($request);
         $this->requireRole($user, self::ALLOWED_ROLES);
+        $user = $this->withRequestedStudentId($request, $user);
         $data = $this->service->getGameProgress($user);
         return $this->success($response, $data);
     }
@@ -271,6 +321,7 @@ class StudentController extends BaseController
         $user = $this->authenticate($request);
         $this->requireRole($user, self::ALLOWED_ROLES);
         $body = (array) $request->getParsedBody();
+        $user = $this->withRequestedStudentId($request, $user, $body);
         $data = $this->service->syncGameProgress($user, $body);
         return $this->success($response, $data);
     }
@@ -279,6 +330,7 @@ class StudentController extends BaseController
     {
         $user = $this->authenticate($request);
         $this->requireRole($user, self::ALLOWED_ROLES);
+        $user = $this->withRequestedStudentId($request, $user);
         $data = $this->service->claimDailyLogin($user);
         return $this->success($response, $data);
     }

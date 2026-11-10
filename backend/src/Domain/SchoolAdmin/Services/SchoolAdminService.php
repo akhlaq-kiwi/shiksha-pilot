@@ -5046,22 +5046,86 @@ class SchoolAdminService extends BaseService
                                             ':uid' => $user['id'] ?? 1
                                         ]);
 
-                                        // Create dashboard notifications
-                                        $stmtNotif = $pdo->prepare("
-                                            INSERT INTO dashboard_notifications (school_id, user_role, title, message, link, is_read)
-                                            VALUES (:sid, :role, 'Late Payment Penalty', :msg, '/student/fees', 0)
-                                        ");
+                                        // Create student-scoped dashboard notifications
                                         $notifMsg = "A late payment penalty of INR " . $penaltyAmount . " has been applied for previous year dues.";
-                                        $stmtNotif->execute([
-                                            ':sid' => $schoolId,
-                                            ':role' => 'STUDENT',
-                                            ':msg' => $notifMsg
-                                        ]);
-                                        $stmtNotif->execute([
-                                            ':sid' => $schoolId,
-                                            ':role' => 'PARENT',
-                                            ':msg' => $notifMsg
-                                        ]);
+                                        $stmtStuContacts = $pdo->prepare("
+                                            SELECT student_mobile, parent_phone, father_phone, mother_phone, guardian_phone, email, student_email
+                                            FROM students
+                                            WHERE id = :stid AND school_id = :sid
+                                            LIMIT 1
+                                        ");
+                                        $stmtStuContacts->execute([':stid' => $newStudentId, ':sid' => $schoolId]);
+                                        $sc = $stmtStuContacts->fetch(PDO::FETCH_ASSOC) ?: [];
+                                        $phones = array_values(array_unique(array_filter(array_map('trim', [
+                                            $sc['student_mobile'] ?? '',
+                                            $sc['parent_phone'] ?? '',
+                                            $sc['father_phone'] ?? '',
+                                            $sc['mother_phone'] ?? '',
+                                            $sc['guardian_phone'] ?? '',
+                                        ]))));
+                                        $emails = array_values(array_unique(array_filter(array_map('trim', [
+                                            $sc['email'] ?? '',
+                                            $sc['student_email'] ?? '',
+                                        ]))));
+
+                                        $stmtInsNotif = $pdo->prepare("
+                                            INSERT INTO dashboard_notifications (school_id, user_role, user_id, student_id, title, message, link, category, event_key, is_read)
+                                            VALUES (:sid, :role, :uid, :stid, 'Late Payment Penalty', :msg, '/student/fees', 'FEES', 'FEE_PENALTY_APPLIED', 0)
+                                        ");
+
+                                        $insertedAny = false;
+                                        if (!empty($phones) || !empty($emails)) {
+                                            $conds = [];
+                                            $uParams = [':sid' => $schoolId];
+                                            if (!empty($phones)) {
+                                                $phHolders = [];
+                                                foreach ($phones as $idx => $p) {
+                                                    $k = ":mp_{$idx}";
+                                                    $phHolders[] = $k;
+                                                    $uParams[$k] = $p;
+                                                }
+                                                $conds[] = "phone IN (" . implode(',', $phHolders) . ")";
+                                            }
+                                            if (!empty($emails)) {
+                                                $emHolders = [];
+                                                foreach ($emails as $idx => $em) {
+                                                    $k = ":me_{$idx}";
+                                                    $emHolders[] = $k;
+                                                    $uParams[$k] = $em;
+                                                }
+                                                $conds[] = "email IN (" . implode(',', $emHolders) . ")";
+                                            }
+                                            $stmtU = $pdo->prepare("
+                                                SELECT DISTINCT id, role
+                                                FROM users
+                                                WHERE school_id = :sid
+                                                  AND (status IS NULL OR UPPER(status) = 'ACTIVE')
+                                                  AND UPPER(role) IN ('STUDENT', 'PARENT')
+                                                  AND (" . implode(' OR ', $conds) . ")
+                                            ");
+                                            $stmtU->execute($uParams);
+                                            foreach ($stmtU->fetchAll(PDO::FETCH_ASSOC) ?: [] as $uRow) {
+                                                $stmtInsNotif->execute([
+                                                    ':sid' => $schoolId,
+                                                    ':role' => strtoupper((string)$uRow['role']),
+                                                    ':uid' => (int)$uRow['id'],
+                                                    ':stid' => $newStudentId,
+                                                    ':msg' => $notifMsg,
+                                                ]);
+                                                $insertedAny = true;
+                                            }
+                                        }
+                                        if (!$insertedAny) {
+                                            foreach (['STUDENT', 'PARENT'] as $fallbackRole) {
+                                                $stmtInsNotif->execute([
+                                                    ':sid' => $schoolId,
+                                                    ':role' => $fallbackRole,
+                                                    ':uid' => null,
+                                                    ':stid' => $newStudentId,
+                                                    ':msg' => $notifMsg,
+                                                ]);
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -6079,25 +6143,19 @@ class SchoolAdminService extends BaseService
             $message = "The achievement leaderboard is now available. See the top performers in attendance and academics.";
 
             $stmtInsNotif = $pdo->prepare("
-                INSERT INTO dashboard_notifications (school_id, user_role, title, message, link, is_read)
-                VALUES (:sid, :role, :title, :msg, '/achievements', 0)
+                INSERT INTO dashboard_notifications (school_id, user_role, title, message, link, category, event_key, is_read)
+                VALUES (:sid, :role, :title, :msg, '/achievements', 'ACHIEVEMENT', 'ACHIEVEMENTS_UNLOCKED', 0)
             ");
 
-            // Notify STUDENT role
-            $stmtInsNotif->execute([
-                ':sid' => $schoolId,
-                ':role' => 'STUDENT',
-                ':title' => $title,
-                ':msg' => $message
-            ]);
-
-            // Notify TEACHER role
-            $stmtInsNotif->execute([
-                ':sid' => $schoolId,
-                ':role' => 'TEACHER',
-                ':title' => $title,
-                ':msg' => $message
-            ]);
+            // Notify STUDENT, PARENT, and TEACHER roles
+            foreach (['STUDENT', 'PARENT', 'TEACHER'] as $targetRole) {
+                $stmtInsNotif->execute([
+                    ':sid' => $schoolId,
+                    ':role' => $targetRole,
+                    ':title' => $title,
+                    ':msg' => $message
+                ]);
+            }
         } catch (\Throwable $e) {
             error_log("Failed to send single achievement notification: " . $e->getMessage());
         }
@@ -6106,33 +6164,83 @@ class SchoolAdminService extends BaseService
     private function notifyAchievementGenerated(PDO $pdo, int $schoolId, int $studentId, string $studentName, string $title, string $message): void
     {
         try {
-            $stmtS = $pdo->prepare("SELECT parent_phone, student_mobile, phone FROM students WHERE id = :sid LIMIT 1");
+            $stmtS = $pdo->prepare("
+                SELECT parent_phone, father_phone, mother_phone, guardian_phone, student_mobile, email, student_email
+                FROM students
+                WHERE id = :sid
+                LIMIT 1
+            ");
             $stmtS->execute([':sid' => $studentId]);
             $stu = $stmtS->fetch(PDO::FETCH_ASSOC);
 
             if ($stu) {
+                $phones = array_values(array_unique(array_filter(array_map('trim', [
+                    $stu['parent_phone'] ?? '',
+                    $stu['father_phone'] ?? '',
+                    $stu['mother_phone'] ?? '',
+                    $stu['guardian_phone'] ?? '',
+                    $stu['student_mobile'] ?? '',
+                ]))));
+                $emails = array_values(array_unique(array_filter(array_map('trim', [
+                    $stu['email'] ?? '',
+                    $stu['student_email'] ?? '',
+                ]))));
+
                 $stmtInsNotif = $pdo->prepare("
-                    INSERT INTO dashboard_notifications (school_id, user_role, title, message, link, is_read)
-                    VALUES (:sid, :role, :title, :msg, '/achievements', 0)
+                    INSERT INTO dashboard_notifications (school_id, user_role, user_id, student_id, title, message, link, category, event_key, is_read)
+                    VALUES (:sid, :role, :uid, :stid, :title, :msg, '/achievements', 'ACHIEVEMENT', 'ACHIEVEMENTS_UNLOCKED', 0)
                 ");
 
-                // Notify student role
-                $stmtInsNotif->execute([
-                    ':sid' => $schoolId,
-                    ':role' => 'STUDENT',
-                    ':title' => $title,
-                    ':msg' => $message
-                ]);
-
-                // Notify parent role
-                $stmtInsNotif->execute([
-                    ':sid' => $schoolId,
-                    ':role' => 'PARENT',
-                    ':title' => $title,
-                    ':msg' => "Child: {$studentName} - " . $message
-                ]);
+                $notifiedUsers = [];
+                if (!empty($phones) || !empty($emails)) {
+                    $conds = [];
+                    $uParams = [':sid' => $schoolId];
+                    if (!empty($phones)) {
+                        $phHolders = [];
+                        foreach ($phones as $idx => $p) {
+                            $k = ":ap_{$idx}";
+                            $phHolders[] = $k;
+                            $uParams[$k] = $p;
+                        }
+                        $conds[] = "phone IN (" . implode(',', $phHolders) . ")";
+                    }
+                    if (!empty($emails)) {
+                        $emHolders = [];
+                        foreach ($emails as $idx => $em) {
+                            $k = ":ae_{$idx}";
+                            $emHolders[] = $k;
+                            $uParams[$k] = $em;
+                        }
+                        $conds[] = "email IN (" . implode(',', $emHolders) . ")";
+                    }
+                    $stmtUsers = $pdo->prepare("
+                        SELECT DISTINCT id, role
+                        FROM users
+                        WHERE school_id = :sid
+                          AND (status IS NULL OR UPPER(status) = 'ACTIVE')
+                          AND UPPER(role) IN ('STUDENT', 'PARENT')
+                          AND (" . implode(' OR ', $conds) . ")
+                    ");
+                    $stmtUsers->execute($uParams);
+                    foreach ($stmtUsers->fetchAll(PDO::FETCH_ASSOC) ?: [] as $u) {
+                        $uid = (int)$u['id'];
+                        $uRole = strtoupper((string)$u['role']);
+                        if ($uid <= 0 || isset($notifiedUsers[$uid])) {
+                            continue;
+                        }
+                        $notifiedUsers[$uid] = true;
+                        $stmtInsNotif->execute([
+                            ':sid' => $schoolId,
+                            ':role' => $uRole,
+                            ':uid' => $uid,
+                            ':stid' => $studentId,
+                            ':title' => $title,
+                            ':msg' => ($uRole === 'PARENT') ? "Child: {$studentName} - " . $message : $message,
+                        ]);
+                    }
+                }
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             // Ignore notification failures
         }
     }
@@ -6345,39 +6453,67 @@ class SchoolAdminService extends BaseService
     {
         if (empty($absentStudentIds)) return;
         try {
-            $inPlaceholders = implode(',', array_fill(0, count($absentStudentIds), '?'));
+            $dispatcher = new \App\Shared\Notifications\PushDispatcher(
+                $pdo,
+                new \App\Shared\Notifications\FcmClient($pdo)
+            );
+
+            $stmtStudent = $pdo->prepare("
+                SELECT id,
+                       CASE
+                         WHEN COALESCE(name, '') != '' THEN name
+                         WHEN last_name = '.' OR last_name IS NULL OR TRIM(last_name) = '' THEN
+                           TRIM(CONCAT(first_name, ' ', COALESCE(middle_name, '')))
+                         ELSE
+                           TRIM(CONCAT(first_name, ' ', COALESCE(middle_name, ''), ' ', last_name))
+                       END AS name
+                FROM students
+                WHERE id = :id AND school_id = :sid
+                LIMIT 1
+            ");
+
             $stmtUsers = $pdo->prepare("
                 SELECT DISTINCT u.id AS user_id, u.role
                 FROM students s
                 JOIN users u ON u.school_id = s.school_id AND (
-                    u.phone = s.student_mobile OR 
-                    u.phone = s.parent_phone OR 
-                    u.phone = s.father_phone OR 
-                    u.phone = s.mother_phone OR 
-                    u.phone = s.guardian_phone OR 
-                    (u.email IS NOT NULL AND u.email = s.email AND u.email != '')
+                    u.phone = s.student_mobile OR
+                    u.phone = s.parent_phone OR
+                    u.phone = s.father_phone OR
+                    u.phone = s.mother_phone OR
+                    u.phone = s.guardian_phone OR
+                    (u.email IS NOT NULL AND u.email != '' AND (u.email = s.email OR u.email = s.student_email))
                 )
-                WHERE s.id IN ($inPlaceholders) 
-                  AND s.school_id = ? 
+                WHERE s.id = :st_id
+                  AND s.school_id = :sid
+                  AND (u.status IS NULL OR UPPER(u.status) = 'ACTIVE')
                   AND u.role IN ('STUDENT', 'PARENT')
             ");
-            $params = array_merge($absentStudentIds, [$schoolId]);
-            $stmtUsers->execute($params);
-            $recipients = $stmtUsers->fetchAll(PDO::FETCH_ASSOC);
 
-            if (!empty($recipients)) {
-                $dispatcher = new \App\Shared\Notifications\PushDispatcher(
-                    $pdo,
-                    new \App\Shared\Notifications\FcmClient($pdo)
-                );
-                $dispatcher->toUsers(
-                    $schoolId,
-                    $recipients,
-                    'ATTENDANCE_MARKED_ABSENT',
-                    'You are absent today.',
-                    'Attendance has been marked for today, You can check the attendance.',
-                    '/attendance'
-                );
+            $uniqueAbsentIds = array_unique(array_map('intval', $absentStudentIds));
+
+            foreach ($uniqueAbsentIds as $stId) {
+                if ($stId <= 0) continue;
+
+                $stmtStudent->execute([':id' => $stId, ':sid' => $schoolId]);
+                $stRow = $stmtStudent->fetch(PDO::FETCH_ASSOC);
+                $studentName = !empty($stRow['name']) ? $stRow['name'] : 'Student';
+
+                $stmtUsers->execute([':st_id' => $stId, ':sid' => $schoolId]);
+                $recipients = $stmtUsers->fetchAll(PDO::FETCH_ASSOC);
+
+                if (!empty($recipients)) {
+                    $title = "{$studentName} is Absent Today";
+                    $message = "{$studentName} has been marked absent for today. Tap to view details.";
+                    $dispatcher->toUsers(
+                        $schoolId,
+                        $recipients,
+                        'ATTENDANCE_MARKED_ABSENT',
+                        $title,
+                        $message,
+                        '/attendance',
+                        $stId
+                    );
+                }
             }
         } catch (\Throwable $ne) {
             // Suppress notification errors so attendance commit is preserved
@@ -15493,8 +15629,8 @@ Only approve the settlement after reviewing all financial records.
                 : "{$holidayName} has been added (" . count($createdDates) . " days).\n{$formattedStart} to {$formattedEnd}";
 
             $stmtNotif = $pdo->prepare("
-                INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, is_read)
-                VALUES (:sid, :role, :uid, :title, :msg, :link, 0)
+                INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, category, event_key, is_read)
+                VALUES (:sid, :role, :uid, :title, :msg, :link, 'LEAVE', 'HOLIDAY_ANNOUNCED', 0)
             ");
 
             foreach ($usersToNotify as $utn) {
@@ -17356,23 +17492,30 @@ Only approve the settlement after reviewing all financial records.
             $message = "Your admit card has been reverted to draft. Please stay tuned for updates.";
         }
 
-        // Get student and parent user IDs in the class (Deduplicated)
+        // Get active students and their parent/student user IDs in the class (paired per student_id)
         $stmtUsers = $pdo->prepare("
-            SELECT DISTINCT u.id AS user_id, u.role
-            FROM users u
-            JOIN students s ON s.class_id = :class_id AND s.school_id = u.school_id
-            WHERE u.school_id = :school_id
+            SELECT DISTINCT s.id AS student_id, u.id AS user_id, u.role
+            FROM students s
+            JOIN users u ON u.school_id = s.school_id
+            WHERE s.class_id = :class_id
+              AND s.school_id = :school_id
+              AND (s.status IS NULL OR UPPER(s.status) = 'ACTIVE')
+              AND s.exit_date IS NULL
+              AND (u.status IS NULL OR UPPER(u.status) = 'ACTIVE')
               AND (
                 (u.role = 'STUDENT' AND (
                     (s.student_mobile IS NOT NULL AND s.student_mobile != '' AND u.phone = s.student_mobile) OR
                     (s.parent_phone IS NOT NULL AND s.parent_phone != '' AND u.phone = s.parent_phone) OR
                     (s.father_phone IS NOT NULL AND s.father_phone != '' AND u.phone = s.father_phone) OR
-                    (s.email IS NOT NULL AND s.email != '' AND u.email = s.email)
+                    (s.mother_phone IS NOT NULL AND s.mother_phone != '' AND u.phone = s.mother_phone) OR
+                    (s.guardian_phone IS NOT NULL AND s.guardian_phone != '' AND u.phone = s.guardian_phone) OR
+                    (u.email IS NOT NULL AND u.email != '' AND (u.email = s.email OR u.email = s.student_email))
                 ))
-                OR 
+                OR
                 (u.role = 'PARENT' AND (
                     (s.parent_phone IS NOT NULL AND s.parent_phone != '' AND u.phone = s.parent_phone) OR
                     (s.father_phone IS NOT NULL AND s.father_phone != '' AND u.phone = s.father_phone) OR
+                    (s.mother_phone IS NOT NULL AND s.mother_phone != '' AND u.phone = s.mother_phone) OR
                     (s.guardian_phone IS NOT NULL AND s.guardian_phone != '' AND u.phone = s.guardian_phone) OR
                     (s.student_mobile IS NOT NULL AND s.student_mobile != '' AND u.phone = s.student_mobile)
                 ))
@@ -17381,42 +17524,48 @@ Only approve the settlement after reviewing all financial records.
         $stmtUsers->execute([':class_id' => $classId, ':school_id' => $schoolId]);
         $studentParentUsers = $stmtUsers->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-        // Insert notifications for students/parents with duplicate protection
+        // Insert notifications for students/parents with duplicate protection per student
         $stmtCheckDup = $pdo->prepare("
-            SELECT COUNT(*) FROM dashboard_notifications 
-            WHERE school_id = :school_id AND user_id = :user_id AND title = :title AND message = :message 
+            SELECT COUNT(*) FROM dashboard_notifications
+            WHERE school_id = :school_id AND user_id = :user_id AND student_id = :student_id AND title = :title AND message = :message
               AND created_at >= NOW() - INTERVAL 1 MINUTE
         ");
 
         $stmtInsert = $pdo->prepare("
-            INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, category, event_key, is_read)
-            VALUES (:school_id, :role, :user_id, :title, :message, :link, 'EXAM', :event_key, 0)
+            INSERT INTO dashboard_notifications (school_id, user_role, user_id, student_id, title, message, link, category, event_key, is_read)
+            VALUES (:school_id, :role, :user_id, :student_id, :title, :message, :link, 'EXAM', :event_key, 0)
         ");
 
+        $pushedUsers = [];
         foreach ($studentParentUsers as $u) {
+            $studentId = (int)$u['student_id'];
             $userId = (int)$u['user_id'];
             $userRole = (string)$u['role'];
 
             $stmtCheckDup->execute([
-                ':school_id' => $schoolId,
-                ':user_id'   => $userId,
-                ':title'     => $title,
-                ':message'   => $message
+                ':school_id'  => $schoolId,
+                ':user_id'    => $userId,
+                ':student_id' => $studentId,
+                ':title'      => $title,
+                ':message'    => $message
             ]);
             if ((int)$stmtCheckDup->fetchColumn() === 0) {
                 $stmtInsert->execute([
-                    ':school_id' => $schoolId,
-                    ':role'      => $userRole,
-                    ':user_id'   => $userId,
-                    ':title'     => $title,
-                    ':message'   => $message,
-                    ':link'      => $link,
-                    ':event_key' => $eventKey
+                    ':school_id'  => $schoolId,
+                    ':role'       => $userRole,
+                    ':user_id'    => $userId,
+                    ':student_id' => $studentId,
+                    ':title'      => $title,
+                    ':message'    => $message,
+                    ':link'       => $link,
+                    ':event_key'  => $eventKey
                 ]);
             }
 
-            // Dispatch Push Notification to each student and parent user
-            PushDispatcher::pushOnly($pdo, $schoolId, $userRole, $userId, $eventKey, $title, $message, $link);
+            if (!isset($pushedUsers[$userId])) {
+                $pushedUsers[$userId] = true;
+                PushDispatcher::pushOnly($pdo, $schoolId, $userRole, $userId, $eventKey, $title, $message, $link);
+            }
         }
 
         // Also insert role-wide broadcast notifications & FCM topic push if classId is 0 (all classes) or for scheme/admit card/result publication to teachers
@@ -17429,13 +17578,14 @@ Only approve the settlement after reviewing all financial records.
             $stmtCheckTeacher->execute([':sid' => $schoolId, ':title' => $title, ':msg' => $message]);
             if ((int)$stmtCheckTeacher->fetchColumn() === 0) {
                 $stmtInsert->execute([
-                    ':school_id' => $schoolId,
-                    ':role'      => 'TEACHER',
-                    ':user_id'   => null,
-                    ':title'     => $title,
-                    ':message'   => $message,
-                    ':link'      => $link,
-                    ':event_key' => $eventKey
+                    ':school_id'  => $schoolId,
+                    ':role'       => 'TEACHER',
+                    ':user_id'    => null,
+                    ':student_id' => null,
+                    ':title'      => $title,
+                    ':message'    => $message,
+                    ':link'       => $link,
+                    ':event_key'  => $eventKey
                 ]);
             }
             PushDispatcher::pushOnly($pdo, $schoolId, 'TEACHER', null, $eventKey, $title, $message, $link);
@@ -20131,12 +20281,21 @@ Only approve the settlement after reviewing all financial records.
         $pdo = $this->classRepo->getPdo();
 
         if ($id > 0) {
-            $stmt = $pdo->prepare("
-                UPDATE dashboard_notifications 
-                SET is_read = 1 
-                WHERE id = :id AND school_id = :sid
-            ");
-            $stmt->execute([':id' => $id, ':sid' => $schoolId]);
+            if ($role === 'SCHOOL_ADMIN' || $role === 'SUPER_ADMIN') {
+                $stmt = $pdo->prepare("
+                    UPDATE dashboard_notifications 
+                    SET is_read = 1 
+                    WHERE id = :id AND school_id = :sid AND user_role = 'SCHOOL_ADMIN'
+                ");
+                $stmt->execute([':id' => $id, ':sid' => $schoolId]);
+            } else {
+                $stmt = $pdo->prepare("
+                    UPDATE dashboard_notifications 
+                    SET is_read = 1 
+                    WHERE id = :id AND school_id = :sid AND user_role = :role AND (user_id = :uid OR user_id IS NULL)
+                ");
+                $stmt->execute([':id' => $id, ':sid' => $schoolId, ':role' => $role, ':uid' => $userId]);
+            }
         } else {
             $module = strtolower($body['module'] ?? '');
             $eventKey = $body['event_key'] ?? '';
@@ -20147,7 +20306,9 @@ Only approve the settlement after reviewing all financial records.
                 $query = "UPDATE dashboard_notifications SET is_read = 1 WHERE school_id = :sid AND is_read = 0";
                 $params = [':sid' => $schoolId];
 
-                if ($role !== 'SCHOOL_ADMIN' && $role !== 'SUPER_ADMIN') {
+                if ($role === 'SCHOOL_ADMIN' || $role === 'SUPER_ADMIN') {
+                    $query .= " AND user_role = 'SCHOOL_ADMIN'";
+                } else {
                     $query .= " AND user_role = :role AND (user_id = :uid OR user_id IS NULL)";
                     $params[':role'] = $role;
                     $params[':uid'] = $userId;
@@ -20166,7 +20327,9 @@ Only approve the settlement after reviewing all financial records.
                 } elseif ($module === 'financial_report' || $module === 'financial-report' || $module === 'financial-reports' || $module === 'revenue') {
                     $query .= " AND (event_key = 'FINANCIAL_REPORT_APPROVAL_REQUEST' OR link LIKE '%financial-report%' OR link LIKE '%revenue%' OR title LIKE '%Financial Report%' OR title LIKE '%Settlement%')";
                 } elseif ($module === 'leave' || $module === 'leaves' || $module === 'leave_request' || $module === 'leave-request') {
-                    $query .= " AND (event_key LIKE '%LEAVE%' OR category = 'LEAVE' OR category = 'LEAVE_MANAGEMENT' OR link LIKE '%leave%' OR title LIKE '%Leave%')";
+                    $query .= " AND (event_key LIKE '%LEAVE%' OR event_key = 'HOLIDAY_ANNOUNCED' OR category = 'LEAVE' OR category = 'LEAVE_MANAGEMENT' OR link LIKE '%leave%' OR title LIKE '%Leave%' OR title LIKE '%Holiday%')";
+                } elseif ($module === 'all' || $module === 'notifications') {
+                    $query .= " AND (link != '/notice' OR link IS NULL) AND (event_key != 'ANNOUNCEMENT_PUBLISHED' OR event_key IS NULL) AND (category != 'ANNOUNCEMENT' OR category IS NULL)";
                 } elseif (!empty($eventKey)) {
                     $query .= " AND event_key = :ekey";
                     $params[':ekey'] = $eventKey;
@@ -20571,95 +20734,65 @@ Only approve the settlement after reviewing all financial records.
     private function notifyClassStudents(PDO $pdo, int $schoolId, int $classId, string $title, string $message): void
     {
         $stmtStudents = $pdo->prepare("
-            SELECT s.email, s.parent_phone, s.father_phone, s.guardian_phone, s.student_mobile 
-            FROM students s 
-            WHERE s.school_id = :sid AND s.class_id = :cid AND (s.status IS NULL OR UPPER(s.status) = 'ACTIVE') AND s.exit_date IS NULL
+            SELECT DISTINCT s.id AS student_id, u.id AS user_id, u.role
+            FROM students s
+            JOIN users u ON u.school_id = s.school_id
+            WHERE s.school_id = :sid
+              AND s.class_id = :cid
+              AND (s.status IS NULL OR UPPER(s.status) = 'ACTIVE')
+              AND s.exit_date IS NULL
+              AND (u.status IS NULL OR UPPER(u.status) = 'ACTIVE')
+              AND (
+                (u.role = 'STUDENT' AND (
+                    (s.student_mobile IS NOT NULL AND s.student_mobile != '' AND u.phone = s.student_mobile) OR
+                    (s.parent_phone IS NOT NULL AND s.parent_phone != '' AND u.phone = s.parent_phone) OR
+                    (s.father_phone IS NOT NULL AND s.father_phone != '' AND u.phone = s.father_phone) OR
+                    (s.mother_phone IS NOT NULL AND s.mother_phone != '' AND u.phone = s.mother_phone) OR
+                    (s.guardian_phone IS NOT NULL AND s.guardian_phone != '' AND u.phone = s.guardian_phone) OR
+                    (u.email IS NOT NULL AND u.email != '' AND (u.email = s.email OR u.email = s.student_email))
+                ))
+                OR
+                (u.role = 'PARENT' AND (
+                    (s.parent_phone IS NOT NULL AND s.parent_phone != '' AND u.phone = s.parent_phone) OR
+                    (s.father_phone IS NOT NULL AND s.father_phone != '' AND u.phone = s.father_phone) OR
+                    (s.mother_phone IS NOT NULL AND s.mother_phone != '' AND u.phone = s.mother_phone) OR
+                    (s.guardian_phone IS NOT NULL AND s.guardian_phone != '' AND u.phone = s.guardian_phone) OR
+                    (s.student_mobile IS NOT NULL AND s.student_mobile != '' AND u.phone = s.student_mobile)
+                ))
+              )
         ");
         $stmtStudents->execute([':sid' => $schoolId, ':cid' => $classId]);
-        $rows = $stmtStudents->fetchAll(PDO::FETCH_ASSOC);
+        $rows = $stmtStudents->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
         if (empty($rows)) {
             return;
         }
 
-        $emails = array_unique(array_filter(array_column($rows, 'email')));
-        $phones = [];
-        foreach ($rows as $r) {
-            if (!empty($r['parent_phone'])) $phones[] = trim((string)$r['parent_phone']);
-            if (!empty($r['father_phone'])) $phones[] = trim((string)$r['father_phone']);
-            if (!empty($r['guardian_phone'])) $phones[] = trim((string)$r['guardian_phone']);
-            if (!empty($r['student_mobile'])) $phones[] = trim((string)$r['student_mobile']);
-        }
-        $phones = array_unique(array_filter($phones));
+        $stmtIns = $pdo->prepare("
+            INSERT INTO dashboard_notifications (school_id, user_role, user_id, student_id, title, message, link, category, event_key, is_read)
+            VALUES (:sid, :role, :uid, :stid, :title, :msg, '/timetable', 'TIMETABLE', 'TIMETABLE_UPDATED', 0)
+        ");
 
-        // Find Student users by email or phone
-        $studentUserIds = [];
-        if (!empty($emails) || !empty($phones)) {
-            $conditions = [];
-            $params = [':sid' => $schoolId];
-            if (!empty($emails)) {
-                $placeholders = [];
-                foreach (array_values($emails) as $idx => $e) {
-                    $k = ":e_" . $idx;
-                    $placeholders[] = $k;
-                    $params[$k] = $e;
-                }
-                $conditions[] = "email IN (" . implode(',', $placeholders) . ")";
-            }
-            if (!empty($phones)) {
-                $placeholders = [];
-                foreach (array_values($phones) as $idx => $p) {
-                    $k = ":p_" . $idx;
-                    $placeholders[] = $k;
-                    $params[$k] = $p;
-                }
-                $conditions[] = "phone IN (" . implode(',', $placeholders) . ")";
-            }
+        $pushedUsers = [];
+        foreach ($rows as $row) {
+            $uid = (int)$row['user_id'];
+            $stuId = (int)$row['student_id'];
+            $role = strtoupper((string)$row['role']);
 
-            $sql = "SELECT DISTINCT id FROM users WHERE school_id = :sid AND role = 'STUDENT' AND (" . implode(' OR ', $conditions) . ")";
-            $stmtStudentUsers = $pdo->prepare($sql);
-            $stmtStudentUsers->execute($params);
-            $studentUserIds = array_map('intval', $stmtStudentUsers->fetchAll(PDO::FETCH_COLUMN) ?: []);
+            $stmtIns->execute([
+                ':sid' => $schoolId,
+                ':role' => $role,
+                ':uid' => $uid,
+                ':stid' => $stuId,
+                ':title' => $title,
+                ':msg' => $message,
+            ]);
 
-            if (!empty($studentUserIds)) {
-                $stmtIns = $pdo->prepare("
-                    INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, category, event_key, is_read)
-                    VALUES (?, 'STUDENT', ?, ?, ?, '/timetable', 'TIMETABLE', 'TIMETABLE_UPDATED', 0)
-                ");
-                foreach ($studentUserIds as $uid) {
-                    $stmtIns->execute([$schoolId, $uid, $title, $message]);
-                    \App\Shared\Notifications\PushDispatcher::pushOnly(
-                        $pdo, $schoolId, 'STUDENT', (int)$uid, 'TIMETABLE_UPDATED', $title, $message, '/timetable'
-                    );
-                }
-            }
-        }
-
-        // Find Parent users by phone
-        if (!empty($phones)) {
-            $placeholders = [];
-            $params = [':sid' => $schoolId];
-            foreach (array_values($phones) as $idx => $p) {
-                $k = ":par_p_" . $idx;
-                $placeholders[] = $k;
-                $params[$k] = $p;
-            }
-            $sqlParent = "SELECT DISTINCT id FROM users WHERE school_id = :sid AND role = 'PARENT' AND phone IN (" . implode(',', $placeholders) . ")";
-            $stmtParentUsers = $pdo->prepare($sqlParent);
-            $stmtParentUsers->execute($params);
-            $parentUserIds = array_map('intval', $stmtParentUsers->fetchAll(PDO::FETCH_COLUMN) ?: []);
-
-            if (!empty($parentUserIds)) {
-                $stmtIns = $pdo->prepare("
-                    INSERT INTO dashboard_notifications (school_id, user_role, user_id, title, message, link, category, event_key, is_read)
-                    VALUES (?, 'PARENT', ?, ?, ?, '/timetable', 'TIMETABLE', 'TIMETABLE_UPDATED', 0)
-                ");
-                foreach ($parentUserIds as $uid) {
-                    $stmtIns->execute([$schoolId, $uid, $title, $message]);
-                    \App\Shared\Notifications\PushDispatcher::pushOnly(
-                        $pdo, $schoolId, 'PARENT', (int)$uid, 'TIMETABLE_UPDATED', $title, $message, '/timetable'
-                    );
-                }
+            if (!isset($pushedUsers[$uid])) {
+                $pushedUsers[$uid] = true;
+                \App\Shared\Notifications\PushDispatcher::pushOnly(
+                    $pdo, $schoolId, $role, $uid, 'TIMETABLE_UPDATED', $title, $message, '/timetable'
+                );
             }
         }
     }
@@ -21244,11 +21377,55 @@ Only approve the settlement after reviewing all financial records.
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     announcement_id INT NOT NULL,
                     user_id INT NOT NULL,
+                    student_id INT NOT NULL DEFAULT 0,
                     read_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE KEY unique_announcement_user (announcement_id, user_id),
+                    UNIQUE KEY unique_announcement_user_student (announcement_id, user_id, student_id),
                     KEY user_id (user_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             ");
+        } else {
+            $stmtStCol = $pdo->query("SHOW COLUMNS FROM announcement_reads LIKE 'student_id'");
+            $hasStudentIdCol = $stmtStCol && (bool)$stmtStCol->fetch(PDO::FETCH_ASSOC);
+            if ($stmtStCol) {
+                $stmtStCol->closeCursor();
+            }
+            if (!$hasStudentIdCol) {
+                try {
+                    $pdo->exec("ALTER TABLE announcement_reads ADD COLUMN student_id INT NOT NULL DEFAULT 0 AFTER user_id");
+                } catch (\PDOException $e) {
+                    if ((int)($e->errorInfo[1] ?? 0) !== 1060) {
+                        throw $e;
+                    }
+                }
+            }
+
+            $stmtNewIdx = $pdo->query("SHOW INDEX FROM announcement_reads WHERE Key_name = 'unique_announcement_user_student'");
+            $hasNewIdx = $stmtNewIdx && (bool)$stmtNewIdx->fetch(PDO::FETCH_ASSOC);
+            if ($stmtNewIdx) {
+                $stmtNewIdx->closeCursor();
+            }
+            if (!$hasNewIdx) {
+                try {
+                    $pdo->exec("ALTER TABLE announcement_reads ADD UNIQUE INDEX unique_announcement_user_student (announcement_id, user_id, student_id)");
+                } catch (\PDOException $e) {
+                    if ((int)($e->errorInfo[1] ?? 0) !== 1061) {
+                        throw $e;
+                    }
+                }
+            }
+
+            $stmtOldIdx = $pdo->query("SHOW INDEX FROM announcement_reads WHERE Key_name = 'unique_announcement_user'");
+            $hasOldIdx = $stmtOldIdx && (bool)$stmtOldIdx->fetch(PDO::FETCH_ASSOC);
+            if ($stmtOldIdx) {
+                $stmtOldIdx->closeCursor();
+            }
+            if ($hasOldIdx) {
+                try {
+                    $pdo->exec("ALTER TABLE announcement_reads DROP INDEX unique_announcement_user");
+                } catch (\PDOException $e) {
+                    // Ignore if already dropped
+                }
+            }
         }
 
         $this->announcementsSchemaEnsured = true;
@@ -21466,7 +21643,7 @@ Only approve the settlement after reviewing all financial records.
 
         // Mark read for creator user
         if (!empty($user['id'])) {
-            $stmtCreatorRead = $pdo->prepare("INSERT IGNORE INTO announcement_reads (announcement_id, user_id) VALUES (:ann, :uid)");
+            $stmtCreatorRead = $pdo->prepare("INSERT IGNORE INTO announcement_reads (announcement_id, user_id, student_id) VALUES (:ann, :uid, 0)");
             $stmtCreatorRead->execute([':ann' => $announcementId, ':uid' => (int)$user['id']]);
         }
 

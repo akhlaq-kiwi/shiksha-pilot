@@ -15,7 +15,9 @@ class AttendanceService {
 
   // Student/Parent: Fetch student attendance history
   Future<List<dynamic>> getStudentAttendance(int? studentId) async {
-    final uri = Uri.parse('$baseUrl/api/student/attendance');
+    final uri = Uri.parse('$baseUrl/api/student/attendance').replace(
+      queryParameters: studentId != null ? {'student_id': studentId.toString()} : null,
+    );
     final response = await http.get(uri, headers: _headers(studentId));
 
     if (response.statusCode == 200) {

@@ -49,12 +49,53 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
   final int _limit = 10;
   String _errorText = '';
 
+  bool get _isStudentSide {
+    final role = (widget.userRole ?? '').toUpperCase();
+    if (role == 'STUDENT' || role == 'PARENT') return true;
+    if (role == 'TEACHER' || role == 'PRINCIPAL' || role == 'SCHOOL_ADMIN' || role == 'SUPER_ADMIN') {
+      return false;
+    }
+    return widget.studentId != null;
+  }
+
+  String get _notificationsBasePath {
+    if (_isStudentSide) return '/api/student/notifications';
+    final role = (widget.userRole ?? '').toUpperCase();
+    if (role == 'TEACHER' || role == 'PRINCIPAL') {
+      return '/api/teacher/notifications';
+    }
+    return '/api/school/notifications';
+  }
+
+  Map<String, String>? get _studentQueryParams =>
+      (_isStudentSide && widget.studentId != null)
+          ? {'student_id': widget.studentId.toString()}
+          : null;
+
+  String get _effectiveRoleForChildScreen {
+    final role = (widget.userRole ?? '').trim();
+    if (role.isNotEmpty) return role;
+    return widget.studentId != null ? 'PARENT' : 'TEACHER';
+  }
+
+  int? _studentIdForNotif(dynamic notif) {
+    if (widget.studentId != null) return widget.studentId;
+    if (!_isStudentSide) return null;
+    final raw = notif?['student_id'];
+    if (raw is int) return raw;
+    return int.tryParse(raw?.toString() ?? '');
+  }
+
   @override
   void initState() {
     super.initState();
-    _fetchInitialNotifications();
-    _markAllRead();
+    _initAndMarkRead();
     _scrollController.addListener(_onScroll);
+  }
+
+  Future<void> _initAndMarkRead() async {
+    await _fetchInitialNotifications();
+    await _markAllRead();
   }
 
   @override
@@ -82,17 +123,19 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
     });
     try {
       final role = (widget.userRole ?? '').toUpperCase();
-      final isStudentOrParent = role == 'STUDENT' || role == 'PARENT' || widget.studentId != null;
-      final endpoint = isStudentOrParent 
-          ? '/api/student/notifications' 
-          : (role == 'TEACHER' || role == 'PRINCIPAL' ? '/api/teacher/notifications' : '/api/school/notifications');
-      final uri = Uri.parse('${widget.baseUrl}$endpoint?limit=$_limit&offset=0');
+      final uri = Uri.parse('${widget.baseUrl}$_notificationsBasePath').replace(
+        queryParameters: {
+          'limit': '$_limit',
+          'offset': '0',
+          if (_studentQueryParams != null) ..._studentQueryParams!,
+        },
+      );
       final response = await http.get(
         uri,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ${widget.token}',
-          if (widget.studentId != null) 'X-Student-Id': widget.studentId.toString(),
+          if (_isStudentSide && widget.studentId != null) 'X-Student-Id': widget.studentId.toString(),
         },
       );
 
@@ -148,17 +191,19 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
 
     try {
       final role = (widget.userRole ?? '').toUpperCase();
-      final isStudentOrParent = role == 'STUDENT' || role == 'PARENT' || widget.studentId != null;
-      final endpoint = isStudentOrParent 
-          ? '/api/student/notifications' 
-          : (role == 'TEACHER' || role == 'PRINCIPAL' ? '/api/teacher/notifications' : '/api/school/notifications');
-      final uri = Uri.parse('${widget.baseUrl}$endpoint?limit=$_limit&offset=$_offset');
+      final uri = Uri.parse('${widget.baseUrl}$_notificationsBasePath').replace(
+        queryParameters: {
+          'limit': '$_limit',
+          'offset': '$_offset',
+          if (_studentQueryParams != null) ..._studentQueryParams!,
+        },
+      );
       final response = await http.get(
         uri,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ${widget.token}',
-          if (widget.studentId != null) 'X-Student-Id': widget.studentId.toString(),
+          if (_isStudentSide && widget.studentId != null) 'X-Student-Id': widget.studentId.toString(),
         },
       );
 
@@ -211,15 +256,15 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
     });
 
     try {
-      final isStaff = widget.studentId == null;
-      final endpoint = isStaff ? '/api/school/notifications/$id' : '/api/student/notifications/$id';
-      final uri = Uri.parse('${widget.baseUrl}$endpoint');
+      final uri = Uri.parse('${widget.baseUrl}$_notificationsBasePath/$id').replace(
+        queryParameters: _studentQueryParams,
+      );
       final response = await http.delete(
         uri,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ${widget.token}',
-          if (widget.studentId != null) 'X-Student-Id': widget.studentId.toString(),
+          if (_isStudentSide && widget.studentId != null) 'X-Student-Id': widget.studentId.toString(),
         },
       );
 
@@ -255,16 +300,17 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
 
   Future<void> _markAllRead() async {
     try {
-      final isStaff = widget.studentId == null;
-      final endpoint = isStaff ? '/api/school/notifications/read-all' : '/api/student/notifications/read-all';
-      final uri = Uri.parse('${widget.baseUrl}$endpoint');
+      final uri = Uri.parse('${widget.baseUrl}$_notificationsBasePath/0/read').replace(
+        queryParameters: _studentQueryParams,
+      );
       await http.post(
         uri,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ${widget.token}',
-          if (widget.studentId != null) 'X-Student-Id': widget.studentId.toString(),
+          if (_isStudentSide && widget.studentId != null) 'X-Student-Id': widget.studentId.toString(),
         },
+        body: json.encode({'module': 'all'}),
       );
     } catch (e) {
       // Ignore
@@ -439,22 +485,19 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                 notif['is_read'] = 1;
                               });
 
+                              final int? targetStudentIdForNotif = _studentIdForNotif(notif);
                               // Fire background API call to update notification state to read
                               try {
-                                final roleUpper = (widget.userRole ?? '').toUpperCase();
-                                final String path;
-                                if (roleUpper == 'TEACHER' || roleUpper == 'PRINCIPAL') {
-                                  path = '/api/teacher/notifications/${notif['id']}/read';
-                                } else if (roleUpper == 'SCHOOL_ADMIN' || roleUpper == 'SUPER_ADMIN') {
-                                  path = '/api/school/notifications/${notif['id']}/read';
-                                } else {
-                                  path = '/api/student/notifications/${notif['id']}/read';
-                                }
-                                final uri = Uri.parse('${widget.baseUrl}$path');
+                                final uri = Uri.parse('${widget.baseUrl}$_notificationsBasePath/${notif['id']}/read').replace(
+                                  queryParameters: (_isStudentSide && targetStudentIdForNotif != null)
+                                      ? {'student_id': targetStudentIdForNotif.toString()}
+                                      : null,
+                                );
                                 final headers = {
                                   'Content-Type': 'application/json',
                                   'Authorization': 'Bearer ${widget.token}',
-                                  if (widget.studentId != null) 'X-Student-Id': widget.studentId.toString(),
+                                  if (_isStudentSide && targetStudentIdForNotif != null)
+                                    'X-Student-Id': targetStudentIdForNotif.toString(),
                                 };
                                 http.post(uri, headers: headers).catchError((_) => http.Response('', 500));
                               } catch (_) {}
@@ -489,8 +532,8 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                   MaterialPageRoute(
                                     builder: (context) => HomeworkListScreen(
                                       baseUrl: widget.baseUrl,
-                                      userRole: widget.studentId != null ? 'PARENT' : (widget.userRole ?? 'STUDENT'),
-                                      selectedStudentId: widget.studentId,
+                                      userRole: _effectiveRoleForChildScreen,
+                                      selectedStudentId: targetStudentIdForNotif,
                                     ),
                                   ),
                                 );
@@ -505,8 +548,8 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                     builder: (context) => AchievementsScreen(
                                       baseUrl: widget.baseUrl,
                                       token: widget.token,
-                                      userRole: widget.studentId != null ? 'PARENT' : (widget.userRole ?? 'STUDENT'),
-                                      studentId: widget.studentId,
+                                      userRole: _effectiveRoleForChildScreen,
+                                      studentId: targetStudentIdForNotif,
                                     ),
                                   ),
                                 );
@@ -522,11 +565,13 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                 );
 
                                 try {
-                                  final noticesUri = Uri.parse('${widget.baseUrl}/api/student/announcements');
+                                  final noticesUri = Uri.parse('${widget.baseUrl}/api/student/announcements').replace(
+                                    queryParameters: _studentQueryParams,
+                                  );
                                   final headers = {
                                     'Content-Type': 'application/json',
                                     'Authorization': 'Bearer ${widget.token}',
-                                    if (widget.studentId != null) 'X-Student-Id': widget.studentId.toString(),
+                                    if (_isStudentSide && widget.studentId != null) 'X-Student-Id': widget.studentId.toString(),
                                   };
                                   final response = await http.get(noticesUri, headers: headers);
                                   
@@ -545,7 +590,9 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
 
                                     if (matchingNotice != null) {
                                       final int noticeId = matchingNotice['id'] as int;
-                                      final readUri = Uri.parse('${widget.baseUrl}/api/student/announcements/$noticeId/read');
+                                      final readUri = Uri.parse('${widget.baseUrl}/api/student/announcements/$noticeId/read').replace(
+                                        queryParameters: _studentQueryParams,
+                                      );
                                       await http.post(readUri, headers: headers);
 
                                       if (context.mounted) {
@@ -609,8 +656,8 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                   MaterialPageRoute(
                                     builder: (context) => LeaveListScreen(
                                       leaveService: LeaveService(baseUrl: widget.baseUrl, token: widget.token),
-                                      userRole: widget.studentId != null ? 'PARENT' : 'TEACHER',
-                                      selectedStudentId: widget.studentId,
+                                      userRole: _effectiveRoleForChildScreen,
+                                      selectedStudentId: targetStudentIdForNotif,
                                       initialTabIndex: isLeaveReqNotif ? 1 : 0,
                                     ),
                                   ),
@@ -625,8 +672,8 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                     builder: (context) => TimetableScreen(
                                       baseUrl: widget.baseUrl,
                                       token: widget.token,
-                                      userRole: widget.studentId != null ? 'PARENT' : 'TEACHER',
-                                      selectedStudentId: widget.studentId,
+                                      userRole: _effectiveRoleForChildScreen,
+                                      selectedStudentId: targetStudentIdForNotif,
                                     ),
                                   ),
                                 );
@@ -645,8 +692,8 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                     baseUrl: widget.baseUrl,
                                     token: widget.token,
                                   );
-                                  final effectiveRole = widget.userRole ?? (widget.studentId != null ? 'PARENT' : 'TEACHER');
-                                  final exams = await examService.getExamsList(effectiveRole, widget.studentId);
+                                  final effectiveRole = _effectiveRoleForChildScreen;
+                                  final exams = await examService.getExamsList(effectiveRole, targetStudentIdForNotif);
                                   
                                   if (Navigator.canPop(context)) {
                                     Navigator.pop(context);
@@ -667,7 +714,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                             examId: targetExam['id'] as int,
                                             examName: targetExam['name'] ?? 'Exam Detail',
                                             userRole: effectiveRole,
-                                            studentId: widget.studentId,
+                                            studentId: targetStudentIdForNotif,
                                           ),
                                         ),
                                       );
@@ -678,7 +725,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                           builder: (context) => ExamListScreen(
                                             examService: examService,
                                             userRole: effectiveRole,
-                                            selectedStudentId: widget.studentId,
+                                            selectedStudentId: targetStudentIdForNotif,
                                           ),
                                         ),
                                       );
@@ -697,8 +744,8 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                             baseUrl: widget.baseUrl,
                                             token: widget.token,
                                           ),
-                                          userRole: widget.studentId != null ? 'PARENT' : 'STUDENT',
-                                          selectedStudentId: widget.studentId,
+                                          userRole: _effectiveRoleForChildScreen,
+                                          selectedStudentId: targetStudentIdForNotif,
                                         ),
                                       ),
                                     );
@@ -761,7 +808,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                     builder: (context) => FeesCardScreen(
                                       baseUrl: widget.baseUrl,
                                       token: widget.token,
-                                      studentId: widget.studentId,
+                                      studentId: targetStudentIdForNotif,
                                     ),
                                   ),
                                 );
@@ -795,8 +842,8 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                   MaterialPageRoute(
                                     builder: (context) => AttendanceScreen(
                                       attendanceService: AttendanceService(baseUrl: widget.baseUrl, token: widget.token),
-                                      userRole: widget.userRole ?? (widget.studentId != null ? 'PARENT' : 'STUDENT'),
-                                      selectedStudentId: widget.studentId,
+                                      userRole: _effectiveRoleForChildScreen,
+                                      selectedStudentId: targetStudentIdForNotif,
                                     ),
                                   ),
                                 );
@@ -810,11 +857,13 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                               );
 
                               try {
-                                final noticesUri = Uri.parse('${widget.baseUrl}/api/student/announcements');
+                                final noticesUri = Uri.parse('${widget.baseUrl}/api/student/announcements').replace(
+                                  queryParameters: _studentQueryParams,
+                                );
                                 final headers = {
                                   'Content-Type': 'application/json',
                                   'Authorization': 'Bearer ${widget.token}',
-                                  if (widget.studentId != null) 'X-Student-Id': widget.studentId.toString(),
+                                  if (_isStudentSide && widget.studentId != null) 'X-Student-Id': widget.studentId.toString(),
                                 };
                                 final response = await http.get(noticesUri, headers: headers);
                                 
@@ -833,7 +882,9 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
 
                                   if (matchingNotice != null) {
                                     final int noticeId = matchingNotice['id'] as int;
-                                    final readUri = Uri.parse('${widget.baseUrl}/api/student/announcements/$noticeId/read');
+                                    final readUri = Uri.parse('${widget.baseUrl}/api/student/announcements/$noticeId/read').replace(
+                                      queryParameters: _studentQueryParams,
+                                    );
                                     await http.post(readUri, headers: headers);
 
                                     if (context.mounted) {

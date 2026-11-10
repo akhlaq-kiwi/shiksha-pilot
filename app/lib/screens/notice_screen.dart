@@ -193,11 +193,17 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
     });
 
     try {
-      final uri = Uri.parse('${widget.baseUrl}/api/student/announcements');
+      final roleUpper = widget.userRole.toUpperCase();
+      final bool isStudentOrParent = roleUpper == 'PARENT' || roleUpper == 'STUDENT';
+      final uri = Uri.parse('${widget.baseUrl}/api/student/announcements').replace(
+        queryParameters: (isStudentOrParent && widget.studentId != null)
+            ? {'student_id': widget.studentId.toString()}
+            : null,
+      );
       final headers = {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ${widget.token}',
-        if (widget.userRole.toUpperCase() == 'PARENT' && widget.studentId != null)
+        if (isStudentOrParent && widget.studentId != null)
           'X-Student-Id': widget.studentId.toString(),
       };
 
@@ -238,11 +244,17 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
 
   Future<void> _markAllAsRead() async {
     try {
-      final uri = Uri.parse('${widget.baseUrl}/api/student/announcements/read-all');
+      final roleUpper = widget.userRole.toUpperCase();
+      final bool isStudentOrParent = roleUpper == 'PARENT' || roleUpper == 'STUDENT';
+      final uri = Uri.parse('${widget.baseUrl}/api/student/announcements/read-all').replace(
+        queryParameters: (isStudentOrParent && widget.studentId != null)
+            ? {'student_id': widget.studentId.toString()}
+            : null,
+      );
       final headers = {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ${widget.token}',
-        if (widget.userRole.toUpperCase() == 'PARENT' && widget.studentId != null)
+        if (isStudentOrParent && widget.studentId != null)
           'X-Student-Id': widget.studentId.toString(),
       };
 
@@ -274,10 +286,18 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
 
   Future<void> _markAsRead(int noticeId) async {
     try {
-      final uri = Uri.parse('${widget.baseUrl}/api/student/announcements/$noticeId/read');
+      final roleUpper = widget.userRole.toUpperCase();
+      final bool isStudentOrParent = roleUpper == 'PARENT' || roleUpper == 'STUDENT';
+      final uri = Uri.parse('${widget.baseUrl}/api/student/announcements/$noticeId/read').replace(
+        queryParameters: (isStudentOrParent && widget.studentId != null)
+            ? {'student_id': widget.studentId.toString()}
+            : null,
+      );
       final headers = {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ${widget.token}',
+        if (isStudentOrParent && widget.studentId != null)
+          'X-Student-Id': widget.studentId.toString(),
       };
 
       final response = await http.post(uri, headers: headers);

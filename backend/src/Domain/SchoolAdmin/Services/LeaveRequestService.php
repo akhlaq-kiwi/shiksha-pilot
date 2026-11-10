@@ -383,6 +383,10 @@ class LeaveRequestService extends BaseService
                 $eventKey = 'LEAVE_REJECTED';
             }
 
+            $targetStudentId = (($leave['applicant_role'] ?? '') === 'STUDENT' && !empty($leave['student_id']))
+                ? (int)$leave['student_id']
+                : null;
+
             $recipients = $this->resolveRecipientsForLeaveRequest($pdo, $leave);
             if (!empty($recipients)) {
                 $dispatcher = new PushDispatcher($pdo, new \App\Shared\Notifications\FcmClient($pdo));
@@ -393,12 +397,12 @@ class LeaveRequestService extends BaseService
                         ? '/teacher/leaves' 
                         : (($recRole === 'STUDENT') ? '/student/leaves' : '/parent/leaves');
 
-                    $dispatcher->toUser($schoolId, $recUserId, $recRole, $eventKey, $title, $message, $link);
+                    $dispatcher->toUser($schoolId, $recUserId, $recRole, $eventKey, $title, $message, $link, $targetStudentId);
                 }
             } else {
                 $applicantUserRole = $leave['applicant_role'] === 'TEACHER' ? 'TEACHER' : 'PARENT';
                 $link = $leave['applicant_role'] === 'TEACHER' ? '/teacher/leaves' : '/parent/leaves';
-                $this->createNotification($pdo, $schoolId, $applicantUserRole, $title, $message, $link, $eventKey);
+                $this->createNotification($pdo, $schoolId, $applicantUserRole, $title, $message, $link, $eventKey, $targetStudentId);
             }
 
             $this->commit($pdo);
@@ -460,6 +464,9 @@ class LeaveRequestService extends BaseService
                 );
             } else {
                 $applicantUserRole = $leave['applicant_role'] === 'TEACHER' ? 'TEACHER' : 'PARENT';
+                $targetStudentId = (($leave['applicant_role'] ?? '') === 'STUDENT' && !empty($leave['student_id']))
+                    ? (int)$leave['student_id']
+                    : null;
                 $this->createNotification(
                     $pdo,
                     $schoolId,
@@ -467,7 +474,8 @@ class LeaveRequestService extends BaseService
                     "Leave Request Cancelled by Admin",
                     "Your leave request has been cancelled by an administrator.",
                     $leave['applicant_role'] === 'TEACHER' ? '/teacher/leaves' : '/parent/leaves',
-                    'LEAVE_CANCELLED_BY_ADMIN'
+                    'LEAVE_CANCELLED_BY_ADMIN',
+                    $targetStudentId
                 );
             }
 
@@ -544,28 +552,34 @@ class LeaveRequestService extends BaseService
             }
         }
 
-        if (empty($phone) || strlen($phone) < 10) {
+        $digits = preg_replace('/[^0-9]/', '', $phone);
+        $phone10 = strlen($digits) >= 10 ? substr($digits, -10) : '';
+
+        if (empty($phone) || (strlen($phone) < 10 && $phone10 === '')) {
             if (!empty($email)) {
                 $stmt = $pdo->prepare("
                     SELECT s.*, 
                            c.name AS class_name, 
                            c.section AS section_name,
                            ay.name AS academic_year_name,
-                           ay.is_current AS is_current_academic_year
+                           ay.status AS academic_year_status,
+                           (CASE WHEN UPPER(COALESCE(ay.status, '')) = 'ACTIVE' OR ay.is_current = 1 OR s.academic_year_id IS NULL THEN 1 ELSE 0 END) AS is_current_academic_year
                     FROM students s
                     LEFT JOIN classes c ON s.class_id = c.id
                     LEFT JOIN academic_years ay ON s.academic_year_id = ay.id
                     WHERE s.school_id = :sid
                       AND (s.status IS NULL OR UPPER(s.status) = 'ACTIVE')
                       AND s.exit_date IS NULL
-                      AND LOWER(s.email) = LOWER(:email)
-                    ORDER BY (CASE WHEN ay.status = 'ACTIVE' THEN 2 WHEN ay.is_current = 1 THEN 1 ELSE 0 END) DESC, s.id DESC
+                      AND (LOWER(COALESCE(s.email, '')) = LOWER(:email1) OR LOWER(COALESCE(s.student_email, '')) = LOWER(:email2))
+                    ORDER BY (CASE WHEN UPPER(COALESCE(ay.status, '')) = 'ACTIVE' THEN 2 WHEN ay.is_current = 1 THEN 1 ELSE 0 END) DESC, s.id DESC
                 ");
-                $stmt->execute([':sid' => $schoolId, ':email' => $email]);
+                $stmt->execute([':sid' => $schoolId, ':email1' => $email, ':email2' => $email]);
                 $raw = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
                 $filtered = [];
                 $seen = [];
                 foreach ($raw as $st) {
+                    $st['id'] = (int)$st['id'];
+                    $st['is_current_academic_year'] = (int)($st['is_current_academic_year'] ?? 0);
                     $identity = !empty($st['admission_no']) ? 'ADM_' . $st['admission_no'] : 'NAME_' . mb_strtolower(trim($st['name'] ?? ''));
                     if (!isset($seen[$identity])) {
                         $seen[$identity] = true;
@@ -577,40 +591,62 @@ class LeaveRequestService extends BaseService
             return [];
         }
 
+        $phoneSql = "
+            (s.parent_phone = :p1 AND s.parent_phone IS NOT NULL AND s.parent_phone != '') OR
+            (s.father_phone = :p2 AND s.father_phone IS NOT NULL AND s.father_phone != '') OR
+            (s.mother_phone = :p3 AND s.mother_phone IS NOT NULL AND s.mother_phone != '') OR
+            (s.guardian_phone = :p4 AND s.guardian_phone IS NOT NULL AND s.guardian_phone != '') OR
+            (s.student_mobile = :p5 AND s.student_mobile IS NOT NULL AND s.student_mobile != '')
+        ";
+        $params = [
+            ':sid' => $schoolId,
+            ':p1'  => $phone,
+            ':p2'  => $phone,
+            ':p3'  => $phone,
+            ':p4'  => $phone,
+            ':p5'  => $phone,
+        ];
+        if (strlen($phone10) === 10) {
+            $phoneSql .= "
+                OR (s.parent_phone IS NOT NULL AND s.parent_phone != '' AND RIGHT(TRIM(s.parent_phone), 10) = :q1)
+                OR (s.father_phone IS NOT NULL AND s.father_phone != '' AND RIGHT(TRIM(s.father_phone), 10) = :q2)
+                OR (s.mother_phone IS NOT NULL AND s.mother_phone != '' AND RIGHT(TRIM(s.mother_phone), 10) = :q3)
+                OR (s.guardian_phone IS NOT NULL AND s.guardian_phone != '' AND RIGHT(TRIM(s.guardian_phone), 10) = :q4)
+                OR (s.student_mobile IS NOT NULL AND s.student_mobile != '' AND RIGHT(TRIM(s.student_mobile), 10) = :q5)
+            ";
+            $params[':q1'] = $phone10;
+            $params[':q2'] = $phone10;
+            $params[':q3'] = $phone10;
+            $params[':q4'] = $phone10;
+            $params[':q5'] = $phone10;
+        }
+
         $stmt = $pdo->prepare("
             SELECT s.*, 
                    c.name AS class_name, 
                    c.section AS section_name,
                    ay.name AS academic_year_name,
-                   ay.is_current AS is_current_academic_year
+                   ay.status AS academic_year_status,
+                   (CASE WHEN UPPER(COALESCE(ay.status, '')) = 'ACTIVE' OR ay.is_current = 1 OR s.academic_year_id IS NULL THEN 1 ELSE 0 END) AS is_current_academic_year
             FROM students s
             LEFT JOIN classes c ON s.class_id = c.id
             LEFT JOIN academic_years ay ON s.academic_year_id = ay.id
             WHERE s.school_id = :sid
               AND (s.status IS NULL OR UPPER(s.status) = 'ACTIVE')
               AND s.exit_date IS NULL
-              AND (
-                (s.parent_phone = :p1 AND s.parent_phone IS NOT NULL AND s.parent_phone != '') OR
-                (s.father_phone = :p2 AND s.father_phone IS NOT NULL AND s.father_phone != '') OR
-                (s.guardian_phone = :p3 AND s.guardian_phone IS NOT NULL AND s.guardian_phone != '') OR
-                (s.student_mobile = :p4 AND s.student_mobile IS NOT NULL AND s.student_mobile != '')
-              )
-            ORDER BY (CASE WHEN ay.status = 'ACTIVE' THEN 2 WHEN ay.is_current = 1 THEN 1 ELSE 0 END) DESC, s.id DESC
+              AND ($phoneSql)
+            ORDER BY (CASE WHEN UPPER(COALESCE(ay.status, '')) = 'ACTIVE' THEN 2 WHEN ay.is_current = 1 THEN 1 ELSE 0 END) DESC, s.id DESC
         ");
 
-        $stmt->execute([
-            ':sid' => $schoolId,
-            ':p1'  => $phone,
-            ':p2'  => $phone,
-            ':p3'  => $phone,
-            ':p4'  => $phone
-        ]);
+        $stmt->execute($params);
 
         $rawStudents = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
         $filtered = [];
         $seenIdentityMap = [];
         foreach ($rawStudents as $st) {
+            $st['id'] = (int)$st['id'];
+            $st['is_current_academic_year'] = (int)($st['is_current_academic_year'] ?? 0);
             $identity = !empty($st['admission_no']) ? 'ADM_' . $st['admission_no'] : 'NAME_' . mb_strtolower(trim($st['name'] ?? ''));
             if (!isset($seenIdentityMap[$identity])) {
                 $seenIdentityMap[$identity] = true;
@@ -749,7 +785,7 @@ class LeaveRequestService extends BaseService
         if (($leave['applicant_role'] ?? '') === 'STUDENT' && !empty($leave['student_id'])) {
             $studentId = (int)$leave['student_id'];
             $stmtSt = $pdo->prepare("
-                SELECT id, student_mobile, parent_phone, father_phone, guardian_phone, email, student_email 
+                SELECT id, student_mobile, parent_phone, father_phone, mother_phone, guardian_phone, email, student_email 
                 FROM students 
                 WHERE id = :id LIMIT 1
             ");
@@ -759,6 +795,7 @@ class LeaveRequestService extends BaseService
                 $parentPhones = array_values(array_filter(array_map('trim', [
                     $st['parent_phone'] ?? '',
                     $st['father_phone'] ?? '',
+                    $st['mother_phone'] ?? '',
                     $st['guardian_phone'] ?? ''
                 ])));
                 $studentPhones = array_values(array_filter(array_map('trim', [
@@ -840,15 +877,16 @@ class LeaveRequestService extends BaseService
         return $recipients;
     }
 
-    private function createNotification(PDO $pdo, int $schoolId, string $role, string $title, string $message, ?string $link = null, ?string $eventKey = null): void
+    private function createNotification(PDO $pdo, int $schoolId, string $role, string $title, string $message, ?string $link = null, ?string $eventKey = null, ?int $studentId = null): void
     {
         $stmt = $pdo->prepare("
-            INSERT INTO dashboard_notifications (school_id, user_role, title, message, link, category, event_key, is_read)
-            VALUES (:school_id, :user_role, :title, :message, :link, :category, :event_key, 0)
+            INSERT INTO dashboard_notifications (school_id, user_role, student_id, title, message, link, category, event_key, is_read)
+            VALUES (:school_id, :user_role, :student_id, :title, :message, :link, :category, :event_key, 0)
         ");
         $stmt->execute([
             ':school_id' => $schoolId,
             ':user_role' => $role,
+            ':student_id' => $studentId,
             ':title' => $title,
             ':message' => $message,
             ':link' => $link,

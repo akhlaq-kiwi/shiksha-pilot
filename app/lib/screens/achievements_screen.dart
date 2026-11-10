@@ -115,12 +115,35 @@ class _AchievementsScreenState extends State<AchievementsScreen> with SingleTick
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _markAchievementsNotificationsRead();
     _fetchAchievements();
     _searchController.addListener(() {
       setState(() {
         _searchQuery = _searchController.text.trim().toLowerCase();
       });
     });
+  }
+
+  Future<void> _markAchievementsNotificationsRead() async {
+    try {
+      final roleUpper = widget.userRole.toUpperCase();
+      if (roleUpper != 'STUDENT' && roleUpper != 'PARENT') return;
+      if (widget.token.isEmpty) return;
+      final uri = Uri.parse('${widget.baseUrl}/api/student/notifications/0/read').replace(
+        queryParameters: widget.studentId != null
+            ? {'student_id': widget.studentId.toString()}
+            : null,
+      );
+      await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${widget.token}',
+          if (widget.studentId != null) 'X-Student-Id': widget.studentId.toString(),
+        },
+        body: json.encode({'module': 'achievements'}),
+      );
+    } catch (_) {}
   }
 
   @override

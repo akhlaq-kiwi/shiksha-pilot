@@ -128,6 +128,8 @@ final class PushDispatcher
             return;
         }
 
+        $userIds = array_values(array_unique($userIds));
+
         $this->guard(function () use ($schoolId, $userIds, $eventKey, $title, $message, $link) {
             $tokens = $this->activeTokensForUsers($schoolId, $userIds);
             $this->fanOut($tokens, $eventKey, $title, $message, $link);

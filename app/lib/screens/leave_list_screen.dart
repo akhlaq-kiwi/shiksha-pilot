@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:school_hub/services/http_service.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/leave_request.dart';
@@ -118,7 +118,11 @@ class _LeaveListScreenState extends State<LeaveListScreen> with SingleTickerProv
               : '/api/teacher/notifications/0/read')
           : '/api/student/notifications/0/read';
 
-      final uri = Uri.parse('$baseUrl$path');
+      final uri = Uri.parse('$baseUrl$path').replace(
+        queryParameters: (!isSchoolStaff && widget.selectedStudentId != null)
+            ? {'student_id': widget.selectedStudentId.toString()}
+            : null,
+      );
       final headers = {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
