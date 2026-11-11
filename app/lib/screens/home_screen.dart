@@ -326,6 +326,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _loadSessionInfo();
     _fetchChildrenList();
     _notifTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
       _fetchUnreadNotificationsCount();
       _fetchUnreadNoticesCount();
       _fetchPendingExpenseCount();
@@ -369,6 +373,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _loadSessionInfo() async {
     final prefs = await SharedPreferences.getInstance();
+    final activeToken = prefs.getString('auth_token') ?? '';
+    if (!mounted || activeToken.isEmpty) return;
     final roleUpper = widget.userRole.toUpperCase();
     final isStudentOrParent = roleUpper == 'PARENT' || roleUpper == 'STUDENT';
     final savedId = StudentSessionHelper.readSavedStudentId(prefs);
@@ -1851,6 +1857,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _handleLogout() async {
+    http.suppressUnauthorizedRedirects(duration: const Duration(seconds: 30));
     // Detach push and clear scheduled reminders BEFORE wiping prefs — both
     // need the auth token and the stored FCM token to do their work, and
     // prefs.clear() destroys them. Otherwise the next person to log in on a
@@ -2078,7 +2085,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               isFeeCollector: _isFeeCollector,
             ),
           ),
-        ).then((_) => _loadSessionInfo());
+        ).then((_) {
+          if (mounted) {
+            _loadSessionInfo();
+          }
+        });
       } else if (feature.name == 'Attendance') {
         final roleUpper = widget.userRole.toUpperCase();
         final bool isStudentOrParent = roleUpper == 'PARENT' || roleUpper == 'STUDENT';

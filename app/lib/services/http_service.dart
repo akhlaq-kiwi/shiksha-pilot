@@ -361,13 +361,47 @@ Future<http.Response> sendMultipart(
   }
 }
 
+bool _isRedirectingToLogin = false;
+DateTime? _suppressUnauthorizedRedirectUntil;
+
+/// Suppresses global 401 -> LoginScreen redirects briefly during intentional
+/// transitions (such as password change or explicit logout) so concurrent or
+/// late in-flight responses cannot cause flicker or overwrite Sign In state.
+void suppressUnauthorizedRedirects({
+  Duration duration = const Duration(seconds: 30),
+}) {
+  _suppressUnauthorizedRedirectUntil = DateTime.now().add(duration);
+}
+
+/// Re-enables global 401 -> LoginScreen redirects once a fresh sign-in succeeds.
+void resetUnauthorizedRedirectState() {
+  _isRedirectingToLogin = false;
+  _suppressUnauthorizedRedirectUntil = null;
+}
+
+bool _isUnauthorizedRedirectSuppressed() {
+  final until = _suppressUnauthorizedRedirectUntil;
+  return until != null && DateTime.now().isBefore(until);
+}
+
 void checkUnauthorized(http.Response response) {
   _checkUnauthorized(response);
 }
 
 void _checkUnauthorized(http.Response response) async {
-  if (response.statusCode == 401) {
+  if (response.statusCode != 401) return;
+  if (_isRedirectingToLogin || _isUnauthorizedRedirectSuppressed()) return;
+
+  _isRedirectingToLogin = true;
+  try {
     final prefs = await SharedPreferences.getInstance();
+    if (_isUnauthorizedRedirectSuppressed()) return;
+
+    // Skip if session token is already gone (logged out, password changed, or
+    // another concurrent 401 already handled the redirect).
+    final existingToken = prefs.getString('auth_token') ?? '';
+    if (existingToken.isEmpty) return;
+
     await prefs.remove('auth_token');
     await prefs.remove('user_role');
     await prefs.remove('user_name');
@@ -375,19 +409,28 @@ void _checkUnauthorized(http.Response response) async {
     await prefs.remove('selected_student_id');
     await prefs.remove('selected_student_name');
     await prefs.remove('selected_student_admission_no');
-    
+
     String errorMsg = 'This account is Inactive';
     try {
       final bodyData = json.decode(response.body);
-      if (bodyData is Map && bodyData['message'] != null && bodyData['message'].toString().isNotEmpty) {
+      if (bodyData is Map &&
+          bodyData['message'] != null &&
+          bodyData['message'].toString().isNotEmpty) {
         errorMsg = bodyData['message'].toString();
       }
     } catch (_) {}
 
+    // Guard against back-to-back 401s from concurrent requests while pushing LoginScreen.
+    suppressUnauthorizedRedirects(duration: const Duration(seconds: 5));
+
     // Globally redirect to LoginScreen using MaterialApp navigatorKey
     MyApp.navigatorKey.currentState?.pushAndRemoveUntil(
-      MaterialPageRoute(builder: (context) => LoginScreen(initialErrorMessage: errorMsg)),
+      MaterialPageRoute(
+        builder: (context) => LoginScreen(initialErrorMessage: errorMsg),
+      ),
       (route) => false,
     );
+  } finally {
+    _isRedirectingToLogin = false;
   }
 }

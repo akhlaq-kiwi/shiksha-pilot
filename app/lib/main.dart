@@ -565,7 +565,12 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 // -----------------------------------------------------------------------------
 class LoginScreen extends StatefulWidget {
   final String? initialErrorMessage;
-  const LoginScreen({Key? key, this.initialErrorMessage}) : super(key: key);
+  final String? initialSuccessMessage;
+  const LoginScreen({
+    Key? key,
+    this.initialErrorMessage,
+    this.initialSuccessMessage,
+  }) : super(key: key);
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -583,6 +588,11 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _phoneValidationError;
   String? _passwordValidationError;
 
+  bool _showSuccessToast = false;
+  bool _successToastScheduled = false;
+  Timer? _successToastTimer;
+  Animation<double>? _routeAnimation;
+
   @override
   void initState() {
     super.initState();
@@ -592,6 +602,55 @@ class _LoginScreenState extends State<LoginScreen> {
     _loadServerUrl();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_successToastScheduled &&
+        widget.initialSuccessMessage != null &&
+        widget.initialSuccessMessage!.isNotEmpty) {
+      final anim = ModalRoute.of(context)?.animation;
+      if (anim != null && !anim.isCompleted) {
+        if (_routeAnimation != anim) {
+          _routeAnimation?.removeStatusListener(_onRouteAnimationStatus);
+          _routeAnimation = anim;
+          _routeAnimation!.addStatusListener(_onRouteAnimationStatus);
+        }
+      } else {
+        _scheduleSuccessToast();
+      }
+    }
+  }
+
+  void _onRouteAnimationStatus(AnimationStatus status) {
+    if (status == AnimationStatus.completed) {
+      _routeAnimation?.removeStatusListener(_onRouteAnimationStatus);
+      _routeAnimation = null;
+      _scheduleSuccessToast();
+    }
+  }
+
+  void _scheduleSuccessToast() {
+    if (_successToastScheduled || !mounted) return;
+    _successToastScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (appThemeNotifier.value != ThemeMode.light) {
+        appThemeNotifier.value = ThemeMode.light;
+      }
+      setState(() {
+        _showSuccessToast = true;
+      });
+      _successToastTimer?.cancel();
+      _successToastTimer = Timer(const Duration(seconds: 5), () {
+        if (mounted) {
+          setState(() {
+            _showSuccessToast = false;
+          });
+        }
+      });
+    });
+  }
+
   Future<void> _loadServerUrl() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(kBaseUrlPrefKey, resolveBaseUrlFrom(prefs));
@@ -599,6 +658,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
+    _routeAnimation?.removeStatusListener(_onRouteAnimationStatus);
+    _successToastTimer?.cancel();
     _phoneController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -607,9 +668,11 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
+    _successToastTimer?.cancel();
     setState(() {
       _isLoading = true;
       _errorMessage = '';
+      _showSuccessToast = false;
     });
 
     final prefs = await SharedPreferences.getInstance();
@@ -627,6 +690,8 @@ class _LoginScreenState extends State<LoginScreen> {
       final user = data['user'] as Map<String, dynamic>;
       final role = user['role'] as String;
       final name = user['name'] as String;
+
+      http_svc.resetUnauthorizedRedirectState();
 
       // Save credentials locally
       await prefs.setString('auth_token', token);
@@ -921,8 +986,10 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
           child: SafeArea(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
+            child: Stack(
+              children: [
+                LayoutBuilder(
+                  builder: (context, constraints) {
                 final availHeight = constraints.maxHeight;
 
                 // When keyboard is open:
@@ -1132,7 +1199,80 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 );
-              },
+                  },
+                ),
+                if (widget.initialSuccessMessage != null &&
+                    widget.initialSuccessMessage!.isNotEmpty)
+                  Positioned(
+                    top: isKeyboardOpen ? 10 : null,
+                    bottom: isKeyboardOpen ? null : 24,
+                    left: 20,
+                    right: 20,
+                    child: IgnorePointer(
+                      ignoring: !_showSuccessToast,
+                      child: AnimatedSlide(
+                        duration: const Duration(milliseconds: 240),
+                        curve: Curves.easeOutCubic,
+                        offset: _showSuccessToast
+                            ? Offset.zero
+                            : (isKeyboardOpen
+                                ? const Offset(0, -0.35)
+                                : const Offset(0, 0.35)),
+                        child: AnimatedOpacity(
+                          duration: const Duration(milliseconds: 220),
+                          curve: Curves.easeInOut,
+                          opacity: _showSuccessToast ? 1.0 : 0.0,
+                          child: Material(
+                            color: Colors.transparent,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 13,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF059669),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: const Color(0xFF34D399)
+                                      .withValues(alpha: 0.45),
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.22),
+                                    blurRadius: 16,
+                                    offset: const Offset(0, 6),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.check_circle_rounded,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      widget.initialSuccessMessage!,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        height: 1.35,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ),

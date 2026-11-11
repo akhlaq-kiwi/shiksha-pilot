@@ -1451,6 +1451,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _handleLogout() async {
+    http.suppressUnauthorizedRedirects(duration: const Duration(seconds: 30));
     final prefs = await SharedPreferences.getInstance();
     final allKeys = prefs.getKeys();
     final preserved = <String, dynamic>{};

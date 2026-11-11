@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:school_hub/main.dart';
 import 'package:school_hub/services/auth_service.dart';
+import 'package:school_hub/services/http_service.dart' as http_svc;
+import 'package:school_hub/services/local_notification_scheduler.dart';
 
 class ChangePasswordDialog extends StatefulWidget {
   final String baseUrl;
@@ -97,75 +100,130 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
     });
 
     try {
+      final prefs = await SharedPreferences.getInstance();
       String activeToken = widget.token ?? '';
       if (activeToken.isEmpty) {
-        final prefs = await SharedPreferences.getInstance();
         activeToken = prefs.getString('auth_token') ?? '';
       }
 
       final authService = AuthService(baseUrl: widget.baseUrl);
 
-      // Call API: Backend verifies Current Password against database FIRST (Step 2)
+      // Step 2 – Verify Current Password against database WITHOUT mutating it yet
+      await authService.verifyPassword(activeToken, currentPass);
+
+      // Step 3 – New Password Must Differ
+      if (currentPass == newPass) {
+        if (mounted) {
+          setState(() {
+            _isUpdating = false;
+            _newPasswordError = 'New password must be different from your current password.';
+          });
+        }
+        return;
+      }
+
+      // Step 4 – Password Policy
+      if (newPass.length < 6) {
+        if (mounted) {
+          setState(() {
+            _isUpdating = false;
+            _newPasswordError = 'At least 6 characters required.';
+          });
+        }
+        return;
+      }
+      final bool hasUppercase = newPass.contains(RegExp(r'[A-Z]'));
+      final bool hasDigits = newPass.contains(RegExp(r'[0-9]'));
+      final bool hasAlpha = newPass.contains(RegExp(r'[a-zA-Z]'));
+      if (!hasUppercase || !hasDigits || !hasAlpha) {
+        if (mounted) {
+          setState(() {
+            _isUpdating = false;
+            _newPasswordError = 'Must contain 1 uppercase, 1 digit & 1 letter.';
+          });
+        }
+        return;
+      }
+
+      // Step 5 – Confirm Password Match
+      if (confirmPass != newPass) {
+        if (mounted) {
+          setState(() {
+            _isUpdating = false;
+            _confirmPasswordError = 'Passwords do not match.';
+          });
+        }
+        return;
+      }
+
+      // Step 6 – Commit Password Update on Server
       await authService.changePassword(
         activeToken,
         currentPass,
         newPass,
       );
 
-      // Step 3 – New Password Must Differ
-      if (currentPass == newPass) {
-        setState(() {
-          _isUpdating = false;
-          _newPasswordError = 'New password must be different from your current password.';
-        });
-        return;
+      // Step 7 – Suppress in-flight 401 error redirects, tear down session cleanly,
+      // and navigate smoothly to LoginScreen without flickering.
+      http_svc.suppressUnauthorizedRedirects(duration: const Duration(seconds: 30));
+
+      try {
+        await LocalNotificationScheduler.cancelAll();
+      } catch (_) {}
+
+      final allKeys = prefs.getKeys();
+      final preserved = <String, dynamic>{};
+      for (final k in allKeys) {
+        if (k.startsWith('app_lock_enabled_') ||
+            k.startsWith('app_lock_digest_') ||
+            k == 'base_url' ||
+            k == 'selected_base_url') {
+          preserved[k] = prefs.get(k);
+        }
+      }
+      await prefs.clear();
+      for (final entry in preserved.entries) {
+        if (entry.value is bool) {
+          await prefs.setBool(entry.key, entry.value as bool);
+        } else if (entry.value is String) {
+          await prefs.setString(entry.key, entry.value as String);
+        } else if (entry.value is int) {
+          await prefs.setInt(entry.key, entry.value as int);
+        }
       }
 
-      // Step 4 – Password Policy
-      if (newPass.length < 6) {
-        setState(() {
-          _isUpdating = false;
-          _newPasswordError = 'At least 6 characters required.';
-        });
-        return;
-      }
-      bool hasUppercase = newPass.contains(RegExp(r'[A-Z]'));
-      bool hasDigits = newPass.contains(RegExp(r'[0-9]'));
-      bool hasAlpha = newPass.contains(RegExp(r'[a-zA-Z]'));
-      if (!hasUppercase || !hasDigits || !hasAlpha) {
-        setState(() {
-          _isUpdating = false;
-          _newPasswordError = 'Must contain 1 uppercase, 1 digit & 1 letter.';
-        });
-        return;
+      // Dismiss keyboard before pushing LoginScreen so LoginScreen does not
+      // jump from keyboard-open sizing to full-screen sizing mid-transition.
+      final bool hadKeyboardOpen =
+          mounted && MediaQuery.of(context).viewInsets.bottom > 0;
+      FocusManager.instance.primaryFocus?.unfocus();
+      if (hadKeyboardOpen) {
+        await Future.delayed(const Duration(milliseconds: 220));
       }
 
-      // Step 5 – Confirm Password Match
-      if (confirmPass != newPass) {
-        setState(() {
-          _isUpdating = false;
-          _confirmPasswordError = 'Passwords do not match.';
-        });
-        return;
-      }
-
-      // Step 6 – Password Updated Successfully
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
-                SizedBox(width: 8),
-                Text('Password updated successfully!'),
-              ],
-            ),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: Color(0xFF059669),
+      final navState = MyApp.navigatorKey.currentState ??
+          (mounted ? Navigator.of(context, rootNavigator: true) : null);
+      navState?.pushAndRemoveUntil(
+        PageRouteBuilder(
+          transitionDuration: const Duration(milliseconds: 320),
+          reverseTransitionDuration: const Duration(milliseconds: 240),
+          pageBuilder: (context, animation, secondaryAnimation) => const LoginScreen(
+            initialSuccessMessage:
+                'Your password has been changed successfully, please login with New password.',
           ),
-        );
-      }
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            final curved = CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+            );
+            return FadeTransition(
+              opacity: curved,
+              child: child,
+            );
+          },
+        ),
+        (route) => false,
+      );
     } on AuthValidationException catch (e) {
       if (mounted) {
         setState(() {
@@ -197,7 +255,10 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
       }
     } catch (e) {
       if (mounted) {
-        final rawMsg = e.toString().replaceAll('Exception:', '').trim();
+        final rawMsg = http_svc.formatErrorMessage(
+          e,
+          fallback: 'Failed to update password. Please try again.',
+        );
         setState(() {
           _isUpdating = false;
           if (rawMsg.toLowerCase().contains('current password')) {
@@ -207,7 +268,7 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
           } else if (rawMsg.toLowerCase().contains('different')) {
             _newPasswordError = 'New password must be different from your current password.';
           } else {
-            _generalError = rawMsg.isNotEmpty ? rawMsg : 'Failed to update password. Please try again.';
+            _generalError = rawMsg;
           }
         });
       }
@@ -287,82 +348,84 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + bottomInset),
-      child: SafeArea(
-        top: false,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Handle bar
-              Center(
-                child: Container(
-                  width: 44,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE2E8F0),
-                    borderRadius: BorderRadius.circular(2),
+    return PopScope(
+      canPop: !_isUpdating,
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + bottomInset),
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Handle bar
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE2E8F0),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
-              ),
 
-              // Header: Icon, Title, Subtitle, Close Button
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFEF3C7),
-                      borderRadius: BorderRadius.circular(12),
+                // Header: Icon, Title, Subtitle, Close Button
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.lock_reset_rounded,
+                        color: Color(0xFFD97706),
+                        size: 24,
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.lock_reset_rounded,
-                      color: Color(0xFFD97706),
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text(
-                          'Change Password',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF0F172A),
-                            letterSpacing: 0.2,
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text(
+                            'Change Password',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF0F172A),
+                              letterSpacing: 0.2,
+                            ),
                           ),
-                        ),
-                        SizedBox(height: 3),
-                        Text(
-                          'Update your account password securely',
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF64748B),
+                          SizedBox(height: 3),
+                          Text(
+                            'Update your account password securely',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF64748B),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B), size: 22),
-                    onPressed: () => Navigator.pop(context),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                ],
-              ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B), size: 22),
+                      onPressed: _isUpdating ? null : () => Navigator.pop(context),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
+                ),
 
               const SizedBox(height: 18),
 
@@ -518,6 +581,7 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

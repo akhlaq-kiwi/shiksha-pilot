@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:school_hub/main.dart';
+import 'package:school_hub/services/http_service.dart' as http_svc;
 import 'package:school_hub/services/push_notification_service.dart';
 import 'package:school_hub/services/local_notification_scheduler.dart';
 import 'package:school_hub/services/student_session_helper.dart';
@@ -198,6 +199,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   }
 
   Future<void> _handleLogout() async {
+    http_svc.suppressUnauthorizedRedirects(duration: const Duration(seconds: 30));
     try {
       await PushNotificationService.unregisterDevice();
       await LocalNotificationScheduler.cancelAll();
