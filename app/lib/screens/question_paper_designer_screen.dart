@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:school_hub/services/http_service.dart' as http;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -310,27 +310,19 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
   ];
 
   Future<http.Response?> _getWithFallback(String path, String token, String primaryBaseUrl) async {
-    final List<String> baseUrls = [
-      primaryBaseUrl,
-      if (!primaryBaseUrl.contains('10.155.82.71')) 'http://10.155.82.71:8000',
-      if (!primaryBaseUrl.contains('127.0.0.1')) 'http://127.0.0.1:8000',
-    ];
-
-    for (final base in baseUrls) {
-      try {
-        final res = await http.get(
-          Uri.parse('$base$path'),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $token',
-          },
-        ).timeout(const Duration(milliseconds: 1200));
-        if (res.statusCode == 200) {
-          return res;
-        }
-      } catch (e) {
-        debugPrint('Failed to connect to $base$path: $e');
+    try {
+      final res = await http.get(
+        Uri.parse('$primaryBaseUrl$path'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+      if (res.statusCode == 200) {
+        return res;
       }
+    } catch (e) {
+      debugPrint('Failed to connect to $primaryBaseUrl$path: $e');
     }
     return null;
   }

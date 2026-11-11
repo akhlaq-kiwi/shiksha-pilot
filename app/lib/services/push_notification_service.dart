@@ -193,6 +193,8 @@ class PushNotificationService {
     final studentId = prefs.getInt('selected_student_id');
 
     final payload = {
+      'id': message.data['id'] ?? message.data['notification_id'] ?? message.data['notif_id'] ?? '',
+      'notification_id': message.data['notification_id'] ?? message.data['id'] ?? '',
       'title': message.notification?.title ?? message.data['title'] ?? '',
       'message': message.notification?.body ?? message.data['body'] ?? '',
       'link': message.data['link'] ?? '',

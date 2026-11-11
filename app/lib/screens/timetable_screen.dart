@@ -198,7 +198,7 @@ class _TimetableScreenState extends State<TimetableScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorText = 'Failed to load timetable. Please check connection.';
+          _errorText = http.formatErrorMessage(e, fallback: 'Failed to load timetable.');
           _isLoading = false;
         });
       }

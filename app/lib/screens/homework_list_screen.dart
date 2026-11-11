@@ -894,7 +894,11 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
                                         if (mounted) {
                                           ScaffoldMessenger.of(context).showSnackBar(
                                             SnackBar(
-                                              content: Text('Failed: ${err.toString().replaceAll('Exception: ', '')}'),
+                                              content: Text(
+                                                http.isNetworkError(err)
+                                                    ? http.kNetworkErrorMessage
+                                                    : 'Failed: ${http.formatErrorMessage(err)}',
+                                              ),
                                               backgroundColor: Colors.red.shade700,
                                               behavior: SnackBarBehavior.floating,
                                             ),

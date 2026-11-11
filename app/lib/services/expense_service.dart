@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
-import 'package:http/http.dart' as raw_http;
 import 'package:school_hub/services/http_service.dart' as http;
 
 class ExpenseService {
@@ -58,7 +57,7 @@ class ExpenseService {
   /// Create a new school operational expense
   Future<Map<String, dynamic>> createExpense({
     required String description,
-    required double amount,
+    required int amount,
     required String expenseDate,
     String? category,
     String? paymentMethod,
@@ -130,17 +129,17 @@ class ExpenseService {
       attempts++;
       try {
         final uri = Uri.parse('$baseUrl/api/school/upload');
-        final request = raw_http.MultipartRequest('POST', uri);
+        final request = http.MultipartRequest('POST', uri);
 
         request.headers.addAll({
           'Authorization': 'Bearer $token',
         });
         request.fields['category'] = 'finance';
 
-        final stream = raw_http.ByteStream(file.openRead());
+        final stream = http.ByteStream(file.openRead());
         final length = await file.length();
 
-        final multipartFile = raw_http.MultipartFile(
+        final multipartFile = http.MultipartFile(
           'document',
           stream,
           length,
@@ -149,8 +148,7 @@ class ExpenseService {
 
         request.files.add(multipartFile);
 
-        final streamedResponse = await request.send();
-        final response = await raw_http.Response.fromStream(streamedResponse);
+        final response = await http.sendMultipart(request);
 
         if (response.statusCode == 200 || response.statusCode == 201) {
           final decoded = json.decode(response.body);
@@ -269,17 +267,49 @@ class ExpenseService {
     }
   }
 
-  /// Get count of pending expenses waiting for approval (School Admin only)
-  Future<int> getPendingExpenseCount() async {
+  /// Get pending expense badge stats (total pending + DB-persisted unseen count)
+  Future<Map<String, int>> getPendingExpenseBadgeInfo() async {
     try {
       final uri = Uri.parse('$baseUrl/api/school/expenses/pending-count');
       final response = await http.get(uri, headers: _headers);
       if (response.statusCode == 200) {
         final decoded = json.decode(response.body);
         final data = decoded['data'] ?? decoded;
-        return (data['pending_count'] as num?)?.toInt() ?? 0;
+        final pending = (data['pending_count'] as num?)?.toInt() ?? 0;
+        final unread = (data['unread_count'] as num?)?.toInt() ?? pending;
+        final maxId = (data['max_pending_id'] as num?)?.toInt() ?? 0;
+        return {
+          'pending_count': pending,
+          'unread_count': unread,
+          'max_pending_id': maxId,
+        };
       }
     } catch (_) {}
-    return 0;
+    return {
+      'pending_count': 0,
+      'unread_count': 0,
+      'max_pending_id': 0,
+    };
+  }
+
+  /// Get count of pending expenses waiting for approval (School Admin only)
+  Future<int> getPendingExpenseCount() async {
+    final info = await getPendingExpenseBadgeInfo();
+    return info['pending_count'] ?? 0;
+  }
+
+  /// Persist seen state on server so the Expense badge stays cleared across logout/login
+  Future<void> markExpenseBadgeSeen({int? maxId}) async {
+    try {
+      final uri = Uri.parse('$baseUrl/api/school/badges/seen');
+      await http.post(
+        uri,
+        headers: _headers,
+        body: json.encode({
+          'feature_key': 'expense',
+          if (maxId != null && maxId > 0) 'max_id': maxId,
+        }),
+      );
+    } catch (_) {}
   }
 }

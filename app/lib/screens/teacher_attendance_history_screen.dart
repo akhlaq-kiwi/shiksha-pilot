@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:school_hub/services/http_service.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -21,6 +21,7 @@ class TeacherAttendanceHistoryScreen extends StatefulWidget {
 
 class _TeacherAttendanceHistoryScreenState extends State<TeacherAttendanceHistoryScreen> {
   bool _isLoading = true;
+  String? _errorText;
   String _teacherName = '';
   String _empId = '';
   String _ayName = '';
@@ -67,6 +68,7 @@ class _TeacherAttendanceHistoryScreenState extends State<TeacherAttendanceHistor
   Future<void> _loadHistory() async {
     setState(() {
       _isLoading = true;
+      _errorText = null;
     });
 
     try {
@@ -116,6 +118,7 @@ class _TeacherAttendanceHistoryScreenState extends State<TeacherAttendanceHistor
         } else {
           if (mounted) {
             setState(() {
+              _errorText = body['message']?.toString() ?? 'Failed to load attendance history.';
               _isLoading = false;
             });
           }
@@ -127,6 +130,7 @@ class _TeacherAttendanceHistoryScreenState extends State<TeacherAttendanceHistor
         }
         if (mounted) {
           setState(() {
+            _errorText = 'Failed to load attendance history.';
             _isLoading = false;
           });
         }
@@ -134,6 +138,7 @@ class _TeacherAttendanceHistoryScreenState extends State<TeacherAttendanceHistor
     } catch (e) {
       if (mounted) {
         setState(() {
+          _errorText = http.formatErrorMessage(e);
           _isLoading = false;
         });
       }
@@ -232,7 +237,7 @@ class _TeacherAttendanceHistoryScreenState extends State<TeacherAttendanceHistor
     } catch (e) {
       if (mounted) Navigator.pop(context);
       if (mounted) {
-        _showErrorDialog("Network error: ${e.toString()}");
+        _showErrorDialog(http.formatErrorMessage(e));
       }
     }
   }
@@ -679,12 +684,33 @@ class _TeacherAttendanceHistoryScreenState extends State<TeacherAttendanceHistor
                     child: _months.isEmpty
                         ? ListView(
                             physics: const AlwaysScrollableScrollPhysics(),
-                            children: const [
-                              SizedBox(height: 120),
-                              Center(
-                                child: Text(
-                                  "No attendance records found for this academic year.",
-                                  style: TextStyle(color: Colors.grey),
+                            children: [
+                              const SizedBox(height: 120),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 24),
+                                child: Column(
+                                  children: [
+                                    if (_errorText != null) ...[
+                                      Icon(Icons.wifi_off_rounded, size: 42, color: Colors.red.shade400),
+                                      const SizedBox(height: 12),
+                                    ],
+                                    Text(
+                                      _errorText ?? "No attendance records found for this academic year.",
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: _errorText != null ? Colors.red.shade700 : Colors.grey,
+                                        fontWeight: _errorText != null ? FontWeight.w600 : FontWeight.normal,
+                                      ),
+                                    ),
+                                    if (_errorText != null) ...[
+                                      const SizedBox(height: 14),
+                                      ElevatedButton.icon(
+                                        onPressed: _loadHistory,
+                                        icon: const Icon(Icons.refresh_rounded, size: 18),
+                                        label: const Text('Try Again'),
+                                      ),
+                                    ],
+                                  ],
                                 ),
                               ),
                             ],

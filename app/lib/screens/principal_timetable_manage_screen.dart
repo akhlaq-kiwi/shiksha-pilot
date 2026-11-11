@@ -3,6 +3,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '../services/timetable_service.dart';
+import '../services/http_service.dart' as http;
 import '../utils/class_formatter.dart';
 
 class DropdownMenuItemModel<T> {
@@ -164,7 +165,9 @@ class _PrincipalTimetableManageScreenState
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorText = 'Failed to load timetable options.';
+          _errorText = http.isNetworkError(e)
+              ? http.kNetworkErrorMessage
+              : 'Failed to load timetable options.';
           _isLoading = false;
         });
       }
@@ -213,7 +216,9 @@ class _PrincipalTimetableManageScreenState
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorText = 'Failed to load timetable for selected week.';
+          _errorText = http.isNetworkError(e)
+              ? http.kNetworkErrorMessage
+              : 'Failed to load timetable for selected week.';
           _isLoading = false;
         });
       }

@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:http/http.dart' as http;
+import 'package:school_hub/services/http_service.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/homework_service.dart';
 import '../utils/class_formatter.dart';
@@ -178,8 +178,10 @@ class _CreateEditHomeworkModalState extends State<CreateEditHomeworkModal> {
           _isUploading = false;
           _uploadStatusText = null;
         });
-        final errText = e.toString().replaceAll('Exception: ', '');
-        _showErrorSnackBar(errText.isNotEmpty ? errText : 'Unable to upload attachment. Please try again.');
+        _showErrorSnackBar(http.formatErrorMessage(
+          e,
+          fallback: 'Unable to upload attachment. Please try again.',
+        ));
       }
     }
   }
@@ -260,8 +262,10 @@ class _CreateEditHomeworkModalState extends State<CreateEditHomeworkModal> {
         setState(() {
           _isSubmitting = false;
         });
-        final errStr = e.toString().replaceAll('Exception: ', '');
-        _showErrorSnackBar(errStr.isNotEmpty ? errStr : 'Failed to save homework');
+        _showErrorSnackBar(http.formatErrorMessage(
+          e,
+          fallback: 'Failed to save homework',
+        ));
       }
     }
   }

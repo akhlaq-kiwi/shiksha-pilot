@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:school_hub/services/class_teacher_service.dart';
+import 'package:school_hub/services/http_service.dart' as http_svc;
 
 class ClassTeacherAssignmentScreen extends StatefulWidget {
   final String baseUrl;
@@ -223,7 +224,9 @@ class _ClassTeacherAssignmentScreenState extends State<ClassTeacherAssignmentScr
       if (mounted) {
         setState(() {
           _localAssignments[classId] = previousTeacherId;
-          _errorMessage = 'Unable to save changes. Please try again.';
+          _errorMessage = http_svc.isNetworkError(err)
+              ? http_svc.kNetworkErrorMessage
+              : 'Unable to save changes. Please try again.';
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

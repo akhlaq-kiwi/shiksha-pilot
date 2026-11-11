@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:school_hub/services/fee_service.dart';
+import 'package:school_hub/services/http_service.dart' as http_svc;
 import 'package:school_hub/screens/fees_portal_screen.dart';
 
 String formatFeeSummary(String? feeType, String? summary) {
@@ -258,7 +259,11 @@ class _PendingDiscountRequestsScreenState extends State<PendingDiscountRequestsS
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to cancel request: $e'),
+            content: Text(
+              http_svc.isNetworkError(e)
+                  ? http_svc.kNetworkErrorMessage
+                  : 'Failed to cancel request: ${http_svc.formatErrorMessage(e)}',
+            ),
             backgroundColor: const Color(0xFFDC2626),
             behavior: SnackBarBehavior.floating,
           ),

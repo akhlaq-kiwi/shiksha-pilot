@@ -567,5 +567,20 @@ class FeeService {
     }
     throw Exception(msg);
   }
+
+  /// Persist seen state on server so the Manage Discount badge stays cleared across logout/login
+  Future<void> markDiscountBadgeSeen({int? maxId}) async {
+    try {
+      final uri = Uri.parse('$baseUrl/api/school/badges/seen');
+      await http.post(
+        uri,
+        headers: _headers,
+        body: json.encode({
+          'feature_key': 'discount_request',
+          if (maxId != null && maxId > 0) 'max_id': maxId,
+        }),
+      );
+    } catch (_) {}
+  }
 }
 

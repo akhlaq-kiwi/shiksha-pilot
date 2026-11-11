@@ -253,6 +253,7 @@ return function (App $app) {
     $app->get('/api/school/notifications', [SchoolAdminController::class, 'getNotifications']);
     $app->post('/api/school/notifications/{id}/read', [SchoolAdminController::class, 'markNotificationRead']);
     $app->delete('/api/school/notifications/{id}', [SchoolAdminController::class, 'deleteNotification']);
+    $app->post('/api/school/badges/seen', [SchoolAdminController::class, 'markFeatureBadgeSeen']);
 
     // Announcements Domain
     $app->get('/api/school/announcements', [SchoolAdminController::class, 'getAnnouncements']);

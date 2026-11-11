@@ -1478,6 +1478,7 @@ class SchoolAdminController extends BaseController
                 '/api/school/profile',
                 '/api/school/academic-years',
                 '/api/school/notifications',
+                '/api/school/badges',
                 '/api/school/plans',
                 '/api/school/subscriptions',
             ];
@@ -2247,8 +2248,8 @@ class SchoolAdminController extends BaseController
         $user = $this->authenticate($request);
         $this->requireRole($user, ['SCHOOL_ADMIN', 'SUPER_ADMIN']);
 
-        $count = $this->service->getPendingFinancialReportCount($user);
-        return $this->success($response, ['pending_count' => $count]);
+        $stats = $this->service->getPendingFinancialReportBadgeStats($user);
+        return $this->success($response, $stats);
     }
 
     public function getPendingExpenseCount(Request $request, Response $response): Response
@@ -2256,8 +2257,21 @@ class SchoolAdminController extends BaseController
         $user = $this->authenticate($request);
         $this->requireRole($user, ['SCHOOL_ADMIN']);
 
-        $count = $this->service->getPendingExpenseCount($user);
-        return $this->success($response, ['pending_count' => $count]);
+        $stats = $this->service->getPendingExpenseBadgeStats($user);
+        return $this->success($response, $stats);
+    }
+
+    public function markFeatureBadgeSeen(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'SUPER_ADMIN', 'TEACHER', 'PRINCIPAL', 'STAFF']);
+
+        $body = RequestParser::body($request);
+        $featureKey = (string)($body['feature_key'] ?? $body['feature'] ?? '');
+        $maxId = isset($body['max_id']) ? (int)$body['max_id'] : null;
+
+        $data = $this->service->markFeatureBadgeSeen($user, $featureKey, $maxId);
+        return $this->success($response, $data, 'Feature badge marked as seen');
     }
 
     public function getAdditionalFeeTypes(Request $request, Response $response): Response

@@ -111,7 +111,7 @@ class _SalaryCardScreenState extends State<SalaryCardScreen> {
       debugPrint('Salary fetch error: $e');
       if (mounted) {
         setState(() {
-          _errorText = 'An error occurred while loading salary.';
+          _errorText = http.formatErrorMessage(e, fallback: 'Failed to load salary details.');
           _isLoading = false;
         });
       }
@@ -195,7 +195,11 @@ class _SalaryCardScreenState extends State<SalaryCardScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to download salary slip: ${e.toString()}'),
+          content: Text(
+            http.isNetworkError(e)
+                ? http.kNetworkErrorMessage
+                : 'Failed to download salary slip: ${http.formatErrorMessage(e)}',
+          ),
           behavior: SnackBarBehavior.floating,
           backgroundColor: Colors.red,
         ),

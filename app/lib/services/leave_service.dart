@@ -153,8 +153,7 @@ class LeaveService {
 
     request.files.add(multipartFile);
 
-    final streamedResponse = await request.send();
-    final response = await http.Response.fromStream(streamedResponse);
+    final response = await http.sendMultipart(request);
 
     if (response.statusCode == 200) {
       final resData = json.decode(response.body)['data'];

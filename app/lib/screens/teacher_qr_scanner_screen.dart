@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:school_hub/services/http_service.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -93,7 +93,7 @@ class _TeacherQrScannerScreenState extends State<TeacherQrScannerScreen> {
     } catch (e) {
       if (mounted) Navigator.pop(context);
       if (mounted) {
-        _showErrorDialog("Network error: ${e.toString()}");
+        _showErrorDialog(http.formatErrorMessage(e));
       }
     } finally {
       if (mounted) {

@@ -13,6 +13,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:school_hub/services/teacher_management_service.dart';
+import 'package:school_hub/services/http_service.dart' as http_svc;
 import 'package:school_hub/widgets/profile_avatar_view.dart';
 
 class TeachersScreen extends StatefulWidget {
@@ -2029,7 +2030,9 @@ class _AddEditTeacherModalState extends State<_AddEditTeacherModal> {
       if (mounted) {
         setState(() {
           _uploadingPhoto = false;
-          _errorMessage = 'Failed to upload photo: ${e.toString().replaceAll('Exception:', '').trim()}';
+          _errorMessage = http_svc.isNetworkError(e)
+              ? http_svc.kNetworkErrorMessage
+              : 'Failed to upload photo: ${http_svc.formatErrorMessage(e)}';
         });
       }
     }
@@ -2080,7 +2083,9 @@ class _AddEditTeacherModalState extends State<_AddEditTeacherModal> {
       if (mounted) {
         setState(() {
           _uploadingDoc = false;
-          _errorMessage = 'Failed to upload document: ${e.toString().replaceAll('Exception:', '').trim()}';
+          _errorMessage = http_svc.isNetworkError(e)
+              ? http_svc.kNetworkErrorMessage
+              : 'Failed to upload document: ${http_svc.formatErrorMessage(e)}';
         });
       }
     }
@@ -3473,7 +3478,13 @@ class _TeacherIdCardsPreviewScreenState extends State<_TeacherIdCardsPreviewScre
       if (mounted) {
         setState(() => _isGeneratingPdf = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to generate PDF: $e')),
+          SnackBar(
+            content: Text(
+              http_svc.isNetworkError(e)
+                  ? http_svc.kNetworkErrorMessage
+                  : 'Failed to generate PDF: ${http_svc.formatErrorMessage(e)}',
+            ),
+          ),
         );
       }
     }

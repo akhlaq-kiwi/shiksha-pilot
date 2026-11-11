@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:school_hub/services/auth_service.dart';
+import 'package:school_hub/services/http_service.dart' as http_svc;
 
 class VerifyPasswordDialog extends StatefulWidget {
   final String baseUrl;
@@ -76,18 +77,11 @@ class _VerifyPasswordDialogState extends State<VerifyPasswordDialog> {
       }
     } catch (e) {
       if (mounted) {
-        final rawErr = e.toString().replaceFirst(RegExp(r'^[A-Za-z0-9_]*Exception:\s*'), '');
-        final isNetworkErr = rawErr.contains('SocketException') ||
-            rawErr.contains('ClientException') ||
-            rawErr.contains('Network is unreachable') ||
-            rawErr.contains('Connection refused') ||
-            rawErr.toLowerCase().contains('timeout') ||
-            rawErr.contains('failed to connect') ||
-            rawErr.contains('Connection closed');
         setState(() {
-          _errorMessage = isNetworkErr
-              ? 'Unable to connect to server. Please check your network connection.'
-              : (rawErr.isNotEmpty ? rawErr : 'Incorrect password. Please try again.');
+          _errorMessage = http_svc.formatErrorMessage(
+            e,
+            fallback: 'Incorrect password. Please try again.',
+          );
           _isLoading = false;
         });
       }

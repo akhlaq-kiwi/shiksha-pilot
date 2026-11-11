@@ -3,6 +3,21 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:school_hub/services/http_service.dart' as http;
 
+class PendingApprovalsException implements Exception {
+  final String message;
+  final int pendingExpenseCount;
+  final int pendingDiscountCount;
+
+  PendingApprovalsException({
+    required this.message,
+    required this.pendingExpenseCount,
+    required this.pendingDiscountCount,
+  });
+
+  @override
+  String toString() => message;
+}
+
 class FinancialReportService {
   final String baseUrl;
   final String token;
@@ -31,6 +46,8 @@ class FinancialReportService {
         'has_previous_report': data['has_previous_report'] == true || data['has_previous_report'] == 1,
         'from_time': data['from_time']?.toString() ?? '12:00 AM',
         'academic_year_start_date': data['academic_year_start_date']?.toString() ?? '',
+        'pending_expense_count': (data['pending_expense_count'] as num?)?.toInt() ?? 0,
+        'pending_discount_count': (data['pending_discount_count'] as num?)?.toInt() ?? 0,
       };
     } else {
       final err = json.decode(response.body);
@@ -76,6 +93,16 @@ class FinancialReportService {
       return Map<String, dynamic>.from(decoded['data'] ?? decoded);
     } else {
       final err = json.decode(response.body);
+      final errData = err['data'];
+      final errors = errData is Map ? errData['errors'] : null;
+      if (errors is Map && errors['code'] == 'PENDING_APPROVAL_REQUIRED') {
+        throw PendingApprovalsException(
+          message: err['message']?.toString() ??
+              'Your expense or discount request is still pending. You need to get it approved or rejected by the School Admin before generating a financial report.',
+          pendingExpenseCount: (errors['pending_expense_count'] as num?)?.toInt() ?? 0,
+          pendingDiscountCount: (errors['pending_discount_count'] as num?)?.toInt() ?? 0,
+        );
+      }
       throw Exception(err['message'] ?? 'Failed to generate financial report');
     }
   }
@@ -142,18 +169,50 @@ class FinancialReportService {
     }
   }
 
-  /// Get count of pending financial reports awaiting settlement approval (School Admin only)
-  Future<int> getPendingFinancialReportCount() async {
+  /// Get pending financial report badge stats (total pending + DB-persisted unseen count)
+  Future<Map<String, int>> getPendingFinancialReportBadgeInfo() async {
     try {
       final uri = Uri.parse('$baseUrl/api/school/financial-reports/pending-count');
       final response = await http.get(uri, headers: _headers);
       if (response.statusCode == 200) {
         final decoded = json.decode(response.body);
         final data = decoded['data'] ?? decoded;
-        return (data['pending_count'] as num?)?.toInt() ?? 0;
+        final pending = (data['pending_count'] as num?)?.toInt() ?? 0;
+        final unread = (data['unread_count'] as num?)?.toInt() ?? pending;
+        final maxId = (data['max_pending_id'] as num?)?.toInt() ?? 0;
+        return {
+          'pending_count': pending,
+          'unread_count': unread,
+          'max_pending_id': maxId,
+        };
       }
     } catch (_) {}
-    return 0;
+    return {
+      'pending_count': 0,
+      'unread_count': 0,
+      'max_pending_id': 0,
+    };
+  }
+
+  /// Get count of pending financial reports awaiting settlement approval (School Admin only)
+  Future<int> getPendingFinancialReportCount() async {
+    final info = await getPendingFinancialReportBadgeInfo();
+    return info['pending_count'] ?? 0;
+  }
+
+  /// Persist seen state on server so the Financial Report badge stays cleared across logout/login
+  Future<void> markFinancialReportBadgeSeen({int? maxId}) async {
+    try {
+      final uri = Uri.parse('$baseUrl/api/school/badges/seen');
+      await http.post(
+        uri,
+        headers: _headers,
+        body: json.encode({
+          'feature_key': 'financial_report',
+          if (maxId != null && maxId > 0) 'max_id': maxId,
+        }),
+      );
+    } catch (_) {}
   }
 
   /// Download Excel bytes of a preview report

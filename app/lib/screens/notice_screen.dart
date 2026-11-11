@@ -227,7 +227,7 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
       } else {
         if (mounted) {
           setState(() {
-            _errorText = 'Unable to load announcements.\nPlease check your internet connection.';
+            _errorText = 'Unable to load announcements. Please try again.';
             _isLoading = false;
           });
         }
@@ -235,7 +235,9 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorText = 'Unable to load announcements.\nPlease check your internet connection.';
+          _errorText = http.isNetworkError(e)
+              ? http.kNetworkErrorMessage
+              : 'Unable to load announcements. Please try again.';
           _isLoading = false;
         });
       }
@@ -844,8 +846,7 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
       );
       request.files.add(multipartFile);
 
-      final streamedResponse = await request.send();
-      final response = await http.Response.fromStream(streamedResponse);
+      final response = await http.sendMultipart(request);
 
       if (response.statusCode != 200 && response.statusCode != 201) {
         return _extractApiErrorMessage(response.body, 'Failed to upload voice note');
@@ -885,7 +886,8 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
       }
       return _extractApiErrorMessage(createRes.body, 'Failed to publish voice announcement');
     } catch (e) {
-      return 'Failed to publish voice announcement: $e';
+      if (http.isNetworkError(e)) return http.kNetworkErrorMessage;
+      return 'Failed to publish voice announcement: ${http.formatErrorMessage(e)}';
     }
   }
 
@@ -1286,7 +1288,8 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
       }
       return _extractApiErrorMessage(res.body, 'Failed to publish announcement');
     } catch (e) {
-      return 'Failed to publish announcement: $e';
+      if (http.isNetworkError(e)) return http.kNetworkErrorMessage;
+      return 'Failed to publish announcement: ${http.formatErrorMessage(e)}';
     }
   }
 
@@ -1337,7 +1340,8 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
       }
       return _extractApiErrorMessage(res.body, 'Failed to update announcement');
     } catch (e) {
-      return 'An error occurred while updating announcement: $e';
+      if (http.isNetworkError(e)) return http.kNetworkErrorMessage;
+      return 'An error occurred while updating announcement: ${http.formatErrorMessage(e)}';
     }
   }
 
@@ -1357,7 +1361,8 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
       }
       return _extractApiErrorMessage(res.body, 'Failed to delete announcement');
     } catch (e) {
-      return 'An error occurred while deleting announcement: $e';
+      if (http.isNetworkError(e)) return http.kNetworkErrorMessage;
+      return 'An error occurred while deleting announcement: ${http.formatErrorMessage(e)}';
     }
   }
 

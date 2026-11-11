@@ -126,11 +126,19 @@ class _AchievementsScreenState extends State<AchievementsScreen> with SingleTick
 
   Future<void> _markAchievementsNotificationsRead() async {
     try {
-      final roleUpper = widget.userRole.toUpperCase();
-      if (roleUpper != 'STUDENT' && roleUpper != 'PARENT') return;
       if (widget.token.isEmpty) return;
-      final uri = Uri.parse('${widget.baseUrl}/api/student/notifications/0/read').replace(
-        queryParameters: widget.studentId != null
+      final roleUpper = widget.userRole.toUpperCase();
+      final bool isSchoolAdmin = roleUpper == 'SCHOOL_ADMIN' || roleUpper == 'SUPER_ADMIN';
+      final bool isTeacherOrPrincipal = roleUpper == 'TEACHER' || roleUpper == 'PRINCIPAL';
+      final String path = isSchoolAdmin
+          ? '/api/school/notifications/0/read'
+          : (isTeacherOrPrincipal
+              ? '/api/teacher/notifications/0/read'
+              : '/api/student/notifications/0/read');
+      final bool isStudentSide = !isSchoolAdmin && !isTeacherOrPrincipal;
+
+      final uri = Uri.parse('${widget.baseUrl}$path').replace(
+        queryParameters: (isStudentSide && widget.studentId != null)
             ? {'student_id': widget.studentId.toString()}
             : null,
       );
@@ -139,7 +147,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> with SingleTick
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ${widget.token}',
-          if (widget.studentId != null) 'X-Student-Id': widget.studentId.toString(),
+          if (isStudentSide && widget.studentId != null) 'X-Student-Id': widget.studentId.toString(),
         },
         body: json.encode({'module': 'achievements'}),
       );
@@ -196,7 +204,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> with SingleTick
       }
     } catch (e) {
       setState(() {
-        _errorText = 'Network error: $e';
+        _errorText = http.formatErrorMessage(e);
         _isLoading = false;
       });
     }
@@ -570,7 +578,11 @@ class _AchievementsScreenState extends State<AchievementsScreen> with SingleTick
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to download certificate: $e'),
+            content: Text(
+              http.isNetworkError(e)
+                  ? http.kNetworkErrorMessage
+                  : 'Failed to download certificate: ${http.formatErrorMessage(e)}',
+            ),
             backgroundColor: Colors.red.shade700,
             behavior: SnackBarBehavior.floating,
           ),
@@ -914,7 +926,14 @@ class _AchievementsScreenState extends State<AchievementsScreen> with SingleTick
       if (!mounted) return;
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading report card: $e'), backgroundColor: Colors.red.shade700),
+        SnackBar(
+          content: Text(
+            http.isNetworkError(e)
+                ? http.kNetworkErrorMessage
+                : 'Error loading report card: ${http.formatErrorMessage(e)}',
+          ),
+          backgroundColor: Colors.red.shade700,
+        ),
       );
     }
   }

@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:http/http.dart' as http;
+import 'package:school_hub/services/http_service.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
@@ -99,7 +99,29 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
   @override
   void initState() {
     super.initState();
+    _markExamsNotificationsRead();
     _loadDashboardData();
+  }
+
+  Future<void> _markExamsNotificationsRead() async {
+    try {
+      final token = widget.examService.token;
+      if (token.isEmpty) return;
+      final roleUpper = widget.userRole.toUpperCase();
+      final bool isSchoolAdmin = roleUpper == 'SCHOOL_ADMIN' || roleUpper == 'SUPER_ADMIN';
+      final path = isSchoolAdmin
+          ? '/api/school/notifications/0/read'
+          : '/api/teacher/notifications/0/read';
+      final uri = Uri.parse('${widget.examService.baseUrl}$path');
+      await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode({'module': 'exams'}),
+      );
+    } catch (_) {}
   }
 
   @override
@@ -635,7 +657,12 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
       setState(() {
         _loadingTimetable = false;
       });
-      _showAppSnackBar('Error loading timetable: $e', isError: true);
+      _showAppSnackBar(
+        http.isNetworkError(e)
+            ? http.kNetworkErrorMessage
+            : 'Error loading timetable: ${http.formatErrorMessage(e)}',
+        isError: true,
+      );
     }
   }
 
@@ -906,7 +933,12 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
       );
     } catch (e) {
       if (mounted) {
-        _showAppSnackBar('Failed to download scheme: $e', isError: true);
+        _showAppSnackBar(
+          http.isNetworkError(e)
+              ? http.kNetworkErrorMessage
+              : 'Failed to download scheme: ${http.formatErrorMessage(e)}',
+          isError: true,
+        );
       }
     } finally {
       if (mounted) setState(() => _downloadingScheme = false);
@@ -1552,7 +1584,12 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
       }
     } catch (e) {
       setState(() => _loadingMarks = false);
-      _showAppSnackBar('Error loading marks entry: $e', isError: true);
+      _showAppSnackBar(
+        http.isNetworkError(e)
+            ? http.kNetworkErrorMessage
+            : 'Error loading marks entry: ${http.formatErrorMessage(e)}',
+        isError: true,
+      );
     }
   }
 
@@ -1587,7 +1624,12 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
       });
     } catch (e) {
       setState(() => _loadingMarks = false);
-      _showAppSnackBar('Failed to load marks sheet: $e', isError: true);
+      _showAppSnackBar(
+        http.isNetworkError(e)
+            ? http.kNetworkErrorMessage
+            : 'Failed to load marks sheet: ${http.formatErrorMessage(e)}',
+        isError: true,
+      );
     }
   }
 
@@ -1682,7 +1724,12 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
         _showPublishedMarksLockedPopup();
         return;
       }
-      _showAppSnackBar('Error saving mark: $e', isError: true);
+      _showAppSnackBar(
+        http.isNetworkError(e)
+            ? http.kNetworkErrorMessage
+            : 'Error saving mark: ${http.formatErrorMessage(e)}',
+        isError: true,
+      );
     } finally {
       if (mounted) {
         setState(() => _savingMarkStudentIds.remove(studentId));
@@ -1789,7 +1836,12 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
       });
     } catch (e) {
       setState(() => _loadingReportCards = false);
-      _showAppSnackBar('Error loading report cards: $e', isError: true);
+      _showAppSnackBar(
+        http.isNetworkError(e)
+            ? http.kNetworkErrorMessage
+            : 'Error loading report cards: ${http.formatErrorMessage(e)}',
+        isError: true,
+      );
     }
   }
 
@@ -1859,7 +1911,7 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
         if (!fullUrl.startsWith('http')) {
           fullUrl = '${widget.examService.baseUrl}/$fullUrl'.replaceAll(RegExp(r'(?<!:)/+'), '/');
         }
-        final resp = await http.get(Uri.parse(fullUrl)).timeout(const Duration(seconds: 4));
+        final resp = await http.getRaw(Uri.parse(fullUrl), timeout: const Duration(seconds: 4));
         if (resp.statusCode == 200 && resp.bodyBytes.isNotEmpty) {
           return pw.MemoryImage(resp.bodyBytes);
         }
@@ -2395,7 +2447,12 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
       await _saveAndNotifyPdf(pdfBytes, filename, 'Report Card Downloaded');
     } catch (e) {
       if (mounted) {
-        _showAppSnackBar('Failed to download report card: $e', isError: true);
+        _showAppSnackBar(
+          http.isNetworkError(e)
+              ? http.kNetworkErrorMessage
+              : 'Failed to download report card: ${http.formatErrorMessage(e)}',
+          isError: true,
+        );
       }
     }
   }
@@ -2432,7 +2489,12 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
       await _saveAndNotifyPdf(pdfBytes, filename, 'All Report Cards Downloaded');
     } catch (e) {
       if (mounted) {
-        _showAppSnackBar('Failed to download all report cards: $e', isError: true);
+        _showAppSnackBar(
+          http.isNetworkError(e)
+              ? http.kNetworkErrorMessage
+              : 'Failed to download all report cards: ${http.formatErrorMessage(e)}',
+          isError: true,
+        );
       }
     }
   }
@@ -3428,7 +3490,9 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
                                     } catch (e) {
                                       setSheetState(() {
                                         isSaving = false;
-                                        localError = 'Failed to update terminal: $e';
+                                        localError = http.isNetworkError(e)
+                                            ? http.kNetworkErrorMessage
+                                            : 'Failed to update terminal: ${http.formatErrorMessage(e)}';
                                       });
                                     }
                                   },
@@ -4143,7 +4207,12 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        _showAppSnackBar('Failed to update test: $e', isError: true);
+        _showAppSnackBar(
+          http.isNetworkError(e)
+              ? http.kNetworkErrorMessage
+              : 'Failed to update test: ${http.formatErrorMessage(e)}',
+          isError: true,
+        );
       }
     }
   }

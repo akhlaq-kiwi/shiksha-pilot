@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as raw_http;
 import 'package:path/path.dart' as path;
 import 'package:school_hub/services/http_service.dart' as http;
 
@@ -92,17 +91,17 @@ class TeacherManagementService {
   /// Upload document or photo (Multipart)
   Future<String> uploadFile(File file, {String category = 'staff-documents'}) async {
     final uri = Uri.parse('$baseUrl/api/school/upload');
-    final request = raw_http.MultipartRequest('POST', uri);
+    final request = http.MultipartRequest('POST', uri);
 
     request.headers.addAll({
       'Authorization': 'Bearer $token',
     });
     request.fields['category'] = category;
 
-    final stream = raw_http.ByteStream(file.openRead());
+    final stream = http.ByteStream(file.openRead());
     final length = await file.length();
 
-    final multipartFile = raw_http.MultipartFile(
+    final multipartFile = http.MultipartFile(
       'file',
       stream,
       length,
@@ -111,8 +110,7 @@ class TeacherManagementService {
 
     request.files.add(multipartFile);
 
-    final streamedResponse = await request.send();
-    final response = await raw_http.Response.fromStream(streamedResponse);
+    final response = await http.sendMultipart(request);
 
     if (response.statusCode == 200 || response.statusCode == 201) {
       final decoded = json.decode(response.body);

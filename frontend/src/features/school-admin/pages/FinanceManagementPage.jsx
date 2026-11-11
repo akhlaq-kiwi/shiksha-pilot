@@ -276,6 +276,7 @@ export default function FinanceManagementPage() {
   const [expenseBillPath, setExpenseBillPath] = useState(null);
   const [expenseBillUploading, setExpenseBillUploading] = useState(false);
   const [expenseBillError, setExpenseBillError] = useState('');
+  const [expenseFormError, setExpenseFormError] = useState('');
   const [previewingBillUrl, setPreviewingBillUrl] = useState(null);
 
   // Delete Expense Confirmation
@@ -969,7 +970,13 @@ export default function FinanceManagementPage() {
       }
       setEditingExpense(expenseToEdit);
       setExpenseDesc(expenseToEdit.description || '');
-      setExpenseAmount(expenseToEdit.amount || '');
+      const rawAmt = expenseToEdit.amount;
+      const numAmt = Number(rawAmt);
+      const formattedAmt =
+        rawAmt !== null && rawAmt !== undefined && rawAmt !== '' && !isNaN(numAmt)
+          ? (Number.isInteger(numAmt) ? String(numAmt) : String(rawAmt))
+          : '';
+      setExpenseAmount(formattedAmt);
       setExpenseDate(expenseToEdit.expense_date || '');
       setExpenseBillPath(expenseToEdit.bill_attachment_path || null);
     } else {
@@ -980,6 +987,7 @@ export default function FinanceManagementPage() {
       setExpenseBillPath(null);
     }
     setExpenseBillError('');
+    setExpenseFormError('');
     setIsExpenseModalOpen(true);
   };
 
@@ -1031,17 +1039,30 @@ export default function FinanceManagementPage() {
 
   const handleSaveExpense = async (e) => {
     e.preventDefault();
-    if (!expenseDesc.trim() || !expenseAmount || !expenseDate) {
-      alert('Please fill in all mandatory fields.');
+    setExpenseFormError('');
+    const trimmedDesc = expenseDesc.trim();
+    const trimmedAmount = String(expenseAmount ?? '').trim();
+
+    if (!trimmedDesc || !trimmedAmount || !expenseDate) {
+      setExpenseFormError('Please fill in all mandatory fields.');
       return;
     }
-    if (parseFloat(expenseAmount) <= 0) {
-      alert('Amount must be positive.');
+    if (trimmedDesc.length < 3) {
+      setExpenseFormError('Description must be at least 3 characters.');
+      return;
+    }
+    if (!/^\d+$/.test(trimmedAmount)) {
+      setExpenseFormError('Amount must be a positive whole number without decimals.');
+      return;
+    }
+    const parsedAmount = parseInt(trimmedAmount, 10);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      setExpenseFormError('Amount must be greater than 0.');
       return;
     }
     const todayStr = getLocalDateString();
     if (expenseDate > todayStr) {
-      alert('Expense date cannot be in the future.');
+      setExpenseFormError('Expense date cannot be in the future.');
       return;
     }
 
@@ -1050,8 +1071,8 @@ export default function FinanceManagementPage() {
     setSuccess('');
 
     const payload = {
-      description: expenseDesc.trim(),
-      amount: parseFloat(expenseAmount),
+      description: trimmedDesc,
+      amount: parsedAmount,
       expense_date: expenseDate,
       bill_attachment_path: expenseBillPath
     };
@@ -1070,7 +1091,7 @@ export default function FinanceManagementPage() {
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       console.error(err);
-      setError(err.message || 'Failed to save expense entry.');
+      setExpenseFormError(err.message || 'Failed to save expense entry.');
     } finally {
       setExpenseSubmitting(false);
     }
@@ -2074,12 +2095,21 @@ export default function FinanceManagementPage() {
         </>}
       >
         <form onSubmit={handleSaveExpense} className="space-y-4">
+          {expenseFormError && (
+            <div className="p-2.5 bg-red-500/10 border border-red-500/20 rounded-xl text-xs font-semibold text-red-600 flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>{expenseFormError}</span>
+            </div>
+          )}
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-text-secondary uppercase">Description *</label>
             <Input id="restriction-applies-to" 
               placeholder="e.g. Electricity bill June" 
               value={expenseDesc} 
-              onChange={e => setExpenseDesc(e.target.value)} 
+              onChange={e => {
+                setExpenseDesc(e.target.value);
+                if (expenseFormError) setExpenseFormError('');
+              }} 
               required 
               className="rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
             />
@@ -2089,10 +2119,30 @@ export default function FinanceManagementPage() {
             <div className="space-y-1.5">
               <label htmlFor="amount" className="text-xs font-bold text-text-secondary uppercase">Amount (₹) *</label>
               <Input id="amount" 
-                type="number" 
-                placeholder="Rupees" 
-                value={expenseAmount} 
-                onChange={e => setExpenseAmount(e.target.value)} 
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                placeholder="e.g. 500"
+                value={expenseAmount}
+                onKeyDown={e => {
+                  if (['.', ',', '-', '+', 'e', 'E'].includes(e.key)) {
+                    e.preventDefault();
+                  }
+                }}
+                onPaste={e => {
+                  const pasted = e.clipboardData.getData('text').trim();
+                  if (!/^\d+$/.test(pasted)) {
+                    e.preventDefault();
+                    setExpenseFormError('Amount must be a positive whole number without decimals.');
+                  }
+                }}
+                onChange={e => {
+                  const val = e.target.value;
+                  if (val === '' || /^\d+$/.test(val)) {
+                    setExpenseAmount(val);
+                    if (expenseFormError) setExpenseFormError('');
+                  }
+                }}
                 required 
                 className="rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
               />
@@ -2103,7 +2153,10 @@ export default function FinanceManagementPage() {
               <Input 
                 type="date" 
                 value={expenseDate} 
-                onChange={e => setExpenseDate(e.target.value)} 
+                onChange={e => {
+                  setExpenseDate(e.target.value);
+                  if (expenseFormError) setExpenseFormError('');
+                }} 
                 max={getLocalDateString()}
                 required 
                 className="rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"

@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:school_hub/services/http_service.dart' as http;
 import '../services/fee_reminder_service.dart';
 import '../utils/class_formatter.dart';
 
@@ -61,7 +63,29 @@ class _FeeReminderScreenState extends State<FeeReminderScreen> {
   @override
   void initState() {
     super.initState();
+    _markFeeReminderNotificationsRead();
     _loadInitialData();
+  }
+
+  Future<void> _markFeeReminderNotificationsRead() async {
+    try {
+      final token = widget.service.token;
+      if (token.isEmpty) return;
+      final roleUpper = widget.userRole.toUpperCase();
+      final isSchoolAdmin = roleUpper == 'SCHOOL_ADMIN' || roleUpper == 'SUPER_ADMIN';
+      final path = isSchoolAdmin
+          ? '/api/school/notifications/0/read'
+          : '/api/teacher/notifications/0/read';
+      final uri = Uri.parse('${widget.service.baseUrl}$path');
+      await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode({'module': 'fee_reminder'}),
+      );
+    } catch (_) {}
   }
 
   @override

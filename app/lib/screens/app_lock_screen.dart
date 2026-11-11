@@ -6,6 +6,7 @@ import 'package:school_hub/widgets/verify_password_dialog.dart';
 import '../config.dart';
 import '../services/app_lock_helper.dart';
 import '../services/auth_service.dart';
+import '../services/http_service.dart' as http_svc;
 
 class AppLockScreen extends StatefulWidget {
   final VoidCallback onUnlockSuccess;
@@ -167,7 +168,7 @@ class _AppLockScreenState extends State<AppLockScreen> with SingleTickerProvider
           verified = (_enteredPin == _savedPin);
         } else {
           verified = false;
-          failMsg = 'Internet connection required to verify PIN.';
+          failMsg = http_svc.kNetworkErrorMessage;
         }
       }
     } else if (AppLockHelper.hasLocalDigest(prefs, userId: uid, phone: phone)) {
@@ -251,9 +252,9 @@ class _AppLockScreenState extends State<AppLockScreen> with SingleTickerProvider
         await AuthService(baseUrl: baseUrl).disableAppLock(token, capturedPassword);
       } catch (e) {
         if (!mounted) return;
-        final msg = e.toString().replaceFirst(RegExp(r'^[A-Za-z0-9_]*Exception:\s*'), '');
+        final msg = http_svc.formatErrorMessage(e, fallback: 'Failed to reset App Lock.');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(msg.isNotEmpty ? msg : 'Failed to reset App Lock.')),
+          SnackBar(content: Text(msg)),
         );
         return;
       }

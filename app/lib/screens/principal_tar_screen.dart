@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:school_hub/services/http_service.dart' as http_service;
 import 'package:school_hub/services/leave_service.dart';
 import 'package:school_hub/widgets/profile_avatar_view.dart';
@@ -64,8 +65,31 @@ class _PrincipalTarScreenState extends State<PrincipalTarScreen> with SingleTick
       }
     });
 
+    _markTarNotificationsRead();
     _fetchDailyAttendance();
     _fetchMonthlyReport();
+  }
+
+  Future<void> _markTarNotificationsRead() async {
+    try {
+      final token = widget.leaveService.token;
+      if (token.isEmpty) return;
+      final prefs = await SharedPreferences.getInstance();
+      final roleUpper = (prefs.getString('user_role') ?? '').toUpperCase();
+      final isSchoolAdmin = roleUpper == 'SCHOOL_ADMIN' || roleUpper == 'SUPER_ADMIN';
+      final path = isSchoolAdmin
+          ? '/api/school/notifications/0/read'
+          : '/api/teacher/notifications/0/read';
+      final uri = Uri.parse('${widget.leaveService.baseUrl}$path');
+      await http_service.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode({'module': 'tar'}),
+      );
+    } catch (_) {}
   }
 
   @override
@@ -113,7 +137,12 @@ class _PrincipalTarScreenState extends State<PrincipalTarScreen> with SingleTick
         _showSnackBar('Failed to load attendance (${res.statusCode})', isError: true);
       }
     } catch (e) {
-      _showSnackBar('Error loading attendance: $e', isError: true);
+      _showSnackBar(
+        http_service.isNetworkError(e)
+            ? http_service.kNetworkErrorMessage
+            : 'Error loading attendance: ${http_service.formatErrorMessage(e)}',
+        isError: true,
+      );
     } finally {
       if (mounted) setState(() => _isLoadingDaily = false);
     }
@@ -148,7 +177,12 @@ class _PrincipalTarScreenState extends State<PrincipalTarScreen> with SingleTick
         _showSnackBar('Failed to load monthly report (${res.statusCode})', isError: true);
       }
     } catch (e) {
-      _showSnackBar('Error loading monthly report: $e', isError: true);
+      _showSnackBar(
+        http_service.isNetworkError(e)
+            ? http_service.kNetworkErrorMessage
+            : 'Error loading monthly report: ${http_service.formatErrorMessage(e)}',
+        isError: true,
+      );
     } finally {
       if (mounted) setState(() => _isLoadingReport = false);
     }
@@ -1544,7 +1578,12 @@ class _PrincipalTarScreenState extends State<PrincipalTarScreen> with SingleTick
         _showSnackBar(msg, isError: true);
       }
     } catch (e) {
-      _showSnackBar('Error marking attendance: $e', isError: true);
+      _showSnackBar(
+        http_service.isNetworkError(e)
+            ? http_service.kNetworkErrorMessage
+            : 'Error marking attendance: ${http_service.formatErrorMessage(e)}',
+        isError: true,
+      );
     } finally {
       setSheetState(() {
         _markingDates.remove(dateStr);

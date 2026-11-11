@@ -10,6 +10,7 @@ import 'screens/home_screen.dart';
 import 'screens/app_lock_screen.dart';
 import 'services/leave_service.dart';
 import 'services/auth_service.dart';
+import 'services/http_service.dart' as http_svc;
 import 'services/app_lock_helper.dart';
 import 'services/notification_helper.dart';
 import 'services/push_notification_service.dart';
@@ -60,12 +61,17 @@ void callbackDispatcher() {
             if (!isSchoolStaff && studentId != null) 'X-Student-Id': studentId.toString(),
           };
 
-          final response = await http.get(uri, headers: headers);
+          final response = await http.get(uri, headers: headers).timeout(const Duration(seconds: 20));
           if (response.statusCode == 200) {
             final decodedBody = json.decode(response.body);
-            final List<dynamic> data = isSchoolStaff 
-                ? (decodedBody['notifications'] ?? decodedBody['data'] ?? [])
-                : (decodedBody['data'] ?? []);
+            final dynamic rawData = decodedBody is Map ? decodedBody['data'] : null;
+            final List<dynamic> data = isSchoolStaff
+                ? ((decodedBody is Map && decodedBody['notifications'] is List)
+                    ? decodedBody['notifications'] as List<dynamic>
+                    : (rawData is Map && rawData['notifications'] is List
+                        ? rawData['notifications'] as List<dynamic>
+                        : (rawData is List ? rawData : [])))
+                : (rawData is List ? rawData : []);
 
             if (data.isNotEmpty) {
               int lastNotifiedId = prefs.getInt(lastNotifiedKey) ?? 0;
@@ -832,8 +838,7 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       }
     } catch (e) {
-      final rawError = e.toString();
-      final errorMsg = rawError.replaceAll('Exception:', '').trim();
+      final errorMsg = e.toString().replaceAll('Exception:', '').trim();
       
       setState(() {
         _phoneValidationError = null;
@@ -841,9 +846,9 @@ class _LoginScreenState extends State<LoginScreen> {
         _errorMessage = '';
       });
 
-      if (rawError.contains('SocketException') || rawError.contains('ClientException') || rawError.contains('Connection refused') || rawError.contains('Failed host lookup')) {
+      if (http_svc.isNetworkError(e)) {
         setState(() {
-          _errorMessage = 'Cannot reach Shiksha Pilot. Check your internet connection and try again.';
+          _errorMessage = http_svc.kNetworkErrorMessage;
         });
       } else if (errorMsg.toLowerCase().contains('mobile no not found')) {
         setState(() {
@@ -865,13 +870,9 @@ class _LoginScreenState extends State<LoginScreen> {
           _phoneValidationError = 'Invalid credential';
         });
         _formKey.currentState!.validate();
-      } else if (errorMsg.toLowerCase().contains('timeout') || errorMsg.toLowerCase().contains('future not completed')) {
-        setState(() {
-          _errorMessage = 'Connection timeout. Please check your network or server connection.';
-        });
       } else {
         setState(() {
-          _errorMessage = errorMsg;
+          _errorMessage = http_svc.formatErrorMessage(e);
         });
       }
     } finally {

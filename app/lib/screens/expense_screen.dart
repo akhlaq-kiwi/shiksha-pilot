@@ -1,9 +1,10 @@
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:http/http.dart' as http;
+import 'package:school_hub/services/http_service.dart' as http;
 import 'package:school_hub/services/expense_service.dart';
 import 'package:school_hub/screens/full_screen_image_screen.dart';
 
@@ -553,15 +554,22 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
 
   Future<void> _markExpenseNotificationsAsRead() async {
     try {
-      final uri = Uri.parse('${widget.baseUrl}/api/school/notifications/0/read');
-      await http.post(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${widget.token}',
-        },
-        body: json.encode({'module': 'expense'}),
-      );
+      final prefs = await SharedPreferences.getInstance();
+      final role = (prefs.getString('user_role') ?? widget.userRole ?? '').toUpperCase();
+      final isAdmin = role == 'SCHOOL_ADMIN' || role == 'SUPER_ADMIN';
+      final path = isAdmin ? '/api/school/notifications/0/read' : '/api/teacher/notifications/0/read';
+      final uri = Uri.parse('${widget.baseUrl}$path');
+      await Future.wait([
+        if (isAdmin) _expenseService.markExpenseBadgeSeen(),
+        http.post(
+          uri,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ${widget.token}',
+          },
+          body: json.encode({'module': 'expense'}),
+        ),
+      ]);
     } catch (_) {}
   }
 
@@ -1863,7 +1871,9 @@ class _AddExpenseBottomSheetState extends State<_AddExpenseBottomSheet> {
             _isUploadingFile = false;
             _pickedFile = null;
             _uploadedBillUrl = null;
-            _formError = 'Failed to upload bill receipt: ${e.toString().replaceAll('Exception:', '').trim()}';
+            _formError = http.isNetworkError(e)
+                ? http.kNetworkErrorMessage
+                : 'Failed to upload bill receipt: ${http.formatErrorMessage(e)}';
           });
         }
       }
@@ -1873,7 +1883,15 @@ class _AddExpenseBottomSheetState extends State<_AddExpenseBottomSheet> {
   Future<void> _submitExpense() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final amountVal = double.tryParse(_amountController.text.trim());
+    final rawAmount = _amountController.text.trim();
+    if (!RegExp(r'^\d+$').hasMatch(rawAmount)) {
+      setState(() {
+        _formError = 'Amount must be a positive whole number without decimals.';
+      });
+      return;
+    }
+
+    final amountVal = int.tryParse(rawAmount);
     if (amountVal == null || amountVal <= 0) {
       setState(() {
         _formError = 'Please enter a valid amount greater than 0';
@@ -1902,7 +1920,7 @@ class _AddExpenseBottomSheetState extends State<_AddExpenseBottomSheet> {
       if (mounted) {
         setState(() {
           _isSubmitting = false;
-          _formError = e.toString().replaceAll('Exception:', '').trim();
+          _formError = http.formatErrorMessage(e);
         });
       }
     }
@@ -2045,10 +2063,22 @@ class _AddExpenseBottomSheetState extends State<_AddExpenseBottomSheet> {
                               const SizedBox(height: 6),
                               TextFormField(
                                 controller: _amountController,
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  TextInputFormatter.withFunction((oldValue, newValue) {
+                                    if (newValue.text.isEmpty || RegExp(r'^\d+$').hasMatch(newValue.text)) {
+                                      return newValue;
+                                    }
+                                    return oldValue;
+                                  }),
+                                ],
                                 validator: (val) {
                                   if (val == null || val.trim().isEmpty) return 'Enter amount';
-                                  final numVal = double.tryParse(val.trim());
+                                  final trimmed = val.trim();
+                                  if (!RegExp(r'^\d+$').hasMatch(trimmed)) {
+                                    return 'Whole numbers only';
+                                  }
+                                  final numVal = int.tryParse(trimmed);
                                   if (numVal == null || numVal <= 0) return 'Must be > 0';
                                   return null;
                                 },
@@ -2056,7 +2086,7 @@ class _AddExpenseBottomSheetState extends State<_AddExpenseBottomSheet> {
                                 decoration: InputDecoration(
                                   prefixText: '₹ ',
                                   prefixStyle: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFEF4444), fontSize: 14),
-                                  hintText: '0.00',
+                                  hintText: '0',
                                   hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
                                   contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),

@@ -120,6 +120,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _unreadNoticeCount = 0;
   int _unreadExpenseCount = 0;
   int _unreadFinancialReportCount = 0;
+  int _latestPendingExpenseMaxId = 0;
+  int _latestPendingReportMaxId = 0;
+  int _latestPendingDiscountMaxId = 0;
   Future<void>? _currentNoticesFetch;
   int _noticesFetchSeq = 0;
   int _unreadTimetableCount = 0;
@@ -127,6 +130,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _unreadExamsCount = 0;
   int _unreadFeeReminderCount = 0;
   int _unreadDiscountRequestCount = 0;
+  int _unreadTarCount = 0;
+  int _unreadFeesPortalCount = 0;
   int _unreadLeaveCount = 0;
   int _unreadAttendanceCount = 0;
   int _unreadFeesCount = 0;
@@ -407,6 +412,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             _unreadSalaryCount = 0;
             _unreadExamsCount = 0;
             _unreadFeeReminderCount = 0;
+            _unreadTarCount = 0;
+            _unreadFeesPortalCount = 0;
             _unreadAttendanceCount = 0;
             _unreadFeesCount = 0;
             _unreadHomeworkCount = 0;
@@ -657,9 +664,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (!mounted || fetchSeq != _notificationsFetchSeq) return;
       if (response.statusCode == 200) {
         final decodedBody = json.decode(response.body);
+        final dynamic rawData = decodedBody is Map ? decodedBody['data'] : null;
         final List<dynamic> data = isSchoolStaff
-            ? (decodedBody['notifications'] ?? decodedBody['data'] ?? [])
-            : (decodedBody['data'] ?? []);
+            ? ((decodedBody is Map && decodedBody['notifications'] is List)
+                ? decodedBody['notifications'] as List<dynamic>
+                : (rawData is Map && rawData['notifications'] is List
+                    ? rawData['notifications'] as List<dynamic>
+                    : (rawData is List ? rawData : [])))
+            : (rawData is List ? rawData : []);
 
         bool isUnread(dynamic n) =>
             n['is_read'] == 0 || n['is_read'] == false || n['is_read'] == '0';
@@ -731,6 +743,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               linkStr.contains('fee-reminder') ||
               linkStr.contains('fee-follow-up')) {
             return 'fee_reminder';
+          }
+          if (evtStr == 'DISCOUNT_REQUEST_APPROVED' ||
+              evtStr == 'DISCOUNT_REQUEST_REJECTED' ||
+              linkStr.contains('fees-portal')) {
+            return 'fees_portal';
           }
           if (evtStr.startsWith('EXPENSE') ||
               evtStr.startsWith('FINANCIAL_REPORT') ||
@@ -855,6 +872,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               titleStr.contains('topper');
         }
 
+        bool isTarNotif(dynamic n) {
+          final canon = canonicalModuleOf(n);
+          if (canon != null) return canon == 'tar';
+          final linkStr = (n['link'] ?? '').toString().toLowerCase();
+          final titleStr = (n['title'] ?? '').toString().toLowerCase();
+          return linkStr.contains('teacher-attendance') ||
+              linkStr.contains('/tar') ||
+              titleStr.contains('late teacher');
+        }
+
+        bool isFeesPortalNotif(dynamic n) {
+          final canon = canonicalModuleOf(n);
+          if (canon != null) return canon == 'fees_portal';
+          final linkStr = (n['link'] ?? '').toString().toLowerCase();
+          final titleStr = (n['title'] ?? '').toString().toLowerCase();
+          return linkStr.contains('fees-portal') ||
+              titleStr.contains('discount request');
+        }
+
         int count = data.where((n) {
           if (!isUnread(n)) return false;
           if (isNoticeNotif(n)) return false;
@@ -866,11 +902,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         int salaryCount = data.where((n) => isUnread(n) && isSalaryNotif(n)).length;
         int examsCount = data.where((n) => isUnread(n) && isExamsNotif(n)).length;
         int feeReminderCount = data.where((n) => isUnread(n) && isFeeReminderNotif(n)).length;
+        int tarCount = isSchoolStaff ? data.where((n) => isUnread(n) && isTarNotif(n)).length : 0;
+        int feesPortalCount = isSchoolStaff ? data.where((n) => isUnread(n) && isFeesPortalNotif(n)).length : 0;
         int leaveCount = roleUpper == 'SCHOOL_ADMIN' ? 0 : data.where((n) => isUnread(n) && isLeaveNotif(n)).length;
         int attendanceCount = !isSchoolStaff ? data.where((n) => isUnread(n) && isAttendanceNotif(n)).length : 0;
         int feesCount = !isSchoolStaff ? data.where((n) => isUnread(n) && isFeesCardNotif(n)).length : 0;
         int homeworkCount = !isSchoolStaff ? data.where((n) => isUnread(n) && isHomeworkNotif(n)).length : 0;
-        int achievementsCount = !isSchoolStaff ? data.where((n) => isUnread(n) && isAchievementsNotif(n)).length : 0;
+        int achievementsCount = data.where((n) => isUnread(n) && isAchievementsNotif(n)).length;
 
         if (mounted && fetchSeq == _notificationsFetchSeq) {
           setState(() {
@@ -879,6 +917,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             _unreadSalaryCount = salaryCount;
             _unreadExamsCount = examsCount;
             _unreadFeeReminderCount = feeReminderCount;
+            _unreadTarCount = tarCount;
+            _unreadFeesPortalCount = feesPortalCount;
             _unreadLeaveCount = leaveCount;
             _unreadAttendanceCount = attendanceCount;
             _unreadFeesCount = feesCount;
@@ -979,20 +1019,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (token.isEmpty) return;
       final baseUrl = resolveBaseUrlFrom(prefs);
       final expService = ExpenseService(baseUrl: baseUrl, token: token);
-      final pendingCount = await expService.getPendingExpenseCount();
-      final lastViewed = prefs.getInt('last_viewed_expense_pending_count') ?? 0;
-      final badgeCleared = prefs.getBool('expense_badge_cleared') ?? false;
-
-      int unread = 0;
-      if (!badgeCleared) {
-        unread = pendingCount;
-      } else if (pendingCount > lastViewed) {
-        unread = pendingCount - lastViewed;
-      }
+      final info = await expService.getPendingExpenseBadgeInfo();
+      final int unread = info['unread_count'] ?? 0;
+      final int maxId = info['max_pending_id'] ?? 0;
 
       if (mounted) {
         setState(() {
           _unreadExpenseCount = unread;
+          _latestPendingExpenseMaxId = maxId;
         });
       }
     } catch (e) {
@@ -1009,20 +1043,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (token.isEmpty) return;
       final baseUrl = resolveBaseUrlFrom(prefs);
       final repService = FinancialReportService(baseUrl: baseUrl, token: token);
-      final pendingCount = await repService.getPendingFinancialReportCount();
-      final lastViewed = prefs.getInt('last_viewed_financial_report_pending_count') ?? 0;
-      final badgeCleared = prefs.getBool('financial_report_badge_cleared') ?? false;
-
-      int unread = 0;
-      if (!badgeCleared) {
-        unread = pendingCount;
-      } else if (pendingCount > lastViewed) {
-        unread = pendingCount - lastViewed;
-      }
+      final info = await repService.getPendingFinancialReportBadgeInfo();
+      final int unread = info['unread_count'] ?? 0;
+      final int maxId = info['max_pending_id'] ?? 0;
 
       if (mounted) {
         setState(() {
           _unreadFinancialReportCount = unread;
+          _latestPendingReportMaxId = maxId;
         });
       }
     } catch (e) {
@@ -1044,25 +1072,24 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         if (mounted) {
           setState(() {
             _unreadDiscountRequestCount = 0;
+            _latestPendingDiscountMaxId = 0;
           });
         }
         return;
       }
-      final pendingList = await feeService.getDiscountRequests(status: 'PENDING');
-      final pendingCount = pendingList.length;
-      final lastViewed = prefs.getInt('last_viewed_discount_pending_count') ?? 0;
-      final badgeCleared = prefs.getBool('discount_badge_cleared') ?? false;
-
-      int unread = 0;
-      if (!badgeCleared) {
-        unread = pendingCount;
-      } else if (pendingCount > lastViewed) {
-        unread = pendingCount - lastViewed;
-      }
+      final pendingData = await feeService.getDiscountRequests(status: 'PENDING');
+      final dynamic summaryRaw = pendingData['summary'];
+      final Map<String, dynamic> summary = summaryRaw is Map<String, dynamic>
+          ? summaryRaw
+          : (summaryRaw is Map ? Map<String, dynamic>.from(summaryRaw) : <String, dynamic>{});
+      final int unread = (summary['unseen_pending'] as num?)?.toInt() ??
+          ((summary['pending'] as num?)?.toInt() ?? 0);
+      final int maxId = (summary['max_pending_id'] as num?)?.toInt() ?? 0;
 
       if (mounted) {
         setState(() {
           _unreadDiscountRequestCount = unread;
+          _latestPendingDiscountMaxId = maxId;
         });
       }
     } catch (e) {
@@ -1103,10 +1130,38 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               // Handle deep linking on click
               final titleLower = title.toString().toLowerCase();
               final msgLower = message.toString().toLowerCase();
+              final eventKey = (notif['event_key'] ?? '').toString().toUpperCase();
+              final linkLower = (notif['link'] ?? '').toString().toLowerCase();
 
               final isLeaveApprovalOrReqNotif = titleLower.contains('approve') || titleLower.contains('reject') || msgLower.contains('approve') || msgLower.contains('reject') || titleLower.contains('request') || msgLower.contains('request');
               final isHolidayNotif = titleLower.contains('holiday') || msgLower.contains('holiday');
-              if (titleLower.contains('leave') || msgLower.contains('leave') || isHolidayNotif) {
+              if (eventKey == 'LATE_TEACHERS_ALERT' || linkLower.contains('teacher-attendance') || linkLower.contains('/tar') || titleLower.contains('late teacher')) {
+                if (mounted) {
+                  setState(() {
+                    _unreadTarCount = 0;
+                  });
+                }
+                final Future<void> markFuture = _markFeatureNotificationsRead('tar');
+                if (!mounted) return;
+                Navigator.of(this.context).push(
+                  MaterialPageRoute(
+                    builder: (_) => PrincipalTarScreen(
+                      leaveService: widget.leaveService,
+                    ),
+                  ),
+                ).then((_) async {
+                  if (mounted) {
+                    setState(() {
+                      _unreadTarCount = 0;
+                    });
+                  }
+                  await markFuture;
+                  await _markFeatureNotificationsRead('tar');
+                  if (mounted) {
+                    await _fetchUnreadNotificationsCount();
+                  }
+                });
+              } else if (titleLower.contains('leave') || msgLower.contains('leave') || isHolidayNotif) {
                 if (mounted) {
                   setState(() {
                     _unreadLeaveCount = 0;
@@ -1259,62 +1314,124 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     }
                   }
                 });
-              } else if (titleLower.contains('financial report') || msgLower.contains('financial report') || titleLower.contains('settlement') || msgLower.contains('settlement')) {
-                setState(() {
-                  _unreadFinancialReportCount = 0;
-                });
-                _markFeatureNotificationsRead('financial_report');
-                Navigator.push(
-                  context,
+              } else if (eventKey == 'EXPENSE_APPROVAL_REQUEST' || linkLower.contains('expense') || titleLower.contains('expense') || msgLower.contains('expense')) {
+                if (mounted) {
+                  setState(() {
+                    _unreadExpenseCount = 0;
+                  });
+                }
+                final prefs = await SharedPreferences.getInstance();
+                final token = prefs.getString('auth_token') ?? widget.leaveService.token;
+                final effectiveBase = widget.leaveService.baseUrl.isNotEmpty
+                    ? widget.leaveService.baseUrl
+                    : resolveBaseUrlFrom(prefs);
+                final expService = ExpenseService(baseUrl: effectiveBase, token: token);
+                final Future<void> markSeenFuture = expService.markExpenseBadgeSeen(
+                  maxId: _latestPendingExpenseMaxId > 0 ? _latestPendingExpenseMaxId : null,
+                );
+                final Future<void> markNotifFuture = _markFeatureNotificationsRead('expense');
+                if (!mounted) return;
+                Navigator.of(this.context).push(
                   MaterialPageRoute(
-                    builder: (context) => RevenueScreen(
-                      reportService: FinancialReportService(
-                        baseUrl: widget.leaveService.baseUrl,
-                        token: widget.leaveService.token,
-                      ),
+                    builder: (_) => ExpenseScreen(
+                      baseUrl: effectiveBase,
+                      token: token,
+                      userRole: widget.userRole,
+                    ),
+                  ),
+                ).then((_) async {
+                  await markSeenFuture;
+                  await markNotifFuture;
+                  await _markFeatureNotificationsRead('expense');
+                  if (mounted) {
+                    await Future.wait([
+                      _fetchPendingExpenseCount(),
+                      _fetchUnreadNotificationsCount(),
+                    ]);
+                  }
+                });
+              } else if (eventKey == 'FINANCIAL_REPORT_APPROVAL_REQUEST' || titleLower.contains('financial report') || msgLower.contains('financial report') || titleLower.contains('settlement') || msgLower.contains('settlement')) {
+                if (mounted) {
+                  setState(() {
+                    _unreadFinancialReportCount = 0;
+                  });
+                }
+                final prefs = await SharedPreferences.getInstance();
+                final token = prefs.getString('auth_token') ?? widget.leaveService.token;
+                final effectiveBase = widget.leaveService.baseUrl.isNotEmpty
+                    ? widget.leaveService.baseUrl
+                    : resolveBaseUrlFrom(prefs);
+                final repService = FinancialReportService(
+                  baseUrl: effectiveBase,
+                  token: token,
+                );
+                final Future<void> markSeenFuture = repService.markFinancialReportBadgeSeen(
+                  maxId: _latestPendingReportMaxId > 0 ? _latestPendingReportMaxId : null,
+                );
+                final Future<void> markNotifFuture = _markFeatureNotificationsRead('financial_report');
+                if (!mounted) return;
+                Navigator.of(this.context).push(
+                  MaterialPageRoute(
+                    builder: (_) => RevenueScreen(
+                      reportService: repService,
                       userRole: widget.userRole,
                       isFeeCollector: _isFeeCollector,
                     ),
                   ),
-                ).then((_) {
-                  _fetchPendingFinancialReportCount();
+                ).then((_) async {
+                  await markSeenFuture;
+                  await markNotifFuture;
+                  await _markFeatureNotificationsRead('financial_report');
+                  if (mounted) {
+                    await Future.wait([
+                      _fetchPendingFinancialReportCount(),
+                      _fetchUnreadNotificationsCount(),
+                    ]);
+                  }
                 });
-              } else if (titleLower.contains('fee reminder') || msgLower.contains('fee reminder') || titleLower.contains('fee follow-up') || msgLower.contains('fee follow-up') || (notif['event_key'] ?? '').toString() == 'FEE_FOLLOWUP_DUE_TODAY') {
+              } else if (titleLower.contains('fee reminder') || msgLower.contains('fee reminder') || titleLower.contains('fee follow-up') || msgLower.contains('fee follow-up') || eventKey == 'FEE_FOLLOWUP_DUE_TODAY') {
                 if (mounted) {
                   setState(() {
                     _unreadFeeReminderCount = 0;
                   });
                 }
-                _markFeatureNotificationsRead('fee_reminder');
-                Navigator.push(
-                  context,
+                final Future<void> markFuture = _markFeatureNotificationsRead('fee_reminder');
+                if (!mounted) return;
+                Navigator.of(this.context).push(
                   MaterialPageRoute(
-                    builder: (context) => FeeReminderScreen(
+                    builder: (_) => FeeReminderScreen(
                       service: FeeReminderService(
                         baseUrl: widget.leaveService.baseUrl,
                         token: widget.leaveService.token,
                       ),
                       userRole: widget.userRole,
+                      isPrincipal: _isPrincipal || (widget.userRole.toUpperCase() == 'SCHOOL_ADMIN'),
                       isFeeCollector: true,
                     ),
                   ),
-                ).then((_) {
-                  _fetchUnreadNotificationsCount();
+                ).then((_) async {
+                  if (mounted) {
+                    setState(() {
+                      _unreadFeeReminderCount = 0;
+                    });
+                  }
+                  await markFuture;
+                  await _markFeatureNotificationsRead('fee_reminder');
+                  if (mounted) {
+                    await _fetchUnreadNotificationsCount();
+                  }
                 });
               } else if (titleLower.contains('achievement') || msgLower.contains('achievement')) {
-                final roleUpper = widget.userRole.toUpperCase();
-                final bool isStudentOrParent = roleUpper == 'PARENT' || roleUpper == 'STUDENT';
-                Future<void>? markFuture;
-                if (isStudentOrParent) {
+                if (mounted) {
                   setState(() {
                     _unreadAchievementsCount = 0;
                   });
-                  markFuture = _markFeatureNotificationsRead('achievements');
                 }
-                Navigator.push(
-                  context,
+                final Future<void> markFuture = _markFeatureNotificationsRead('achievements');
+                if (!mounted) return;
+                Navigator.of(this.context).push(
                   MaterialPageRoute(
-                    builder: (context) => AchievementsScreen(
+                    builder: (_) => AchievementsScreen(
                       baseUrl: widget.leaveService.baseUrl,
                       token: widget.leaveService.token,
                       userRole: widget.userRole,
@@ -1322,22 +1439,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ),
                   ),
                 ).then((_) async {
-                  if (isStudentOrParent) {
-                    if (mounted) {
-                      setState(() {
-                        _unreadAchievementsCount = 0;
-                      });
-                    }
-                    if (markFuture != null) await markFuture;
-                    await _markFeatureNotificationsRead('achievements');
-                    if (mounted) {
-                      await _fetchUnreadNotificationsCount();
-                    }
+                  if (mounted) {
+                    setState(() {
+                      _unreadAchievementsCount = 0;
+                    });
+                  }
+                  await markFuture;
+                  await _markFeatureNotificationsRead('achievements');
+                  if (mounted) {
+                    await _fetchUnreadNotificationsCount();
                   }
                 });
               } else if (titleLower.contains('discount request') ||
                   msgLower.contains('discount request') ||
-                  (notif['event_key'] ?? '').toString().contains('DISCOUNT_REQUEST')) {
+                  eventKey.contains('DISCOUNT_REQUEST')) {
                 int? targetStudentId;
                 try {
                   final rawLink = (notif['link'] ?? '').toString();
@@ -1349,19 +1464,39 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 if (targetStudentId == null && notif['student_id'] != null) {
                   targetStudentId = int.tryParse(notif['student_id'].toString());
                 }
+                if (mounted) {
+                  setState(() {
+                    _unreadFeesPortalCount = 0;
+                  });
+                }
+                final Future<void> markFuture = _markFeatureNotificationsRead('fees_portal');
                 final prefs = await SharedPreferences.getInstance();
                 final token = prefs.getString('auth_token') ?? widget.leaveService.token;
                 final baseUrl = resolveBaseUrlFrom(prefs);
-                Navigator.push(
-                  context,
+                if (!mounted) return;
+                Navigator.of(this.context).push(
                   MaterialPageRoute(
-                    builder: (context) => FeesPortalScreen(
+                    builder: (_) => FeesPortalScreen(
                       baseUrl: baseUrl,
                       token: token,
                       initialStudentId: targetStudentId,
                     ),
                   ),
-                );
+                ).then((_) async {
+                  if (mounted) {
+                    setState(() {
+                      _unreadFeesPortalCount = 0;
+                    });
+                  }
+                  await markFuture;
+                  await _markFeatureNotificationsRead('fees_portal');
+                  if (mounted) {
+                    await Future.wait([
+                      _fetchUnreadNotificationsCount(),
+                      _fetchPendingDiscountRequestCount(),
+                    ]);
+                  }
+                });
               } else if ((titleLower.contains('absent') || msgLower.contains('absent') || titleLower.contains('attendance')) && !(notif['event_key']?.toString() == 'LATE_TEACHERS_ALERT')) {
                 final roleUpper = widget.userRole.toUpperCase();
                 final bool isStudentOrParent = roleUpper == 'PARENT' || roleUpper == 'STUDENT';
@@ -1688,6 +1823,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _unreadSalaryCount = 0;
       _unreadExamsCount = 0;
       _unreadFeeReminderCount = 0;
+      _unreadTarCount = 0;
+      _unreadFeesPortalCount = 0;
       _unreadAttendanceCount = 0;
       _unreadFeesCount = 0;
       _unreadHomeworkCount = 0;
@@ -1800,6 +1937,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 _unreadSalaryCount = 0;
                 _unreadExamsCount = 0;
                 _unreadFeeReminderCount = 0;
+                _unreadTarCount = 0;
+                _unreadFeesPortalCount = 0;
                 _unreadAttendanceCount = 0;
                 _unreadFeesCount = 0;
                 _unreadHomeworkCount = 0;
@@ -2016,14 +2155,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
         );
       } else if (feature.name == 'Salary' || feature.name == 'Staff Salary' || feature.name == 'Salaries') {
-        setState(() {
-          _unreadSalaryCount = 0;
-        });
-        _markFeatureNotificationsRead('salary');
+        if (mounted) {
+          setState(() {
+            _unreadSalaryCount = 0;
+          });
+        }
+        final Future<void> markFuture = _markFeatureNotificationsRead('salary');
         final prefs = await SharedPreferences.getInstance();
         final token = prefs.getString('auth_token') ?? widget.leaveService.token;
         final baseUrl = prefs.getString('base_url') ?? widget.leaveService.baseUrl;
-        Navigator.push(
+        await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => SalaryCardScreen(
@@ -2031,15 +2172,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               token: token,
             ),
           ),
-        ).then((_) async {
-          if (mounted) {
-            setState(() {
-              _unreadSalaryCount = 0;
-            });
-          }
-          await _markFeatureNotificationsRead('salary');
+        );
+        if (mounted) {
+          setState(() {
+            _unreadSalaryCount = 0;
+          });
+        }
+        await markFuture;
+        await _markFeatureNotificationsRead('salary');
+        if (mounted) {
           await _fetchUnreadNotificationsCount();
-        });
+        }
       } else if (feature.name == 'Notice' || feature.name == 'Notice Board' || feature.name == 'Notices') {
         if (mounted) {
           setState(() {
@@ -2104,12 +2247,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               _unreadSalaryCount = 0;
               _unreadExamsCount = 0;
               _unreadFeeReminderCount = 0;
+              _unreadTarCount = 0;
+              _unreadFeesPortalCount = 0;
+              _unreadAchievementsCount = 0;
             }
           });
         }
         await _markFeatureNotificationsRead('all');
         if (mounted) {
-          await _fetchUnreadNotificationsCount();
+          await Future.wait([
+            _fetchUnreadNotificationsCount(),
+            _fetchPendingExpenseCount(),
+            _fetchPendingFinancialReportCount(),
+            _fetchPendingDiscountRequestCount(),
+          ]);
         }
       } else if (feature.name == 'Homework') {
         final roleUpper = widget.userRole.toUpperCase();
@@ -2233,17 +2384,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           await _fetchUnreadNotificationsCount();
         }
       } else if (feature.name == 'Achievements') {
-        final roleUpper = widget.userRole.toUpperCase();
-        final bool isStudentOrParent = roleUpper == 'PARENT' || roleUpper == 'STUDENT';
-        Future<void>? markFuture;
-        if (isStudentOrParent) {
-          if (mounted) {
-            setState(() {
-              _unreadAchievementsCount = 0;
-            });
-          }
-          markFuture = _markFeatureNotificationsRead('achievements');
+        if (mounted) {
+          setState(() {
+            _unreadAchievementsCount = 0;
+          });
         }
+        final Future<void> markFuture = _markFeatureNotificationsRead('achievements');
         final prefs = await SharedPreferences.getInstance();
         final token = prefs.getString('auth_token') ?? widget.leaveService.token;
         await Navigator.push(
@@ -2257,17 +2403,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
         );
-        if (isStudentOrParent) {
-          if (mounted) {
-            setState(() {
-              _unreadAchievementsCount = 0;
-            });
-          }
-          if (markFuture != null) await markFuture;
-          await _markFeatureNotificationsRead('achievements');
-          if (mounted) {
-            await _fetchUnreadNotificationsCount();
-          }
+        if (mounted) {
+          setState(() {
+            _unreadAchievementsCount = 0;
+          });
+        }
+        await markFuture;
+        await _markFeatureNotificationsRead('achievements');
+        if (mounted) {
+          await _fetchUnreadNotificationsCount();
         }
       } else if (feature.name == 'Outstanding') {
         final prefs = await SharedPreferences.getInstance();
@@ -2291,7 +2435,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
         );
       } else if (feature.name == 'TAR') {
-        Navigator.push(
+        if (mounted) {
+          setState(() {
+            _unreadTarCount = 0;
+          });
+        }
+        final Future<void> markFuture = _markFeatureNotificationsRead('tar');
+        await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => PrincipalTarScreen(
@@ -2299,14 +2449,30 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
         );
+        if (mounted) {
+          setState(() {
+            _unreadTarCount = 0;
+          });
+        }
+        await markFuture;
+        await _markFeatureNotificationsRead('tar');
+        if (mounted) {
+          await _fetchUnreadNotificationsCount();
+        }
       } else if (feature.name == 'Fees Portal') {
+        if (mounted) {
+          setState(() {
+            _unreadFeesPortalCount = 0;
+          });
+        }
+        final Future<void> markFuture = _markFeatureNotificationsRead('fees_portal');
         final prefs = await SharedPreferences.getInstance();
         final token = prefs.getString('auth_token') ?? widget.leaveService.token;
         String effectiveBase = widget.leaveService.baseUrl;
         if (effectiveBase.isEmpty || effectiveBase.contains('10.22.6.71') || effectiveBase.contains('10.155.82.71')) {
           effectiveBase = resolveBaseUrlFrom(prefs);
         }
-        Navigator.push(
+        await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => FeesPortalScreen(
@@ -2315,6 +2481,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
         );
+        if (mounted) {
+          setState(() {
+            _unreadFeesPortalCount = 0;
+          });
+        }
+        await markFuture;
+        await _markFeatureNotificationsRead('fees_portal');
+        if (mounted) {
+          await Future.wait([
+            _fetchUnreadNotificationsCount(),
+            _fetchPendingDiscountRequestCount(),
+          ]);
+        }
       } else if (feature.name == 'TSD') {
         final prefs = await SharedPreferences.getInstance();
         final token = prefs.getString('auth_token') ?? widget.leaveService.token;
@@ -2339,19 +2518,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           effectiveBase = resolveBaseUrlFrom(prefs);
         }
 
-        // Immediately clear badge count on tap per user requirement
-        setState(() {
-          _unreadExpenseCount = 0;
-        });
-        await prefs.setBool('expense_badge_cleared', true);
-        _markFeatureNotificationsRead('expense');
-        try {
-          final expService = ExpenseService(baseUrl: effectiveBase, token: token);
-          final currentPending = await expService.getPendingExpenseCount();
-          await prefs.setInt('last_viewed_expense_pending_count', currentPending);
-        } catch (_) {}
+        // Immediately clear badge count on tap and persist seen state on backend DB
+        if (mounted) {
+          setState(() {
+            _unreadExpenseCount = 0;
+          });
+        }
+        final expService = ExpenseService(baseUrl: effectiveBase, token: token);
+        final Future<void> markSeenFuture = expService.markExpenseBadgeSeen(
+          maxId: _latestPendingExpenseMaxId > 0 ? _latestPendingExpenseMaxId : null,
+        );
+        final Future<void> markNotifFuture = _markFeatureNotificationsRead('expense');
 
-        Navigator.push(
+        await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => ExpenseScreen(
@@ -2360,10 +2539,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               userRole: widget.userRole,
             ),
           ),
-        ).then((_) {
-          _fetchPendingExpenseCount();
-          _fetchUnreadNotificationsCount();
-        });
+        );
+        await markSeenFuture;
+        await markNotifFuture;
+        await _markFeatureNotificationsRead('expense');
+        if (mounted) {
+          await Future.wait([
+            _fetchPendingExpenseCount(),
+            _fetchUnreadNotificationsCount(),
+          ]);
+        }
       } else if (feature.name == 'Class Assignment' || feature.name == 'Class assignment' || feature.name == 'Class Teacher') {
         final prefs = await SharedPreferences.getInstance();
         final token = prefs.getString('auth_token') ?? widget.leaveService.token;
@@ -2429,36 +2614,38 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             _unreadFinancialReportCount = 0;
           });
         }
-        await prefs.setBool('financial_report_badge_cleared', true);
-        _markFeatureNotificationsRead('financial_report');
-
-        try {
-          final effectiveBase = resolveBaseUrlFrom(prefs);
-          final repService = FinancialReportService(baseUrl: effectiveBase, token: prefs.getString('auth_token') ?? widget.leaveService.token);
-          final currentPending = await repService.getPendingFinancialReportCount();
-          await prefs.setInt('last_viewed_financial_report_pending_count', currentPending);
-        } catch (_) {}
-
         final token = prefs.getString('auth_token') ?? widget.leaveService.token;
         String effectiveBase = widget.leaveService.baseUrl;
         if (effectiveBase.isEmpty || effectiveBase.contains('10.22.6.71') || effectiveBase.contains('10.155.82.71')) {
           effectiveBase = resolveBaseUrlFrom(prefs);
         }
+        final repService = FinancialReportService(
+          baseUrl: effectiveBase,
+          token: token,
+        );
+        final Future<void> markSeenFuture = repService.markFinancialReportBadgeSeen(
+          maxId: _latestPendingReportMaxId > 0 ? _latestPendingReportMaxId : null,
+        );
+        final Future<void> markNotifFuture = _markFeatureNotificationsRead('financial_report');
+
         await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => RevenueScreen(
-              reportService: FinancialReportService(
-                baseUrl: effectiveBase,
-                token: token,
-              ),
+              reportService: repService,
               userRole: widget.userRole,
               isFeeCollector: _isFeeCollector,
             ),
           ),
         );
+        await markSeenFuture;
+        await markNotifFuture;
+        await _markFeatureNotificationsRead('financial_report');
         if (mounted) {
-          _fetchPendingFinancialReportCount();
+          await Future.wait([
+            _fetchPendingFinancialReportCount(),
+            _fetchUnreadNotificationsCount(),
+          ]);
         }
       } else if (feature.name == 'Fee Reminder') {
         if (!(_isFeeCollector == true)) {
@@ -2482,7 +2669,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             _unreadFeeReminderCount = 0;
           });
         }
-        _markFeatureNotificationsRead('fee_reminder');
+        final Future<void> markFuture = _markFeatureNotificationsRead('fee_reminder');
 
         await Navigator.push(
           context,
@@ -2498,25 +2685,28 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
         );
+        await markFuture;
+        await _markFeatureNotificationsRead('fee_reminder');
         if (mounted) {
-          _fetchUnreadNotificationsCount();
+          await _fetchUnreadNotificationsCount();
         }
       } else if (feature.name == 'Manage Discount') {
         final prefs = await SharedPreferences.getInstance();
-        setState(() {
-          _unreadDiscountRequestCount = 0;
-        });
-        await prefs.setBool('discount_badge_cleared', true);
+        if (mounted) {
+          setState(() {
+            _unreadDiscountRequestCount = 0;
+          });
+        }
         final token = prefs.getString('auth_token') ?? widget.leaveService.token;
         String effectiveBase = widget.leaveService.baseUrl;
         if (effectiveBase.isEmpty || effectiveBase.contains('10.22.6.71') || effectiveBase.contains('10.155.82.71')) {
           effectiveBase = resolveBaseUrlFrom(prefs);
         }
-        try {
-          final feeService = FeeService(baseUrl: effectiveBase, token: token);
-          final pending = await feeService.getDiscountRequests(status: 'PENDING');
-          await prefs.setInt('last_viewed_discount_pending_count', pending.length);
-        } catch (_) {}
+        final feeService = FeeService(baseUrl: effectiveBase, token: token);
+        final Future<void> markSeenFuture = feeService.markDiscountBadgeSeen(
+          maxId: _latestPendingDiscountMaxId > 0 ? _latestPendingDiscountMaxId : null,
+        );
+        final Future<void> markNotifFuture = _markFeatureNotificationsRead('discount');
 
         await Navigator.push(
           context,
@@ -2528,8 +2718,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
         );
+        await markSeenFuture;
+        await markNotifFuture;
+        await _markFeatureNotificationsRead('discount');
         if (mounted) {
-          _fetchPendingDiscountRequestCount();
+          await Future.wait([
+            _fetchPendingDiscountRequestCount(),
+            _fetchUnreadNotificationsCount(),
+          ]);
         }
       }
     } else {
@@ -2785,6 +2981,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           final bool isAchievements = feature.name == 'Achievements';
                           final bool isFeeReminder = feature.name == 'Fee Reminder';
                           final bool isManageDiscount = feature.name == 'Manage Discount';
+                          final bool isTar = feature.name == 'TAR';
+                          final bool isFeesPortal = feature.name == 'Fees Portal';
                           int badgeCount = 0;
                           if (isNotice) {
                             badgeCount = _unreadNoticeCount;
@@ -2814,6 +3012,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             badgeCount = _unreadFeeReminderCount;
                           } else if (isManageDiscount) {
                             badgeCount = _unreadDiscountRequestCount;
+                          } else if (isTar) {
+                            badgeCount = _unreadTarCount;
+                          } else if (isFeesPortal) {
+                            badgeCount = _unreadFeesPortalCount;
                           }
 
                           return GestureDetector(

@@ -108,7 +108,7 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
       }
     } catch (e) {
       setState(() {
-        _errorText = 'An error occurred. Please check connection.';
+        _errorText = http.formatErrorMessage(e, fallback: 'Failed to load fees details.');
         _isLoading = false;
       });
     }
@@ -202,7 +202,11 @@ class _FeesCardScreenState extends State<FeesCardScreen> {
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to download receipt: ${e.toString()}'),
+          content: Text(
+            http.isNetworkError(e)
+                ? http.kNetworkErrorMessage
+                : 'Failed to download receipt: ${http.formatErrorMessage(e)}',
+          ),
           duration: const Duration(seconds: 3),
           behavior: SnackBarBehavior.floating,
           backgroundColor: Colors.red,

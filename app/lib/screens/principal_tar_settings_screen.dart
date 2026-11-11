@@ -138,7 +138,12 @@ class _PrincipalTarSettingsScreenState extends State<PrincipalTarSettingsScreen>
         });
       }
     } catch (e) {
-      _showSnackBar('Failed to load configurations: $e', isError: true);
+      _showSnackBar(
+        http_service.isNetworkError(e)
+            ? http_service.kNetworkErrorMessage
+            : 'Failed to load configurations: ${http_service.formatErrorMessage(e)}',
+        isError: true,
+      );
     } finally {
       if (mounted) setState(() => _isLoadingSettings = false);
     }
@@ -166,7 +171,12 @@ class _PrincipalTarSettingsScreenState extends State<PrincipalTarSettingsScreen>
         });
       }
     } catch (e) {
-      _showSnackBar('Failed to load QR code: $e', isError: true);
+      _showSnackBar(
+        http_service.isNetworkError(e)
+            ? http_service.kNetworkErrorMessage
+            : 'Failed to load QR code: ${http_service.formatErrorMessage(e)}',
+        isError: true,
+      );
     } finally {
       if (mounted) setState(() => _isLoadingQr = false);
     }
@@ -209,7 +219,12 @@ class _PrincipalTarSettingsScreenState extends State<PrincipalTarSettingsScreen>
         _showSnackBar('Failed to update configurations (${res.statusCode})', isError: true);
       }
     } catch (e) {
-      _showSnackBar('Error updating configurations: $e', isError: true);
+      _showSnackBar(
+        http_service.isNetworkError(e)
+            ? http_service.kNetworkErrorMessage
+            : 'Error updating configurations: ${http_service.formatErrorMessage(e)}',
+        isError: true,
+      );
     } finally {
       if (mounted) setState(() => _isSavingSettings = false);
     }
@@ -240,7 +255,12 @@ class _PrincipalTarSettingsScreenState extends State<PrincipalTarSettingsScreen>
         _showSnackBar('Failed to regenerate QR code (${res.statusCode})', isError: true);
       }
     } catch (e) {
-      _showSnackBar('Error regenerating QR code: $e', isError: true);
+      _showSnackBar(
+        http_service.isNetworkError(e)
+            ? http_service.kNetworkErrorMessage
+            : 'Error regenerating QR code: ${http_service.formatErrorMessage(e)}',
+        isError: true,
+      );
     } finally {
       if (mounted) setState(() => _isRefreshingQr = false);
     }
@@ -399,7 +419,12 @@ class _PrincipalTarSettingsScreenState extends State<PrincipalTarSettingsScreen>
         );
       }
     } catch (e) {
-      _showSnackBar('Failed to download QR code: $e', isError: true);
+      _showSnackBar(
+        http_service.isNetworkError(e)
+            ? http_service.kNetworkErrorMessage
+            : 'Failed to download QR code: ${http_service.formatErrorMessage(e)}',
+        isError: true,
+      );
     }
   }
 

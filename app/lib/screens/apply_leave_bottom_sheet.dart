@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as path;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/leave_service.dart';
+import '../services/http_service.dart' as http_svc;
 import '../main.dart';
 
 class ApplyLeaveBottomSheet extends StatefulWidget {
@@ -209,7 +210,9 @@ class _ApplyLeaveBottomSheetState extends State<ApplyLeaveBottomSheet> {
             _attachment = null;
             _uploadedAttachmentPath = null;
             _isUploadingAttachment = false;
-            _errorMessage = 'Failed to upload attachment: ${e.toString()}';
+            _errorMessage = http_svc.isNetworkError(e)
+                ? http_svc.kNetworkErrorMessage
+                : 'Failed to upload attachment: ${http_svc.formatErrorMessage(e)}';
           });
         }
       }

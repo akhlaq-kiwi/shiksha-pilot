@@ -2433,13 +2433,13 @@ class TeacherService extends BaseService
         $role = strtoupper($user['role'] ?? 'TEACHER');
         $pdo = $this->teacherRepo->getPdo();
 
-        $isPrincipal = ($role === 'PRINCIPAL');
+        $isPrincipal = $this->isPrincipal($pdo, $user);
 
         if ($isPrincipal) {
             $stmt = $pdo->prepare("
                 SELECT * FROM dashboard_notifications
                 WHERE school_id = :school_id 
-                  AND (user_id = :user_id OR (user_id IS NULL AND (user_role = 'PRINCIPAL' OR user_role = 'TEACHER' OR user_role = 'SCHOOL_ADMIN')))
+                  AND (user_id = :user_id OR (user_id IS NULL AND (user_role = 'PRINCIPAL' OR user_role = 'TEACHER')))
                   AND (link != '/notice' OR link IS NULL)
                   AND (event_key != 'ANNOUNCEMENT_PUBLISHED' OR event_key IS NULL)
                   AND (category != 'ANNOUNCEMENT' OR category IS NULL)
@@ -2479,10 +2479,11 @@ class TeacherService extends BaseService
         $userId = (int)($user['id'] ?? 0);
         $role = strtoupper($user['role'] ?? 'TEACHER');
         $pdo = $this->teacherRepo->getPdo();
+        $isPrincipal = $this->isPrincipal($pdo, $user);
 
         if ($id > 0) {
-            $roleCond = ($role === 'PRINCIPAL')
-                ? "(user_id = :user_id OR (user_id IS NULL AND (user_role = 'PRINCIPAL' OR user_role = 'TEACHER' OR user_role = 'SCHOOL_ADMIN')))"
+            $roleCond = $isPrincipal
+                ? "(user_id = :user_id OR (user_id IS NULL AND (user_role = 'PRINCIPAL' OR user_role = 'TEACHER')))"
                 : "(user_id = :user_id OR (user_role = :role AND user_id IS NULL))";
 
             $stmt = $pdo->prepare("
@@ -2495,22 +2496,22 @@ class TeacherService extends BaseService
                 ':school_id' => $schoolId,
                 ':user_id' => $userId,
             ];
-            if ($role !== 'PRINCIPAL') {
+            if (!$isPrincipal) {
                 $params[':role'] = $role;
             }
             $stmt->execute($params);
         } else {
-            $module = strtolower($body['module'] ?? '');
-            $eventKey = $body['event_key'] ?? '';
-            $link = $body['link'] ?? '';
-            $title = $body['title'] ?? '';
+            $module = strtolower(trim((string)($body['module'] ?? '')));
+            $eventKey = (string)($body['event_key'] ?? '');
+            $link = (string)($body['link'] ?? '');
+            $title = (string)($body['title'] ?? '');
 
             if (!empty($module) || !empty($eventKey) || !empty($link) || !empty($title)) {
                 $query = "UPDATE dashboard_notifications SET is_read = 1 WHERE school_id = :sid AND is_read = 0";
                 $params = [':sid' => $schoolId, ':uid' => $userId];
 
-                if ($role === 'PRINCIPAL') {
-                    $query .= " AND (user_id = :uid OR (user_id IS NULL AND (user_role = 'TEACHER' OR user_role = 'PRINCIPAL' OR user_role = 'SCHOOL_ADMIN')))";
+                if ($isPrincipal) {
+                    $query .= " AND (user_id = :uid OR (user_id IS NULL AND (user_role = 'TEACHER' OR user_role = 'PRINCIPAL')))";
                 } else {
                     $query .= " AND (user_id = :uid OR (user_id IS NULL AND user_role = :role))";
                     $params[':role'] = $role;
@@ -2519,9 +2520,25 @@ class TeacherService extends BaseService
                 if ($module === 'timetable') {
                     $query .= " AND (event_key LIKE '%TIMETABLE%' OR event_key = 'SUBSTITUTE_ASSIGNED' OR category = 'TIMETABLE' OR (COALESCE(category, '') != 'EXAM' AND (event_key IS NULL OR event_key NOT LIKE '%EXAM%') AND (link LIKE '%timetable%' OR LOWER(COALESCE(title, '')) LIKE '%timetable%' OR LOWER(COALESCE(title, '')) LIKE '%time table%')))";
                 } elseif ($module === 'salary') {
-                    $query .= " AND (event_key = 'SALARY_DISBURSED' OR link LIKE '%salary%' OR title LIKE '%Salary%' OR category = 'Finance' OR category = 'SALARY')";
+                    $query .= " AND (event_key = 'SALARY_DISBURSED' OR event_key LIKE '%SALARY%' OR link LIKE '%salary%' OR LOWER(COALESCE(title, '')) LIKE '%salary%' OR category IN ('Finance', 'SALARY'))";
                 } elseif ($module === 'fee_reminder' || $module === 'fee-reminder' || $module === 'fee_follow_up' || $module === 'fee-follow-up') {
-                    $query .= " AND (event_key LIKE '%FEE_REMINDER%' OR event_key LIKE '%FEE_FOLLOWUP%' OR link LIKE '%fee-reminder%' OR link LIKE '%fee-follow-up%' OR title LIKE '%Fee Reminder%' OR title LIKE '%Fee Follow-up%')";
+                    $query .= " AND (event_key LIKE '%FEE_REMINDER%' OR event_key LIKE '%FEE_FOLLOWUP%' OR category = 'FEE_REMINDER' OR link LIKE '%fee-reminder%' OR link LIKE '%fee-follow-up%' OR LOWER(COALESCE(title, '')) LIKE '%fee reminder%' OR LOWER(COALESCE(title, '')) LIKE '%fee follow-up%' OR LOWER(COALESCE(title, '')) LIKE '%due today%')";
+                } elseif ($module === 'tar') {
+                    $query .= " AND (event_key = 'LATE_TEACHERS_ALERT' OR link LIKE '%teacher-attendance%' OR link LIKE '%/tar%' OR LOWER(COALESCE(title, '')) LIKE '%late teacher%')";
+                } elseif ($module === 'achievements' || $module === 'achievement') {
+                    $query .= " AND (event_key LIKE '%ACHIEVEMENT%' OR category = 'ACHIEVEMENT' OR link LIKE '%achievement%' OR LOWER(COALESCE(title, '')) LIKE '%achievement%' OR LOWER(COALESCE(title, '')) LIKE '%certificate%' OR LOWER(COALESCE(title, '')) LIKE '%champion%' OR LOWER(COALESCE(title, '')) LIKE '%topper%')";
+                } elseif ($module === 'homework' || $module === 'assignments') {
+                    $query .= " AND (event_key LIKE '%HOMEWORK%' OR category = 'HOMEWORK' OR link LIKE '%homework%' OR LOWER(COALESCE(title, '')) LIKE '%homework%')";
+                } elseif ($module === 'attendance') {
+                    $query .= " AND (COALESCE(event_key, '') != 'LATE_TEACHERS_ALERT' AND (link IS NULL OR (link NOT LIKE '%teacher-attendance%' AND link NOT LIKE '%/tar%')) AND (event_key = 'ATTENDANCE_MARKED_ABSENT' OR category = 'ATTENDANCE' OR link LIKE '%attendance%' OR LOWER(COALESCE(title, '')) LIKE '%absent%' OR LOWER(COALESCE(title, '')) LIKE '%attendance%'))";
+                } elseif ($module === 'fees_portal' || $module === 'fees-portal' || $module === 'discount' || $module === 'discount_request' || $module === 'manage_discount') {
+                    $query .= " AND (event_key LIKE 'DISCOUNT_REQUEST_%' OR link LIKE '%fees-portal%' OR LOWER(COALESCE(title, '')) LIKE '%discount request%')";
+                } elseif ($module === 'fees' || $module === 'fee' || $module === 'fees_card' || $module === 'fees-card') {
+                    $query .= " AND (COALESCE(event_key, '') NOT IN ('SALARY_DISBURSED', 'FEE_FOLLOWUP_DUE_TODAY', 'FEE_FOLLOWUP_OVERDUE', 'EXPENSE_APPROVAL_REQUEST', 'FINANCIAL_REPORT_APPROVAL_REQUEST') AND (event_key LIKE 'FEE_%' OR event_key LIKE 'DISCOUNT_REQUEST_%' OR category = 'FEES' OR link LIKE '%fees%' OR LOWER(COALESCE(title, '')) LIKE '%discount request%' OR LOWER(COALESCE(title, '')) LIKE '%fee deposited%' OR LOWER(COALESCE(title, '')) LIKE '%fee payment%'))";
+                } elseif ($module === 'expense' || $module === 'expenses') {
+                    $query .= " AND (event_key LIKE '%EXPENSE%' OR link LIKE '%expense%' OR LOWER(COALESCE(title, '')) LIKE '%expense%')";
+                } elseif ($module === 'financial_report' || $module === 'financial-report' || $module === 'financial-reports' || $module === 'revenue') {
+                    $query .= " AND (event_key LIKE '%FINANCIAL_REPORT%' OR link LIKE '%financial-report%' OR link LIKE '%revenue%' OR LOWER(COALESCE(title, '')) LIKE '%financial report%' OR LOWER(COALESCE(title, '')) LIKE '%settlement%')";
                 } elseif ($module === 'exams' || $module === 'exam') {
                     $query .= " AND (event_key LIKE '%EXAM%' OR category = 'EXAM' OR (COALESCE(category, '') != 'TIMETABLE' AND (link LIKE '%exam%' OR LOWER(COALESCE(title, '')) LIKE '%exam%' OR LOWER(COALESCE(title, '')) LIKE '%examination%' OR LOWER(COALESCE(title, '')) LIKE '%admit card%' OR LOWER(COALESCE(title, '')) LIKE '%report card%' OR LOWER(COALESCE(title, '')) LIKE '%scheme%' OR LOWER(COALESCE(title, '')) LIKE '%datesheet%')))";
                 } elseif ($module === 'leave' || $module === 'leaves' || $module === 'leave_request' || $module === 'leave-request') {
@@ -2553,9 +2570,10 @@ class TeacherService extends BaseService
         $userId = (int)($user['id'] ?? 0);
         $role = strtoupper($user['role'] ?? 'TEACHER');
         $pdo = $this->teacherRepo->getPdo();
+        $isPrincipal = $this->isPrincipal($pdo, $user);
 
-        $roleCond = ($role === 'PRINCIPAL')
-            ? "(user_id = :user_id OR (user_id IS NULL AND (user_role = 'PRINCIPAL' OR user_role = 'TEACHER' OR user_role = 'SCHOOL_ADMIN')))"
+        $roleCond = $isPrincipal
+            ? "(user_id = :user_id OR (user_id IS NULL AND (user_role = 'PRINCIPAL' OR user_role = 'TEACHER')))"
             : "(user_id = :user_id OR (user_role = :role AND user_id IS NULL))";
 
         $stmt = $pdo->prepare("
@@ -2567,7 +2585,7 @@ class TeacherService extends BaseService
             ':school_id' => $schoolId,
             ':user_id' => $userId,
         ];
-        if ($role !== 'PRINCIPAL') {
+        if (!$isPrincipal) {
             $params[':role'] = $role;
         }
         $stmt->execute($params);

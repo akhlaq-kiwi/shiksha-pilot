@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:school_hub/services/http_service.dart' as http;
 import '../services/fee_service.dart';
 
 String formatFeeSummary(String? feeType, String? summary) {
@@ -75,7 +77,26 @@ class _ManageDiscountScreenState extends State<ManageDiscountScreen> {
   void initState() {
     super.initState();
     _feeService = FeeService(baseUrl: widget.baseUrl, token: widget.token);
+    _markDiscountNotificationsRead();
     _loadInitialData();
+  }
+
+  Future<void> _markDiscountNotificationsRead() async {
+    try {
+      if (widget.token.isEmpty) return;
+      final uri = Uri.parse('${widget.baseUrl}/api/school/notifications/0/read');
+      await Future.wait([
+        _feeService.markDiscountBadgeSeen(),
+        http.post(
+          uri,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ${widget.token}',
+          },
+          body: json.encode({'module': 'discount'}),
+        ),
+      ]);
+    } catch (_) {}
   }
 
   @override

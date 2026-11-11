@@ -1,7 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:school_hub/services/http_service.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/leave_service.dart';
 
@@ -249,7 +249,7 @@ class _AcademicYearMigrationScreenState extends State<AcademicYearMigrationScree
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = e.toString();
+        _errorMessage = http.formatErrorMessage(e);
       });
     }
   }
@@ -698,7 +698,7 @@ class _AcademicYearMigrationScreenState extends State<AcademicYearMigrationScree
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  e.toString().replaceAll('Exception: ', ''),
+                  http.formatErrorMessage(e),
                   style: const TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.45),
                 ),
                 const SizedBox(height: 18),

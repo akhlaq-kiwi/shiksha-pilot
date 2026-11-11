@@ -5,6 +5,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '../services/school_examination_service.dart';
+import '../services/http_service.dart' as http_svc;
 import '../utils/class_formatter.dart';
 
 class PrincipalSeatingPlanScreen extends StatefulWidget {
@@ -1097,7 +1098,11 @@ class _PrincipalSeatingPlanScreenState extends State<PrincipalSeatingPlanScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to generate PDF: ${e.toString().replaceAll('Exception: ', '')}'),
+            content: Text(
+              http_svc.isNetworkError(e)
+                  ? http_svc.kNetworkErrorMessage
+                  : 'Failed to generate PDF: ${http_svc.formatErrorMessage(e)}',
+            ),
             backgroundColor: const Color(0xFFD97706),
           ),
         );

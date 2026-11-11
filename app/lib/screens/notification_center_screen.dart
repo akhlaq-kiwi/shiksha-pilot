@@ -18,6 +18,9 @@ import '../services/attendance_service.dart';
 import 'principal_tar_screen.dart';
 import 'fee_reminder_screen.dart';
 import '../services/fee_reminder_service.dart';
+import 'expense_screen.dart';
+import 'revenue_screen.dart';
+import '../services/financial_report_service.dart';
 
 class NotificationCenterScreen extends StatefulWidget {
   final String baseUrl;
@@ -177,7 +180,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
       }
     } catch (e) {
       setState(() {
-        _errorText = 'An error occurred. Please check connection.';
+        _errorText = http.formatErrorMessage(e, fallback: 'Unable to load notifications.');
         _isLoading = false;
       });
     }
@@ -767,6 +770,48 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                       service: FeeReminderService(baseUrl: widget.baseUrl, token: widget.token),
                                       userRole: widget.userRole ?? 'TEACHER',
                                       isFeeCollector: true,
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+
+                              final isExpenseNotif = linkStr.contains('expense') ||
+                                  titleLower.contains('expense') ||
+                                  msgLower.contains('expense') ||
+                                  (notif['event_key'] ?? '').toString().toUpperCase() == 'EXPENSE_APPROVAL_REQUEST';
+                              if (isExpenseNotif) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => ExpenseScreen(
+                                      baseUrl: widget.baseUrl,
+                                      token: widget.token,
+                                      userRole: widget.userRole,
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+
+                              final isFinancialReportNotif = linkStr.contains('financial-report') ||
+                                  linkStr.contains('financial_report') ||
+                                  linkStr.contains('revenue') ||
+                                  titleLower.contains('financial report') ||
+                                  msgLower.contains('financial report') ||
+                                  titleLower.contains('settlement') ||
+                                  msgLower.contains('settlement') ||
+                                  (notif['event_key'] ?? '').toString().toUpperCase() == 'FINANCIAL_REPORT_APPROVAL_REQUEST';
+                              if (isFinancialReportNotif) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => RevenueScreen(
+                                      reportService: FinancialReportService(
+                                        baseUrl: widget.baseUrl,
+                                        token: widget.token,
+                                      ),
+                                      userRole: widget.userRole ?? 'TEACHER',
                                     ),
                                   ),
                                 );

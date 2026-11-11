@@ -1,9 +1,11 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:school_hub/services/financial_report_service.dart';
+import 'package:school_hub/services/http_service.dart' as http_svc;
 import 'package:school_hub/services/notification_helper.dart';
 
 class RevenueScreen extends StatefulWidget {
@@ -43,6 +45,7 @@ class _RevenueScreenState extends State<RevenueScreen> {
   List<dynamic> _reports = [];
 
   // Action states
+  bool _checkingGenerate = false;
   bool _generatingReport = false;
   int? _handingOverId;
   int? _deletingReportId;
@@ -70,8 +73,32 @@ class _RevenueScreenState extends State<RevenueScreen> {
     super.initState();
     final role = widget.userRole.trim().toUpperCase();
     _isSchoolAdmin = (role == 'SCHOOL_ADMIN' || role == 'SUPER_ADMIN' || role == 'ADMIN');
+    _markFinancialReportNotificationsRead();
     _detectSchoolAdmin();
     _loadInitialData();
+  }
+
+  Future<void> _markFinancialReportNotificationsRead() async {
+    try {
+      final token = widget.reportService.token;
+      if (token.isEmpty) return;
+      final prefs = await SharedPreferences.getInstance();
+      final rolePref = (prefs.getString('role') ?? prefs.getString('user_role') ?? widget.userRole).trim().toUpperCase();
+      final isAdmin = rolePref == 'SCHOOL_ADMIN' || rolePref == 'SUPER_ADMIN' || rolePref == 'ADMIN';
+      final path = isAdmin ? '/api/school/notifications/0/read' : '/api/teacher/notifications/0/read';
+      final uri = Uri.parse('${widget.reportService.baseUrl}$path');
+      await Future.wait([
+        if (isAdmin) widget.reportService.markFinancialReportBadgeSeen(),
+        http_svc.post(
+          uri,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: json.encode({'module': 'financial_report'}),
+        ),
+      ]);
+    } catch (_) {}
   }
 
   Future<void> _detectSchoolAdmin() async {
@@ -83,6 +110,7 @@ class _RevenueScreenState extends State<RevenueScreen> {
           setState(() {
             _isSchoolAdmin = true;
           });
+          _markFinancialReportNotificationsRead();
         }
       }
     } catch (_) {}
@@ -248,19 +276,61 @@ class _RevenueScreenState extends State<RevenueScreen> {
   }
 
 
-  void _onStartGenerate() {
-    // Exact web rule:
-    // if (reports.length > 0 && reports[0].status !== 'Settled') -> show Blocked dialog!
-    if (_reports.isNotEmpty) {
-      final latest = _reports[0];
-      final latestStatus = (latest['status'] ?? '').toString();
-      if (latestStatus != 'Settled') {
-        _showBlockedDialog(latest);
+  String _buildPendingApprovalsMessage(int pendingExpenseCount, int pendingDiscountCount) {
+    if (pendingExpenseCount > 0 && pendingDiscountCount > 0) {
+      return 'Your expense request and discount request are still pending. You need to get them approved or rejected by the School Admin before generating a financial report.';
+    }
+    if (pendingExpenseCount > 0) {
+      return 'Your expense request is still pending. You need to get it approved or rejected by the School Admin before generating a financial report.';
+    }
+    return 'Your discount request is still pending. You need to get it approved or rejected by the School Admin before generating a financial report.';
+  }
+
+  Future<void> _onStartGenerate() async {
+    setState(() {
+      _checkingGenerate = true;
+      _error = '';
+    });
+
+    try {
+      final res = await widget.reportService.getFinancialReports();
+      if (!mounted) return;
+      final freshReports = res['reports'] as List<dynamic>;
+      final expPending = (res['pending_expense_count'] as num?)?.toInt() ?? 0;
+      final discPending = (res['pending_discount_count'] as num?)?.toInt() ?? 0;
+
+      setState(() {
+        _reports = freshReports;
+        _checkingGenerate = false;
+      });
+
+      if (freshReports.isNotEmpty) {
+        final latest = freshReports[0];
+        final latestStatus = (latest['status'] ?? '').toString();
+        if (latestStatus != 'Settled') {
+          _showBlockedDialog(latest);
+          return;
+        }
+      }
+
+      if (expPending > 0 || discPending > 0) {
+        _showPendingApprovalsDialog(
+          pendingExpenseCount: expPending,
+          pendingDiscountCount: discPending,
+          message: _buildPendingApprovalsMessage(expPending, discPending),
+        );
         return;
       }
-    }
 
-    _showGenerateConfirmDialog();
+      _showGenerateConfirmDialog();
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _checkingGenerate = false;
+          _error = http_svc.formatErrorMessage(e);
+        });
+      }
+    }
   }
 
   void _showBlockedDialog(dynamic blockedReport) {
@@ -337,6 +407,132 @@ class _RevenueScreenState extends State<RevenueScreen> {
                       'Please make sure the previous report is settled or deleted before generating a new financial report.',
                       style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF92400E)),
                     ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Divider(color: Color(0xFFE2E8F0), height: 1),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFD97706),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text(
+                    'Understand & Close',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showPendingApprovalsDialog({
+    required int pendingExpenseCount,
+    required int pendingDiscountCount,
+    String? message,
+  }) {
+    final displayMsg = (message != null && message.trim().isNotEmpty)
+        ? message
+        : _buildPendingApprovalsMessage(pendingExpenseCount, pendingDiscountCount);
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: Colors.white,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: Padding(
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.error_outline_rounded,
+                      color: Color(0xFFD97706),
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.only(top: 2),
+                      child: Text(
+                        'Pending Approvals Required',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF0F172A),
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFFDE68A)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Cannot Generate Financial Report',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5, color: Color(0xFF92400E)),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      displayMsg,
+                      style: const TextStyle(fontSize: 11.5, color: Color(0xFF78350F), height: 1.45),
+                    ),
+                    if (pendingExpenseCount > 0 || pendingDiscountCount > 0) ...[
+                      const SizedBox(height: 8),
+                      const Divider(color: Color(0xFFFDE68A), height: 1),
+                      const SizedBox(height: 8),
+                      if (pendingExpenseCount > 0)
+                        Text(
+                          '• Pending Expense Requests: $pendingExpenseCount',
+                          style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF92400E)),
+                        ),
+                      if (pendingDiscountCount > 0) ...[
+                        if (pendingExpenseCount > 0) const SizedBox(height: 4),
+                        Text(
+                          '• Pending Discount Requests: $pendingDiscountCount',
+                          style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF92400E)),
+                        ),
+                      ],
+                    ],
                   ],
                 ),
               ),
@@ -524,10 +720,19 @@ class _RevenueScreenState extends State<RevenueScreen> {
         _showSuccess('Financial report generated successfully.');
         await _loadInitialData();
       }
+    } on PendingApprovalsException catch (e) {
+      if (mounted) {
+        _showPendingApprovalsDialog(
+          pendingExpenseCount: e.pendingExpenseCount,
+          pendingDiscountCount: e.pendingDiscountCount,
+          message: e.message,
+        );
+        _loadInitialData();
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString().replaceAll('Exception: ', '');
+          _error = http_svc.formatErrorMessage(e);
         });
       }
     } finally {
@@ -1450,7 +1655,11 @@ class _RevenueScreenState extends State<RevenueScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Export failed: $e'),
+            content: Text(
+              http_svc.isNetworkError(e)
+                  ? http_svc.kNetworkErrorMessage
+                  : 'Export failed: ${http_svc.formatErrorMessage(e)}',
+            ),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
           ),
@@ -1691,7 +1900,7 @@ class _RevenueScreenState extends State<RevenueScreen> {
           SizedBox(
             width: double.infinity,
             child: OutlinedButton(
-              onPressed: _previewLoading ? null : () => _fetchPreview(),
+              onPressed: (_previewLoading || _generatingReport || _checkingGenerate) ? null : () => _fetchPreview(),
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFF334155),
                 side: const BorderSide(color: Color(0xFFCBD5E1)),
@@ -1724,8 +1933,8 @@ class _RevenueScreenState extends State<RevenueScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: (_previewLoading || _generatingReport) ? null : _onStartGenerate,
-              icon: _generatingReport
+              onPressed: (_previewLoading || _generatingReport || _checkingGenerate) ? null : _onStartGenerate,
+              icon: (_generatingReport || _checkingGenerate)
                   ? const SizedBox(
                       width: 14,
                       height: 14,
@@ -1733,7 +1942,9 @@ class _RevenueScreenState extends State<RevenueScreen> {
                     )
                   : const Icon(Icons.auto_awesome_rounded, size: 16, color: Colors.white),
               label: Text(
-                _generatingReport ? 'GENERATING...' : 'GENERATE FINANCIAL REPORT',
+                _checkingGenerate
+                    ? 'CHECKING...'
+                    : (_generatingReport ? 'GENERATING...' : 'GENERATE FINANCIAL REPORT'),
                 style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w900,

@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:school_hub/services/http_service.dart' as http_svc;
 import 'package:school_hub/services/exam_service.dart';
 import 'package:school_hub/services/notification_helper.dart';
@@ -104,7 +103,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
       });
     } catch (err) {
       setState(() {
-        _errorMessage = err.toString().replaceAll('Exception: ', '');
+        _errorMessage = http_svc.formatErrorMessage(err);
         _isLoading = false;
       });
     }
@@ -622,7 +621,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                 });
               } catch (e) {
                 setModalState(() {
-                  sheetError = e.toString().replaceAll('Exception: ', '');
+                  sheetError = http_svc.formatErrorMessage(e);
                   isLoadingSheet = false;
                 });
               }
@@ -722,7 +721,11 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                 });
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Failed to save marks: ${e.toString().replaceAll('Exception: ', '')}'),
+                    content: Text(
+                      http_svc.isNetworkError(e)
+                          ? http_svc.kNetworkErrorMessage
+                          : 'Failed to save marks: ${http_svc.formatErrorMessage(e)}',
+                    ),
                     backgroundColor: Colors.red,
                     behavior: SnackBarBehavior.floating,
                   ),
@@ -1503,7 +1506,11 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
         _showErrorToast('Failed to download Admit Card.');
       }
     } catch (e) {
-      _showErrorToast('Failed to download Admit Card: ${e.toString()}');
+      _showErrorToast(
+        http_svc.isNetworkError(e)
+            ? http_svc.kNetworkErrorMessage
+            : 'Failed to download Admit Card: ${http_svc.formatErrorMessage(e)}',
+      );
     } finally {
       setModalState(() {
         _isDownloading = false;
@@ -2718,7 +2725,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
       pw.MemoryImage? logoImage;
       if (schoolLogo.isNotEmpty) {
         try {
-          final response = await http.get(Uri.parse(schoolLogo));
+          final response = await http_svc.getRaw(Uri.parse(schoolLogo));
           if (response.statusCode == 200) {
             logoImage = pw.MemoryImage(response.bodyBytes);
           }
@@ -3167,7 +3174,11 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
         _showErrorToast('Failed to download Report Card.');
       }
     } catch (e) {
-      _showErrorToast('Failed to download Report Card: ${e.toString()}');
+      _showErrorToast(
+        http_svc.isNetworkError(e)
+            ? http_svc.kNetworkErrorMessage
+            : 'Failed to download Report Card: ${http_svc.formatErrorMessage(e)}',
+      );
     } finally {
       setModalState(() {
         _isDownloading = false;

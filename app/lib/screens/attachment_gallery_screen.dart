@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:school_hub/services/http_service.dart' as http;
 import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config.dart';
@@ -92,7 +92,7 @@ class _AttachmentGalleryScreenState extends State<AttachmentGalleryScreen> {
     String lastErr = 'Failed to load image';
     for (final url in candidateUrls) {
       try {
-        final response = await http.get(Uri.parse(url), headers: headers);
+        final response = await http.getRaw(Uri.parse(url), headers: headers);
         if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
           if (mounted) {
             setState(() {
@@ -102,10 +102,12 @@ class _AttachmentGalleryScreenState extends State<AttachmentGalleryScreen> {
           }
           return;
         } else {
-          lastErr = 'HTTP ${response.statusCode} on $url';
+          lastErr = 'Unable to load image (HTTP ${response.statusCode})';
         }
       } catch (e) {
-        lastErr = '$e on $url';
+        lastErr = http.isNetworkError(e)
+            ? http.kNetworkErrorMessage
+            : http.formatErrorMessage(e, fallback: 'Failed to load image');
       }
     }
 
@@ -155,14 +157,17 @@ class _AttachmentGalleryScreenState extends State<AttachmentGalleryScreen> {
       };
 
       http.Response? response;
+      Object? lastPdfError;
       for (final url in candidateUrls) {
         try {
-          final res = await http.get(Uri.parse(url), headers: headers);
+          final res = await http.getRaw(Uri.parse(url), headers: headers);
           if (res.statusCode == 200 && res.bodyBytes.isNotEmpty) {
             response = res;
             break;
           }
-        } catch (_) {}
+        } catch (err) {
+          lastPdfError = err;
+        }
       }
 
       if (response != null && response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
@@ -179,13 +184,17 @@ class _AttachmentGalleryScreenState extends State<AttachmentGalleryScreen> {
           );
         }
       } else {
-        throw Exception('Failed to load PDF document from server');
+        throw lastPdfError ?? Exception('Failed to load PDF document from server');
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Unable to open PDF: $e'),
+            content: Text(
+              http.isNetworkError(e)
+                  ? http.kNetworkErrorMessage
+                  : 'Unable to open PDF: ${http.formatErrorMessage(e)}',
+            ),
             behavior: SnackBarBehavior.floating,
             backgroundColor: Colors.red.shade700,
           ),

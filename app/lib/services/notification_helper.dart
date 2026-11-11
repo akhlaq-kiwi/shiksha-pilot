@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:school_hub/services/http_service.dart' as http;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -290,6 +290,40 @@ class NotificationHelper {
       final String eventKey = (notif['event_key'] ?? '').toString();
       final String link = (notif['link'] ?? '').toString();
       final String title = (notif['title'] ?? notif['message'] ?? '').toString();
+      final String evtUpper = eventKey.toUpperCase();
+      final String linkLower = link.toLowerCase();
+      final String titleLower = title.toLowerCase();
+
+      String derivedModule = (notif['module'] ?? '').toString().trim().toLowerCase();
+      if (derivedModule.isEmpty && (notifId == null || notifId <= 0)) {
+        if (evtUpper.contains('TIMETABLE') || evtUpper == 'SUBSTITUTE_ASSIGNED' || linkLower.contains('timetable') || titleLower.contains('timetable')) {
+          derivedModule = 'timetable';
+        } else if (evtUpper.contains('EXAM') || linkLower.contains('exam') || titleLower.contains('exam') || titleLower.contains('admit card') || titleLower.contains('report card')) {
+          derivedModule = 'exams';
+        } else if (evtUpper.contains('LEAVE') || evtUpper == 'HOLIDAY_ANNOUNCED' || linkLower.contains('leave') || titleLower.contains('leave') || titleLower.contains('holiday')) {
+          derivedModule = 'leaves';
+        } else if (evtUpper == 'LATE_TEACHERS_ALERT' || linkLower.contains('teacher-attendance') || linkLower.contains('/tar') || titleLower.contains('late teacher')) {
+          derivedModule = 'tar';
+        } else if (evtUpper.contains('HOMEWORK') || linkLower.contains('homework') || titleLower.contains('homework')) {
+          derivedModule = 'homework';
+        } else if (evtUpper.contains('ACHIEVEMENT') || linkLower.contains('achievement') || titleLower.contains('achievement') || titleLower.contains('certificate') || titleLower.contains('champion') || titleLower.contains('topper')) {
+          derivedModule = 'achievements';
+        } else if (evtUpper.contains('FEE_REMINDER') || evtUpper.contains('FEE_FOLLOWUP') || linkLower.contains('fee-reminder') || linkLower.contains('fee-follow-up') || titleLower.contains('fee reminder') || titleLower.contains('fee follow-up') || titleLower.contains('due today')) {
+          derivedModule = 'fee_reminder';
+        } else if (evtUpper == 'DISCOUNT_REQUEST_APPROVED' || evtUpper == 'DISCOUNT_REQUEST_REJECTED' || linkLower.contains('fees-portal') || titleLower.contains('discount request')) {
+          derivedModule = 'fees_portal';
+        } else if (evtUpper.contains('EXPENSE') || linkLower.contains('expense') || titleLower.contains('expense')) {
+          derivedModule = 'expense';
+        } else if (evtUpper.contains('FINANCIAL_REPORT') || linkLower.contains('financial-report') || linkLower.contains('revenue') || titleLower.contains('financial report') || titleLower.contains('settlement')) {
+          derivedModule = 'financial_report';
+        } else if (evtUpper == 'SALARY_DISBURSED' || linkLower.contains('salary') || titleLower.contains('salary')) {
+          derivedModule = 'salary';
+        } else if (evtUpper == 'ATTENDANCE_MARKED_ABSENT' || linkLower.contains('attendance') || titleLower.contains('absent') || titleLower.contains('attendance')) {
+          derivedModule = 'attendance';
+        } else if (evtUpper.startsWith('FEE_') || linkLower.contains('/student/fees') || linkLower.contains('fees-card') || titleLower.contains('fee')) {
+          derivedModule = 'fees';
+        }
+      }
 
       final roleUpper = userRole.toUpperCase();
       final bool isTeacherOrPrincipal = roleUpper == 'TEACHER' || roleUpper == 'PRINCIPAL';
@@ -314,6 +348,7 @@ class NotificationHelper {
 
       final bodyPayload = json.encode({
         'id': notifId,
+        if (derivedModule.isNotEmpty) 'module': derivedModule,
         'event_key': eventKey,
         'link': link,
         'title': title,

@@ -14,6 +14,7 @@ import 'package:printing/printing.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:school_hub/screens/teachers_screen.dart' show kIndianStatesAndCities;
 import 'package:school_hub/services/class_management_service.dart';
+import 'package:school_hub/services/http_service.dart' as http_svc;
 import 'package:school_hub/widgets/profile_avatar_view.dart';
 
 // ----------------------------------------------------------------------------
@@ -4059,7 +4060,14 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
         final url = await widget.classService.uploadFile(cropped, category: 'student-photos');
         if (mounted) setState(() { _photoPath = url; _uploadingMap['photo'] = false; });
       } catch (e) {
-        if (mounted) setState(() { _uploadingMap['photo'] = false; _error = 'Failed to upload photo: $e'; });
+        if (mounted) {
+          setState(() {
+            _uploadingMap['photo'] = false;
+            _error = http_svc.isNetworkError(e)
+                ? http_svc.kNetworkErrorMessage
+                : 'Failed to upload photo: ${http_svc.formatErrorMessage(e)}';
+          });
+        }
       }
     }
   }
@@ -4083,7 +4091,14 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
           });
         }
       } catch (e) {
-        if (mounted) setState(() { _uploadingMap[docKey] = false; _error = 'Failed to upload document: $e'; });
+        if (mounted) {
+          setState(() {
+            _uploadingMap[docKey] = false;
+            _error = http_svc.isNetworkError(e)
+                ? http_svc.kNetworkErrorMessage
+                : 'Failed to upload document: ${http_svc.formatErrorMessage(e)}';
+          });
+        }
       }
     }
   }
@@ -5999,7 +6014,13 @@ class _ClassIdCardsPreviewScreenState extends State<_ClassIdCardsPreviewScreen> 
       if (mounted) {
         setState(() => _generating = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to generate PDF: $e')),
+          SnackBar(
+            content: Text(
+              http_svc.isNetworkError(e)
+                  ? http_svc.kNetworkErrorMessage
+                  : 'Failed to generate PDF: ${http_svc.formatErrorMessage(e)}',
+            ),
+          ),
         );
       }
     }

@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:printing/printing.dart';
 import 'package:school_hub/services/fee_service.dart';
+import 'package:school_hub/services/http_service.dart' as http_svc;
 import 'package:school_hub/screens/fees_collection_history_screen.dart';
 import 'package:school_hub/screens/manage_finance_fees_screen.dart';
 import 'package:school_hub/screens/pending_discount_requests_screen.dart';
@@ -69,7 +70,29 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
     super.initState();
     _feeService = FeeService(baseUrl: widget.baseUrl, token: widget.token);
     _searchController.addListener(_applyFilters);
+    _markFeesPortalNotificationsRead();
     _loadPortalData();
+  }
+
+  Future<void> _markFeesPortalNotificationsRead() async {
+    try {
+      if (widget.token.isEmpty) return;
+      final prefs = await SharedPreferences.getInstance();
+      final roleUpper = (prefs.getString('user_role') ?? '').toUpperCase();
+      final isSchoolAdmin = roleUpper == 'SCHOOL_ADMIN' || roleUpper == 'SUPER_ADMIN';
+      final path = isSchoolAdmin
+          ? '/api/school/notifications/0/read'
+          : '/api/teacher/notifications/0/read';
+      final uri = Uri.parse('${widget.baseUrl}$path');
+      await http_svc.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${widget.token}',
+        },
+        body: json.encode({'module': 'fees_portal'}),
+      );
+    } catch (_) {}
   }
 
   @override
@@ -3357,7 +3380,11 @@ class _ReceiptShareSheetState extends State<_ReceiptShareSheet> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to share receipt: ${e.toString().replaceAll('Exception: ', '')}'),
+            content: Text(
+              http_svc.isNetworkError(e)
+                  ? http_svc.kNetworkErrorMessage
+                  : 'Failed to share receipt: ${http_svc.formatErrorMessage(e)}',
+            ),
             backgroundColor: Colors.red.shade700,
           ),
         );

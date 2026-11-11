@@ -147,19 +147,62 @@ export default function FinancialReportsPage() {
 
   const [showBlockedModal, setShowBlockedModal] = useState(false);
   const [blockedReport, setBlockedReport] = useState(null);
+  const [showPendingApprovalModal, setShowPendingApprovalModal] = useState(false);
+  const [pendingApprovalInfo, setPendingApprovalInfo] = useState({
+    expenseCount: 0,
+    discountCount: 0,
+    message: '',
+  });
+  const [checkingGenerate, setCheckingGenerate] = useState(false);
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [reportToDelete, setReportToDelete] = useState(null);
   const [deletingReport, setDeletingReport] = useState(false);
   const [handingOverId, setHandingOverId] = useState(null);
 
-  const handleStartGenerate = () => {
-    if (reports.length > 0 && reports[0].status !== 'Settled') {
-      setBlockedReport(reports[0]);
-      setShowBlockedModal(true);
-      return;
+  const buildPendingApprovalMessage = (expCount, discCount) => {
+    if (expCount > 0 && discCount > 0) {
+      return 'Your expense request and discount request are still pending. You need to get them approved or rejected by the School Admin before generating a financial report.';
     }
-    setShowGenerateConfirm(true);
+    if (expCount > 0) {
+      return 'Your expense request is still pending. You need to get it approved or rejected by the School Admin before generating a financial report.';
+    }
+    return 'Your discount request is still pending. You need to get it approved or rejected by the School Admin before generating a financial report.';
+  };
+
+  const handleStartGenerate = async () => {
+    setError('');
+    setCheckingGenerate(true);
+    try {
+      const res = await schoolService.getFinancialReports();
+      const freshReports = res.reports || [];
+      const expPending = Number(res.pending_expense_count || 0);
+      const discPending = Number(res.pending_discount_count || 0);
+      setReports(freshReports);
+
+      if (freshReports.length > 0 && freshReports[0].status !== 'Settled') {
+        setBlockedReport(freshReports[0]);
+        setShowBlockedModal(true);
+        return;
+      }
+
+      if (expPending > 0 || discPending > 0) {
+        setPendingApprovalInfo({
+          expenseCount: expPending,
+          discountCount: discPending,
+          message: buildPendingApprovalMessage(expPending, discPending),
+        });
+        setShowPendingApprovalModal(true);
+        return;
+      }
+
+      setShowGenerateConfirm(true);
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Failed to verify pending approvals before generating report.');
+    } finally {
+      setCheckingGenerate(false);
+    }
   };
 
   const handleDeleteReportClick = (report) => {
@@ -285,7 +328,20 @@ export default function FinancialReportsPage() {
       setTimeout(() => setSuccess(''), 4000);
     } catch (err) {
       console.error(err);
-      setError(err.message || 'Failed to generate financial report.');
+      const errData = err?.data?.errors;
+      if (errData?.code === 'PENDING_APPROVAL_REQUIRED') {
+        const expPending = Number(errData.pending_expense_count || 0);
+        const discPending = Number(errData.pending_discount_count || 0);
+        setPendingApprovalInfo({
+          expenseCount: expPending,
+          discountCount: discPending,
+          message: err.message || buildPendingApprovalMessage(expPending, discPending),
+        });
+        setShowPendingApprovalModal(true);
+        loadReports();
+      } else {
+        setError(err.message || 'Failed to generate financial report.');
+      }
     } finally {
       setGeneratingReport(false);
     }
@@ -441,7 +497,7 @@ export default function FinancialReportsPage() {
               <div className="space-y-3 pt-1">
                 <Button 
                   onClick={handlePreview} 
-                  disabled={previewLoading || generatingReport}
+                  disabled={previewLoading || generatingReport || checkingGenerate}
                   variant="secondary"
                   className="w-full py-2.5 font-bold uppercase tracking-wider text-xs flex items-center justify-center gap-2"
                 >
@@ -456,10 +512,14 @@ export default function FinancialReportsPage() {
 
                 <Button 
                   onClick={handleStartGenerate} 
-                  disabled={previewLoading || generatingReport}
+                  disabled={previewLoading || generatingReport || checkingGenerate}
                   className="w-full py-2.5 font-bold uppercase tracking-wider text-xs flex items-center justify-center gap-2 bg-primary text-white"
                 >
-                  {generatingReport ? (
+                  {checkingGenerate ? (
+                    <>
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Checking...
+                    </>
+                  ) : generatingReport ? (
                     <>
                       <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Generating...
                     </>
@@ -785,6 +845,49 @@ export default function FinancialReportsPage() {
               <p className="leading-relaxed pt-1.5 border-t border-amber-500/20 text-amber-900 dark:text-amber-200">
                 Please make sure the previous report is settled or deleted before generating a new financial report.
               </p>
+            </div>
+          </div>
+        </Dialog>
+      )}
+
+      {/* Pending Approvals Required Warning Modal */}
+      {showPendingApprovalModal && (
+        <Dialog
+          isOpen={showPendingApprovalModal}
+          onClose={() => setShowPendingApprovalModal(false)}
+          title="Pending Approvals Required"
+          description=""
+          showClose={false}
+          className="max-w-md animate-in fade-in duration-200 border-amber-500/30"
+          footer={
+            <div className="flex justify-center w-full">
+              <Button
+                onClick={() => setShowPendingApprovalModal(false)}
+                className="font-bold bg-amber-600 hover:bg-amber-700 text-white px-6"
+              >
+                Understand & Close
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-3 text-sm mt-2">
+            <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-900 dark:text-amber-200 text-xs space-y-2.5">
+              <p className="font-bold text-sm text-amber-900 dark:text-amber-200 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" /> Cannot Generate Financial Report
+              </p>
+              <p className="leading-relaxed">
+                {pendingApprovalInfo.message || buildPendingApprovalMessage(pendingApprovalInfo.expenseCount, pendingApprovalInfo.discountCount)}
+              </p>
+              {(pendingApprovalInfo.expenseCount > 0 || pendingApprovalInfo.discountCount > 0) && (
+                <div className="pt-2 border-t border-amber-500/20 space-y-1 text-amber-900 dark:text-amber-200 font-semibold">
+                  {pendingApprovalInfo.expenseCount > 0 && (
+                    <p>• Pending Expense Requests: <strong className="font-bold">{pendingApprovalInfo.expenseCount}</strong></p>
+                  )}
+                  {pendingApprovalInfo.discountCount > 0 && (
+                    <p>• Pending Discount Requests: <strong className="font-bold">{pendingApprovalInfo.discountCount}</strong></p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </Dialog>

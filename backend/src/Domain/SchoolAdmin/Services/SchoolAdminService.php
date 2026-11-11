@@ -39,6 +39,7 @@ class SchoolAdminService extends BaseService
 
     private readonly StorageService $storage;
     private bool $announcementsSchemaEnsured = false;
+    private bool $featureBadgeSeenSchemaEnsured = false;
 
     private function isDateHoliday(int $schoolId, string $date): bool
     {
@@ -5219,7 +5220,7 @@ class SchoolAdminService extends BaseService
                                 'to_date' => $preview['to_date'],
                                 'academic_year_id' => (int)$prevYearId,
                                 'status' => 'Hand Over'
-                            ]);
+                            ], true);
                         }
                     }
                 } catch (\Exception $reportEx) {
@@ -11091,6 +11092,53 @@ class SchoolAdminService extends BaseService
         return;
     }
 
+    private function getPendingFinancialApprovals(\PDO $pdo, int $schoolId, ?int $academicYearId): array
+    {
+        $ayClause = ($academicYearId !== null && $academicYearId > 0)
+            ? " AND (academic_year_id = :ayid OR academic_year_id IS NULL)"
+            : "";
+        $params = [':sid' => $schoolId];
+        if ($academicYearId !== null && $academicYearId > 0) {
+            $params[':ayid'] = $academicYearId;
+        }
+
+        $stmtExp = $pdo->prepare("
+            SELECT COUNT(*)
+            FROM school_expenses
+            WHERE school_id = :sid
+              AND approval_status = 'Pending'
+              {$ayClause}
+        ");
+        $stmtExp->execute($params);
+        $pendingExpenseCount = (int)$stmtExp->fetchColumn();
+
+        $stmtDisc = $pdo->prepare("
+            SELECT COUNT(*)
+            FROM fee_discount_requests
+            WHERE school_id = :sid
+              AND status = 'PENDING'
+              {$ayClause}
+        ");
+        $stmtDisc->execute($params);
+        $pendingDiscountCount = (int)$stmtDisc->fetchColumn();
+
+        return [
+            'pending_expense_count' => $pendingExpenseCount,
+            'pending_discount_count' => $pendingDiscountCount,
+        ];
+    }
+
+    private function buildPendingApprovalsMessage(int $pendingExpenseCount, int $pendingDiscountCount): string
+    {
+        if ($pendingExpenseCount > 0 && $pendingDiscountCount > 0) {
+            return 'Your expense request and discount request are still pending. You need to get them approved or rejected by the School Admin before generating a financial report.';
+        }
+        if ($pendingExpenseCount > 0) {
+            return 'Your expense request is still pending. You need to get it approved or rejected by the School Admin before generating a financial report.';
+        }
+        return 'Your discount request is still pending. You need to get it approved or rejected by the School Admin before generating a financial report.';
+    }
+
     public function getFinancialReports(array $user): array
     {
         $schoolId = $this->getSchoolId($user);
@@ -11122,7 +11170,7 @@ class SchoolAdminService extends BaseService
                             'to_date' => $preview['to_date'],
                             'academic_year_id' => $academicYearId,
                             'status' => 'Hand Over'
-                        ]);
+                        ], true);
                         $stmt->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
                         $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     }
@@ -11176,16 +11224,20 @@ class SchoolAdminService extends BaseService
             }
         }
 
+        $pendingCounts = $this->getPendingFinancialApprovals($pdo, $schoolId, $academicYearId > 0 ? $academicYearId : null);
+
         return [
             'reports' => $reports,
             'next_suggested_start_date' => $suggestedStartDate,
             'from_time' => $fromTimeFormatted,
             'has_previous_report' => $latestReport ? true : false,
-            'academic_year_start_date' => $workingYear['start_date'] ?? null
+            'academic_year_start_date' => $workingYear['start_date'] ?? null,
+            'pending_expense_count' => $pendingCounts['pending_expense_count'],
+            'pending_discount_count' => $pendingCounts['pending_discount_count'],
         ];
     }
 
-    public function createFinancialReport(array $user, array $data): array
+    public function createFinancialReport(array $user, array $data, bool $isSystemGenerated = false): array
     {
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->financialReportRepo->getPdo();
@@ -11221,6 +11273,22 @@ class SchoolAdminService extends BaseService
             throw new ValidationException([
                 'fields' => "You cannot generate a new financial report because the last generated report ({$repId}) is currently in '{$repStatus}' status. Please make sure the previous report is settled or deleted before generating a new one."
             ]);
+        }
+
+        if (!$isSystemGenerated) {
+            $pendingCounts = $this->getPendingFinancialApprovals($pdo, $schoolId, $academicYearId);
+            $pendingExpenseCount = $pendingCounts['pending_expense_count'];
+            $pendingDiscountCount = $pendingCounts['pending_discount_count'];
+
+            if ($pendingExpenseCount > 0 || $pendingDiscountCount > 0) {
+                $pendingMsg = $this->buildPendingApprovalsMessage($pendingExpenseCount, $pendingDiscountCount);
+                throw new ValidationException([
+                    'fields' => $pendingMsg,
+                    'code' => 'PENDING_APPROVAL_REQUIRED',
+                    'pending_expense_count' => $pendingExpenseCount,
+                    'pending_discount_count' => $pendingDiscountCount,
+                ], $pendingMsg);
+            }
         }
 
         // Recalculate profit loss for security with transaction isolation
@@ -12547,6 +12615,35 @@ Only approve the settlement after reviewing all financial records.
         }, $expenses);
     }
 
+    private function validatePositiveWholeExpenseAmount(mixed $raw): int
+    {
+        if (is_bool($raw) || $raw === null || is_array($raw)) {
+            throw new ValidationException(['amount' => 'Amount must be a positive whole number without decimals.']);
+        }
+        if (is_string($raw)) {
+            $trimmed = trim($raw);
+            if ($trimmed === '' || !preg_match('/^\d+$/', $trimmed)) {
+                throw new ValidationException(['amount' => 'Amount must be a positive whole number without decimals.']);
+            }
+            $val = (int)$trimmed;
+        } elseif (is_int($raw)) {
+            $val = $raw;
+        } elseif (is_float($raw)) {
+            if (!is_finite($raw) || floor($raw) !== $raw) {
+                throw new ValidationException(['amount' => 'Amount must be a positive whole number without decimals.']);
+            }
+            $val = (int)$raw;
+        } else {
+            throw new ValidationException(['amount' => 'Amount must be a positive whole number without decimals.']);
+        }
+
+        if ($val <= 0) {
+            throw new ValidationException(['amount' => 'Amount must be greater than 0.']);
+        }
+
+        return $val;
+    }
+
     public function createSchoolExpense(array $user, array $data): array
     {
         $schoolId = $this->getSchoolId($user);
@@ -12561,16 +12658,13 @@ Only approve the settlement after reviewing all financial records.
         if (empty($data['description']) || strlen(trim($data['description'])) < 3) {
             throw new ValidationException(['description' => 'Description must be at least 3 characters.']);
         }
-        if (empty($data['amount']) || (float)$data['amount'] <= 0) {
-            throw new ValidationException(['amount' => 'Amount must be greater than 0.']);
-        }
+        $amount = $this->validatePositiveWholeExpenseAmount($data['amount'] ?? null);
         if (empty($data['expense_date'])) {
             throw new ValidationException(['expense_date' => 'Expense Date is required.']);
         }
 
         $category = !empty($data['category']) ? trim($data['category']) : 'Other';
         $desc = trim($data['description']);
-        $amount = (float)$data['amount'];
         $expenseDate = trim($data['expense_date']);
         $createdBy = (int)$user['id'];
         $payMethod = !empty($data['payment_method']) ? trim($data['payment_method']) : 'Cash';
@@ -12622,7 +12716,7 @@ Only approve the settlement after reviewing all financial records.
             try {
                 $creatorName = trim($user['name'] ?? 'Fee Collector');
                 $title = 'Expense Approval Request';
-                $message = "{$creatorName} submitted an expense of ₹" . number_format($amount, 2) . " for '{$desc}' requiring your approval.";
+                $message = "{$creatorName} submitted an expense of ₹" . number_format($amount) . " for '{$desc}' requiring your approval.";
                 $link = '/expenses';
                 $eventKey = 'EXPENSE_APPROVAL_REQUEST';
 
@@ -12917,17 +13011,22 @@ Only approve the settlement after reviewing all financial records.
         $requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         // Fetch counts summary for filter chips
+        $this->ensureFeatureBadgeSeenSchema($pdo);
+        $lastSeenDiscountId = $this->getFeatureBadgeLastSeenMaxId($pdo, $schoolId, (int)($user['id'] ?? 0), 'discount_request');
+
         $stmtCounts = $pdo->prepare("
             SELECT 
                 COUNT(*) AS total_count,
                 SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) AS pending_count,
+                SUM(CASE WHEN status = 'PENDING' AND id > :last_seen_id THEN 1 ELSE 0 END) AS unseen_pending_count,
+                COALESCE(MAX(CASE WHEN status = 'PENDING' THEN id ELSE 0 END), 0) AS max_pending_id,
                 SUM(CASE WHEN status = 'APPROVED' THEN 1 ELSE 0 END) AS approved_count,
                 SUM(CASE WHEN status = 'REJECTED' THEN 1 ELSE 0 END) AS rejected_count,
                 SUM(CASE WHEN status = 'CANCELLED' THEN 1 ELSE 0 END) AS cancelled_count
             FROM fee_discount_requests
             WHERE school_id = :sid
         ");
-        $stmtCounts->execute([':sid' => $schoolId]);
+        $stmtCounts->execute([':sid' => $schoolId, ':last_seen_id' => $lastSeenDiscountId]);
         $counts = $stmtCounts->fetch(PDO::FETCH_ASSOC);
 
         // Distinct collectors for filter dropdown with phone number
@@ -12990,6 +13089,9 @@ Only approve the settlement after reviewing all financial records.
             'summary' => [
                 'total' => (int)($counts['total_count'] ?? 0),
                 'pending' => (int)($counts['pending_count'] ?? 0),
+                'unseen_pending' => (int)($counts['unseen_pending_count'] ?? 0),
+                'max_pending_id' => (int)($counts['max_pending_id'] ?? 0),
+                'last_seen_max_id' => $lastSeenDiscountId,
                 'approved' => (int)($counts['approved_count'] ?? 0),
                 'rejected' => (int)($counts['rejected_count'] ?? 0),
                 'cancelled' => (int)($counts['cancelled_count'] ?? 0),
@@ -13332,30 +13434,217 @@ Only approve the settlement after reviewing all financial records.
         ];
     }
 
-    public function getPendingFinancialReportCount(array $user): int
+    private function ensureFeatureBadgeSeenSchema(PDO $pdo): void
     {
-        $schoolId = $this->getSchoolId($user);
-        $pdo = $this->staffRepo->getPdo();
-        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
-        $academicYearId = $workingYear ? (int)$workingYear['id'] : 0;
+        if ($this->featureBadgeSeenSchemaEnsured) {
+            return;
+        }
+
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS feature_badge_seen_states (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                school_id INT NOT NULL,
+                user_id INT NOT NULL,
+                feature_key VARCHAR(64) NOT NULL,
+                last_seen_max_id INT NOT NULL DEFAULT 0,
+                updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY uniq_school_user_feature (school_id, user_id, feature_key),
+                KEY idx_user_id (user_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+
+        $this->featureBadgeSeenSchemaEnsured = true;
+    }
+
+    private function normalizeFeatureBadgeKey(string $featureKey): string
+    {
+        $key = strtolower(trim($featureKey));
+        if (in_array($key, ['expense', 'expenses'], true)) {
+            return 'expense';
+        }
+        if (in_array($key, ['financial_report', 'financial-report', 'financial_reports', 'financial-reports', 'revenue'], true)) {
+            return 'financial_report';
+        }
+        if (in_array($key, ['discount_request', 'discount-request', 'discount_requests', 'discount-requests', 'discount', 'manage_discount', 'manage-discount'], true)) {
+            return 'discount_request';
+        }
+        throw new ValidationException(['feature_key' => 'Invalid feature key']);
+    }
+
+    private function getFeatureBadgeLastSeenMaxId(PDO $pdo, int $schoolId, int $userId, string $featureKey): int
+    {
+        if ($userId <= 0) {
+            return 0;
+        }
 
         $stmt = $pdo->prepare("
-            SELECT COUNT(*) FROM financial_reports 
+            SELECT last_seen_max_id
+            FROM feature_badge_seen_states
+            WHERE school_id = :sid AND user_id = :uid AND feature_key = :fkey
+            LIMIT 1
+        ");
+        $stmt->execute([
+            ':sid' => $schoolId,
+            ':uid' => $userId,
+            ':fkey' => $featureKey,
+        ]);
+        $val = $stmt->fetchColumn();
+        return $val !== false ? (int)$val : 0;
+    }
+
+    private function computeCurrentMaxPendingId(PDO $pdo, int $schoolId, string $featureKey): int
+    {
+        if ($featureKey === 'expense') {
+            $stmt = $pdo->prepare("
+                SELECT COALESCE(MAX(id), 0)
+                FROM school_expenses
+                WHERE school_id = :sid AND approval_status = 'Pending'
+            ");
+            $stmt->execute([':sid' => $schoolId]);
+            return (int)($stmt->fetchColumn() ?: 0);
+        }
+
+        if ($featureKey === 'financial_report') {
+            $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+            $academicYearId = $workingYear ? (int)$workingYear['id'] : 0;
+            $stmt = $pdo->prepare("
+                SELECT COALESCE(MAX(id), 0)
+                FROM financial_reports
+                WHERE school_id = :sid
+                  AND (academic_year_id = :ayid OR academic_year_id IS NULL)
+                  AND (status = 'Pending' OR status = 'Request Sent')
+            ");
+            $stmt->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+            return (int)($stmt->fetchColumn() ?: 0);
+        }
+
+        $stmt = $pdo->prepare("
+            SELECT COALESCE(MAX(id), 0)
+            FROM fee_discount_requests
+            WHERE school_id = :sid AND status = 'PENDING'
+        ");
+        $stmt->execute([':sid' => $schoolId]);
+        return (int)($stmt->fetchColumn() ?: 0);
+    }
+
+    public function markFeatureBadgeSeen(array $user, string $featureKey, ?int $maxId = null): array
+    {
+        $normalizedKey = $this->normalizeFeatureBadgeKey($featureKey);
+        $schoolId = $this->getSchoolId($user);
+        $userId = (int)($user['id'] ?? 0);
+        $pdo = $this->staffRepo->getPdo();
+        $this->ensureFeatureBadgeSeenSchema($pdo);
+
+        $currentMaxId = $this->computeCurrentMaxPendingId($pdo, $schoolId, $normalizedKey);
+        $targetMaxId = max($currentMaxId, max(0, (int)($maxId ?? 0)));
+
+        if ($userId > 0) {
+            $stmt = $pdo->prepare("
+                INSERT INTO feature_badge_seen_states (school_id, user_id, feature_key, last_seen_max_id)
+                VALUES (:sid, :uid, :fkey, :max_id)
+                ON DUPLICATE KEY UPDATE last_seen_max_id = GREATEST(last_seen_max_id, VALUES(last_seen_max_id))
+            ");
+            $stmt->execute([
+                ':sid' => $schoolId,
+                ':uid' => $userId,
+                ':fkey' => $normalizedKey,
+                ':max_id' => $targetMaxId,
+            ]);
+            $targetMaxId = $this->getFeatureBadgeLastSeenMaxId($pdo, $schoolId, $userId, $normalizedKey);
+
+            $roleUpper = strtoupper((string)($user['role'] ?? ''));
+            if ($roleUpper === 'SCHOOL_ADMIN' || $roleUpper === 'SUPER_ADMIN') {
+                $notifModule = match ($normalizedKey) {
+                    'expense' => 'expense',
+                    'financial_report' => 'financial_report',
+                    default => 'discount',
+                };
+                $this->markNotificationRead($user, 0, ['module' => $notifModule]);
+            }
+        }
+
+        return [
+            'feature_key' => $normalizedKey,
+            'last_seen_max_id' => $targetMaxId,
+            'unread_count' => 0,
+        ];
+    }
+
+    public function getPendingFinancialReportBadgeStats(array $user): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $userId = (int)($user['id'] ?? 0);
+        $pdo = $this->staffRepo->getPdo();
+        $this->ensureFeatureBadgeSeenSchema($pdo);
+
+        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+        $academicYearId = $workingYear ? (int)$workingYear['id'] : 0;
+        $lastSeenId = $this->getFeatureBadgeLastSeenMaxId($pdo, $schoolId, $userId, 'financial_report');
+
+        $stmt = $pdo->prepare("
+            SELECT
+                COUNT(*) AS pending_count,
+                SUM(CASE WHEN id > :last_seen_id THEN 1 ELSE 0 END) AS unseen_count,
+                COALESCE(MAX(id), 0) AS max_pending_id
+            FROM financial_reports 
             WHERE school_id = :sid 
               AND (academic_year_id = :ayid OR academic_year_id IS NULL)
               AND (status = 'Pending' OR status = 'Request Sent')
         ");
-        $stmt->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
-        return (int)$stmt->fetchColumn();
+        $stmt->execute([
+            ':sid' => $schoolId,
+            ':ayid' => $academicYearId,
+            ':last_seen_id' => $lastSeenId,
+        ]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        return [
+            'pending_count' => (int)($row['pending_count'] ?? 0),
+            'unread_count' => (int)($row['unseen_count'] ?? 0),
+            'max_pending_id' => (int)($row['max_pending_id'] ?? 0),
+            'last_seen_max_id' => $lastSeenId,
+        ];
+    }
+
+    public function getPendingExpenseBadgeStats(array $user): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $userId = (int)($user['id'] ?? 0);
+        $pdo = $this->staffRepo->getPdo();
+        $this->ensureFeatureBadgeSeenSchema($pdo);
+
+        $lastSeenId = $this->getFeatureBadgeLastSeenMaxId($pdo, $schoolId, $userId, 'expense');
+
+        $stmt = $pdo->prepare("
+            SELECT
+                COUNT(*) AS pending_count,
+                SUM(CASE WHEN id > :last_seen_id THEN 1 ELSE 0 END) AS unseen_count,
+                COALESCE(MAX(id), 0) AS max_pending_id
+            FROM school_expenses
+            WHERE school_id = :sid AND approval_status = 'Pending'
+        ");
+        $stmt->execute([
+            ':sid' => $schoolId,
+            ':last_seen_id' => $lastSeenId,
+        ]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        return [
+            'pending_count' => (int)($row['pending_count'] ?? 0),
+            'unread_count' => (int)($row['unseen_count'] ?? 0),
+            'max_pending_id' => (int)($row['max_pending_id'] ?? 0),
+            'last_seen_max_id' => $lastSeenId,
+        ];
+    }
+
+    public function getPendingFinancialReportCount(array $user): int
+    {
+        return $this->getPendingFinancialReportBadgeStats($user)['pending_count'];
     }
 
     public function getPendingExpenseCount(array $user): int
     {
-        $schoolId = $this->getSchoolId($user);
-        $pdo = $this->staffRepo->getPdo();
-        $stmt = $pdo->prepare("SELECT COUNT(*) FROM school_expenses WHERE school_id = :sid AND approval_status = 'Pending'");
-        $stmt->execute([':sid' => $schoolId]);
-        return (int)$stmt->fetchColumn();
+        return $this->getPendingExpenseBadgeStats($user)['pending_count'];
     }
 
     public function updateSchoolExpense(array $user, int $id, array $data): array
@@ -13384,16 +13673,13 @@ Only approve the settlement after reviewing all financial records.
         if (empty($data['description']) || strlen(trim($data['description'])) < 3) {
             throw new ValidationException(['description' => 'Description must be at least 3 characters.']);
         }
-        if (empty($data['amount']) || (float)$data['amount'] <= 0) {
-            throw new ValidationException(['amount' => 'Amount must be greater than 0.']);
-        }
+        $amount = $this->validatePositiveWholeExpenseAmount($data['amount'] ?? null);
         if (empty($data['expense_date'])) {
             throw new ValidationException(['expense_date' => 'Expense Date is required.']);
         }
 
         $category = !empty($data['category']) ? trim($data['category']) : 'Other';
         $desc = trim($data['description']);
-        $amount = (float)$data['amount'];
         $expenseDate = trim($data['expense_date']);
         $payMethod = !empty($data['payment_method']) ? trim($data['payment_method']) : 'Cash';
         $refNo = !empty($data['reference_number']) ? trim($data['reference_number']) : null;
@@ -20206,13 +20492,13 @@ Only approve the settlement after reviewing all financial records.
     public function getNotifications(array $user, array $params = []): array
     {
         $schoolId = $this->getSchoolId($user);
-        $role = $user['role'] ?? '';
+        $role = strtoupper((string)($user['role'] ?? ''));
         $userId = (int)($user['id'] ?? 0);
         $limit = isset($params['limit']) ? max(1, (int)$params['limit']) : 10;
         $offset = isset($params['offset']) ? max(0, (int)$params['offset']) : 0;
         $pdo = $this->classRepo->getPdo();
 
-        if ($role === 'SCHOOL_ADMIN') {
+        if ($role === 'SCHOOL_ADMIN' || $role === 'SUPER_ADMIN') {
             $stmt = $pdo->prepare("
                 SELECT * FROM dashboard_notifications
                 WHERE school_id = :sid AND user_role = 'SCHOOL_ADMIN'
@@ -20315,19 +20601,31 @@ Only approve the settlement after reviewing all financial records.
                 }
 
                 if ($module === 'timetable') {
-                    $query .= " AND (event_key LIKE '%TIMETABLE%' OR event_key = 'SUBSTITUTE_ASSIGNED' OR link LIKE '%timetable%' OR title LIKE '%Timetable%' OR title LIKE '%Time Table%' OR category = 'TIMETABLE')";
+                    $query .= " AND (event_key LIKE '%TIMETABLE%' OR event_key = 'SUBSTITUTE_ASSIGNED' OR category = 'TIMETABLE' OR link LIKE '%timetable%' OR LOWER(COALESCE(title, '')) LIKE '%timetable%' OR LOWER(COALESCE(title, '')) LIKE '%time table%')";
                 } elseif ($module === 'salary') {
-                    $query .= " AND (event_key = 'SALARY_DISBURSED' OR link LIKE '%salary%' OR title LIKE '%Salary%' OR category = 'Finance' OR category = 'SALARY')";
+                    $query .= " AND (event_key = 'SALARY_DISBURSED' OR event_key LIKE '%SALARY%' OR link LIKE '%salary%' OR LOWER(COALESCE(title, '')) LIKE '%salary%' OR category IN ('Finance', 'SALARY'))";
                 } elseif ($module === 'exams' || $module === 'exam') {
-                    $query .= " AND (event_key LIKE '%EXAM%' OR category = 'EXAM' OR link LIKE '%exam%' OR title LIKE '%exam%' OR title LIKE '%examination%' OR title LIKE '%admit card%' OR title LIKE '%report card%' OR title LIKE '%scheme%' OR title LIKE '%datesheet%')";
+                    $query .= " AND (event_key LIKE '%EXAM%' OR category = 'EXAM' OR link LIKE '%exam%' OR LOWER(COALESCE(title, '')) LIKE '%exam%' OR LOWER(COALESCE(title, '')) LIKE '%examination%' OR LOWER(COALESCE(title, '')) LIKE '%admit card%' OR LOWER(COALESCE(title, '')) LIKE '%report card%' OR LOWER(COALESCE(title, '')) LIKE '%scheme%' OR LOWER(COALESCE(title, '')) LIKE '%datesheet%')";
                 } elseif ($module === 'fee_reminder' || $module === 'fee-reminder' || $module === 'fee_follow_up' || $module === 'fee-follow-up') {
-                    $query .= " AND (event_key LIKE '%FEE_REMINDER%' OR event_key LIKE '%FEE_FOLLOWUP%' OR link LIKE '%fee-reminder%' OR link LIKE '%fee-follow-up%' OR title LIKE '%Fee Reminder%' OR title LIKE '%Fee Follow-up%')";
+                    $query .= " AND (event_key LIKE '%FEE_REMINDER%' OR event_key LIKE '%FEE_FOLLOWUP%' OR category = 'FEE_REMINDER' OR link LIKE '%fee-reminder%' OR link LIKE '%fee-follow-up%' OR LOWER(COALESCE(title, '')) LIKE '%fee reminder%' OR LOWER(COALESCE(title, '')) LIKE '%fee follow-up%' OR LOWER(COALESCE(title, '')) LIKE '%due today%')";
                 } elseif ($module === 'expense' || $module === 'expenses') {
-                    $query .= " AND (event_key = 'EXPENSE_APPROVAL_REQUEST' OR link LIKE '%expense%' OR title LIKE '%Expense%' OR title LIKE '%expense%')";
+                    $query .= " AND (event_key = 'EXPENSE_APPROVAL_REQUEST' OR event_key LIKE '%EXPENSE%' OR link LIKE '%expense%' OR LOWER(COALESCE(title, '')) LIKE '%expense%')";
                 } elseif ($module === 'financial_report' || $module === 'financial-report' || $module === 'financial-reports' || $module === 'revenue') {
-                    $query .= " AND (event_key = 'FINANCIAL_REPORT_APPROVAL_REQUEST' OR link LIKE '%financial-report%' OR link LIKE '%revenue%' OR title LIKE '%Financial Report%' OR title LIKE '%Settlement%')";
+                    $query .= " AND (event_key = 'FINANCIAL_REPORT_APPROVAL_REQUEST' OR event_key LIKE '%FINANCIAL_REPORT%' OR link LIKE '%financial-report%' OR link LIKE '%revenue%' OR LOWER(COALESCE(title, '')) LIKE '%financial report%' OR LOWER(COALESCE(title, '')) LIKE '%settlement%')";
+                } elseif ($module === 'tar') {
+                    $query .= " AND (event_key = 'LATE_TEACHERS_ALERT' OR link LIKE '%teacher-attendance%' OR link LIKE '%/tar%' OR LOWER(COALESCE(title, '')) LIKE '%late teacher%')";
+                } elseif ($module === 'achievements' || $module === 'achievement') {
+                    $query .= " AND (event_key LIKE '%ACHIEVEMENT%' OR category = 'ACHIEVEMENT' OR link LIKE '%achievement%' OR LOWER(COALESCE(title, '')) LIKE '%achievement%' OR LOWER(COALESCE(title, '')) LIKE '%certificate%' OR LOWER(COALESCE(title, '')) LIKE '%champion%' OR LOWER(COALESCE(title, '')) LIKE '%topper%')";
+                } elseif ($module === 'homework' || $module === 'assignments') {
+                    $query .= " AND (event_key LIKE '%HOMEWORK%' OR category = 'HOMEWORK' OR link LIKE '%homework%' OR LOWER(COALESCE(title, '')) LIKE '%homework%')";
+                } elseif ($module === 'attendance') {
+                    $query .= " AND (COALESCE(event_key, '') != 'LATE_TEACHERS_ALERT' AND (link IS NULL OR (link NOT LIKE '%teacher-attendance%' AND link NOT LIKE '%/tar%')) AND (event_key = 'ATTENDANCE_MARKED_ABSENT' OR category = 'ATTENDANCE' OR link LIKE '%attendance%' OR LOWER(COALESCE(title, '')) LIKE '%absent%' OR LOWER(COALESCE(title, '')) LIKE '%attendance%'))";
+                } elseif ($module === 'fees_portal' || $module === 'fees-portal' || $module === 'discount' || $module === 'discount_request' || $module === 'manage_discount') {
+                    $query .= " AND (event_key LIKE 'DISCOUNT_REQUEST_%' OR link LIKE '%fees-portal%' OR link LIKE '%discount%' OR LOWER(COALESCE(title, '')) LIKE '%discount%')";
+                } elseif ($module === 'fees' || $module === 'fee' || $module === 'fees_card' || $module === 'fees-card') {
+                    $query .= " AND (COALESCE(event_key, '') NOT IN ('SALARY_DISBURSED', 'FEE_FOLLOWUP_DUE_TODAY', 'FEE_FOLLOWUP_OVERDUE', 'EXPENSE_APPROVAL_REQUEST', 'FINANCIAL_REPORT_APPROVAL_REQUEST') AND (event_key LIKE 'FEE_%' OR event_key LIKE 'DISCOUNT_REQUEST_%' OR category = 'FEES' OR link LIKE '%fees%' OR LOWER(COALESCE(title, '')) LIKE '%discount%' OR LOWER(COALESCE(title, '')) LIKE '%fee deposited%' OR LOWER(COALESCE(title, '')) LIKE '%fee payment%'))";
                 } elseif ($module === 'leave' || $module === 'leaves' || $module === 'leave_request' || $module === 'leave-request') {
-                    $query .= " AND (event_key LIKE '%LEAVE%' OR event_key = 'HOLIDAY_ANNOUNCED' OR category = 'LEAVE' OR category = 'LEAVE_MANAGEMENT' OR link LIKE '%leave%' OR title LIKE '%Leave%' OR title LIKE '%Holiday%')";
+                    $query .= " AND (event_key LIKE '%LEAVE%' OR event_key = 'HOLIDAY_ANNOUNCED' OR category IN ('LEAVE', 'LEAVE_MANAGEMENT') OR link LIKE '%leave%' OR LOWER(COALESCE(title, '')) LIKE '%leave%' OR LOWER(COALESCE(title, '')) LIKE '%holiday%')";
                 } elseif ($module === 'all' || $module === 'notifications') {
                     $query .= " AND (link != '/notice' OR link IS NULL) AND (event_key != 'ANNOUNCEMENT_PUBLISHED' OR event_key IS NULL) AND (category != 'ANNOUNCEMENT' OR category IS NULL)";
                 } elseif (!empty($eventKey)) {

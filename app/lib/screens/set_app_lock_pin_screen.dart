@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config.dart';
 import '../services/app_lock_helper.dart';
 import '../services/auth_service.dart';
+import '../services/http_service.dart' as http_svc;
 
 class SetAppLockPinScreen extends StatefulWidget {
   final String? baseUrl;
@@ -102,16 +103,12 @@ class _SetAppLockPinScreenState extends State<SetAppLockPinScreen> {
         } catch (e) {
           HapticFeedback.heavyImpact();
           if (!mounted) return;
-          final rawErr = e.toString().replaceFirst(RegExp(r'^[A-Za-z0-9_]*Exception:\s*'), '');
-          final isNetwork = rawErr.contains('SocketException') ||
-              rawErr.contains('ClientException') ||
-              rawErr.contains('Connection refused') ||
-              rawErr.toLowerCase().contains('timeout');
           setState(() {
             _isSaving = false;
-            _errorMessage = isNetwork
-                ? 'Network error. Please check internet connection and try again.'
-                : (rawErr.isNotEmpty ? rawErr : 'Failed to save App Lock PIN.');
+            _errorMessage = http_svc.formatErrorMessage(
+              e,
+              fallback: 'Failed to save App Lock PIN.',
+            );
             _currentInput = '';
             _step = 1;
             _firstPin = '';
