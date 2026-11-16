@@ -13,6 +13,7 @@ use App\Domain\Student\Controllers\StudentController;
 use App\Domain\SchoolAdmin\Controllers\LeaveRequestController;
 use App\Domain\Student\Controllers\VocabularyController;
 use App\Domain\Teacher\Controllers\HomeworkController;
+use App\Domain\TestSeries\Controllers\TestSeriesController;
 
 use App\Domain\Platform\Controllers\ReportCardTemplateController;
 use App\Shared\Notifications\DeviceTokenController;
@@ -381,6 +382,24 @@ return function (App $app) {
     $app->delete('/api/teacher/homework/{id}', [HomeworkController::class, 'deleteHomework']);
     $app->get('/api/student/homework', [HomeworkController::class, 'getStudentHomework']);
     $app->get('/uploads/{filename:.+}', [HomeworkController::class, 'serveUpload']);
+
+    // Test Series Module
+    $app->get('/api/teacher/test-series/access', [TestSeriesController::class, 'getAccess']);
+    $app->get('/api/teacher/test-series/permissions', [TestSeriesController::class, 'getPermissions']);
+    $app->post('/api/teacher/test-series/permissions', [TestSeriesController::class, 'setPermission']);
+    $app->post('/api/teacher/test-series/upload-image', [TestSeriesController::class, 'uploadImage']);
+    $app->get('/api/teacher/test-series', [TestSeriesController::class, 'listForTeacher']);
+    $app->post('/api/teacher/test-series', [TestSeriesController::class, 'create']);
+    $app->get('/api/teacher/test-series/{id}', [TestSeriesController::class, 'getTeacherDetail']);
+    $app->put('/api/teacher/test-series/{id}', [TestSeriesController::class, 'update']);
+    $app->delete('/api/teacher/test-series/{id}', [TestSeriesController::class, 'delete']);
+    $app->get('/api/teacher/test-series/{id}/leaderboard', [TestSeriesController::class, 'getTeacherLeaderboard']);
+
+    $app->get('/api/student/test-series', [TestSeriesController::class, 'listForStudent']);
+    $app->get('/api/student/test-series/{id}/attempt', [TestSeriesController::class, 'startAttempt']);
+    $app->post('/api/student/test-series/{id}/pause', [TestSeriesController::class, 'pauseAttempt']);
+    $app->post('/api/student/test-series/{id}/submit', [TestSeriesController::class, 'submitAttempt']);
+    $app->get('/api/student/test-series/{id}/leaderboard', [TestSeriesController::class, 'getStudentLeaderboard']);
 
     // Word Builder Game endpoints
     $app->get('/api/student/game/word-builder/progress', [VocabularyController::class, 'getGameProgress']);

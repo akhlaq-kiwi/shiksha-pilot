@@ -92,11 +92,10 @@ bool _isTransientSocketError(Object error) {
 }
 
 const String _kUsbBaseUrl = 'http://127.0.0.1:8000';
-const String _kWifiBaseUrl = 'http://10.144.32.71:8000';
-const String _kWifiBaseUrlPrev = 'http://10.56.244.71:8000';
-const String _kWifiBaseUrlOld = 'http://10.22.6.71:8000';
+const String _kWifiBaseUrl = 'http://10.56.244.71:8000';
 
 String? _inMemoryWorkingBase;
+String? get activeLocalBaseUrl => _inMemoryWorkingBase;
 
 Future<void> _saveWorkingBaseUrl(String base) async {
   _inMemoryWorkingBase = base;
@@ -115,7 +114,7 @@ Future<http.Response> _executeWithFallback(
 }) async {
   final origin = originalUrl.origin;
   final bool isProductionOrQa = origin.contains('shikshapilot.com');
-  
+
   String? savedBase;
   try {
     final prefs = await SharedPreferences.getInstance();
@@ -125,13 +124,19 @@ Future<http.Response> _executeWithFallback(
   final List<String> candidateBaseUrls = isProductionOrQa
       ? [origin]
       : [
+          if (_inMemoryWorkingBase != null && _inMemoryWorkingBase!.isNotEmpty)
+            _inMemoryWorkingBase!,
           _kUsbBaseUrl,
-          if (_inMemoryWorkingBase != null && _inMemoryWorkingBase!.isNotEmpty && !_inMemoryWorkingBase!.contains('10.22.6.71')) _inMemoryWorkingBase!,
           _kWifiBaseUrl,
-          if (savedBase != null && savedBase.isNotEmpty && !savedBase.contains('10.57.197.71') && !savedBase.contains('10.184.196.71') && !savedBase.contains('10.155.82.71') && !savedBase.contains('10.22.6.71')) savedBase,
           origin,
-          _kWifiBaseUrlPrev,
-          _kWifiBaseUrlOld,
+          if (savedBase != null &&
+              savedBase.isNotEmpty &&
+              !savedBase.contains('10.144.32.71') &&
+              !savedBase.contains('10.57.197.71') &&
+              !savedBase.contains('10.184.196.71') &&
+              !savedBase.contains('10.155.82.71') &&
+              !savedBase.contains('10.22.6.71'))
+            savedBase,
         ];
 
   // Remove duplicates while preserving order
@@ -160,7 +165,7 @@ Future<http.Response> _executeWithFallback(
         : isKnownWorking
             ? const Duration(seconds: 15)
             : isLocalLan
-                ? const Duration(seconds: 4)
+                ? const Duration(milliseconds: 2500)
                 : const Duration(seconds: 25);
 
     final bool allowRetryForBase = retryOnTransientFailure &&
@@ -218,6 +223,25 @@ Future<http.Response> _executeWithFallback(
 
         break;
       }
+    }
+  }
+
+  // If USB cable was just reconnected and adb reverse took a moment to settle,
+  // give loopback one quick second-chance GET before surfacing a network error.
+  if (!isProductionOrQa && retryOnTransientFailure) {
+    try {
+      await Future.delayed(const Duration(milliseconds: 700));
+      final pathAndQuery = originalUrl.hasQuery
+          ? '${originalUrl.path}?${originalUrl.query}'
+          : originalUrl.path;
+      final retryUri = Uri.parse('$_kUsbBaseUrl$pathAndQuery');
+      final response = await requestFn(retryUri).timeout(const Duration(milliseconds: 2000));
+      _checkUnauthorized(response);
+      _saveWorkingBaseUrl(_kUsbBaseUrl);
+      return response;
+    } catch (e) {
+      lastError = e;
+      _inMemoryWorkingBase = null;
     }
   }
 

@@ -141,6 +141,7 @@ class NotificationEvent {
   static const homeworkDueReminder = 'HOMEWORK_DUE_REMINDER';
   static const timetableUpdated = 'TIMETABLE_UPDATED';
   static const substituteAssigned = 'SUBSTITUTE_ASSIGNED';
+  static const testSeriesPublished = 'TEST_SERIES_PUBLISHED';
 
   static const examScheduled = 'EXAM_SCHEDULED';
   static const examSchemePublished = 'EXAM_SCHEME_PUBLISHED';

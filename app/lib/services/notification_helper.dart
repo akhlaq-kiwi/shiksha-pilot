@@ -24,6 +24,7 @@ import '../screens/notice_screen.dart';
 import '../screens/expense_screen.dart';
 import '../screens/revenue_screen.dart';
 import '../screens/fee_reminder_screen.dart';
+import '../screens/test_series_screen.dart';
 import '../services/fee_reminder_service.dart';
 import '../services/financial_report_service.dart';
 import '../services/attendance_service.dart';
@@ -306,6 +307,8 @@ class NotificationHelper {
           derivedModule = 'tar';
         } else if (evtUpper.contains('HOMEWORK') || linkLower.contains('homework') || titleLower.contains('homework')) {
           derivedModule = 'homework';
+        } else if (evtUpper.contains('TEST_SERIES') || linkLower.contains('test-series') || titleLower.contains('test series')) {
+          derivedModule = 'test_series';
         } else if (evtUpper.contains('ACHIEVEMENT') || linkLower.contains('achievement') || titleLower.contains('achievement') || titleLower.contains('certificate') || titleLower.contains('champion') || titleLower.contains('topper')) {
           derivedModule = 'achievements';
         } else if (evtUpper.contains('FEE_REMINDER') || evtUpper.contains('FEE_FOLLOWUP') || linkLower.contains('fee-reminder') || linkLower.contains('fee-follow-up') || titleLower.contains('fee reminder') || titleLower.contains('fee follow-up') || titleLower.contains('due today')) {
@@ -488,6 +491,13 @@ class NotificationHelper {
         userRole: userRole,
         selectedStudentId: notifStudentId ?? studentId,
       );
+    } else if (link.contains('test-series') || title.contains('test series') || message.contains('test series') || eventKey == NotificationEvent.testSeriesPublished) {
+      targetScreen = TestSeriesScreen(
+        baseUrl: baseUrl,
+        token: token,
+        userRole: userRole,
+        studentId: notifStudentId ?? studentId,
+      );
     } else if (link.contains('achievements') || title.toLowerCase().contains('achievement') || message.toLowerCase().contains('achievement')) {
       targetScreen = AchievementsScreen(
         baseUrl: baseUrl,
@@ -584,6 +594,14 @@ class NotificationHelper {
           selectedStudentId: studentId,
         );
 
+      case NotificationEvent.testSeriesPublished:
+        return TestSeriesScreen(
+          baseUrl: baseUrl,
+          token: token,
+          userRole: userRole,
+          studentId: studentId,
+        );
+
       case NotificationEvent.timetableUpdated:
       case NotificationEvent.substituteAssigned:
         return TimetableScreen(
@@ -676,10 +694,7 @@ class NotificationHelper {
         );
 
       case NotificationEvent.attendanceNotMarkedReminder:
-      case NotificationEvent.feeFollowupDueToday:
-      case NotificationEvent.feeFollowupOverdue:
-        // These have no dedicated mobile screen yet; the notification centre
-        // shows the full message, which is the useful destination.
+        // No dedicated mobile screen yet; NotificationCenterScreen shows full message.
         return NotificationCenterScreen(
           baseUrl: baseUrl,
           token: token,

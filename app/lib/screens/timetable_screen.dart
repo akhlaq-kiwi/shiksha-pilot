@@ -38,10 +38,6 @@ class _TimetableScreenState extends State<TimetableScreen> {
   bool _isOffline = false;
   String _errorText = '';
 
-  // Stats for Teacher
-  int _totalPeriods = 0;
-  int _completedPeriods = 0;
-  int _remainingPeriods = 0;
   late bool _isPrincipal;
 
   @override
@@ -52,10 +48,12 @@ class _TimetableScreenState extends State<TimetableScreen> {
         (widget.userRole.toUpperCase() == 'PRINCIPAL');
     _checkPrincipal();
     _service = TimetableService(baseUrl: widget.baseUrl, token: widget.token);
-    _selectedDate = widget.targetDate ?? DateTime.now();
+    final initialDate = widget.targetDate ?? DateTime.now();
+    _selectedDate = DateTime(initialDate.year, initialDate.month, initialDate.day);
     // If target day is Sunday, default to Monday
     if (_selectedDate.weekday == DateTime.sunday) {
       _selectedDate = _selectedDate.add(const Duration(days: 1));
+      _selectedDate = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
     }
     _loadSchedule();
   }
@@ -187,7 +185,6 @@ class _TimetableScreenState extends State<TimetableScreen> {
           setState(() {
             _periods = res['data'] ?? [];
             _isOffline = res['isOffline'] ?? false;
-            _calculateTeacherStats();
             _isLoading = false;
           });
 
@@ -205,18 +202,19 @@ class _TimetableScreenState extends State<TimetableScreen> {
     }
   }
 
-  void _calculateTeacherStats() {
+  bool _isFreePeriod(dynamic p) => p['is_free'] == true || p['is_free'] == 1;
+
+  ({int total, int completed, int remaining}) _computeTeacherStats(DateTime now) {
     int total = 0;
     int completed = 0;
     int remaining = 0;
 
-    final now = DateTime.now();
     final todayStr = _formatDateYYYYMMDD(now);
     final selectedStr = _formatDateYYYYMMDD(_selectedDate);
     final isToday = selectedStr == todayStr;
 
     for (var p in _periods) {
-      if (p['is_free'] == true) continue;
+      if (_isFreePeriod(p)) continue;
       total++;
 
       final status = _getPeriodStatus(p['start_time'], p['end_time'], isToday, _selectedDate, now);
@@ -227,9 +225,7 @@ class _TimetableScreenState extends State<TimetableScreen> {
       }
     }
 
-    _totalPeriods = total;
-    _completedPeriods = completed;
-    _remainingPeriods = remaining;
+    return (total: total, completed: completed, remaining: remaining);
   }
 
   void _scrollToCurrentPeriod() {
@@ -243,7 +239,7 @@ class _TimetableScreenState extends State<TimetableScreen> {
     int currentIndex = -1;
     for (int i = 0; i < _periods.length; i++) {
       final p = _periods[i];
-      if (p['is_free'] == true) continue;
+      if (_isFreePeriod(p)) continue;
       final status = _getPeriodStatus(p['start_time'], p['end_time'], true, _selectedDate, now);
       if (status == 'Current') {
         currentIndex = i;
@@ -274,26 +270,32 @@ class _TimetableScreenState extends State<TimetableScreen> {
   ) {
     if (startTime == null || endTime == null) return 'Upcoming';
 
+    final selectedDay = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+    final todayDay = DateTime(now.year, now.month, now.day);
+
     // If it's a past day, all are completed
-    if (selectedDate.isBefore(DateTime(now.year, now.month, now.day))) {
+    if (selectedDay.isBefore(todayDay)) {
       return 'Completed';
     }
     // If it's a future day, all are upcoming
-    if (selectedDate.isAfter(DateTime(now.year, now.month, now.day))) {
+    if (selectedDay.isAfter(todayDay)) {
       return 'Upcoming';
     }
 
     try {
-      final startParts = startTime.toString().split(':');
-      final endParts = endTime.toString().split(':');
+      final startParts = startTime.toString().trim().split(':');
+      final endParts = endTime.toString().trim().split(':');
+      if (startParts.length < 2 || endParts.length < 2) {
+        return 'Upcoming';
+      }
 
-      final startMin = int.parse(startParts[0]) * 60 + int.parse(startParts[1]);
-      final endMin = int.parse(endParts[0]) * 60 + int.parse(endParts[1]);
+      final startMin = int.parse(startParts[0].trim()) * 60 + int.parse(startParts[1].trim());
+      final endMin = int.parse(endParts[0].trim()) * 60 + int.parse(endParts[1].trim());
       final currentMin = now.hour * 60 + now.minute;
 
-      if (currentMin > endMin) {
+      if (currentMin >= endMin) {
         return 'Completed';
-      } else if (currentMin >= startMin && currentMin <= endMin) {
+      } else if (currentMin >= startMin && currentMin < endMin) {
         return 'Current';
       } else {
         return 'Upcoming';
@@ -330,12 +332,12 @@ class _TimetableScreenState extends State<TimetableScreen> {
   }
 
   void _changeDate(int offset) {
-    DateTime target = _selectedDate.add(Duration(days: offset));
+    DateTime target = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day).add(Duration(days: offset));
     if (target.weekday == DateTime.sunday) {
       target = target.add(Duration(days: offset > 0 ? 1 : -1));
     }
     setState(() {
-      _selectedDate = target;
+      _selectedDate = DateTime(target.year, target.month, target.day);
     });
     _loadSchedule();
   }
@@ -348,7 +350,7 @@ class _TimetableScreenState extends State<TimetableScreen> {
   void _selectWeekday(int index) {
     final target = _mondayDate.add(Duration(days: index));
     setState(() {
-      _selectedDate = target;
+      _selectedDate = DateTime(target.year, target.month, target.day);
     });
     _loadSchedule();
   }
@@ -374,11 +376,14 @@ class _TimetableScreenState extends State<TimetableScreen> {
       },
     );
 
-    if (picked != null && picked != _selectedDate) {
-      setState(() {
-        _selectedDate = picked;
-      });
-      _loadSchedule();
+    if (picked != null) {
+      final pickedDay = DateTime(picked.year, picked.month, picked.day);
+      if (pickedDay != _selectedDate) {
+        setState(() {
+          _selectedDate = pickedDay;
+        });
+        _loadSchedule();
+      }
     }
   }
 
@@ -509,7 +514,7 @@ class _TimetableScreenState extends State<TimetableScreen> {
 
           // Teacher Summary Card
           if (isTeacher && _periods.isNotEmpty && !_isLoading && _errorText.isEmpty)
-            _buildTeacherSummaryCard(),
+            _buildTeacherSummaryCard(now),
 
           // Main List
           Expanded(
@@ -537,7 +542,7 @@ class _TimetableScreenState extends State<TimetableScreen> {
                                 itemCount: _periods.length,
                                 itemBuilder: (context, index) {
                                   final p = _periods[index];
-                                  if (p['is_free'] == true) {
+                                  if (_isFreePeriod(p)) {
                                     return _buildFreePeriodCard(p);
                                   }
                                   return isTeacher 
@@ -612,7 +617,8 @@ class _TimetableScreenState extends State<TimetableScreen> {
     );
   }
 
-  Widget _buildTeacherSummaryCard() {
+  Widget _buildTeacherSummaryCard(DateTime now) {
+    final stats = _computeTeacherStats(now);
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 6, 16, 8),
       padding: const EdgeInsets.all(18),
@@ -631,9 +637,9 @@ class _TimetableScreenState extends State<TimetableScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildSummaryItem('Today\'s Classes', _totalPeriods.toString(), const Color(0xFF1E293B)),
-          _buildSummaryItem('Completed', _completedPeriods.toString(), const Color(0xFF16A34A)),
-          _buildSummaryItem('Remaining', _remainingPeriods.toString(), const Color(0xFFC26600)),
+          _buildSummaryItem('Today\'s Classes', stats.total.toString(), const Color(0xFF1E293B)),
+          _buildSummaryItem('Completed', stats.completed.toString(), const Color(0xFF16A34A)),
+          _buildSummaryItem('Remaining', stats.remaining.toString(), const Color(0xFFC26600)),
         ],
       ),
     );

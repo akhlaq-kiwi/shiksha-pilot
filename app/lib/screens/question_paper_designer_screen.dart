@@ -11,6 +11,8 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:school_hub/constants/app_colors.dart';
+import 'package:school_hub/widgets/test_series_shared.dart';
 import '../services/leave_service.dart';
 import '../utils/class_formatter.dart';
 
@@ -481,11 +483,16 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
     await prefs.setString('qpd_saved_papers', json.encode(savedList));
 
     if (showToast && mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Question paper saved successfully!'),
-          backgroundColor: Colors.teal,
+        SnackBar(
+          content: const Text(
+            'Question paper saved successfully!',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          backgroundColor: AppColors.success600,
           behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       );
     }
@@ -718,11 +725,17 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
       _showShapeSelectorDialog(block);
     }
 
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Added ${type.replaceAll('_', ' ').toUpperCase()} block'),
+        content: Text(
+          'Added ${type.replaceAll('_', ' ').toUpperCase()} block',
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+        backgroundColor: TsColors.ink,
         duration: const Duration(milliseconds: 900),
         behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
@@ -812,25 +825,38 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
   ];
 
   void _showShapeSelectorDialog(QuestionBlock q) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? AppColors.darkSurfaceRaised : TsColors.cardIvory;
+    final textPrimary = isDark ? AppColors.darkTextPrimary : TsColors.ink;
+    final tileBg = isDark ? AppColors.darkSurfaceCanvas : Colors.white;
+    final borderCol = isDark ? TsColors.darkBorder : TsColors.border;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      backgroundColor: bg,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) => Container(
         height: MediaQuery.of(context).size.height * 0.65,
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Select Geometric Shape', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                Text(
+                  'Select Geometric Shape',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: textPrimary),
+                ),
+                IconButton(
+                  icon: Icon(Icons.close_rounded, color: textPrimary),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
               ],
             ),
-            const Divider(),
+            Divider(color: borderCol),
+            const SizedBox(height: 6),
             Expanded(
               child: GridView.builder(
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -858,12 +884,12 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
                         _onQuestionsChanged();
                       });
                     },
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade50,
-                        border: Border.all(color: Colors.grey.shade300, width: 1),
-                        borderRadius: BorderRadius.circular(12),
+                        color: tileBg,
+                        border: Border.all(color: borderCol, width: 1.2),
+                        borderRadius: BorderRadius.circular(14),
                       ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -871,13 +897,23 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
                           SizedBox(
                             width: 36,
                             height: 36,
-                            child: CustomPaint(painter: ShapePainter(s['key']!, Colors.deepPurple.shade700)),
+                            child: CustomPaint(
+                              painter: ShapePainter(
+                                s['key']!,
+                                isDark ? TsColors.amber300 : TsColors.accent,
+                              ),
+                            ),
                           ),
                           const SizedBox(height: 6),
-                          Text(
-                            s['label']!,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.normal),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: Text(
+                              s['label']!,
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: textPrimary),
+                            ),
                           ),
                         ],
                       ),
@@ -893,25 +929,38 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
   }
 
   void _showSingleShapeChangeDialog(VisualElement ve) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? AppColors.darkSurfaceRaised : TsColors.cardIvory;
+    final textPrimary = isDark ? AppColors.darkTextPrimary : TsColors.ink;
+    final tileBg = isDark ? AppColors.darkSurfaceCanvas : Colors.white;
+    final borderCol = isDark ? TsColors.darkBorder : TsColors.border;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      backgroundColor: bg,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) => Container(
         height: MediaQuery.of(context).size.height * 0.65,
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Change Shape', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                Text(
+                  'Change Shape',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: textPrimary),
+                ),
+                IconButton(
+                  icon: Icon(Icons.close_rounded, color: textPrimary),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
               ],
             ),
-            const Divider(),
+            Divider(color: borderCol),
+            const SizedBox(height: 6),
             Expanded(
               child: GridView.builder(
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -932,12 +981,19 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
                         _onQuestionsChanged();
                       });
                     },
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
                     child: Container(
                       decoration: BoxDecoration(
-                        color: isSel ? Colors.deepPurple.shade50 : Colors.grey.shade50,
-                        border: Border.all(color: isSel ? Colors.deepPurple : Colors.grey.shade300, width: isSel ? 2 : 1),
-                        borderRadius: BorderRadius.circular(12),
+                        color: isSel
+                            ? (isDark ? TsColors.amber900.withValues(alpha: 0.3) : TsColors.accentSoft)
+                            : tileBg,
+                        border: Border.all(
+                          color: isSel
+                              ? (isDark ? TsColors.amber300 : TsColors.accent)
+                              : borderCol,
+                          width: isSel ? 1.8 : 1.2,
+                        ),
+                        borderRadius: BorderRadius.circular(14),
                       ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -945,13 +1001,29 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
                           SizedBox(
                             width: 36,
                             height: 36,
-                            child: CustomPaint(painter: ShapePainter(s['key']!, Colors.deepPurple.shade700)),
+                            child: CustomPaint(
+                              painter: ShapePainter(
+                                s['key']!,
+                                isSel
+                                    ? (isDark ? TsColors.amber300 : TsColors.accent)
+                                    : (isDark ? AppColors.darkTextSecondary : TsColors.inkSecondary),
+                              ),
+                            ),
                           ),
                           const SizedBox(height: 6),
-                          Text(
-                            s['label']!,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 10, fontWeight: isSel ? FontWeight.bold : FontWeight.normal),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: Text(
+                              s['label']!,
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
+                                color: isSel ? (isDark ? TsColors.amber300 : TsColors.accent) : textPrimary,
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -973,33 +1045,70 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
       return;
     }
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? AppColors.darkSurfaceRaised : TsColors.cardIvory;
+    final textPrimary = isDark ? AppColors.darkTextPrimary : TsColors.ink;
+    final textSecondary = isDark ? AppColors.darkTextSecondary : TsColors.inkMuted;
+    final borderCol = isDark ? TsColors.darkBorder : TsColors.accentBorder;
+
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
+        backgroundColor: bg,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: BorderSide(color: borderCol, width: 1.5),
+        ),
+        title: Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 24),
-            SizedBox(width: 8),
-            Text('Unsaved Draft', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: isDark
+                    ? TsColors.amber900.withValues(alpha: 0.45)
+                    : TsColors.accentSoft,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isDark ? TsColors.amber800 : TsColors.accentBorder,
+                  width: 1.3,
+                ),
+              ),
+              child: Icon(
+                Icons.warning_amber_rounded,
+                color: isDark ? TsColors.amber300 : TsColors.accent,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Unsaved Draft',
+              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: textPrimary),
+            ),
           ],
         ),
-        content: const Text(
+        content: Text(
           'You have an unsaved question paper draft in progress.\nOpening saved papers will replace your current editor draft.',
-          style: TextStyle(fontSize: 13, height: 1.4),
+          style: TextStyle(fontSize: 13, height: 1.45, color: textSecondary, fontWeight: FontWeight.w500),
         ),
         actions: [
           TextButton(
-            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+            child: Text('Cancel', style: TextStyle(color: textSecondary, fontWeight: FontWeight.w700)),
             onPressed: () => Navigator.pop(ctx, 'cancel'),
           ),
           TextButton(
-            child: const Text('Discard & Open', style: TextStyle(color: Colors.red)),
+            child: const Text('Discard & Open', style: TextStyle(color: AppColors.danger600, fontWeight: FontWeight.w700)),
             onPressed: () => Navigator.pop(ctx, 'discard'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
-            child: const Text('Save & Open'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isDark ? TsColors.accent : TsColors.ink,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            ),
+            child: const Text('Save & Open', style: TextStyle(fontWeight: FontWeight.w800)),
             onPressed: () async {
               await _saveDraft(showToast: true);
               if (ctx.mounted) Navigator.pop(ctx, 'save_open');
@@ -1022,42 +1131,48 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
 
     if (!mounted) return;
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? AppColors.darkSurfaceRaised : TsColors.cardIvory;
+    final textPrimary = isDark ? AppColors.darkTextPrimary : TsColors.ink;
+    final textSecondary = isDark ? AppColors.darkTextSecondary : TsColors.inkMuted;
+    final borderCol = isDark ? TsColors.darkBorder : TsColors.border;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: bg,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setModalState) {
             return Container(
               height: MediaQuery.of(context).size.height * 0.7,
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
+                      Text(
                         'Saved Question Papers',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: textPrimary),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.close),
+                        icon: Icon(Icons.close_rounded, color: textPrimary),
                         onPressed: () => Navigator.pop(ctx),
                       ),
                     ],
                   ),
-                  const Divider(),
+                  Divider(color: borderCol),
                   if (papers.isEmpty)
-                    const Expanded(
+                    Expanded(
                       child: Center(
                         child: Text(
                           'No saved question papers found.',
-                          style: TextStyle(color: Colors.grey),
+                          style: TextStyle(color: textSecondary, fontWeight: FontWeight.w600),
                         ),
                       ),
                     )
@@ -1077,29 +1192,43 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
                           return Container(
                             margin: const EdgeInsets.symmetric(vertical: 6),
                             decoration: BoxDecoration(
-                              color: Colors.grey.shade50,
-                              border: Border.all(color: Colors.grey.shade200),
-                              borderRadius: BorderRadius.circular(12),
+                              color: isDark ? AppColors.darkSurfaceCanvas : Colors.white,
+                              border: Border.all(color: borderCol, width: 1.2),
+                              borderRadius: BorderRadius.circular(14),
                             ),
                             child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: Colors.indigo.shade50,
-                                child: Icon(Icons.description_outlined, color: Colors.indigo.shade700),
+                              leading: Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: isDark ? TsColors.amber900.withValues(alpha: 0.3) : TsColors.accentSoft,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: isDark ? TsColors.amber800 : TsColors.accentBorder,
+                                  ),
+                                ),
+                                child: Icon(Icons.description_outlined, color: isDark ? TsColors.amber300 : TsColors.accent, size: 20),
                               ),
-                              title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                              subtitle: Text('$cls • $sub • $date', style: const TextStyle(fontSize: 11)),
+                              title: Text(
+                                title,
+                                style: TextStyle(fontWeight: FontWeight.w800, color: textPrimary),
+                              ),
+                              subtitle: Text(
+                                '$cls • $sub • $date',
+                                style: TextStyle(fontSize: 11.5, color: textSecondary, fontWeight: FontWeight.w500),
+                              ),
                               trailing: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   IconButton(
-                                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                    icon: const Icon(Icons.delete_outline_rounded, color: AppColors.danger500),
                                     onPressed: () async {
                                       papers.removeAt(index);
                                       await prefs.setString('qpd_saved_papers', json.encode(papers));
                                       setModalState(() {});
                                     },
                                   ),
-                                  const Icon(Icons.chevron_right, color: Colors.grey),
+                                  Icon(Icons.chevron_right_rounded, color: textSecondary),
                                 ],
                               ),
                               onTap: () {
@@ -1140,35 +1269,50 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
 
   // --- Full Screen Live Preview & PDF Actions ---
   void _openLivePreviewModal() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? AppColors.darkSurfaceCanvas : TsColors.canvas;
+    final appbarBg = isDark ? AppColors.darkSurfaceRaised : TsColors.cardIvory;
+    final textPrimary = isDark ? AppColors.darkTextPrimary : TsColors.ink;
+    final borderCol = isDark ? TsColors.darkBorder : TsColors.border;
+
     Navigator.of(context).push(
       MaterialPageRoute(
         fullscreenDialog: true,
         builder: (ctx) => Scaffold(
-          backgroundColor: const Color(0xFFF1F5F9),
+          backgroundColor: bg,
           appBar: AppBar(
-            backgroundColor: Colors.white,
-            elevation: 1,
+            backgroundColor: appbarBg,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(1),
+              child: Divider(height: 1, color: borderCol),
+            ),
             leading: IconButton(
-              icon: const Icon(Icons.close_rounded, color: Colors.black87, size: 28),
+              icon: Icon(Icons.close_rounded, color: textPrimary, size: 24),
               onPressed: () => Navigator.pop(ctx),
             ),
-            title: const Text(
+            title: Text(
               'Live Preview',
-              style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 16),
+              style: TextStyle(color: textPrimary, fontWeight: FontWeight.w900, fontSize: 16),
             ),
             actions: [
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.indigo.shade700,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isDark ? TsColors.accent : TsColors.ink,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                  ),
+                  icon: const Icon(Icons.download_rounded, size: 16),
+                  label: const Text('Download', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5)),
+                  onPressed: () => _downloadPdf(ctx),
                 ),
-                icon: const Icon(Icons.download_rounded, size: 16),
-                label: const Text('Download', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                onPressed: () => _downloadPdf(ctx),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 12),
             ],
           ),
           body: SingleChildScrollView(
@@ -1180,9 +1324,14 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
                 padding: const EdgeInsets.only(left: 28, right: 28, top: 32, bottom: 32),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: borderCol),
                   boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 15, offset: const Offset(0, 6)),
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.1),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
                   ],
                 ),
                 clipBehavior: Clip.hardEdge,
@@ -1780,14 +1929,14 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
                 Expanded(
                   child: Text(
                     'PDF downloaded successfully! ($fileName)',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
                   ),
                 ),
               ],
             ),
-            backgroundColor: Colors.teal.shade800,
+            backgroundColor: AppColors.success600,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             margin: const EdgeInsets.all(16),
             duration: const Duration(seconds: 3),
           ),
@@ -1796,21 +1945,69 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
     } catch (e) {
       debugPrint('Error downloading PDF: $e');
       if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to download PDF'),
-            backgroundColor: Colors.red,
+          SnackBar(
+            content: const Text('Failed to download PDF', style: TextStyle(fontWeight: FontWeight.w700)),
+            backgroundColor: AppColors.danger600,
             behavior: SnackBarBehavior.floating,
-            duration: Duration(seconds: 3),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            duration: const Duration(seconds: 3),
           ),
         );
       }
     }
   }
 
+  InputDecoration _qpdInputDecoration({
+    required String label,
+    required bool isDark,
+    String? hint,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: TextStyle(
+        color: isDark ? AppColors.darkTextSecondary : TsColors.inkMuted,
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+      ),
+      floatingLabelStyle: const TextStyle(
+        color: TsColors.accent,
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+      ),
+      hintText: hint,
+      hintStyle: TextStyle(
+        color: isDark ? AppColors.darkTextMuted : AppColors.textMuted,
+        fontSize: 13,
+        fontWeight: FontWeight.w500,
+      ),
+      filled: true,
+      fillColor: isDark ? AppColors.darkSurfaceCanvas : Colors.white,
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: isDark ? TsColors.darkBorder : TsColors.border),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: isDark ? TsColors.darkBorder : TsColors.border),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: TsColors.accent, width: 1.5),
+      ),
+    );
+  }
+
   // --- Main Build UI ---
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? AppColors.darkSurfaceCanvas : TsColors.canvas;
+    final textPrimary = isDark ? AppColors.darkTextPrimary : TsColors.ink;
+
     return PopScope(
       canPop: true,
       onPopInvokedWithResult: (didPop, result) {
@@ -1820,60 +2017,83 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
         ]);
       },
       child: Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        title: const Text(
-          'Question Paper Designer',
-          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Colors.black87),
+        backgroundColor: bg,
+        appBar: AppBar(
+          backgroundColor: isDark ? AppColors.darkSurfaceRaised : Colors.transparent,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          iconTheme: IconThemeData(color: textPrimary),
+          title: Text(
+            'Question Paper Designer',
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 16,
+              color: textPrimary,
+              letterSpacing: 0.3,
+            ),
+          ),
+          actions: [
+            IconButton(
+              tooltip: 'Saved Papers',
+              icon: Icon(Icons.folder_open_rounded, color: textPrimary),
+              onPressed: _handleSavedPapersNavigation,
+            ),
+            IconButton(
+              tooltip: 'Save Draft',
+              icon: Icon(Icons.bookmark_outline_rounded, color: textPrimary),
+              onPressed: () => _saveDraft(showToast: true),
+            ),
+            const SizedBox(width: 4),
+          ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: Colors.indigo.shade700,
-        foregroundColor: Colors.white,
-        elevation: 4,
-        icon: const Icon(Icons.visibility_rounded),
-        label: const Text('Live Preview', style: TextStyle(fontWeight: FontWeight.bold)),
-        onPressed: _openLivePreviewModal,
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SafeArea(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () {
-                  if (_selectedVisualElementId != null || _resizingVisualElementId != null) {
-                    setState(() {
-                      _selectedVisualElementId = null;
-                      _resizingVisualElementId = null;
-                    });
-                  }
-                },
-                child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.only(left: 14, right: 14, top: 14, bottom: 84),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildConfigurationCard(),
-                      const SizedBox(height: 16),
-                      _buildQuickBlocksPanel(),
-                      const SizedBox(height: 16),
-                      _buildQuestionsListHeader(),
-                      const SizedBox(height: 10),
-                      _buildQuestionsCardList(),
-                    ],
+        floatingActionButton: FloatingActionButton.extended(
+          backgroundColor: isDark ? TsColors.accent : TsColors.ink,
+          foregroundColor: Colors.white,
+          elevation: 3,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          icon: const Icon(Icons.visibility_rounded, size: 20),
+          label: const Text(
+            'Live Preview',
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5),
+          ),
+          onPressed: _openLivePreviewModal,
+        ),
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator(color: TsColors.accent))
+            : SafeArea(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    if (_selectedVisualElementId != null || _resizingVisualElementId != null) {
+                      setState(() {
+                        _selectedVisualElementId = null;
+                        _resizingVisualElementId = null;
+                      });
+                    }
+                  },
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.only(left: 14, right: 14, top: 10, bottom: 84),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildConfigurationCard(isDark),
+                        const SizedBox(height: 16),
+                        _buildQuickBlocksPanel(isDark),
+                        const SizedBox(height: 16),
+                        _buildQuestionsListHeader(isDark),
+                        const SizedBox(height: 10),
+                        _buildQuestionsCardList(isDark),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
       ),
     );
   }
 
-  Widget _buildConfigurationCard() {
+  Widget _buildConfigurationCard(bool isDark) {
     final effectiveClasses = _classes.isNotEmpty ? _classes : _fallbackClasses;
     final effectiveSubjects = _subjects.isNotEmpty ? _subjects : _fallbackSubjects;
 
@@ -1885,13 +2105,26 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
         ? _selectedSubjectId
         : (effectiveSubjects.isNotEmpty ? effectiveSubjects.first['id'].toString() : null);
 
+    final cardColor = isDark ? AppColors.darkSurfaceRaised : TsColors.cardIvory;
+    final textPrimary = isDark ? AppColors.darkTextPrimary : TsColors.ink;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        color: cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark ? TsColors.darkBorder : TsColors.accent,
+          width: 1.8,
+        ),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4)),
+          BoxShadow(
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.35)
+                : TsColors.accent.withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Column(
@@ -1899,12 +2132,19 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
         children: [
           Row(
             children: [
-              Icon(Icons.tune_rounded, color: Colors.indigo.shade700, size: 20),
+              Icon(Icons.tune_rounded, color: isDark ? TsColors.amber300 : TsColors.accent, size: 20),
               const SizedBox(width: 8),
-              const Text('Paper Configuration', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              Text(
+                'Paper Configuration',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
+                  color: textPrimary,
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
 
           // Class & Subject Row
           Row(
@@ -1914,26 +2154,13 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
                   value: safeClassValue,
                   isExpanded: true,
                   borderRadius: BorderRadius.circular(16),
-                  dropdownColor: Colors.white,
+                  dropdownColor: isDark ? TsColors.darkSurfaceElevated : TsColors.cardIvory,
                   elevation: 4,
-                  icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
-                  decoration: InputDecoration(
-                    labelText: 'Select Class *',
-                    labelStyle: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
-                    ),
+                  style: TextStyle(color: textPrimary, fontWeight: FontWeight.w600, fontSize: 13.5),
+                  icon: Icon(Icons.keyboard_arrow_down_rounded, color: isDark ? AppColors.darkTextSecondary : TsColors.inkMuted),
+                  decoration: _qpdInputDecoration(
+                    label: 'Select Class *',
+                    isDark: isDark,
                   ),
                   items: effectiveClasses.map((c) {
                     final shortName = formatShortClassName(c['name']?.toString(), section: c['section']?.toString());
@@ -1953,26 +2180,13 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
                   value: safeSubjectValue,
                   isExpanded: true,
                   borderRadius: BorderRadius.circular(16),
-                  dropdownColor: Colors.white,
+                  dropdownColor: isDark ? TsColors.darkSurfaceElevated : TsColors.cardIvory,
                   elevation: 4,
-                  icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
-                  decoration: InputDecoration(
-                    labelText: 'Select Subject *',
-                    labelStyle: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
-                    ),
+                  style: TextStyle(color: textPrimary, fontWeight: FontWeight.w600, fontSize: 13.5),
+                  icon: Icon(Icons.keyboard_arrow_down_rounded, color: isDark ? AppColors.darkTextSecondary : TsColors.inkMuted),
+                  decoration: _qpdInputDecoration(
+                    label: 'Select Subject *',
+                    isDark: isDark,
                   ),
                   items: effectiveSubjects.map((s) {
                     return DropdownMenuItem<String>(
@@ -1999,23 +2213,10 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
               Expanded(
                 child: TextField(
                   controller: _paperTitleController,
-                  decoration: InputDecoration(
-                    labelText: 'Paper Title',
-                    labelStyle: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
-                    ),
+                  style: TextStyle(color: textPrimary, fontWeight: FontWeight.w600, fontSize: 13.5),
+                  decoration: _qpdInputDecoration(
+                    label: 'Paper Title',
+                    isDark: isDark,
                   ),
                 ),
               ),
@@ -2023,23 +2224,10 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
               Expanded(
                 child: TextField(
                   controller: _examNameController,
-                  decoration: InputDecoration(
-                    labelText: 'Exam Name',
-                    labelStyle: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
-                    ),
+                  style: TextStyle(color: textPrimary, fontWeight: FontWeight.w600, fontSize: 13.5),
+                  decoration: _qpdInputDecoration(
+                    label: 'Exam Name',
+                    isDark: isDark,
                   ),
                 ),
               ),
@@ -2053,23 +2241,10 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
               Expanded(
                 child: TextField(
                   controller: _durationController,
-                  decoration: InputDecoration(
-                    labelText: 'Duration',
-                    labelStyle: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
-                    ),
+                  style: TextStyle(color: textPrimary, fontWeight: FontWeight.w600, fontSize: 13.5),
+                  decoration: _qpdInputDecoration(
+                    label: 'Duration',
+                    isDark: isDark,
                   ),
                 ),
               ),
@@ -2078,24 +2253,12 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
                 child: TextField(
                   controller: _maxMarksController,
                   keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: 'Max Marks',
-                    labelStyle: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
-                    ),
+                  style: TextStyle(color: textPrimary, fontWeight: FontWeight.w600, fontSize: 13.5),
+                  decoration: _qpdInputDecoration(
+                    label: 'Max Marks',
+                    isDark: isDark,
                   ),
+                  onChanged: (_) => setState(() {}),
                 ),
               ),
             ],
@@ -2105,13 +2268,17 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
     );
   }
 
-  Widget _buildQuickBlocksPanel() {
+  Widget _buildQuickBlocksPanel(bool isDark) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Quick Add Blocks:',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey),
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 13,
+            color: isDark ? AppColors.darkTextSecondary : TsColors.inkMuted,
+          ),
         ),
         const SizedBox(height: 8),
         SingleChildScrollView(
@@ -2119,17 +2286,17 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
           physics: const BouncingScrollPhysics(),
           child: Row(
             children: [
-              _buildBlockChip('+ MCQ', 'mcq', Colors.blue),
-              _buildBlockChip('+ True/False', 'true_false', Colors.teal),
-              _buildBlockChip('+ Fill Blank', 'fill_blanks', Colors.indigo),
-              _buildBlockChip('+ Matching', 'matching', Colors.purple),
-              _buildBlockChip('+ Short Q', 'short_answer', Colors.deepOrange),
-              _buildBlockChip('+ Long Q', 'long_answer', Colors.pink),
-              _buildBlockChip('+ Image', 'image', Colors.amber.shade800),
-              _buildBlockChip('+ Shapes', 'shape', Colors.deepPurple),
-              _buildBlockChip('+ Section', 'section', Colors.green),
-              _buildBlockChip('+ Heading', 'heading', Colors.blueGrey),
-              _buildBlockChip('+ Instruction', 'group_instruction', Colors.brown),
+              _buildBlockChip('MCQ', 'mcq', isDark ? TsColors.amber300 : TsColors.ink, isDark),
+              _buildBlockChip('True/False', 'true_false', isDark ? AppColors.success500 : TsColors.success, isDark),
+              _buildBlockChip('Fill Blank', 'fill_blanks', isDark ? TsColors.amber400 : TsColors.accent, isDark),
+              _buildBlockChip('Matching', 'matching', const Color(0xFF8B5CF6), isDark),
+              _buildBlockChip('Short Q', 'short_answer', const Color(0xFFD97706), isDark),
+              _buildBlockChip('Long Q', 'long_answer', const Color(0xFF0284C7), isDark),
+              _buildBlockChip('Image', 'image', const Color(0xFFE11D48), isDark),
+              _buildBlockChip('Shapes', 'shape', const Color(0xFF9333EA), isDark),
+              _buildBlockChip('Section', 'section', isDark ? AppColors.darkTextSecondary : TsColors.inkSecondary, isDark),
+              _buildBlockChip('Heading', 'heading', isDark ? AppColors.darkTextPrimary : TsColors.ink, isDark),
+              _buildBlockChip('Instruction', 'group_instruction', const Color(0xFFB45309), isDark),
             ],
           ),
         ),
@@ -2137,20 +2304,50 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
     );
   }
 
-  Widget _buildBlockChip(String label, String type, Color color) {
+  Widget _buildBlockChip(String label, String type, Color accentColor, bool isDark) {
     return Padding(
       padding: const EdgeInsets.only(right: 8),
-      child: ActionChip(
-        avatar: Icon(Icons.add, size: 16, color: color),
-        label: Text(label, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: color)),
-        backgroundColor: color.withOpacity(0.08),
-        side: BorderSide(color: color.withOpacity(0.3)),
-        onPressed: () => _addQuestion(type),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _addQuestion(type),
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? accentColor.withValues(alpha: 0.18)
+                  : accentColor.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isDark
+                    ? accentColor.withValues(alpha: 0.45)
+                    : accentColor.withValues(alpha: 0.35),
+                width: 1.2,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.add_rounded, size: 16, color: accentColor),
+                const SizedBox(width: 4),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                    color: accentColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildQuestionsListHeader() {
+  Widget _buildQuestionsListHeader(bool isDark) {
     final targetMax = double.tryParse(_maxMarksController.text) ?? 100.0;
     final totalCalc = _totalMarksCalculated;
     final isMatch = (totalCalc == targetMax);
@@ -2160,21 +2357,32 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
       children: [
         Text(
           'Questions List (${_questions.length})',
-          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+          style: TextStyle(
+            fontWeight: FontWeight.w900,
+            fontSize: 16,
+            color: isDark ? AppColors.darkTextPrimary : TsColors.ink,
+          ),
         ),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
-            color: isMatch ? Colors.green.shade50 : Colors.amber.shade50,
+            color: isMatch
+                ? (isDark ? AppColors.success700.withValues(alpha: 0.22) : AppColors.success50)
+                : (isDark ? TsColors.amber900.withValues(alpha: 0.3) : TsColors.accentSoft),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: isMatch ? Colors.green.shade300 : Colors.amber.shade300),
+            border: Border.all(
+              color: isMatch ? AppColors.success600 : TsColors.accentBorder,
+              width: 1.2,
+            ),
           ),
           child: Text(
             'Total: ${totalCalc.toInt() == totalCalc ? totalCalc.toInt() : totalCalc} / ${targetMax.toInt()}',
             style: TextStyle(
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w800,
               fontSize: 12,
-              color: isMatch ? Colors.green.shade800 : Colors.amber.shade900,
+              color: isMatch
+                  ? (isDark ? AppColors.success500 : AppColors.success700)
+                  : (isDark ? TsColors.amber300 : TsColors.amber800),
             ),
           ),
         ),
@@ -2182,27 +2390,40 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
     );
   }
 
-  Widget _buildQuestionsCardList() {
+  Widget _buildQuestionsCardList(bool isDark) {
     if (_questions.isEmpty) {
       return Container(
+        width: double.infinity,
         padding: const EdgeInsets.all(32),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          color: isDark ? AppColors.darkSurfaceRaised : TsColors.cardIvory,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isDark ? TsColors.darkBorder : TsColors.border,
+            width: 1.5,
+          ),
         ),
         child: Column(
           children: [
-            Icon(Icons.post_add_rounded, size: 48, color: Colors.grey.shade400),
-            const SizedBox(height: 8),
-            const Text(
+            Icon(Icons.post_add_rounded, size: 48, color: isDark ? AppColors.darkTextMuted : TsColors.inkMuted),
+            const SizedBox(height: 10),
+            Text(
               'No questions added yet.',
-              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                color: isDark ? AppColors.darkTextPrimary : TsColors.ink,
+                fontSize: 15,
+              ),
             ),
             const SizedBox(height: 4),
-            const Text(
+            Text(
               'Tap any Quick Add Block above to build your question paper.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: Colors.grey),
+              style: TextStyle(
+                fontSize: 12.5,
+                color: isDark ? AppColors.darkTextSecondary : TsColors.inkMuted,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ],
         ),
@@ -2215,14 +2436,17 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
       itemCount: _questions.length,
       itemBuilder: (context, index) {
         final q = _questions[index];
-        return _buildQuestionEditorCard(q, index);
+        return _buildQuestionEditorCard(q, index, isDark);
       },
     );
   }
 
-  Widget _buildQuestionEditorCard(QuestionBlock q, int index) {
+  Widget _buildQuestionEditorCard(QuestionBlock q, int index, bool isDark) {
     final isHeaderType = (q.type == 'section' || q.type == 'heading' || q.type == 'group_instruction');
     final isFocused = (_focusedBlockId == q.id);
+    final textPrimary = isDark ? AppColors.darkTextPrimary : TsColors.ink;
+    final textSecondary = isDark ? AppColors.darkTextSecondary : TsColors.inkMuted;
+    final borderCol = isDark ? TsColors.darkBorder : TsColors.border;
 
     return InkWell(
       onTap: () {
@@ -2232,24 +2456,28 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
           _resizingVisualElementId = null;
         });
       },
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(20),
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 6),
-        padding: const EdgeInsets.all(12),
+        margin: const EdgeInsets.symmetric(vertical: 7),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: isHeaderType ? Colors.indigo.shade50.withOpacity(0.4) : Colors.white,
-          borderRadius: BorderRadius.circular(14),
+          color: isDark ? AppColors.darkSurfaceRaised : TsColors.cardIvory,
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isFocused
-                ? Colors.deepPurple
-                : (isHeaderType ? Colors.indigo.shade200 : Colors.grey.shade300),
-            width: isFocused ? 2.0 : 1.0,
+                ? (isDark ? TsColors.amber400 : TsColors.accent)
+                : (isHeaderType
+                    ? (isDark ? TsColors.amber800 : TsColors.accentBorder)
+                    : borderCol),
+            width: isFocused ? 1.8 : 1.2,
           ),
           boxShadow: [
             BoxShadow(
-              color: isFocused ? Colors.deepPurple.withOpacity(0.12) : Colors.black.withOpacity(0.02),
-              blurRadius: isFocused ? 10 : 6,
-              offset: const Offset(0, 2),
+              color: isFocused
+                  ? TsColors.accent.withValues(alpha: isDark ? 0.22 : 0.12)
+                  : (isDark ? Colors.black26 : TsColors.accent.withValues(alpha: 0.05)),
+              blurRadius: isFocused ? 12 : 6,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
@@ -2260,50 +2488,59 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: isHeaderType ? Colors.indigo.shade100 : Colors.grey.shade200,
-                    borderRadius: BorderRadius.circular(6),
+                    color: TsColors.ink,
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
                     q.type.replaceAll('_', ' ').toUpperCase(),
-                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                      letterSpacing: 0.3,
+                    ),
                   ),
                 ),
                 const Spacer(),
                 IconButton(
-                  icon: const Icon(Icons.arrow_upward, size: 18),
+                  icon: Icon(Icons.arrow_upward_rounded, size: 18, color: index > 0 ? textSecondary : (isDark ? AppColors.darkTextMuted : AppColors.textMuted)),
                   onPressed: index > 0 ? () => _moveQuestion(index, -1) : null,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
+                  tooltip: 'Move Up',
                 ),
                 const SizedBox(width: 8),
                 IconButton(
-                  icon: const Icon(Icons.arrow_downward, size: 18),
+                  icon: Icon(Icons.arrow_downward_rounded, size: 18, color: index < _questions.length - 1 ? textSecondary : (isDark ? AppColors.darkTextMuted : AppColors.textMuted)),
                   onPressed: index < _questions.length - 1 ? () => _moveQuestion(index, 1) : null,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
+                  tooltip: 'Move Down',
                 ),
                 const SizedBox(width: 8),
                 IconButton(
-                  icon: const Icon(Icons.copy_rounded, size: 18, color: Colors.blue),
+                  icon: Icon(Icons.copy_rounded, size: 18, color: isDark ? TsColors.amber300 : TsColors.accent),
                   onPressed: () => _duplicateQuestion(index),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
+                  tooltip: 'Duplicate',
                 ),
                 const SizedBox(width: 8),
                 IconButton(
-                  icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Colors.red),
+                  icon: const Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.danger600),
                   onPressed: () => _deleteQuestion(index),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
+                  tooltip: 'Delete',
                 ),
                 const SizedBox(width: 8),
                 IconButton(
                   icon: Icon(
                     q.isCollapsed ? Icons.expand_more_rounded : Icons.expand_less_rounded,
                     size: 22,
-                    color: Colors.indigo.shade700,
+                    color: isDark ? TsColors.amber300 : TsColors.accent,
                   ),
                   tooltip: q.isCollapsed ? 'Expand' : 'Collapse',
                   onPressed: () {
@@ -2318,7 +2555,7 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
               ],
             ),
             if (q.isCollapsed) ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               InkWell(
                 onTap: () {
                   setState(() {
@@ -2326,13 +2563,13 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
                     _focusedBlockId = q.id;
                   });
                 },
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(10),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey.shade200),
+                    color: isDark ? AppColors.darkSurfaceCanvas : Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: borderCol),
                   ),
                   child: Row(
                     children: [
@@ -2342,23 +2579,28 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 12.5,
                             fontWeight: FontWeight.w600,
-                            color: q.text.trim().isEmpty ? Colors.grey : Colors.black87,
+                            color: q.text.trim().isEmpty ? (isDark ? AppColors.darkTextMuted : AppColors.textMuted) : textPrimary,
                           ),
                         ),
                       ),
                       if (!isHeaderType && q.marks > 0) ...[
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: Colors.indigo.shade50,
-                            borderRadius: BorderRadius.circular(4),
+                            color: isDark ? TsColors.amber900.withValues(alpha: 0.3) : TsColors.accentSoft,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: isDark ? TsColors.amber800 : TsColors.accentBorder),
                           ),
                           child: Text(
                             '${q.marks.toInt() == q.marks ? q.marks.toInt() : q.marks} Marks',
-                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.indigo.shade800),
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                              color: isDark ? TsColors.amber300 : TsColors.amber800,
+                            ),
                           ),
                         ),
                       ],
@@ -2367,17 +2609,19 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
                 ),
               ),
             ] else ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               // Unified Question Content Container Box
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: isDark ? AppColors.darkSurfaceCanvas : Colors.white,
                   border: Border.all(
-                    color: isFocused ? Colors.indigo.shade600 : Colors.grey.shade400,
+                    color: isFocused
+                        ? (isDark ? TsColors.amber400 : TsColors.accent)
+                        : borderCol,
                     width: isFocused ? 1.5 : 1.0,
                   ),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -2389,8 +2633,11 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
                           child: TextFormField(
                             initialValue: q.text,
                             maxLines: null,
+                            style: TextStyle(color: textPrimary, fontSize: 13.5, fontWeight: FontWeight.w600),
                             decoration: InputDecoration(
                               labelText: isHeaderType ? 'Header / Instruction Text' : 'Question / Heading Text',
+                              labelStyle: TextStyle(fontSize: 12.5, color: textSecondary, fontWeight: FontWeight.w600),
+                              floatingLabelStyle: const TextStyle(color: TsColors.accent, fontWeight: FontWeight.w700),
                               isDense: true,
                               border: InputBorder.none,
                             ),
@@ -2410,14 +2657,29 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
                         if (!isHeaderType) ...[
                           const SizedBox(width: 8),
                           SizedBox(
-                            width: 70,
+                            width: 72,
                             child: TextFormField(
                               initialValue: q.marks == 0 ? '' : q.marks.toString(),
                               keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(
+                              style: TextStyle(color: textPrimary, fontSize: 13, fontWeight: FontWeight.w700),
+                              decoration: InputDecoration(
                                 labelText: 'Marks',
+                                labelStyle: TextStyle(fontSize: 11.5, color: textSecondary, fontWeight: FontWeight.w600),
+                                floatingLabelStyle: const TextStyle(color: TsColors.accent, fontWeight: FontWeight.w700),
                                 isDense: true,
-                                border: OutlineInputBorder(),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: BorderSide(color: borderCol),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: BorderSide(color: borderCol),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: const BorderSide(color: TsColors.accent, width: 1.5),
+                                ),
                               ),
                               onTap: () {
                                 if (_focusedBlockId != q.id) {
@@ -2438,23 +2700,25 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
                       ],
                     ),
 
-                    // Embedded Media & Visual Elements (Inside Question Content Box)
+                    // Embedded Media & Visual Elements
                     if (q.visualElements.isNotEmpty) ...[
                       const SizedBox(height: 6),
-                      Divider(height: 1, color: Colors.indigo.shade100),
+                      Divider(height: 1, color: isDark ? TsColors.darkBorder : TsColors.accentBorder),
                       _buildMediaAndVisualElementsSection(q),
                     ],
 
-                    // Text Below Images/Shapes (Inside Question Content Box)
+                    // Text Below Images/Shapes
                     if (q.visualElements.isNotEmpty || q.bottomText.isNotEmpty) ...[
                       const SizedBox(height: 6),
-                      const Divider(height: 1, color: Colors.grey),
+                      Divider(height: 1, color: borderCol),
                       const SizedBox(height: 4),
                       TextFormField(
                         initialValue: q.bottomText,
                         maxLines: null,
-                        decoration: const InputDecoration(
+                        style: TextStyle(color: textPrimary, fontSize: 13),
+                        decoration: InputDecoration(
                           hintText: 'Type text below image / shape (e.g. My text)...',
+                          hintStyle: TextStyle(color: isDark ? AppColors.darkTextMuted : AppColors.textMuted, fontSize: 12),
                           isDense: true,
                           border: InputBorder.none,
                         ),
@@ -2472,36 +2736,60 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
                       ),
                     ],
 
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     Row(
                       children: [
                         InkWell(
                           onTap: () => _pickImageFromGallery(q),
-                          borderRadius: BorderRadius.circular(6),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: isDark ? TsColors.amber900.withValues(alpha: 0.3) : TsColors.accentSoft,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: isDark ? TsColors.amber800 : TsColors.accentBorder),
+                            ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
-                              children: const [
-                                Icon(Icons.add_a_photo_rounded, size: 13, color: Colors.indigo),
-                                SizedBox(width: 4),
-                                Text('+ Add Image', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.indigo)),
+                              children: [
+                                Icon(Icons.add_photo_alternate_rounded, size: 14, color: isDark ? TsColors.amber300 : TsColors.accent),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '+ Add Image',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    color: isDark ? TsColors.amber300 : TsColors.accent,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 10),
                         InkWell(
                           onTap: () => _showShapeSelectorDialog(q),
-                          borderRadius: BorderRadius.circular(6),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            child: Row(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF3B2D54) : const Color(0xFFF3E8FF),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: isDark ? const Color(0xFF7E22CE) : const Color(0xFFD8B4FE)),
+                            ),
+                            child: const Row(
                               mainAxisSize: MainAxisSize.min,
-                              children: const [
-                                Icon(Icons.category_rounded, size: 13, color: Colors.deepPurple),
+                              children: [
+                                Icon(Icons.category_rounded, size: 14, color: Color(0xFF9333EA)),
                                 SizedBox(width: 4),
-                                Text('+ Add Shape', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.deepPurple)),
+                                Text(
+                                  '+ Add Shape',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF9333EA),
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -2512,116 +2800,76 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
                 ),
               ),
 
-            // MCQ Options Editor
-            if (q.type == 'mcq') ...[
-              const SizedBox(height: 10),
-              const Text('Options (2 options per row in paper):', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
-              const SizedBox(height: 4),
-              ...q.options.asMap().entries.map((optEntry) {
-                final labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
-                final label = optEntry.key < labels.length ? labels[optEntry.key] : '${optEntry.key + 1}';
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 3),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 12,
-                        backgroundColor: Colors.indigo.shade50,
-                        child: Text(label, style: TextStyle(fontSize: 11, color: Colors.indigo.shade800, fontWeight: FontWeight.bold)),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextFormField(
-                          initialValue: optEntry.value,
-                          decoration: const InputDecoration(
-                            isDense: true,
-                            contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                            border: OutlineInputBorder(),
-                          ),
-                          onChanged: (val) {
-                            q.options[optEntry.key] = val;
-                            _onQuestionsChanged();
-                          },
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close, size: 16, color: Colors.red),
-                        onPressed: () {
-                          setState(() {
-                            q.options.removeAt(optEntry.key);
-                            _onQuestionsChanged();
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  icon: const Icon(Icons.add, size: 16),
-                  label: const Text('Add Option'),
-                  onPressed: () {
-                    setState(() {
-                      final nextLabel = String.fromCharCode(65 + (q.options.length % 26));
-                      q.options.add('Option $nextLabel');
-                      _onQuestionsChanged();
-                    });
-                  },
+              // MCQ Options Editor
+              if (q.type == 'mcq') ...[
+                const SizedBox(height: 12),
+                Text(
+                  'Options (2 options per row in paper):',
+                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: textSecondary),
                 ),
-              ),
-            ],
-
-            // Matching Columns Editor (Dynamic Pair Length)
-            if (q.type == 'matching') ...[
-              const SizedBox(height: 10),
-              const Text('Matching Column Pairs:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
-              const SizedBox(height: 4),
-              ...List.generate(
-                q.leftMatching.length > q.rightMatching.length ? q.leftMatching.length : q.rightMatching.length,
-                (idx) {
-                  final leftVal = idx < q.leftMatching.length ? q.leftMatching[idx] : '';
-                  final rightVal = idx < q.rightMatching.length ? q.rightMatching[idx] : '';
-                  final rightLabel = String.fromCharCode(97 + (idx % 26));
-
+                const SizedBox(height: 6),
+                ...q.options.asMap().entries.map((optEntry) {
+                  final labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+                  final label = optEntry.key < labels.length ? labels[optEntry.key] : '${optEntry.key + 1}';
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 3),
                     child: Row(
                       children: [
-                        Text('${idx + 1}. ', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                        Expanded(
-                          child: TextFormField(
-                            initialValue: leftVal,
-                            decoration: const InputDecoration(hintText: 'Left item', isDense: true, border: OutlineInputBorder()),
-                            onChanged: (val) {
-                              while (q.leftMatching.length <= idx) q.leftMatching.add('');
-                              q.leftMatching[idx] = val;
-                              _onQuestionsChanged();
-                            },
+                        Container(
+                          width: 26,
+                          height: 26,
+                          decoration: BoxDecoration(
+                            color: isDark ? TsColors.amber900.withValues(alpha: 0.3) : TsColors.accentSoft,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: isDark ? TsColors.amber800 : TsColors.accentBorder,
+                              width: 1.2,
+                            ),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            label,
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: isDark ? TsColors.amber300 : TsColors.accent,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 6),
-                          child: Text('$rightLabel.', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.indigo)),
-                        ),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: TextFormField(
-                            initialValue: rightVal,
-                            decoration: const InputDecoration(hintText: 'Right item', isDense: true, border: OutlineInputBorder()),
+                            initialValue: optEntry.value,
+                            style: TextStyle(color: textPrimary, fontSize: 13, fontWeight: FontWeight.w500),
+                            decoration: InputDecoration(
+                              isDense: true,
+                              filled: true,
+                              fillColor: isDark ? AppColors.darkSurfaceCanvas : Colors.white,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide(color: borderCol),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide(color: borderCol),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(color: TsColors.accent, width: 1.5),
+                              ),
+                            ),
                             onChanged: (val) {
-                              while (q.rightMatching.length <= idx) q.rightMatching.add('');
-                              q.rightMatching[idx] = val;
+                              q.options[optEntry.key] = val;
                               _onQuestionsChanged();
                             },
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                          icon: const Icon(Icons.close_rounded, size: 18, color: AppColors.danger500),
                           onPressed: () {
                             setState(() {
-                              if (idx < q.leftMatching.length) q.leftMatching.removeAt(idx);
-                              if (idx < q.rightMatching.length) q.rightMatching.removeAt(idx);
+                              q.options.removeAt(optEntry.key);
                               _onQuestionsChanged();
                             });
                           },
@@ -2629,31 +2877,134 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
                       ],
                     ),
                   );
-                },
-              ),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  icon: const Icon(Icons.add, size: 16),
-                  label: const Text('Add Pair'),
-                  onPressed: () {
-                    setState(() {
-                      final nextNum = q.leftMatching.length + 1;
-                      final nextChar = String.fromCharCode(65 + (q.rightMatching.length % 26));
-                      q.leftMatching.add('Item $nextNum');
-                      q.rightMatching.add('Matching $nextChar');
-                      _onQuestionsChanged();
-                    });
+                }).toList(),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text('Add Option', style: TextStyle(fontWeight: FontWeight.w800)),
+                    style: TextButton.styleFrom(foregroundColor: TsColors.accent),
+                    onPressed: () {
+                      setState(() {
+                        final nextLabel = String.fromCharCode(65 + (q.options.length % 26));
+                        q.options.add('Option $nextLabel');
+                        _onQuestionsChanged();
+                      });
+                    },
+                  ),
+                ),
+              ],
+
+              // Matching Columns Editor
+              if (q.type == 'matching') ...[
+                const SizedBox(height: 12),
+                Text(
+                  'Matching Column Pairs:',
+                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: textSecondary),
+                ),
+                const SizedBox(height: 6),
+                ...List.generate(
+                  q.leftMatching.length > q.rightMatching.length ? q.leftMatching.length : q.rightMatching.length,
+                  (idx) {
+                    final leftVal = idx < q.leftMatching.length ? q.leftMatching[idx] : '';
+                    final rightVal = idx < q.rightMatching.length ? q.rightMatching[idx] : '';
+                    final rightLabel = String.fromCharCode(97 + (idx % 26));
+
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 3),
+                      child: Row(
+                        children: [
+                          Text('${idx + 1}. ', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: textPrimary)),
+                          Expanded(
+                            child: TextFormField(
+                              initialValue: leftVal,
+                              style: TextStyle(color: textPrimary, fontSize: 13),
+                              decoration: InputDecoration(
+                                hintText: 'Left item',
+                                hintStyle: TextStyle(color: isDark ? AppColors.darkTextMuted : AppColors.textMuted, fontSize: 12),
+                                isDense: true,
+                                filled: true,
+                                fillColor: isDark ? AppColors.darkSurfaceCanvas : Colors.white,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: borderCol)),
+                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: borderCol)),
+                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: TsColors.accent, width: 1.5)),
+                              ),
+                              onChanged: (val) {
+                                while (q.leftMatching.length <= idx) q.leftMatching.add('');
+                                q.leftMatching[idx] = val;
+                                _onQuestionsChanged();
+                              },
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                            child: Text(
+                              '$rightLabel.',
+                              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: isDark ? TsColors.amber300 : TsColors.accent),
+                            ),
+                          ),
+                          Expanded(
+                            child: TextFormField(
+                              initialValue: rightVal,
+                              style: TextStyle(color: textPrimary, fontSize: 13),
+                              decoration: InputDecoration(
+                                hintText: 'Right item',
+                                hintStyle: TextStyle(color: isDark ? AppColors.darkTextMuted : AppColors.textMuted, fontSize: 12),
+                                isDense: true,
+                                filled: true,
+                                fillColor: isDark ? AppColors.darkSurfaceCanvas : Colors.white,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: borderCol)),
+                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: borderCol)),
+                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: TsColors.accent, width: 1.5)),
+                              ),
+                              onChanged: (val) {
+                                while (q.rightMatching.length <= idx) q.rightMatching.add('');
+                                q.rightMatching[idx] = val;
+                                _onQuestionsChanged();
+                              },
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded, size: 18, color: AppColors.danger500),
+                            onPressed: () {
+                              setState(() {
+                                if (idx < q.leftMatching.length) q.leftMatching.removeAt(idx);
+                                if (idx < q.rightMatching.length) q.rightMatching.removeAt(idx);
+                                _onQuestionsChanged();
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    );
                   },
                 ),
-              ),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text('Add Pair', style: TextStyle(fontWeight: FontWeight.w800)),
+                    style: TextButton.styleFrom(foregroundColor: TsColors.accent),
+                    onPressed: () {
+                      setState(() {
+                        final nextNum = q.leftMatching.length + 1;
+                        final nextChar = String.fromCharCode(65 + (q.rightMatching.length % 26));
+                        q.leftMatching.add('Item $nextNum');
+                        q.rightMatching.add('Matching $nextChar');
+                        _onQuestionsChanged();
+                      });
+                    },
+                  ),
+                ),
+              ],
             ],
           ],
-        ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildMediaAndVisualElementsSection(QuestionBlock q) {
     if (q.visualElements.isEmpty) return const SizedBox.shrink();
@@ -2696,8 +3047,8 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
   }
 
   Widget _buildInteractiveVisualElementTile(QuestionBlock q, VisualElement ve, int idx) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final isSelected = (_selectedVisualElementId == ve.id);
-    final isResizing = (_resizingVisualElementId == ve.id);
     final isImage = (ve.type == 'image');
 
     final aspectFactor = 0.75;
@@ -2744,14 +3095,14 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
                 color: Colors.white,
                 border: Border.all(
                   color: isSelected
-                      ? Colors.deepPurple
-                      : (isImage ? Colors.amber.shade400 : Colors.deepPurple.shade200),
-                  width: isSelected ? 2.5 : 1.0,
+                      ? (isDark ? TsColors.amber400 : TsColors.accent)
+                      : (isDark ? TsColors.darkBorder : TsColors.border),
+                  width: isSelected ? 2.5 : 1.2,
                 ),
                 borderRadius: BorderRadius.circular(10),
                 boxShadow: isSelected
-                    ? [BoxShadow(color: Colors.deepPurple.withOpacity(0.25), blurRadius: 8, offset: const Offset(0, 2))]
-                    : [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 4, offset: const Offset(0, 1))],
+                    ? [BoxShadow(color: TsColors.accent.withValues(alpha: isDark ? 0.35 : 0.22), blurRadius: 8, offset: const Offset(0, 2))]
+                    : [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 4, offset: const Offset(0, 1))],
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -2770,7 +3121,7 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: Colors.deepPurple.shade900,
+                      color: TsColors.ink,
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
                     ),
@@ -2803,7 +3154,7 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
                       child: Container(
                         padding: const EdgeInsets.all(4),
                         decoration: const BoxDecoration(
-                          color: Colors.red,
+                          color: AppColors.danger600,
                           shape: BoxShape.circle,
                           boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4)],
                         ),
@@ -2828,10 +3179,11 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
                       child: Center(
                         child: Container(
                           padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                            color: Colors.deepPurple,
+                          decoration: BoxDecoration(
+                            color: TsColors.ink,
                             shape: BoxShape.circle,
-                            boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4)],
+                            border: Border.all(color: isDark ? TsColors.amber300 : TsColors.accentBorder, width: 1.2),
+                            boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
                           ),
                           child: const Icon(Icons.edit_rounded, size: 14, color: Colors.white),
                         ),
@@ -2887,7 +3239,7 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
                         height: 42,
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
-                          color: Colors.deepPurple.shade800,
+                          color: isDark ? TsColors.accent : TsColors.ink,
                           shape: BoxShape.circle,
                           boxShadow: const [
                             BoxShadow(color: Colors.black45, blurRadius: 6, offset: Offset(0, 2)),

@@ -53,6 +53,8 @@ import 'package:school_hub/screens/fee_reminder_screen.dart';
 import 'package:school_hub/services/fee_reminder_service.dart';
 import 'package:school_hub/screens/manage_discount_screen.dart';
 import 'package:school_hub/services/fee_service.dart';
+import 'package:school_hub/screens/test_series_classes_screen.dart';
+import 'package:school_hub/screens/test_series_screen.dart';
 
 class LauncherFeature {
   final String name;
@@ -138,6 +140,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _unreadFeesCount = 0;
   int _unreadHomeworkCount = 0;
   int _unreadAchievementsCount = 0;
+  int _unreadTestSeriesCount = 0;
   DateTime? _lastBackPressTime;
   
   final TextEditingController _searchController = TextEditingController();
@@ -173,7 +176,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       isAvailable: true,
     ),
     LauncherFeature(
-      name: 'Salary',
+      name: 'Salary Card',
       icon: Icons.currency_rupee_rounded,
       color: Colors.teal,
       allowedRoles: ['TEACHER', 'PRINCIPAL'],
@@ -197,6 +200,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       name: 'Examinations',
       icon: Icons.assignment_turned_in_rounded,
       color: Colors.red,
+      allowedRoles: ['PARENT', 'TEACHER', 'PRINCIPAL', 'STUDENT'],
+      isAvailable: true,
+    ),
+    LauncherFeature(
+      name: 'Test Series',
+      icon: Icons.quiz_rounded,
+      color: const Color(0xFF4F46E5),
       allowedRoles: ['PARENT', 'TEACHER', 'PRINCIPAL', 'STUDENT'],
       isAvailable: true,
     ),
@@ -425,6 +435,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             _unreadFeesCount = 0;
             _unreadHomeworkCount = 0;
             _unreadAchievementsCount = 0;
+            _unreadTestSeriesCount = 0;
           }
           _activeStudentId = savedId;
         }
@@ -709,6 +720,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               linkStr.contains('homework')) {
             return 'homework';
           }
+          if (evtStr.contains('TEST_SERIES') ||
+              linkStr.contains('test-series')) {
+            return 'test_series';
+          }
           if (catStr == 'EXAM' ||
               evtStr.contains('EXAM') ||
               linkStr.contains('/exam')) {
@@ -867,6 +882,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               titleStr.contains('homework');
         }
 
+        bool isTestSeriesNotif(dynamic n) {
+          final canon = canonicalModuleOf(n);
+          if (canon != null) return canon == 'test_series';
+          final linkStr = (n['link'] ?? '').toString().toLowerCase();
+          final titleStr = (n['title'] ?? '').toString().toLowerCase();
+          return linkStr.contains('test-series') ||
+              titleStr.contains('test series');
+        }
+
         bool isAchievementsNotif(dynamic n) {
           final canon = canonicalModuleOf(n);
           if (canon != null) return canon == 'achievements';
@@ -916,6 +940,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         int feesCount = !isSchoolStaff ? data.where((n) => isUnread(n) && isFeesCardNotif(n)).length : 0;
         int homeworkCount = !isSchoolStaff ? data.where((n) => isUnread(n) && isHomeworkNotif(n)).length : 0;
         int achievementsCount = data.where((n) => isUnread(n) && isAchievementsNotif(n)).length;
+        int testSeriesCount = !isSchoolStaff ? data.where((n) => isUnread(n) && isTestSeriesNotif(n)).length : 0;
 
         if (mounted && fetchSeq == _notificationsFetchSeq) {
           setState(() {
@@ -931,6 +956,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             _unreadFeesCount = feesCount;
             _unreadHomeworkCount = homeworkCount;
             _unreadAchievementsCount = achievementsCount;
+            _unreadTestSeriesCount = testSeriesCount;
           });
         }
 
@@ -1428,6 +1454,50 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     await _fetchUnreadNotificationsCount();
                   }
                 });
+              } else if (eventKey == 'TEST_SERIES_PUBLISHED' || linkLower.contains('test-series') || titleLower.contains('test series') || msgLower.contains('test series')) {
+                if (mounted) {
+                  setState(() {
+                    _unreadTestSeriesCount = 0;
+                  });
+                }
+                final Future<void> markFuture = _markFeatureNotificationsRead('test_series');
+                final prefs = await SharedPreferences.getInstance();
+                final token = prefs.getString('auth_token') ?? widget.leaveService.token;
+                final baseUrl = widget.leaveService.baseUrl.isNotEmpty
+                    ? widget.leaveService.baseUrl
+                    : resolveBaseUrlFrom(prefs);
+                if (!mounted) return;
+                final isStaffRole = widget.userRole.toUpperCase() == 'TEACHER' ||
+                    widget.userRole.toUpperCase() == 'PRINCIPAL';
+                Navigator.of(this.context).push(
+                  MaterialPageRoute(
+                    builder: (_) => isStaffRole
+                        ? TestSeriesClassesScreen(
+                            baseUrl: baseUrl,
+                            token: token,
+                            userRole: widget.userRole,
+                            isPrincipal: _isPrincipal,
+                          )
+                        : TestSeriesScreen(
+                            baseUrl: baseUrl,
+                            token: token,
+                            userRole: widget.userRole,
+                            studentId: _activeStudentId,
+                            isPrincipal: _isPrincipal,
+                          ),
+                  ),
+                ).then((_) async {
+                  if (mounted) {
+                    setState(() {
+                      _unreadTestSeriesCount = 0;
+                    });
+                  }
+                  await markFuture;
+                  await _markFeatureNotificationsRead('test_series');
+                  if (mounted) {
+                    await _fetchUnreadNotificationsCount();
+                  }
+                });
               } else if (titleLower.contains('achievement') || msgLower.contains('achievement')) {
                 if (mounted) {
                   setState(() {
@@ -1735,9 +1805,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         'Timetable',
         'Homework',
         'Examinations',
+        'Test Series',
         'Leaves',
         'Notifications',
-        'Salary',
+        'Salary Card',
         'Class Assignment',
         'Outstanding',
         'Classes',
@@ -1752,8 +1823,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       };
       final List<LauncherFeature> teacherFeatures = [];
       for (final name in teacherOrderedFeatureNames) {
-        if (!featureMap.containsKey(name)) continue;
-        final f = featureMap[name]!;
+        final lookupName = (name == 'Salary' && !featureMap.containsKey('Salary'))
+            ? 'Salary Card'
+            : ((name == 'Salary Card' && !featureMap.containsKey('Salary Card'))
+                ? 'Salary'
+                : name);
+        if (!featureMap.containsKey(lookupName)) continue;
+        final f = featureMap[lookupName]!;
 
         // Permission check
         if (f.name == 'TAR') {
@@ -1836,6 +1912,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _unreadFeesCount = 0;
       _unreadHomeworkCount = 0;
       _unreadAchievementsCount = 0;
+      _unreadTestSeriesCount = 0;
     });
     await _resolveActiveStudentName();
 
@@ -1951,6 +2028,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 _unreadFeesCount = 0;
                 _unreadHomeworkCount = 0;
                 _unreadAchievementsCount = 0;
+                _unreadTestSeriesCount = 0;
               });
             }
             await _resolveActiveStudentName();
@@ -2166,7 +2244,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
         );
-      } else if (feature.name == 'Salary' || feature.name == 'Staff Salary' || feature.name == 'Salaries') {
+      } else if (feature.name == 'Salary' || feature.name == 'Salary Card' || feature.name == 'Staff Salary' || feature.name == 'Salaries') {
         if (mounted) {
           setState(() {
             _unreadSalaryCount = 0;
@@ -2253,6 +2331,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               _unreadTimetableCount = 0;
               _unreadExamsCount = 0;
               _unreadAchievementsCount = 0;
+              _unreadTestSeriesCount = 0;
             } else {
               _unreadLeaveCount = 0;
               _unreadTimetableCount = 0;
@@ -2394,6 +2473,54 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         await _markFeatureNotificationsRead('exams');
         if (mounted) {
           await _fetchUnreadNotificationsCount();
+        }
+      } else if (feature.name == 'Test Series') {
+        final roleUpper = widget.userRole.toUpperCase();
+        final bool isStudentOrParent = roleUpper == 'PARENT' || roleUpper == 'STUDENT';
+        Future<void>? markFuture;
+        if (isStudentOrParent) {
+          if (mounted) {
+            setState(() {
+              _unreadTestSeriesCount = 0;
+            });
+          }
+          markFuture = _markFeatureNotificationsRead('test_series');
+        }
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('auth_token') ?? widget.leaveService.token;
+        final baseUrl = widget.leaveService.baseUrl.isNotEmpty
+            ? widget.leaveService.baseUrl
+            : resolveBaseUrlFrom(prefs);
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => isStudentOrParent
+                ? TestSeriesScreen(
+                    baseUrl: baseUrl,
+                    token: token,
+                    userRole: widget.userRole,
+                    studentId: _activeStudentId,
+                    isPrincipal: _isPrincipal,
+                  )
+                : TestSeriesClassesScreen(
+                    baseUrl: baseUrl,
+                    token: token,
+                    userRole: widget.userRole,
+                    isPrincipal: _isPrincipal,
+                  ),
+          ),
+        );
+        if (isStudentOrParent) {
+          if (mounted) {
+            setState(() {
+              _unreadTestSeriesCount = 0;
+            });
+          }
+          if (markFuture != null) await markFuture;
+          await _markFeatureNotificationsRead('test_series');
+          if (mounted) {
+            await _fetchUnreadNotificationsCount();
+          }
         }
       } else if (feature.name == 'Achievements') {
         if (mounted) {
@@ -3046,13 +3173,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           final bool isNotification = feature.name == 'Notifications' || feature.name == 'Messages';
                           final bool isLeaves = feature.name == 'Leaves' || feature.name == 'Leave';
                           final bool isTimetable = feature.name == 'Timetable' || feature.name == 'Time Table';
-                          final bool isSalary = feature.name == 'Salary' || feature.name == 'Staff Salary' || feature.name == 'Salaries';
+                          final bool isSalary = feature.name == 'Salary' || feature.name == 'Salary Card' || feature.name == 'Staff Salary' || feature.name == 'Salaries';
                           final bool isExams = feature.name == 'Examinations' || feature.name == 'Exams' || feature.name == 'Exam';
                           final bool isExpense = feature.name == 'Expense' || feature.name == 'Expenses';
                           final bool isFinancialReport = feature.name == 'Financial Report' || feature.name == 'Financial report' || feature.name == 'Revenue';
                           final bool isAttendance = feature.name == 'Attendance';
                           final bool isFeesCard = feature.name == 'Fees Card';
                           final bool isHomework = feature.name == 'Homework';
+                          final bool isTestSeries = feature.name == 'Test Series';
                           final bool isAchievements = feature.name == 'Achievements';
                           final bool isFeeReminder = feature.name == 'Fee Reminder';
                           final bool isManageDiscount = feature.name == 'Manage Discount';
@@ -3071,6 +3199,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             badgeCount = _unreadFeesCount;
                           } else if (isHomework) {
                             badgeCount = _unreadHomeworkCount;
+                          } else if (isTestSeries) {
+                            badgeCount = _unreadTestSeriesCount;
                           } else if (isTimetable) {
                             badgeCount = _unreadTimetableCount;
                           } else if (isSalary) {

@@ -129,6 +129,14 @@ final class NotificationCatalog
             'link'     => '/timetable',
             'label'    => 'You were assigned as a substitute teacher',
         ],
+        'TEST_SERIES_PUBLISHED' => [
+            'category' => self::CAT_ACADEMIC,
+            'delivery' => self::DELIVERY_PUSH,
+            'audience' => ['STUDENT', 'PARENT'],
+            'priority' => 'high',
+            'link'     => '/test-series',
+            'label'    => 'A new class Test Series was published',
+        ],
 
         // ---------------- EXAM ----------------
         'EXAM_SCHEDULED' => [

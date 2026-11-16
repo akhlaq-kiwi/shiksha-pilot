@@ -2560,6 +2560,8 @@ class TeacherService extends BaseService
                     $query .= " AND (event_key LIKE '%ACHIEVEMENT%' OR category = 'ACHIEVEMENT' OR link LIKE '%achievement%' OR LOWER(COALESCE(title, '')) LIKE '%achievement%' OR LOWER(COALESCE(title, '')) LIKE '%certificate%' OR LOWER(COALESCE(title, '')) LIKE '%champion%' OR LOWER(COALESCE(title, '')) LIKE '%topper%')";
                 } elseif ($module === 'homework' || $module === 'assignments') {
                     $query .= " AND (event_key LIKE '%HOMEWORK%' OR category = 'HOMEWORK' OR link LIKE '%homework%' OR LOWER(COALESCE(title, '')) LIKE '%homework%')";
+                } elseif ($module === 'test_series' || $module === 'test-series') {
+                    $query .= " AND (event_key LIKE '%TEST_SERIES%' OR link LIKE '%test-series%' OR LOWER(COALESCE(title, '')) LIKE '%test series%')";
                 } elseif ($module === 'attendance') {
                     $query .= " AND (COALESCE(event_key, '') != 'LATE_TEACHERS_ALERT' AND (link IS NULL OR (link NOT LIKE '%teacher-attendance%' AND link NOT LIKE '%/tar%')) AND (event_key = 'ATTENDANCE_MARKED_ABSENT' OR category = 'ATTENDANCE' OR link LIKE '%attendance%' OR LOWER(COALESCE(title, '')) LIKE '%absent%' OR LOWER(COALESCE(title, '')) LIKE '%attendance%'))";
                 } elseif ($module === 'fees_portal' || $module === 'fees-portal' || $module === 'discount' || $module === 'discount_request' || $module === 'manage_discount') {

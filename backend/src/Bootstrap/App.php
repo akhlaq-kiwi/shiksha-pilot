@@ -49,6 +49,8 @@ use App\Domain\Teacher\Services\TeacherService;
 use App\Domain\Teacher\Controllers\TeacherController;
 use App\Domain\Teacher\Services\HomeworkService;
 use App\Domain\Teacher\Controllers\HomeworkController;
+use App\Domain\TestSeries\Services\TestSeriesService;
+use App\Domain\TestSeries\Controllers\TestSeriesController;
 
 // ── Domain: Student ───────────────────────────────────────────────────────────
 use App\Domain\Student\Repositories\StudentDataRepository;
@@ -369,6 +371,21 @@ class App
                 return new HomeworkController(
                     $c->get(TokenService::class),
                     $c->get(HomeworkService::class),
+                );
+            },
+
+            // ── Test Series ───────────────────────────────────────────────────
+            TestSeriesService::class => function ($c) {
+                return new TestSeriesService(
+                    $c->get(Connection::class)->getPdo(),
+                    $c->get(StorageService::class),
+                );
+            },
+
+            TestSeriesController::class => function ($c) {
+                return new TestSeriesController(
+                    $c->get(TokenService::class),
+                    $c->get(TestSeriesService::class),
                 );
             },
 

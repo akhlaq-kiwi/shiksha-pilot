@@ -1957,6 +1957,12 @@ class StudentService extends BaseService
                 'params' => [],
             ];
         }
+        if ($module === 'test_series' || $module === 'test-series') {
+            return [
+                'sql' => "({$p}event_key LIKE '%TEST_SERIES%' OR {$p}link LIKE '%test-series%' OR LOWER(COALESCE({$p}title, '')) LIKE '%test series%')",
+                'params' => [],
+            ];
+        }
         if ($module === 'achievements' || $module === 'achievement') {
             return [
                 'sql' => "({$p}event_key LIKE '%ACHIEVEMENT%' OR {$p}category = 'ACHIEVEMENT' OR ({$notExam} AND {$notTimetable} AND {$notHomework} AND {$notLeave} AND {$notAttendance} AND {$notFees} AND ({$p}link LIKE '%achievement%' OR LOWER(COALESCE({$p}title, '')) LIKE '%achievement%' OR LOWER(COALESCE({$p}title, '')) LIKE '%certificate%' OR LOWER(COALESCE({$p}title, '')) LIKE '%champion%' OR LOWER(COALESCE({$p}title, '')) LIKE '%topper%')))",

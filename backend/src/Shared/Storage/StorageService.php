@@ -32,6 +32,7 @@ class StorageService
     public const CATEGORY_STUDENT_DOCS  = 'student-documents';
     public const CATEGORY_STAFF_DOCS    = 'staff-documents';
     public const CATEGORY_FINANCE       = 'finance';
+    public const CATEGORY_TEST_SERIES   = 'test-series';
 
     public const CATEGORIES = [
         self::CATEGORY_DOCUMENTS,
@@ -44,6 +45,7 @@ class StorageService
         self::CATEGORY_STUDENT_DOCS,
         self::CATEGORY_STAFF_DOCS,
         self::CATEGORY_FINANCE,
+        self::CATEGORY_TEST_SERIES,
     ];
 
     private string $driver;

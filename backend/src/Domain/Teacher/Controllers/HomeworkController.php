@@ -123,7 +123,7 @@ class HomeworkController extends BaseController
         $dirs = [];
         foreach ($roots as $root) {
             $dirs[] = $root;
-            foreach (['homework', 'documents', 'leave-attachments', 'school-logos', 'signatures'] as $category) {
+            foreach (['homework', 'documents', 'leave-attachments', 'school-logos', 'signatures', 'test-series'] as $category) {
                 $dirs[] = $root . '/' . $category;
             }
         }
