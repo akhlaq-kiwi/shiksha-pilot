@@ -702,10 +702,29 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                                     Navigator.pop(context);
                                   }
 
-                                  final targetExam = exams.firstWhere(
-                                    (e) => e['name'].toString().trim().toLowerCase() == notif['title'].toString().trim().toLowerCase(),
-                                    orElse: () => null,
-                                  );
+                                  dynamic targetExam;
+                                  final cleanNotifTitle = notif['title']
+                                      .toString()
+                                      .replaceAll(RegExp(r'\s*-\s*(Exam Scheme|Admit Card|Report Card|Exam Scheme Update|Admit Card Update).*$', caseSensitive: false), '')
+                                      .trim()
+                                      .toLowerCase();
+
+                                  for (final e in exams) {
+                                    final eName = (e['name'] ?? '').toString().trim().toLowerCase();
+                                    if (eName == cleanNotifTitle || cleanNotifTitle.contains(eName) || (eName.isNotEmpty && cleanNotifTitle.startsWith(eName))) {
+                                      targetExam = e;
+                                      break;
+                                    }
+                                    final subTests = (e['sub_tests'] as List<dynamic>?) ?? [];
+                                    for (final st in subTests) {
+                                      final stName = (st['name'] ?? '').toString().trim().toLowerCase();
+                                      if (stName == cleanNotifTitle || cleanNotifTitle.contains(stName) || (stName.isNotEmpty && cleanNotifTitle.startsWith(stName))) {
+                                        targetExam = st;
+                                        break;
+                                      }
+                                    }
+                                    if (targetExam != null) break;
+                                  }
 
                                   if (context.mounted) {
                                     if (targetExam != null) {

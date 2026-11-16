@@ -2655,9 +2655,12 @@ class StudentService extends BaseService
             $stmtTerm->execute($paramsTerm);
             $termExams = $stmtTerm->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-            // Fetch all PUBLISHED sub-tests under these terms for this school & class
+            // Fetch all PUBLISHED sub-tests under these terms for this school & class (or tests with published scheme/admit-card)
             $sqlSubs = "
-                SELECT e.id, e.parent_id, e.name, e.start_date, e.end_date, e.max_marks, e.status AS exam_status,
+                SELECT e.id, e.parent_id, e.name, 
+                       COALESCE(e.start_date, (SELECT MIN(ep.exam_date) FROM examination_papers ep WHERE ep.exam_id = e.id AND (ep.class_id = :class_id_ep_s OR ep.class_id IS NULL OR ep.class_id = 0))) AS start_date,
+                       COALESCE(e.end_date, (SELECT MAX(ep.exam_date) FROM examination_papers ep WHERE ep.exam_id = e.id AND (ep.class_id = :class_id_ep_e OR ep.class_id IS NULL OR ep.class_id = 0))) AS end_date,
+                       e.max_marks, e.status AS exam_status,
                        COALESCE(ecs.scheme_published, 0) AS scheme_published,
                        COALESCE(ecs.admit_card_published, 0) AS admit_card_published,
                        COALESCE(ecs.status, 'Draft') AS result_status
@@ -2666,7 +2669,12 @@ class StudentService extends BaseService
                 LEFT JOIN examinations p ON e.parent_id = p.id
                 WHERE e.school_id = :school_id 
                   AND e.parent_id IS NOT NULL
-                  AND e.status = 'Published'
+                  AND (
+                    e.status = 'Published'
+                    OR COALESCE(ecs.scheme_published, 0) = 1
+                    OR COALESCE(ecs.admit_card_published, 0) = 1
+                    OR ecs.status = 'Published'
+                  )
                   AND (
                     (e.start_date IS NOT NULL AND e.start_date != '' AND e.start_date != '0000-00-00')
                     OR (SELECT COUNT(*) FROM examination_papers ep WHERE ep.exam_id = e.id AND (ep.class_id = :class_id_ep OR ep.class_id IS NULL OR ep.class_id = 0)) > 0
@@ -2676,6 +2684,8 @@ class StudentService extends BaseService
             $paramsSubs = [
                 ':class_id' => $classId,
                 ':class_id_ep' => $classId,
+                ':class_id_ep_s' => $classId,
+                ':class_id_ep_e' => $classId,
                 ':school_id' => $schoolId
             ];
             if ($academicYearId > 0) {
@@ -2730,7 +2740,9 @@ class StudentService extends BaseService
 
         // Modern School Report (or default flat template flow):
         $sql = "
-            SELECT DISTINCT e.id, e.name, e.start_date, e.end_date,
+            SELECT DISTINCT e.id, e.name, 
+                   COALESCE(e.start_date, (SELECT MIN(ep.exam_date) FROM examination_papers ep WHERE ep.exam_id = e.id AND (ep.class_id = :class_id_ep_s OR ep.class_id IS NULL OR ep.class_id = 0))) AS start_date,
+                   COALESCE(e.end_date, (SELECT MAX(ep.exam_date) FROM examination_papers ep WHERE ep.exam_id = e.id AND (ep.class_id = :class_id_ep_e OR ep.class_id IS NULL OR ep.class_id = 0))) AS end_date,
                    COALESCE(ecs.scheme_published, 0) AS scheme_published,
                    COALESCE(ecs.admit_card_published, 0) AS admit_card_published,
                    COALESCE(ecs.status, 'Draft') AS result_status,
@@ -2738,12 +2750,19 @@ class StudentService extends BaseService
             FROM examinations e
             LEFT JOIN examination_class_status ecs ON e.id = ecs.exam_id AND ecs.class_id = :class_id
             WHERE e.school_id = :school_id 
-              AND e.status = 'Published'
+              AND (
+                e.status = 'Published'
+                OR COALESCE(ecs.scheme_published, 0) = 1
+                OR COALESCE(ecs.admit_card_published, 0) = 1
+                OR ecs.status = 'Published'
+              )
               AND e.parent_id IS NULL
               AND (e.template_code != 'cbse_classic' OR e.template_code IS NULL)
         ";
         $params = [
             ':class_id' => $classId,
+            ':class_id_ep_s' => $classId,
+            ':class_id_ep_e' => $classId,
             ':school_id' => $schoolId
         ];
 
@@ -2888,12 +2907,14 @@ class StudentService extends BaseService
 
         // Fetch Exam basic info
         $stmtExam = $pdo->prepare("
-            SELECT e.name, e.start_date, e.end_date 
+            SELECT e.name, 
+                   COALESCE(e.start_date, (SELECT MIN(ep.exam_date) FROM examination_papers ep WHERE ep.exam_id = e.id AND (ep.class_id = :class_id_s OR ep.class_id IS NULL OR ep.class_id = 0))) AS start_date,
+                   COALESCE(e.end_date, (SELECT MAX(ep.exam_date) FROM examination_papers ep WHERE ep.exam_id = e.id AND (ep.class_id = :class_id_e OR ep.class_id IS NULL OR ep.class_id = 0))) AS end_date
             FROM examinations e
             WHERE e.id = :id AND e.school_id = :sid
             LIMIT 1
         ");
-        $stmtExam->execute([':id' => $examId, ':sid' => $schoolId]);
+        $stmtExam->execute([':id' => $examId, ':sid' => $schoolId, ':class_id_s' => $classId, ':class_id_e' => $classId]);
         $exam = $stmtExam->fetch(PDO::FETCH_ASSOC);
         if (!$exam) {
             throw new NotFoundException('Examination not found.');
