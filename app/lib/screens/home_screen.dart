@@ -40,6 +40,7 @@ import 'package:school_hub/screens/teacher_salary_disbursement_screen.dart';
 import 'package:school_hub/screens/class_teacher_assignment_screen.dart';
 import 'package:school_hub/screens/expense_screen.dart';
 import 'package:school_hub/services/expense_service.dart';
+import 'package:school_hub/widgets/inactive_expense_dialog.dart';
 import 'package:school_hub/screens/teachers_screen.dart';
 import 'package:school_hub/services/teacher_management_service.dart';
 import 'package:school_hub/screens/classes_screen.dart';
@@ -2523,10 +2524,73 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         );
       } else if (feature.name == 'Expense') {
         final prefs = await SharedPreferences.getInstance();
+        String? ayStatus = prefs.getString('selected_academic_year_status');
+        String? ayName = prefs.getString('selected_academic_year_name');
+
         final token = prefs.getString('auth_token') ?? widget.leaveService.token;
         String effectiveBase = widget.leaveService.baseUrl;
         if (effectiveBase.isEmpty || effectiveBase.contains('10.22.6.71') || effectiveBase.contains('10.155.82.71')) {
           effectiveBase = resolveBaseUrlFrom(prefs);
+        }
+
+        // If status is not yet saved in prefs, fetch academic years to be certain
+        if (ayStatus == null || ayStatus.isEmpty) {
+          try {
+            final res = await http.get(
+              Uri.parse('$effectiveBase/api/school/academic-years'),
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer $token',
+              },
+            ).timeout(const Duration(seconds: 4));
+            if (res.statusCode == 200) {
+              final data = json.decode(res.body);
+              List<dynamic> years = [];
+              if (data is Map && data['academic_years'] != null) {
+                years = List<dynamic>.from(data['academic_years']);
+              } else if (data is Map && data['data'] != null) {
+                years = List<dynamic>.from(data['data']);
+              } else if (data is List) {
+                years = List<dynamic>.from(data);
+              }
+              final savedAyId = prefs.getInt('selected_academic_year_id');
+              dynamic matched;
+              if (savedAyId != null) {
+                matched = years.firstWhere(
+                  (y) => (y['id'] is int ? y['id'] : int.tryParse(y['id'].toString())) == savedAyId,
+                  orElse: () => null,
+                );
+              }
+              if (matched == null && years.isNotEmpty) {
+                matched = years.firstWhere(
+                  (y) => y['is_current'] == 1 || y['is_current'] == true || (y['status'] ?? '').toString().toUpperCase() == 'ACTIVE',
+                  orElse: () => years.first,
+                );
+              }
+              if (matched != null) {
+                ayName = matched['name']?.toString() ?? '';
+                ayStatus = (matched['status'] ?? (matched['is_current'] == 1 ? 'ACTIVE' : '')).toString();
+                final int? mid = matched['id'] is int ? matched['id'] : int.tryParse(matched['id'].toString());
+                if (mid != null) await prefs.setInt('selected_academic_year_id', mid);
+                if (ayName.isNotEmpty) await prefs.setString('selected_academic_year_name', ayName);
+                if (ayStatus.isNotEmpty) await prefs.setString('selected_academic_year_status', ayStatus);
+              }
+            }
+          } catch (_) {}
+        }
+
+        final bool isDraftOrArchived = ayStatus != null &&
+            (ayStatus.trim().toUpperCase() == 'DRAFT' || ayStatus.trim().toUpperCase() == 'ARCHIVED');
+
+        if (isDraftOrArchived) {
+          if (mounted) {
+            showInactiveExpenseDialog(
+              context,
+              sessionName: ayName,
+              sessionStatus: ayStatus,
+            );
+          }
+          return;
         }
 
         // Immediately clear badge count on tap and persist seen state on backend DB

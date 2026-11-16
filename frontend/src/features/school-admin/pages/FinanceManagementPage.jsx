@@ -748,6 +748,11 @@ export default function FinanceManagementPage() {
   }, [activeTab, lppSubView]);
 
   const { isReadOnly, isDraft, currentYear } = useAcademicYear();
+  const isInactiveAcademicYear = Boolean(
+    isDraft ||
+    isReadOnly ||
+    (currentYear && currentYear.status && currentYear.status.toUpperCase() !== 'ACTIVE')
+  );
 
   useEffect(() => {
     loadData();
@@ -962,6 +967,11 @@ export default function FinanceManagementPage() {
     setError('');
     setSuccess('');
     setActiveExpenseDropdownId(null);
+
+    if (isInactiveAcademicYear) {
+      setError('Operational expenses can only be recorded and managed in the active academic year.');
+      return;
+    }
 
     if (expenseToEdit) {
       if (expenseToEdit.is_locked) {
@@ -1459,46 +1469,58 @@ export default function FinanceManagementPage() {
           <div className="relative z-30 flex-shrink-0 bg-zinc-50/50 dark:bg-zinc-900/50 border border-border p-5 rounded-2xl shadow-2xs space-y-4">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border pb-4">
               <div>
-                <span className="text-[11px] text-text-muted font-bold uppercase tracking-wider">Total Expenses for Selected Month</span>
+                <span className="text-[11px] text-text-muted font-bold uppercase tracking-wider">
+                  {isInactiveAcademicYear ? 'Total Expenses' : 'Total Expenses for Selected Month'}
+                </span>
                 <p className="text-xl font-bold text-red-500 font-sans mt-0.5">{formatCurrency(filteredTotalExpensesAmount)}</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-              <div>
-                <Input aria-label="Search by Description..." 
-                  placeholder="Search by Description..." 
-                  value={expenseSearch} 
-                  onChange={e => setExpenseSearch(e.target.value)} 
-                  className="text-xs rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
-                />
+            {isInactiveAcademicYear ? (
+              <div className="flex items-start sm:items-center gap-3.5 p-4 bg-amber-500/10 border border-amber-500/20 text-amber-900 dark:text-amber-200 rounded-xl">
+                <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5 sm:mt-0" />
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300">
+                    Active Academic Year Required
+                  </h4>
+                  <p className="text-xs text-text-secondary mt-0.5 leading-relaxed">
+                    Operational expenses can only be recorded and managed in the active academic year. Please switch to the active academic year to add or manage expenses.
+                  </p>
+                </div>
               </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                <div>
+                  <Input aria-label="Search by Description..." 
+                    placeholder="Search by Description..." 
+                    value={expenseSearch} 
+                    onChange={e => setExpenseSearch(e.target.value)} 
+                    className="text-xs rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
+                  />
+                </div>
 
-              <div>
-                <CustomSelect 
-                  value={selectedMonth} 
-                  onChange={val => setSelectedMonth(val)}
-                  className="w-full"
-                  options={[
-                    { value: 'ALL', label: 'All Months' },
-                    ...ACADEMIC_MONTHS.map(m => ({ value: m, label: m }))
-                  ]}
-                />
-              </div>
+                <div>
+                  <CustomSelect 
+                    value={selectedMonth} 
+                    onChange={val => setSelectedMonth(val)}
+                    className="w-full"
+                    options={[
+                      { value: 'ALL', label: 'All Months' },
+                      ...ACADEMIC_MONTHS.map(m => ({ value: m, label: m }))
+                    ]}
+                  />
+                </div>
 
-              {!isReadOnly && (
                 <div className="flex justify-end">
                   <Button 
-                    disabled={isDraft || currentYear?.status === 'Draft'}
-                    title={isDraft || currentYear?.status === 'Draft' ? 'Expenses cannot be added under a Draft Academic Year.' : ''}
-                    className="w-full md:w-auto font-bold uppercase tracking-wider text-xs flex items-center justify-center gap-1.5 shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full md:w-auto font-bold uppercase tracking-wider text-xs flex items-center justify-center gap-1.5 shadow-2xs"
                     onClick={() => handleExpenseModalOpen(null)}
                   >
                     <Plus className="h-4 w-4" /> Add Expense
                   </Button>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           {/* Table Listing Area */}
@@ -1510,7 +1532,9 @@ export default function FinanceManagementPage() {
             >
               {expenses.length === 0 ? (
                 <div className="p-12 text-center text-text-muted text-xs font-bold leading-relaxed">
-                  No expense entries logged.
+                  {isInactiveAcademicYear
+                    ? 'Operational expenses cannot be recorded or managed in an inactive academic year. Switch to the active academic year to manage expenses.'
+                    : 'No expense entries logged.'}
                 </div>
               ) : (
                 <>
@@ -1578,10 +1602,11 @@ export default function FinanceManagementPage() {
                                 }}
                                 className="w-32 bg-surface border border-border shadow-md rounded-xl py-1.5 z-[9999] text-left text-xs text-text-primary animate-in fade-in duration-100"
                               >
-                                {isReadOnly || e.is_locked ? (
+                                {isReadOnly || isDraft || isInactiveAcademicYear || e.is_locked ? (
                                   <div className="px-3 py-1.5 text-text-muted font-bold italic flex flex-col">
                                     <span className="text-[11px] uppercase tracking-wider text-amber-600 flex items-center gap-0.5"><AlertTriangle className="h-3 w-3" /> Locked</span>
                                     {isReadOnly && <span className="text-[8px] text-text-muted mt-0.5">Archived Year</span>}
+                                    {isDraft && <span className="text-[8px] text-text-muted mt-0.5">Draft Year</span>}
                                   </div>
                                 ) : (
                                   <>

@@ -7,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:school_hub/services/http_service.dart' as http;
 import 'package:school_hub/services/expense_service.dart';
 import 'package:school_hub/screens/full_screen_image_screen.dart';
+import 'package:school_hub/widgets/inactive_expense_dialog.dart';
 
 class ExpenseScreen extends StatefulWidget {
   final String baseUrl;
@@ -32,6 +33,12 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
   bool _approvalRequired = false;
   bool _isUpdatingToggle = false;
   int? _currentUserId;
+  String _workingAyStatus = 'ACTIVE';
+  String _workingAyName = '';
+
+  bool get _isInactiveAy =>
+      _workingAyStatus.trim().toUpperCase() == 'DRAFT' ||
+      _workingAyStatus.trim().toUpperCase() == 'ARCHIVED';
 
   int? _extractUserIdFromToken(String token) {
     try {
@@ -117,6 +124,18 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
       final prefs = await SharedPreferences.getInstance();
       final role = (prefs.getString('user_role') ?? widget.userRole ?? '').toUpperCase();
       _currentUserId = prefs.getInt('user_id') ?? _extractUserIdFromToken(widget.token);
+      final savedStatus = prefs.getString('selected_academic_year_status');
+      final savedName = prefs.getString('selected_academic_year_name');
+      if (mounted) {
+        setState(() {
+          if (savedStatus != null && savedStatus.isNotEmpty) {
+            _workingAyStatus = savedStatus;
+          }
+          if (savedName != null && savedName.isNotEmpty) {
+            _workingAyName = savedName;
+          }
+        });
+      }
       if (role == 'SCHOOL_ADMIN') {
         if (mounted) setState(() => _isSchoolAdmin = true);
         _loadSettings();
@@ -633,6 +652,14 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
   }
 
   void _openAddExpenseModal() {
+    if (_isInactiveAy) {
+      showInactiveExpenseDialog(
+        context,
+        sessionName: _workingAyName,
+        sessionStatus: _workingAyStatus,
+      );
+      return;
+    }
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -788,21 +815,23 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: const Color(0xFFD97706),
-        foregroundColor: Colors.white,
-        elevation: 3,
-        icon: const Icon(Icons.add_rounded, size: 22),
-        label: const Text(
-          'ADD EXPENSE',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            letterSpacing: 0.5,
-            fontSize: 13,
-          ),
-        ),
-        onPressed: _openAddExpenseModal,
-      ),
+      floatingActionButton: _isInactiveAy
+          ? null
+          : FloatingActionButton.extended(
+              backgroundColor: const Color(0xFFD97706),
+              foregroundColor: Colors.white,
+              elevation: 3,
+              icon: const Icon(Icons.add_rounded, size: 22),
+              label: const Text(
+                'ADD EXPENSE',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                  fontSize: 13,
+                ),
+              ),
+              onPressed: _openAddExpenseModal,
+            ),
       body: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
         behavior: HitTestBehavior.opaque,
@@ -815,6 +844,43 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
           },
           child: Column(
             children: [
+              if (_isInactiveAy)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  margin: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? const Color(0xFF78350F).withOpacity(0.3)
+                        : const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? const Color(0xFFD97706).withOpacity(0.35)
+                          : const Color(0xFFFDE68A),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline_rounded, color: Color(0xFFD97706), size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _workingAyName.isNotEmpty
+                              ? 'Operational expenses can only be recorded in the active academic year ($_workingAyName is in $_workingAyStatus mode).'
+                              : 'Operational expenses can only be recorded in the active academic year.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Theme.of(context).brightness == Brightness.dark
+                                ? const Color(0xFFFDE68A)
+                                : const Color(0xFF92400E),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               // 1. Month Selector Bar
               _buildMonthSelectorHeader(),
 
