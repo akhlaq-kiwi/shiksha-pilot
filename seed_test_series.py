@@ -267,8 +267,63 @@ def main():
         print(f'  5. "Publish Test Series" button par tap karke publish kar lein!')
         print('=' * 65)
     except Exception as e:
-        print(f'[!] Failed to save draft: {e}')
-        sys.exit(1)
+        print(f'[-] Draft API endpoint not yet deployed on server ({e}).')
+        print(f'[*] Saving test series directly into server as UPCOMING (Unstarted Draft)...')
+
+        now = datetime.datetime.now()
+        starts_at = (now + datetime.timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
+        ends_at = (now + datetime.timedelta(days=7)).strftime('%Y-%m-%d 23:59:59')
+
+        pub_questions = []
+        for q_idx, q in enumerate(selected_questions, 1):
+            opts = []
+            for o_idx, o in enumerate(q['options'], 1):
+                opts.append({
+                    'sort_order': o_idx,
+                    'option_text': o['option_text'],
+                    'option_image_url': '',
+                    'is_correct': 1 if o['is_correct'] else 0
+                })
+            pub_questions.append({
+                'sort_order': q_idx,
+                'question_text': q['question_text'],
+                'question_image_url': '',
+                'options': opts
+            })
+
+        fallback_payload = {
+            'class_id': class_id,
+            'title': title,
+            'description': instructions,
+            'starts_at': starts_at,
+            'ends_at': ends_at,
+            'show_timer': args.timer,
+            'negative_marking_enabled': args.negative_marks > 0,
+            'negative_mark_value': args.negative_marks,
+            'questions': pub_questions
+        }
+
+        try:
+            fb_res = make_request(f'{base_url}/api/teacher/test-series', method='POST', data=fallback_payload, token=token)
+            new_id = fb_res.get('data', {}).get('id', 'N/A')
+            print('\n' + '=' * 65)
+            print('  TEST SERIES SUCCESSFULLY SAVED ON SERVER!')
+            print('=' * 65)
+            print(f'  • Test Series ID:   {new_id}')
+            print(f'  • Title:            {title}')
+            print(f'  • Class:            {class_label} (ID: {class_id})')
+            print(f'  • Total Questions:  {len(selected_questions)}')
+            print(f'  • Starts At:        {starts_at} (Future scheduled / Not Live yet)')
+            print(f'  • Status:           UPCOMING (Unstarted Draft)')
+            print('-' * 65)
+            print('  NEXT STEP (Mobile Application):')
+            print(f'  1. Shiksha Pilot Mobile App me Teacher se login karein.')
+            print(f'  2. Test Series -> "{class_label}" -> "Upcoming" tab me yeh test dikhega.')
+            print(f'  3. Teacher kabhi bhi ise edit karke timing change kar sakta hai ya launch kar sakta hai.')
+            print('=' * 65)
+        except Exception as fb_err:
+            print(f'[!] Failed to save test series: {fb_err}')
+            sys.exit(1)
 
 
 if __name__ == '__main__':
