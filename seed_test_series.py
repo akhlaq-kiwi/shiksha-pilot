@@ -7,7 +7,6 @@ Usage:
   python seed_test_series.py --phone 9876543210 --password mypassword --class "10-A" --count 20
   python seed_test_series.py --url https://qa.shikshapilot.com --phone 9876543210 --password mypass --class 1 --count 50
   python seed_test_series.py --phone 9876543210 --password mypass --list-classes
-  python seed_test_series.py --phone 9876543210 --password mypass --class "10-A" --count 100 --publish
 """
 
 import argparse
@@ -54,7 +53,7 @@ def make_request(url, method='GET', data=None, token=None):
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Shiksha Pilot - Auto-seed Test Series questions into Drafts or Published state.'
+        description='Shiksha Pilot - Auto-seed Test Series questions into Drafts.'
     )
     parser.add_argument('--url', '-u', default='https://qa.shikshapilot.com', help='Base URL of Shiksha Pilot environment (default: https://qa.shikshapilot.com)')
     parser.add_argument('--phone', '-p', help='Teacher login phone number / username')
@@ -65,7 +64,6 @@ def main():
     parser.add_argument('--timer', dest='timer', action='store_true', default=True, help='Enable countdown timer (default: enabled)')
     parser.add_argument('--no-timer', dest='timer', action='store_false', help='Disable countdown timer')
     parser.add_argument('--negative-marks', type=float, default=0.0, choices=[0.0, 0.25, 0.5, 1.0], help='Negative marking deduction per wrong answer (0, 0.25, 0.5, 1.0)')
-    parser.add_argument('--publish', action='store_true', default=False, help='Directly publish immediately instead of saving as Draft')
     parser.add_argument('--list-classes', action='store_true', default=False, help='List all available classes for teacher and exit')
 
     args = parser.parse_args()
@@ -217,118 +215,60 @@ def main():
         '• Ranks, Toppers and Merit Certificates unlock after closing time.'
     )
 
-    # 5. Save as Draft OR Publish
-    if not args.publish:
-        # Save into Draft
-        print(f'[*] Saving test series "{title}" as DRAFT for {class_label}...')
-        draft_url = f'{base_url}/api/teacher/test-series/drafts'
-        draft_id = f'draft_{int(datetime.datetime.now().timestamp() * 1000)}_seed'
+    # 5. Save strictly as DRAFT
+    print(f'[*] Saving test series "{title}" as DRAFT for {class_label}...')
+    draft_url = f'{base_url}/api/teacher/test-series/drafts'
+    draft_id = f'draft_{int(datetime.datetime.now().timestamp() * 1000)}_seed'
 
-        draft_questions = []
-        for q in selected_questions:
-            opts = []
-            for o in q['options']:
-                opts.append({
-                    'option_text': o['option_text'],
-                    'option_image_url': ''
-                })
-            draft_questions.append({
-                'question_text': q['question_text'],
-                'question_image_url': '',
-                'correct_option_index': q['correct_option_index'],
-                'options': opts
+    draft_questions = []
+    for q in selected_questions:
+        opts = []
+        for o in q['options']:
+            opts.append({
+                'option_text': o['option_text'],
+                'option_image_url': ''
             })
+        draft_questions.append({
+            'question_text': q['question_text'],
+            'question_image_url': '',
+            'correct_option_index': q['correct_option_index'],
+            'options': opts
+        })
 
-        draft_payload = {
-            'id': draft_id,
-            'class_id': class_id,
-            'title': title,
-            'description': instructions,
-            'show_timer': args.timer,
-            'negative_marking_enabled': args.negative_marks > 0,
-            'negative_mark_value': args.negative_marks,
-            'schedule_changed': False,
-            'questions': draft_questions
-        }
+    draft_payload = {
+        'id': draft_id,
+        'class_id': class_id,
+        'title': title,
+        'description': instructions,
+        'show_timer': args.timer,
+        'negative_marking_enabled': args.negative_marks > 0,
+        'negative_mark_value': args.negative_marks,
+        'schedule_changed': False,
+        'questions': draft_questions
+    }
 
-        try:
-            draft_res = make_request(draft_url, method='POST', data=draft_payload, token=token)
-            print('\n' + '=' * 65)
-            print('  SUCCESSFULLY SAVED TEST SERIES AS DRAFT!')
-            print('=' * 65)
-            print(f'  • Title:            {title}')
-            print(f'  • Class:            {class_label} (ID: {class_id})')
-            print(f'  • Total Questions:  {len(selected_questions)}')
-            print(f'  • Timer Enabled:    {"Yes" if args.timer else "No"}')
-            print(f'  • Negative Marking: {args.negative_marks if args.negative_marks > 0 else "None"}')
-            print(f'  • Status:           IN DRAFT')
-            print('-' * 65)
-            print('  HOW TO PUBLISH FROM MOBILE APP:')
-            print('  1. Open Shiksha Pilot Mobile App & login as teacher.')
-            print('  2. Open Test Series, switch to ' + class_label + '.')
-            print('  3. Tap the "In Draft" button at the top.')
-            print('  4. Tap this draft to open it with all questions loaded.')
-            print('  5. Tap "Publish Test Series" whenever you are ready!')
-            print('=' * 65)
-        except Exception as e:
-            print(f'[!] Failed to save draft: {e}')
-            sys.exit(1)
-
-    else:
-        # Publish directly
-        print(f'[*] Directly publishing test series "{title}" for {class_label}...')
-        publish_url = f'{base_url}/api/teacher/test-series'
-
-        now = datetime.datetime.now()
-        starts_at = (now + datetime.timedelta(minutes=5)).strftime('%Y-%m-%d %H:%M:%S')
-        ends_at = (now + datetime.timedelta(days=7)).strftime('%Y-%m-%d 23:59:59')
-
-        pub_questions = []
-        for q_idx, q in enumerate(selected_questions, 1):
-            opts = []
-            for o_idx, o in enumerate(q['options'], 1):
-                opts.append({
-                    'sort_order': o_idx,
-                    'option_text': o['option_text'],
-                    'option_image_url': '',
-                    'is_correct': 1 if o['is_correct'] else 0
-                })
-            pub_questions.append({
-                'sort_order': q_idx,
-                'question_text': q['question_text'],
-                'question_image_url': '',
-                'options': opts
-            })
-
-        pub_payload = {
-            'class_id': class_id,
-            'title': title,
-            'description': instructions,
-            'starts_at': starts_at,
-            'ends_at': ends_at,
-            'show_timer': args.timer,
-            'negative_marking_enabled': args.negative_marks > 0,
-            'negative_mark_value': args.negative_marks,
-            'questions': pub_questions
-        }
-
-        try:
-            pub_res = make_request(publish_url, method='POST', data=pub_payload, token=token)
-            new_id = pub_res.get('data', {}).get('id', 'N/A')
-            print('\n' + '=' * 65)
-            print('  SUCCESSFULLY PUBLISHED TEST SERIES!')
-            print('=' * 65)
-            print(f'  • Test Series ID:   {new_id}')
-            print(f'  • Title:            {title}')
-            print(f'  • Class:            {class_label} (ID: {class_id})')
-            print(f'  • Total Questions:  {len(selected_questions)}')
-            print(f'  • Starts At:        {starts_at}')
-            print(f'  • Ends At:          {ends_at}')
-            print(f'  • Status:           UPCOMING / LIVE')
-            print('=' * 65)
-        except Exception as e:
-            print(f'[!] Failed to publish test series: {e}')
-            sys.exit(1)
+    try:
+        draft_res = make_request(draft_url, method='POST', data=draft_payload, token=token)
+        print('\n' + '=' * 65)
+        print('  TEST SERIES SUCCESSFULLY SAVED AS DRAFT!')
+        print('=' * 65)
+        print(f'  • Title:            {title}')
+        print(f'  • Class:            {class_label} (ID: {class_id})')
+        print(f'  • Total Questions:  {len(selected_questions)}')
+        print(f'  • Timer Enabled:    {"Yes" if args.timer else "No"}')
+        print(f'  • Negative Marking: {args.negative_marks if args.negative_marks > 0 else "None"}')
+        print(f'  • Status:           IN DRAFT')
+        print('-' * 65)
+        print('  NEXT STEP (Mobile Application):')
+        print(f'  1. Shiksha Pilot Mobile App me Teacher se login karein.')
+        print(f'  2. Test Series screen par jayein aur "{class_label}" select karein.')
+        print(f'  3. Upar "In Draft" button par tap karein.')
+        print(f'  4. Is draft par tap karein (saare {len(selected_questions)} questions pre-loaded milenge).')
+        print(f'  5. "Publish Test Series" button par tap karke publish kar lein!')
+        print('=' * 65)
+    except Exception as e:
+        print(f'[!] Failed to save draft: {e}')
+        sys.exit(1)
 
 
 if __name__ == '__main__':
