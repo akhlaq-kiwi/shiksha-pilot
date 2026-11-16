@@ -390,6 +390,9 @@ return function (App $app) {
     $app->post('/api/teacher/test-series/upload-image', [TestSeriesController::class, 'uploadImage']);
     $app->get('/api/teacher/test-series', [TestSeriesController::class, 'listForTeacher']);
     $app->post('/api/teacher/test-series', [TestSeriesController::class, 'create']);
+    $app->get('/api/teacher/test-series/drafts', [TestSeriesController::class, 'listDrafts']);
+    $app->post('/api/teacher/test-series/drafts', [TestSeriesController::class, 'saveDraft']);
+    $app->delete('/api/teacher/test-series/drafts/{id}', [TestSeriesController::class, 'deleteDraft']);
     $app->get('/api/teacher/test-series/{id}', [TestSeriesController::class, 'getTeacherDetail']);
     $app->put('/api/teacher/test-series/{id}', [TestSeriesController::class, 'update']);
     $app->delete('/api/teacher/test-series/{id}', [TestSeriesController::class, 'delete']);

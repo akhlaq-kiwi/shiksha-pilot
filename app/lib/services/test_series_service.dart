@@ -329,4 +329,37 @@ class TestSeriesService {
     final data = _decodeAndCheck(response, 'Failed to load results & leaderboard');
     return Map<String, dynamic>.from(data as Map);
   }
+
+  // ---------------------------------------------------------------------------
+  // Drafts
+  // ---------------------------------------------------------------------------
+
+  Future<List<Map<String, dynamic>>> fetchTeacherDrafts({int? classId}) async {
+    final base = await _effectiveBaseUrl();
+    final uri = Uri.parse('$base/api/teacher/test-series/drafts').replace(
+      queryParameters: classId != null && classId > 0 ? {'class_id': classId.toString()} : null,
+    );
+    final response = await http.get(uri, headers: _headers());
+    final data = _decodeAndCheck(response, 'Failed to load drafts');
+    if (data is List) {
+      return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    }
+    return [];
+  }
+
+  Future<Map<String, dynamic>> saveTeacherDraft(Map<String, dynamic> draftData) async {
+    final base = await _effectiveBaseUrl();
+    final uri = Uri.parse('$base/api/teacher/test-series/drafts');
+    final response = await http.post(uri, headers: _headers(), body: json.encode(draftData));
+    final data = _decodeAndCheck(response, 'Failed to save draft');
+    return Map<String, dynamic>.from(data as Map);
+  }
+
+  Future<void> deleteTeacherDraft(String draftId) async {
+    if (draftId.trim().isEmpty) return;
+    final base = await _effectiveBaseUrl();
+    final uri = Uri.parse('$base/api/teacher/test-series/drafts/$draftId');
+    final response = await http.delete(uri, headers: _headers());
+    _decodeAndCheck(response, 'Failed to delete draft');
+  }
 }

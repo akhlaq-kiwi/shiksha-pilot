@@ -97,6 +97,36 @@ class TestSeriesController extends BaseController
         return $this->success($response, $data, 'Image uploaded successfully');
     }
 
+    public function listDrafts(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, self::STAFF_ROLES);
+
+        $params = $request->getQueryParams();
+        $data = $this->service->listDrafts($user, $params);
+        return $this->success($response, $data);
+    }
+
+    public function saveDraft(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, self::STAFF_ROLES);
+
+        $body = (array)$request->getParsedBody();
+        $data = $this->service->saveDraft($user, $body);
+        return $this->success($response, $data, 'Draft saved successfully');
+    }
+
+    public function deleteDraft(Request $request, Response $response, array $args): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, self::STAFF_ROLES);
+
+        $id = (string)($args['id'] ?? '');
+        $data = $this->service->deleteDraft($user, $id);
+        return $this->success($response, ['deleted' => $data], 'Draft deleted successfully');
+    }
+
     public function listForTeacher(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);

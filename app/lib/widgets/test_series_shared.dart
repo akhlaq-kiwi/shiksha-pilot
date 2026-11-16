@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/test_series_service.dart';
 import 'profile_avatar_view.dart';
 
 class TsColors {
@@ -405,8 +406,9 @@ class TestSeriesDraftStore {
     return 'ts_draft_v1_${identity}_c$classId';
   }
 
-  /// Loads all drafts for this teacher and class, migrating any legacy v1 draft if found.
-  static Future<List<Map<String, dynamic>>> loadDrafts(int classId) async {
+  /// Loads all drafts for this teacher and class, migrating any legacy v1 draft if found,
+  /// and synchronizing with cloud-saved drafts.
+  static Future<List<Map<String, dynamic>>> loadDrafts(int classId, {bool syncRemote = true}) async {
     if (classId <= 0) return [];
     final prefs = await SharedPreferences.getInstance();
     final key = await _keyForClass(classId);
@@ -437,11 +439,41 @@ class TestSeriesDraftStore {
       } catch (_) {}
     }
 
+    // Cloud sync: fetch remote drafts from server
+    if (syncRemote) {
+      try {
+        final service = await TestSeriesService.create();
+        if (service.token.isNotEmpty) {
+          final remoteList = await service.fetchTeacherDrafts(classId: classId);
+          if (remoteList.isNotEmpty) {
+            final draftMap = <String, Map<String, dynamic>>{};
+            for (final d in drafts) {
+              final did = d['id']?.toString() ?? '';
+              if (did.isNotEmpty) draftMap[did] = d;
+            }
+            for (final rd in remoteList) {
+              final did = rd['id']?.toString() ?? '';
+              if (did.isNotEmpty) {
+                draftMap[did] = rd;
+              }
+            }
+            drafts = draftMap.values.toList();
+            drafts.sort((a, b) {
+              final sa = (a['saved_at'] ?? a['updated_at'] ?? '').toString();
+              final sb = (b['saved_at'] ?? b['updated_at'] ?? '').toString();
+              return sb.compareTo(sa);
+            });
+            await prefs.setString(key, json.encode(drafts));
+          }
+        }
+      } catch (_) {}
+    }
+
     return drafts;
   }
 
   static Future<int> getDraftCount(int classId) async {
-    final list = await loadDrafts(classId);
+    final list = await loadDrafts(classId, syncRemote: false);
     return list.length;
   }
 
@@ -451,7 +483,7 @@ class TestSeriesDraftStore {
   }
 
   static Future<Map<String, dynamic>?> loadDraftById(int classId, String draftId) async {
-    final list = await loadDrafts(classId);
+    final list = await loadDrafts(classId, syncRemote: false);
     for (final d in list) {
       if (d['id']?.toString() == draftId) return d;
     }
@@ -468,7 +500,7 @@ class TestSeriesDraftStore {
   /// Returns the assigned draftId.
   static Future<String> saveDraft(int classId, Map<String, dynamic> data, {String? draftId}) async {
     if (classId <= 0) return '';
-    final drafts = await loadDrafts(classId);
+    final drafts = await loadDrafts(classId, syncRemote: false);
     final effectiveId = (draftId != null && draftId.isNotEmpty)
         ? draftId
         : (data['id']?.toString() ?? 'draft_${DateTime.now().millisecondsSinceEpoch}');
@@ -488,16 +520,33 @@ class TestSeriesDraftStore {
     final prefs = await SharedPreferences.getInstance();
     final key = await _keyForClass(classId);
     await prefs.setString(key, json.encode(drafts));
+
+    // Asynchronously push to server
+    try {
+      final service = await TestSeriesService.create();
+      if (service.token.isNotEmpty) {
+        service.saveTeacherDraft(updatedData).ignore();
+      }
+    } catch (_) {}
+
     return effectiveId;
   }
 
   static Future<void> deleteDraft(int classId, String draftId) async {
     if (classId <= 0 || draftId.isEmpty) return;
-    final drafts = await loadDrafts(classId);
+    final drafts = await loadDrafts(classId, syncRemote: false);
     drafts.removeWhere((d) => d['id']?.toString() == draftId);
     final prefs = await SharedPreferences.getInstance();
     final key = await _keyForClass(classId);
     await prefs.setString(key, json.encode(drafts));
+
+    // Asynchronously delete on server
+    try {
+      final service = await TestSeriesService.create();
+      if (service.token.isNotEmpty) {
+        service.deleteTeacherDraft(draftId).ignore();
+      }
+    } catch (_) {}
   }
 
   /// Backward-compatible clearDraft: clears first draft or all

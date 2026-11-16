@@ -903,6 +903,128 @@ class TestSeriesService extends BaseService
         ];
     }
 
+    // -------------------------------------------------------------------------
+    // Drafts (Cloud-synced with mobile app)
+    // -------------------------------------------------------------------------
+
+    public function listDrafts(array $user, array $params = []): array
+    {
+        $schoolId = (int)($user['school_id'] ?? 0);
+        $userId = (int)($user['id'] ?? 0);
+
+        $sql = "
+            SELECT id, school_id, teacher_user_id, class_id, title, draft_data, created_at, updated_at
+            FROM test_series_drafts
+            WHERE school_id = :sid AND teacher_user_id = :uid
+        ";
+        $bind = [':sid' => $schoolId, ':uid' => $userId];
+
+        if (isset($params['class_id']) && is_numeric($params['class_id']) && (int)$params['class_id'] > 0) {
+            $sql .= " AND class_id = :cid";
+            $bind[':cid'] = (int)$params['class_id'];
+        }
+
+        $sql .= " ORDER BY updated_at DESC, id DESC";
+
+        try {
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute($bind);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (\PDOException $e) {
+            return [];
+        }
+
+        $drafts = [];
+        foreach ($rows as $r) {
+            $rawJson = (string)($r['draft_data'] ?? '');
+            $data = json_decode($rawJson, true);
+            if (!is_array($data)) {
+                $data = [];
+            }
+            $data['id'] = (string)$r['id'];
+            $data['class_id'] = (int)$r['class_id'];
+            $data['title'] = (string)$r['title'];
+            $data['updated_at'] = (string)$r['updated_at'];
+            $data['saved_at'] = $data['saved_at'] ?? (string)$r['updated_at'];
+            $drafts[] = $data;
+        }
+
+        return $drafts;
+    }
+
+    public function saveDraft(array $user, array $body): array
+    {
+        $schoolId = (int)($user['school_id'] ?? 0);
+        $userId = (int)($user['id'] ?? 0);
+
+        $classId = isset($body['class_id']) && is_numeric($body['class_id']) ? (int)$body['class_id'] : 0;
+        if ($classId <= 0) {
+            throw new ValidationException(['class_id' => 'Target class is required for saving a draft.'], 'Target class is required.');
+        }
+
+        $draftId = trim((string)($body['id'] ?? ''));
+        if ($draftId === '') {
+            $draftId = 'draft_' . round(microtime(true) * 1000) . '_' . bin2hex(random_bytes(3));
+        }
+
+        $title = trim((string)($body['title'] ?? ''));
+        if ($title === '') {
+            $title = 'Untitled Test Series';
+        }
+        if (mb_strlen($title) > 100) {
+            $title = mb_substr($title, 0, 100);
+        }
+
+        $savedAt = date('c');
+        $body['id'] = $draftId;
+        $body['class_id'] = $classId;
+        $body['title'] = $title;
+        $body['saved_at'] = $savedAt;
+
+        $jsonPayload = json_encode($body, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        $stmt = $this->pdo->prepare("
+            INSERT INTO test_series_drafts (id, school_id, teacher_user_id, class_id, title, draft_data)
+            VALUES (:id, :sid, :uid, :cid, :title, :data)
+            ON DUPLICATE KEY UPDATE
+                class_id = VALUES(class_id),
+                title = VALUES(title),
+                draft_data = VALUES(draft_data),
+                updated_at = CURRENT_TIMESTAMP
+        ");
+        $stmt->execute([
+            ':id' => $draftId,
+            ':sid' => $schoolId,
+            ':uid' => $userId,
+            ':cid' => $classId,
+            ':title' => $title,
+            ':data' => $jsonPayload,
+        ]);
+
+        return $body;
+    }
+
+    public function deleteDraft(array $user, string $draftId): bool
+    {
+        $schoolId = (int)($user['school_id'] ?? 0);
+        $userId = (int)($user['id'] ?? 0);
+        $cleanId = trim($draftId);
+        if ($cleanId === '') {
+            return false;
+        }
+
+        try {
+            $stmt = $this->pdo->prepare("
+                DELETE FROM test_series_drafts
+                WHERE id = :id AND school_id = :sid AND teacher_user_id = :uid
+            ");
+            $stmt->execute([':id' => $cleanId, ':sid' => $schoolId, ':uid' => $userId]);
+            return $stmt->rowCount() > 0;
+        } catch (\PDOException $e) {
+            return false;
+        }
+    }
+
     public function createTestSeries(array $user, array $body): array
     {
         if (!$this->canCreateTestSeries($user)) {
@@ -1024,6 +1146,11 @@ class TestSeriesService extends BaseService
         // Best-effort push + in-app notification to students & parents of target class
         $classLabel = $this->formatClassLabel($classRow['name'] ?? '', $classRow['section'] ?? '');
         $this->notifyClassTestSeriesPublished($schoolId, $classId, $classLabel, $title, $startsAt, $endsAt);
+
+        // Clean up draft if this was published from a draft
+        if (!empty($body['draft_id'])) {
+            $this->deleteDraft($user, (string)$body['draft_id']);
+        }
 
         return $this->getTeacherTestSeriesDetail($user, $testSeriesId);
     }
