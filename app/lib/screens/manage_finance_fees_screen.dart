@@ -321,12 +321,18 @@ class _ManageFinanceFeesScreenState extends State<ManageFinanceFeesScreen> with 
     return '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
   }
 
-  // Filtered Additional Fee Types (excluding internal types)
+  // Filtered Additional Fee Types (excluding internal/dedicated-tab types)
   List<dynamic> get _filteredAdditionalFees {
     return _feeTypes.where((ft) {
       final name = (ft['name'] ?? '').toString();
-      final cat = (ft['category'] ?? '').toString();
-      if (name == 'Transport Fees' || name == 'Admission Fee' || cat == 'System Generated') {
+      final nameLower = name.trim().toLowerCase();
+      final catLower = (ft['category'] ?? '').toString().trim().toLowerCase();
+      if (nameLower == 'transport fees' ||
+          nameLower == 'admission fee' ||
+          nameLower == 'annual fee' ||
+          catLower == 'admission fee' ||
+          catLower == 'annual fee' ||
+          catLower == 'system generated') {
         return false;
       }
       if (_additionalFeeSearch.trim().isEmpty) return true;

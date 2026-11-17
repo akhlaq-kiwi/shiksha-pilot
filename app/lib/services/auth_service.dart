@@ -25,6 +25,25 @@ class AuthService {
 
   AuthService({required this.baseUrl});
 
+  Map<String, dynamic> _decodeJsonBody(http.Response response, {String fallback = 'Server is temporarily unavailable. Please try again in a moment.'}) {
+    final raw = response.body.trim();
+    if (raw.isEmpty) {
+      throw Exception(fallback);
+    }
+    try {
+      final decoded = json.decode(raw);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+      if (decoded is Map) {
+        return Map<String, dynamic>.from(decoded);
+      }
+      throw Exception(fallback);
+    } on FormatException {
+      throw Exception(fallback);
+    }
+  }
+
   Future<Map<String, dynamic>> login(String phone, String password) async {
     final uri = Uri.parse('$baseUrl/api/auth/login');
     final response = await http.post(
@@ -34,9 +53,10 @@ class AuthService {
         'phone': phone,
         'password': password,
       }),
+      retryOnTransientFailure: true,
     );
 
-    final resData = json.decode(response.body);
+    final resData = _decodeJsonBody(response);
     if (response.statusCode == 200) {
       return resData['data']; // Contains 'token' and 'user' map
     } else {
@@ -73,7 +93,7 @@ class AuthService {
       }),
     );
 
-    final resData = json.decode(response.body);
+    final resData = _decodeJsonBody(response);
     if (response.statusCode != 200) {
       final Map<String, String> errorsMap = {};
       if (resData['data'] != null && resData['data'] is Map) {
@@ -107,9 +127,10 @@ class AuthService {
       body: json.encode({
         'password': password,
       }),
+      retryOnTransientFailure: true,
     );
 
-    final resData = json.decode(response.body);
+    final resData = _decodeJsonBody(response);
     if (response.statusCode == 200) {
       return true;
     }
@@ -126,7 +147,7 @@ class AuthService {
       },
     );
 
-    final resData = json.decode(response.body);
+    final resData = _decodeJsonBody(response);
     if (response.statusCode == 200) {
       return resData['data']; // User profile map
     } else {
@@ -148,7 +169,7 @@ class AuthService {
       }),
     );
 
-    final resData = json.decode(response.body);
+    final resData = _decodeJsonBody(response);
     if (response.statusCode != 200) {
       throw Exception(resData['message'] ?? 'Failed to enable App Lock.');
     }
@@ -165,9 +186,10 @@ class AuthService {
       body: json.encode({
         'pin': pin,
       }),
+      retryOnTransientFailure: true,
     );
 
-    final resData = json.decode(response.body);
+    final resData = _decodeJsonBody(response);
     if (response.statusCode == 200) {
       return true;
     }
@@ -192,7 +214,7 @@ class AuthService {
       }),
     );
 
-    final resData = json.decode(response.body);
+    final resData = _decodeJsonBody(response);
     if (response.statusCode != 200) {
       throw Exception(resData['message'] ?? 'Failed to disable App Lock.');
     }
@@ -209,7 +231,7 @@ class AuthService {
       },
     );
 
-    final resData = json.decode(response.body);
+    final resData = _decodeJsonBody(response);
     if (response.statusCode != 200) {
       final code = resData['code']?.toString() ?? '';
       final msg = resData['message']?.toString() ?? 'Failed to send OTP.';
@@ -237,7 +259,7 @@ class AuthService {
       }),
     );
 
-    final resData = json.decode(response.body);
+    final resData = _decodeJsonBody(response);
     if (response.statusCode != 200) {
       throw Exception(resData['message'] ?? 'Failed to reset App Lock PIN.');
     }

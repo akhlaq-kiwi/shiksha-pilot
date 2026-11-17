@@ -194,7 +194,7 @@ jobs:
         run: |
           set -e
           REMOTE_PATH="${{ secrets.QA_REMOTE_PATH }}"
-          EXTRACT_CMD="cd $REMOTE_PATH && rm -rf assets api index.html && tar --warning=no-unknown-keyword -xzf deploy.tar.gz && rm deploy.tar.gz && echo 'Running composer install...' && composer install --no-dev --optimize-autoloader --working-dir=$REMOTE_PATH/api && echo 'Running migrations...' && php api/src/Database/migrate.php"
+          EXTRACT_CMD="cd $REMOTE_PATH && rm -rf _deploy_staging && mkdir -p _deploy_staging && tar --warning=no-unknown-keyword -xzf deploy.tar.gz -C _deploy_staging && rm deploy.tar.gz && echo 'Running composer install in staging...' && composer install --no-dev --optimize-autoloader --working-dir=$REMOTE_PATH/_deploy_staging/api && rm -rf api_old && ([ -d api ] && mv api api_old || true) && mv _deploy_staging/api api && rm -rf assets && cp -a _deploy_staging/. . && rm -rf _deploy_staging api_old && echo 'Running migrations...' && php api/src/Database/migrate.php"
           sshpass -e ssh -o StrictHostKeyChecking=no -p "${{ secrets.QA_SSH_PORT }}" \
             "${{ secrets.QA_SSH_USER }}@${{ secrets.QA_SSH_HOST }}" "$EXTRACT_CMD"
 

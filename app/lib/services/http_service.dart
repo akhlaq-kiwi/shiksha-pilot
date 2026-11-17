@@ -74,10 +74,20 @@ String formatErrorMessage(
   if (isNetworkError(error)) {
     return kNetworkErrorMessage;
   }
+  if (error is FormatException) {
+    return 'Server is temporarily unavailable. Please try again in a moment.';
+  }
   final cleaned = error
       .toString()
       .replaceFirst(RegExp(r'^[A-Za-z0-9_]*Exception:\s*'), '')
       .trim();
+  final lower = cleaned.toLowerCase();
+  if (lower.contains('unexpected end of input') ||
+      lower.contains('unexpected character') ||
+      lower.contains('<!doctype html') ||
+      lower.contains('<html')) {
+    return 'Server is temporarily unavailable. Please try again in a moment.';
+  }
   return cleaned.isNotEmpty ? cleaned : fallback;
 }
 
@@ -179,12 +189,19 @@ Future<http.Response> _executeWithFallback(
     for (int attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         final response = await requestFn(targetUri).timeout(timeoutDuration);
-        if (allowRetryForBase &&
-            !didRetryGateway &&
-            (response.statusCode == 502 || response.statusCode == 503 || response.statusCode == 504)) {
+        final bool isTransientGatewayOrEmptyError =
+            response.statusCode == 502 ||
+            response.statusCode == 503 ||
+            response.statusCode == 504 ||
+            (response.statusCode >= 500 && response.body.trim().isEmpty);
+        if (allowRetryForBase && !didRetryGateway && isTransientGatewayOrEmptyError) {
           didRetryGateway = true;
-          debugPrint('HTTP ${response.statusCode} on $targetUri (attempt $attempt). Retrying...');
-          await Future.delayed(const Duration(milliseconds: 350));
+          debugPrint('HTTP ${response.statusCode} (empty=${response.body.trim().isEmpty}) on $targetUri (attempt $attempt). Resetting client and retrying...');
+          try {
+            _sharedClient.close();
+          } catch (_) {}
+          _sharedClient = http.Client();
+          await Future.delayed(const Duration(milliseconds: 450));
           continue;
         }
 
@@ -329,11 +346,18 @@ Future<http.Response> getRaw(
   throw lastError ?? const AppNetworkException(kNetworkErrorMessage);
 }
 
-Future<http.Response> post(Uri url, {Map<String, String>? headers, Object? body, Object? encoding}) async {
+Future<http.Response> post(
+  Uri url, {
+  Map<String, String>? headers,
+  Object? body,
+  Object? encoding,
+  bool retryOnTransientFailure = false,
+}) async {
   final effectiveHeaders = await _prepareHeaders(headers);
   return _executeWithFallback(
     url,
     (targetUri) => _sharedClient.post(targetUri, headers: effectiveHeaders, body: body, encoding: encoding as Encoding?),
+    retryOnTransientFailure: retryOnTransientFailure,
   );
 }
 
