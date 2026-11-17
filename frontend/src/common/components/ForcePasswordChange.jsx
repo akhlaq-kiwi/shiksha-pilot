@@ -12,8 +12,15 @@ export default function ForcePasswordChange({ onDismiss }) {
   const [showPw, setShowPw] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const passwordError = !password
+    ? null
+    : password.length < 6
+      ? 'Password must be at least 6 characters.'
+      : (!/[a-zA-Z]/.test(password) || !/[0-9]/.test(password))
+        ? 'Password must contain both letters and numbers.'
+        : null;
   const mismatch = confirm && password !== confirm;
-  const valid = password.length >= 6 && password === confirm;
+  const valid = password.length >= 6 && !passwordError && password === confirm;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -64,17 +71,22 @@ export default function ForcePasswordChange({ onDismiss }) {
             <div className="relative">
               <Input id="new-password"
                 type={showPw ? 'text' : 'password'}
-                placeholder="Min. 6 characters"
+                placeholder="Min 6 chars (letters & numbers)"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 required
                 minLength={6}
-                className="pr-10"
+                className={`pr-10 ${passwordError ? 'border-red-400 focus:ring-red-400' : ''}`}
               />
               <button type="button" onClick={() => setShowPw(v => !v)} className="absolute right-3 top-2.5 text-text-muted hover:text-text-primary">
                 {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
+            {passwordError ? (
+              <p className="text-xs text-red-500 font-semibold">{passwordError}</p>
+            ) : (
+              <p className="text-[11px] text-text-muted">At least 6 characters with letters and numbers.</p>
+            )}
           </div>
           <div className="space-y-1.5">
             <label htmlFor="confirm-password" className="text-xs font-bold text-text-secondary uppercase">Confirm Password</label>

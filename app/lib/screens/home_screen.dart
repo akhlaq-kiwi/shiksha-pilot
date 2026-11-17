@@ -409,9 +409,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         }
         _userName = savedName;
         _userPhone = prefs.getString('user_phone') ?? '';
-        _userPhoto = isStudentOrParent && hasSavedPhoto
+        _userPhoto = hasSavedPhoto
             ? savedPhoto
-            : (savedPhoto.isNotEmpty ? savedPhoto : (widget.userPhoto ?? _userPhoto));
+            : (widget.userPhoto ?? _userPhoto);
         _isPrincipal = (prefs.getBool('is_principal') == true) ||
             (widget.isPrincipal == true) ||
             (roleUpper == 'PRINCIPAL');
@@ -501,7 +501,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       final authService = AuthService(baseUrl: effectiveBase);
       final profile = await authService.fetchProfile(token);
       
-      final latestPhoto = (profile['photo_path'] as String?) ?? (profile['staff_photo_path'] as String?) ?? '';
+      final latestPhoto = ((profile['photo_path'] as String?) ??
+          (profile['staff_photo_path'] as String?) ??
+          (profile['school_logo_path'] as String?) ??
+          (profile['logo_path'] as String?) ??
+          '').trim();
       final latestName = (profile['name'] as String?) ?? '';
       final latestSchool = (profile['school_name'] as String?) ?? '';
       final bool isPrincipal = profile['is_principal'] == true ||
@@ -513,7 +517,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           profile['is_fee_collector'] == '1';
       
       final role = widget.userRole.toUpperCase();
-      final isStaff = role == 'TEACHER' || role == 'SCHOOL_ADMIN' || role == 'PRINCIPAL';
+      final isStaff = role == 'TEACHER' || role == 'SCHOOL_ADMIN' || role == 'ADMIN' || role == 'PRINCIPAL';
       
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('is_principal', isPrincipal);
@@ -523,7 +527,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       // For PARENT/STUDENT accounts with multiple siblings on one phone, overwriting
       // user_name/user_photo here would clobber the switched sibling's identity.
       if (isStaff) {
-        if (latestPhoto.isNotEmpty) await prefs.setString('user_photo', latestPhoto);
+        await prefs.setString('user_photo', latestPhoto);
         if (latestName.isNotEmpty) await prefs.setString('user_name', latestName);
       }
       if (latestSchool.isNotEmpty) await prefs.setString('school_name', latestSchool.toUpperCase());
@@ -531,7 +535,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (mounted) {
         setState(() {
           if (isStaff) {
-            if (latestPhoto.isNotEmpty) _userPhoto = latestPhoto;
+            _userPhoto = latestPhoto;
             if (latestName.isNotEmpty) _userName = latestName;
           }
           if (latestSchool.isNotEmpty) _schoolName = latestSchool.toUpperCase();
@@ -2048,7 +2052,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           },
         ),
       ),
-    );
+    ).then((_) {
+      if (mounted) {
+        _loadSessionInfo();
+      }
+    });
   }
 
   Future<void> _markFeatureNotificationsRead(String module) async {

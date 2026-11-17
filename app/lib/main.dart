@@ -714,7 +714,11 @@ class _LoginScreenState extends State<LoginScreen> {
         schoolName = 'SHIKSHA PILOT ACADEMY';
       }
       await prefs.setString('school_name', schoolName);
-      final String userPhoto = (user['staff_photo_path'] as String?) ?? (user['photo_path'] as String?) ?? (user['photo'] as String?) ?? '';
+      final String userPhoto = ((user['photo_path'] as String?) ??
+          (user['staff_photo_path'] as String?) ??
+          (user['school_logo_path'] as String?) ??
+          (user['photo'] as String?) ??
+          '').trim();
       await prefs.setString('user_photo', userPhoto);
       final bool isPrincipal = user['is_principal'] == true ||
           user['is_principal'] == 1 ||

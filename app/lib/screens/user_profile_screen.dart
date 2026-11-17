@@ -6,6 +6,7 @@ import 'package:school_hub/main.dart';
 import 'package:school_hub/services/http_service.dart' as http_svc;
 import 'package:school_hub/services/push_notification_service.dart';
 import 'package:school_hub/services/local_notification_scheduler.dart';
+import 'package:school_hub/services/auth_service.dart';
 import 'package:school_hub/services/student_session_helper.dart';
 
 class UserProfileScreen extends StatefulWidget {
@@ -39,11 +40,13 @@ class UserProfileScreen extends StatefulWidget {
 class _UserProfileScreenState extends State<UserProfileScreen> {
   int? _currentActiveChildId;
   String _baseUrl = '';
+  String _livePhotoUrl = '';
 
   @override
   void initState() {
     super.initState();
     _currentActiveChildId = widget.activeStudentId;
+    _livePhotoUrl = widget.photoUrl;
     _initProfilePrefs();
   }
 
@@ -53,11 +56,42 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         ? widget.baseUrl!
         : (prefs.getString('base_url') ?? '');
     final resolvedActiveId = _currentActiveChildId ?? StudentSessionHelper.readSavedStudentId(prefs);
+    final roleUpper = widget.userRole.toUpperCase();
+    final bool isStaffOrAdmin = roleUpper == 'ADMIN' ||
+        roleUpper == 'SCHOOL_ADMIN' ||
+        roleUpper == 'TEACHER' ||
+        roleUpper == 'PRINCIPAL';
+    final cachedPhoto = (prefs.getString('user_photo') ?? '').trim();
+
     if (mounted) {
       setState(() {
         _baseUrl = savedBaseUrl;
         _currentActiveChildId = resolvedActiveId;
+        if (isStaffOrAdmin && _livePhotoUrl.isEmpty && cachedPhoto.isNotEmpty) {
+          _livePhotoUrl = cachedPhoto;
+        }
       });
+    }
+
+    if (isStaffOrAdmin && savedBaseUrl.isNotEmpty) {
+      final token = prefs.getString('auth_token') ?? '';
+      if (token.isNotEmpty) {
+        try {
+          final profile = await AuthService(baseUrl: savedBaseUrl).fetchProfile(token);
+          final latestPhoto = ((profile['photo_path'] as String?) ??
+                  (profile['staff_photo_path'] as String?) ??
+                  (profile['school_logo_path'] as String?) ??
+                  (profile['logo_path'] as String?) ??
+                  '')
+              .trim();
+          await prefs.setString('user_photo', latestPhoto);
+          if (mounted) {
+            setState(() {
+              _livePhotoUrl = latestPhoto;
+            });
+          }
+        } catch (_) {}
+      }
     }
   }
 
@@ -504,7 +538,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
     String photo = isStudentOrParent && activeStudent != null
         ? (activeStudent['photo_path']?.toString() ?? activeStudent['photo']?.toString() ?? widget.photoUrl)
-        : widget.photoUrl;
+        : _livePhotoUrl;
 
     final effectiveBaseUrl = (widget.baseUrl != null && widget.baseUrl!.isNotEmpty)
         ? widget.baseUrl!

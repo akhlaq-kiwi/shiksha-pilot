@@ -3157,6 +3157,10 @@ class _TeacherCredentialsModalState extends State<_TeacherCredentialsModal> {
       setState(() => _error = 'New password must be at least 6 characters.');
       return;
     }
+    if (!newPass.contains(RegExp(r'[a-zA-Z]')) || !newPass.contains(RegExp(r'[0-9]'))) {
+      setState(() => _error = 'Password must contain both letters and numbers.');
+      return;
+    }
 
     final staffId = int.tryParse(widget.teacher['id'].toString()) ?? 0;
     setState(() {
@@ -3314,7 +3318,7 @@ class _TeacherCredentialsModalState extends State<_TeacherCredentialsModal> {
                   child: TextField(
                     controller: _newPassCtrl,
                     decoration: InputDecoration(
-                      hintText: 'Enter new password (min 6 chars)',
+                      hintText: 'Min 6 chars (letters & numbers)',
                       hintStyle: const TextStyle(fontSize: 12),
                       isDense: true,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

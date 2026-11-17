@@ -210,6 +210,12 @@ function CredentialsDialog({ school, onClose }) {
       return;
     }
 
+    if (!/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
+      setError('Password must contain both letters and numbers.');
+      setSaving(false);
+      return;
+    }
+
     try {
       const updated = await platformService.updateSchoolCredentials(school.id, {
         mobile_number: mobileNumber.trim(),

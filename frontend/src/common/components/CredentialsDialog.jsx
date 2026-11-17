@@ -40,9 +40,8 @@ export default function CredentialsDialog({ isOpen, onClose, role, target }) {
   const validatePassword = (pwd) => {
     if (!pwd) return null;
     if (pwd.length < 6) return 'Password must be at least 6 characters.';
-    if (!/[A-Z]/.test(pwd)) return 'Password must contain at least one uppercase letter.';
-    if (!/[0-9]/.test(pwd)) return 'Password must contain at least one digit.';
-    if (!/[a-zA-Z]/.test(pwd)) return 'Password must contain at least one alphabet character.';
+    if (!/[a-zA-Z]/.test(pwd)) return 'Password must contain at least one letter.';
+    if (!/[0-9]/.test(pwd)) return 'Password must contain at least one number.';
     return null;
   };
 
@@ -131,7 +130,7 @@ export default function CredentialsDialog({ isOpen, onClose, role, target }) {
                 </p>
               ) : (
                 <p className="text-[11px] text-text-muted leading-tight">
-                  Must be at least 6 characters. If left empty, a secure password will be generated automatically.
+                  Must be at least 6 characters with letters and numbers. If left empty, a secure password will be generated automatically.
                 </p>
               )}
             </div>

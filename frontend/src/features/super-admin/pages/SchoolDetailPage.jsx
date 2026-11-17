@@ -181,11 +181,18 @@ function ChangePasswordDialog({ schoolName, onClose, onSave }) {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm]   = useState('');
   const [showPw, setShowPw]     = useState(false);
+  const passwordError = !password
+    ? null
+    : password.length < 6
+      ? 'Password must be at least 6 characters.'
+      : (!/[a-zA-Z]/.test(password) || !/[0-9]/.test(password))
+        ? 'Password must contain both letters and numbers.'
+        : null;
   const mismatch = confirm && password !== confirm;
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!mismatch && password.length >= 6) { onSave(password); onClose(); }
+    if (!mismatch && password.length >= 6 && !passwordError) { onSave(password); onClose(); }
   };
 
   return (
@@ -203,11 +210,12 @@ function ChangePasswordDialog({ schoolName, onClose, onSave }) {
           <div className="space-y-1.5">
             <label htmlFor="new-password" className="text-xs font-bold text-text-secondary uppercase">New Password</label>
             <div className="relative">
-              <Input id="new-password" type={showPw ? 'text' : 'password'} placeholder="Min. 6 characters" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} className="pr-10" />
+              <Input id="new-password" type={showPw ? 'text' : 'password'} placeholder="Min 6 chars (letters & numbers)" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} className={`pr-10 ${passwordError ? 'border-red-400' : ''}`} />
               <button type="button" onClick={() => setShowPw(v => !v)} className="absolute right-3 top-2.5 text-text-muted hover:text-text-primary">
                 {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
+            {passwordError && <p className="text-xs text-red-500 font-semibold">{passwordError}</p>}
           </div>
           <div className="space-y-1.5">
             <label htmlFor="confirm-password" className="text-xs font-bold text-text-secondary uppercase">Confirm Password</label>
@@ -216,7 +224,7 @@ function ChangePasswordDialog({ schoolName, onClose, onSave }) {
           </div>
           <div className="flex gap-3 pt-2">
             <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
-            <Button type="submit" className="flex-1" disabled={mismatch || password.length < 6}>Save</Button>
+            <Button type="submit" className="flex-1" disabled={mismatch || password.length < 6 || !!passwordError}>Save</Button>
           </div>
         </form>
       </div>

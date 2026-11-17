@@ -21370,14 +21370,30 @@ Only approve the settlement after reviewing all financial records.
         if (!empty($manualPassword)) {
             $password = trim((string)$manualPassword);
             if (strlen($password) < 6) {
-                throw new ValidationException(['password' => 'Password must be at least 6 characters long.']);
+                throw new ValidationException(
+                    ['password' => 'Password must be at least 6 characters long.'],
+                    'Password must be at least 6 characters long.'
+                );
+            }
+            if (!preg_match('/[a-zA-Z]/', $password) || !preg_match('/[0-9]/', $password)) {
+                throw new ValidationException(
+                    ['password' => 'Password must contain both letters and numbers.'],
+                    'Password must contain both letters and numbers.'
+                );
             }
         } else {
-            $chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-            $password = '';
-            for ($i = 0; $i < 8; $i++) {
-                $password .= $chars[random_int(0, strlen($chars) - 1)];
+            $letters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+            $digits = '0123456789';
+            $chars = $letters . $digits;
+            $passwordChars = [
+                $letters[random_int(0, strlen($letters) - 1)],
+                $digits[random_int(0, strlen($digits) - 1)],
+            ];
+            for ($i = 0; $i < 6; $i++) {
+                $passwordChars[] = $chars[random_int(0, strlen($chars) - 1)];
             }
+            shuffle($passwordChars);
+            $password = implode('', $passwordChars);
         }
         $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
 

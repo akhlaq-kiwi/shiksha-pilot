@@ -132,14 +132,13 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
         }
         return;
       }
-      final bool hasUppercase = newPass.contains(RegExp(r'[A-Z]'));
       final bool hasDigits = newPass.contains(RegExp(r'[0-9]'));
       final bool hasAlpha = newPass.contains(RegExp(r'[a-zA-Z]'));
-      if (!hasUppercase || !hasDigits || !hasAlpha) {
+      if (!hasDigits || !hasAlpha) {
         if (mounted) {
           setState(() {
             _isUpdating = false;
-            _newPasswordError = 'Must contain 1 uppercase, 1 digit & 1 letter.';
+            _newPasswordError = 'Must contain both letters and numbers.';
           });
         }
         return;
@@ -443,7 +442,7 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Password must be at least 6 characters with 1 uppercase letter and 1 number.',
+                        'Password must be at least 6 characters with letters and numbers.',
                         style: TextStyle(fontSize: 11.5, color: Color(0xFF475569), height: 1.3),
                       ),
                     ),

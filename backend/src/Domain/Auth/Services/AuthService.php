@@ -180,6 +180,7 @@ class AuthService extends BaseService
         $safeUser['app_lock_enabled'] = (bool)($user['app_lock_enabled'] ?? false) && !empty($user['app_lock_pin_hash']);
         if (in_array(strtoupper((string)($user['role'] ?? '')), ['ADMIN', 'SCHOOL_ADMIN'], true)) {
             $safeUser['name'] = 'Admin';
+            $safeUser['photo_path'] = !empty($user['school_logo_path']) ? $user['school_logo_path'] : null;
         }
         $isPrincipal = (strtoupper((string)($user['role'] ?? '')) === 'PRINCIPAL');
         $isFeeCollector = false;
@@ -251,7 +252,17 @@ class AuthService extends BaseService
         }
 
         if (strlen($newPassword) < 6) {
-            throw new \App\Shared\Exceptions\ValidationException(['new_password' => 'New password must be at least 6 characters.']);
+            throw new \App\Shared\Exceptions\ValidationException(
+                ['new_password' => 'New password must be at least 6 characters.'],
+                'New password must be at least 6 characters.'
+            );
+        }
+
+        if (!preg_match('/[a-zA-Z]/', $newPassword) || !preg_match('/[0-9]/', $newPassword)) {
+            throw new \App\Shared\Exceptions\ValidationException(
+                ['new_password' => 'Password must contain both letters and numbers.'],
+                'Password must contain both letters and numbers.'
+            );
         }
 
         $this->repo->updatePassword($userId, $newPassword);
@@ -654,6 +665,7 @@ class AuthService extends BaseService
         $profile['app_lock_enabled'] = (bool)($user['app_lock_enabled'] ?? false) && !empty($user['app_lock_pin_hash']);
         if (in_array(strtoupper((string)($user['role'] ?? '')), ['ADMIN', 'SCHOOL_ADMIN'], true)) {
             $profile['name'] = 'Admin';
+            $profile['photo_path'] = !empty($user['school_logo_path']) ? $user['school_logo_path'] : null;
         }
 
         $isPrincipal = (strtoupper((string)($user['role'] ?? '')) === 'PRINCIPAL');

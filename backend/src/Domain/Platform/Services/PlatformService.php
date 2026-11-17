@@ -1368,7 +1368,16 @@ class PlatformService extends BaseService
         }
 
         if (empty($password) || strlen($password) < 6) {
-            throw new \App\Shared\Exceptions\ValidationException(['password' => 'Password must be at least 6 characters.']);
+            throw new \App\Shared\Exceptions\ValidationException(
+                ['password' => 'Password must be at least 6 characters.'],
+                'Password must be at least 6 characters.'
+            );
+        }
+        if (!preg_match('/[a-zA-Z]/', $password) || !preg_match('/[0-9]/', $password)) {
+            throw new \App\Shared\Exceptions\ValidationException(
+                ['password' => 'Password must contain both letters and numbers.'],
+                'Password must contain both letters and numbers.'
+            );
         }
 
         // Uniqueness validation on email

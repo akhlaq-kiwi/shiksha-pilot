@@ -56,7 +56,7 @@ class AuthRepository extends BaseRepository
     {
         $this->ensureAppLockSchema();
         $stmt = $this->pdo->prepare(
-            "SELECT u.*, s.portal_theme AS school_portal_theme, s.status AS school_status, s.name AS school_name, st.photo_path AS staff_photo_path
+            "SELECT u.*, s.portal_theme AS school_portal_theme, s.status AS school_status, s.name AS school_name, s.logo_path AS school_logo_path, st.photo_path AS staff_photo_path
                FROM users u
                LEFT JOIN schools s ON s.id = u.school_id
                LEFT JOIN staff st ON st.phone = u.phone AND st.school_id = u.school_id
@@ -92,7 +92,7 @@ class AuthRepository extends BaseRepository
             if (!empty($candidatePhones)) {
                 $inPlaceholders = implode(',', array_fill(0, count($candidatePhones), '?'));
                 $stmtAlt = $this->pdo->prepare(
-                    "SELECT u.*, s.portal_theme AS school_portal_theme, s.status AS school_status, s.name AS school_name, st.photo_path AS staff_photo_path
+                    "SELECT u.*, s.portal_theme AS school_portal_theme, s.status AS school_status, s.name AS school_name, s.logo_path AS school_logo_path, st.photo_path AS staff_photo_path
                        FROM users u
                        LEFT JOIN schools s ON s.id = u.school_id
                        LEFT JOIN staff st ON st.phone = u.phone AND st.school_id = u.school_id
@@ -118,7 +118,7 @@ class AuthRepository extends BaseRepository
     {
         $this->ensureAppLockSchema();
         $stmt = $this->pdo->prepare(
-            "SELECT u.*, s.portal_theme AS school_portal_theme, s.status AS school_status, s.name AS school_name, st.photo_path AS staff_photo_path
+            "SELECT u.*, s.portal_theme AS school_portal_theme, s.status AS school_status, s.name AS school_name, s.logo_path AS school_logo_path, st.photo_path AS staff_photo_path
                FROM users u
                LEFT JOIN schools s ON s.id = u.school_id
                LEFT JOIN staff st ON st.phone = u.phone AND st.school_id = u.school_id

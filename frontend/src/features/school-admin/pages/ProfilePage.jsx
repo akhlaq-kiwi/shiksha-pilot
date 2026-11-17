@@ -60,6 +60,13 @@ export default function ProfilePage({ mode = 'details' }) {
   const [passwordForm, setPasswordForm] = useState({ newPassword: '', confirmPassword: '' });
   const [submittingPassword, setSubmittingPassword] = useState(false);
 
+  const validateNewPassword = (pwd) => {
+    if (!pwd) return null;
+    if (pwd.length < 6) return 'Password must be at least 6 characters.';
+    if (!/[a-zA-Z]/.test(pwd) || !/[0-9]/.test(pwd)) return 'Password must contain both letters and numbers.';
+    return null;
+  };
+  const passwordPolicyError = validateNewPassword(passwordForm.newPassword);
   const passwordMismatch = passwordForm.confirmPassword && passwordForm.newPassword !== passwordForm.confirmPassword;
 
   const loadProfile = async () => {
@@ -219,7 +226,7 @@ export default function ProfilePage({ mode = 'details' }) {
 
   const handlePasswordChange = async (e) => {
     e.preventDefault();
-    if (passwordMismatch || passwordForm.newPassword.length < 6) return;
+    if (passwordMismatch || !passwordForm.newPassword || passwordPolicyError) return;
 
     setSubmittingPassword(true);
     setError('');
@@ -645,12 +652,18 @@ export default function ProfilePage({ mode = 'details' }) {
                 <label htmlFor="new-password" className="text-xs font-bold text-text-secondary uppercase">New Password</label>
                 <Input id="new-password" 
                   type="password" 
-                  placeholder="Minimum 6 characters" 
+                  placeholder="Min 6 chars (letters & numbers)" 
                   value={passwordForm.newPassword} 
                   onChange={e => setPasswordForm(p => ({ ...p, newPassword: e.target.value }))} 
                   required 
                   minLength={6} 
+                  className={passwordPolicyError ? 'border-red-400 focus:ring-red-400' : ''}
                 />
+                {passwordPolicyError ? (
+                  <p className="text-[11px] text-red-500 font-semibold mt-1">{passwordPolicyError}</p>
+                ) : (
+                  <p className="text-[11px] text-text-muted mt-1">Must be at least 6 characters with letters and numbers.</p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <label htmlFor="confirm-new-password" className="text-xs font-bold text-text-secondary uppercase">Confirm New Password</label>
@@ -666,7 +679,7 @@ export default function ProfilePage({ mode = 'details' }) {
                   <p className="text-[11px] text-red-500 font-semibold mt-1">Passwords do not match</p>
                 )}
               </div>
-              <Button type="submit" disabled={submittingPassword || passwordMismatch || passwordForm.newPassword.length < 6} className="w-full font-bold">
+              <Button type="submit" disabled={submittingPassword || passwordMismatch || !passwordForm.newPassword || !!passwordPolicyError} className="w-full font-bold">
                 {submittingPassword ? 'Updating...' : 'Update Password'}
               </Button>
             </form>
