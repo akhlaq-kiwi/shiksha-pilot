@@ -290,6 +290,196 @@ class _TestSeriesAttemptScreenState extends State<TestSeriesAttemptScreen>
     _persistDraftAnswers();
   }
 
+  void _showUnansweredDialog(BuildContext sheetCtx, bool isDark) {
+    final unansweredIndices = <int>[];
+    for (int i = 0; i < _questions.length; i++) {
+      final qId = (_questions[i]['id'] as num).toInt();
+      if (_selectedOptions[qId] == null) {
+        unansweredIndices.add(i);
+      }
+    }
+    if (unansweredIndices.isEmpty) return;
+
+    final bg = isDark ? AppColors.darkSurfaceRaised : TsColors.cardIvory;
+    final textPrimary = isDark ? AppColors.darkTextPrimary : TsColors.ink;
+    final textSecondary = isDark ? AppColors.darkTextSecondary : TsColors.inkMuted;
+    final borderCol = isDark ? TsColors.darkBorder : TsColors.accentBorder;
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogCtx) => Dialog(
+        backgroundColor: bg,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: BorderSide(color: borderCol, width: 1.5),
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420, maxHeight: 520),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? TsColors.amber900.withValues(alpha: 0.45)
+                            : TsColors.accentSoft,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isDark ? TsColors.amber800 : TsColors.accentBorder,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.help_outline_rounded,
+                        size: 24,
+                        color: isDark ? TsColors.amber300 : TsColors.accent,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Unanswered Questions',
+                            style: TextStyle(
+                              color: textPrimary,
+                              fontSize: 16.5,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${unansweredIndices.length} of ${_questions.length} questions skipped',
+                            style: TextStyle(
+                              color: textSecondary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.close_rounded, size: 20, color: textSecondary),
+                      onPressed: () => Navigator.pop(dialogCtx),
+                      visualDensity: VisualDensity.compact,
+                      tooltip: 'Close',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Divider(color: isDark ? TsColors.darkBorder : TsColors.border, height: 1),
+                const SizedBox(height: 14),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Tap on any question number below to answer it:',
+                          style: TextStyle(
+                            color: textSecondary,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: unansweredIndices.map((index) {
+                            final qNum = index + 1;
+                            return Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: () {
+                                  Navigator.pop(dialogCtx);
+                                  Navigator.pop(sheetCtx, false);
+                                  setState(() {
+                                    _currentIndex = index;
+                                  });
+                                },
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                                  decoration: BoxDecoration(
+                                    color: isDark
+                                        ? TsColors.amber900.withValues(alpha: 0.3)
+                                        : AppColors.warning50,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: isDark
+                                          ? TsColors.amber700.withValues(alpha: 0.6)
+                                          : AppColors.warning500.withValues(alpha: 0.6),
+                                      width: 1.2,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        'Question $qNum',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 13,
+                                          color: isDark
+                                              ? const Color(0xFFFDE68A)
+                                              : AppColors.warning700,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Icon(
+                                        Icons.arrow_forward_ios_rounded,
+                                        size: 11,
+                                        color: isDark
+                                            ? const Color(0xFFFDE68A)
+                                            : AppColors.warning700,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(dialogCtx),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: textPrimary,
+                      side: BorderSide(color: isDark ? TsColors.darkBorder : TsColors.border),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text('Back to Submit Dialog', style: TextStyle(fontWeight: FontWeight.w700)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _confirmAndSubmit() async {
     final total = _questions.length;
     final answered = _answeredCount;
@@ -483,34 +673,43 @@ class _TestSeriesAttemptScreenState extends State<TestSeriesAttemptScreen>
                         bgColor: unanswered > 0
                             ? (isDark ? TsColors.amber900.withValues(alpha: 0.3) : AppColors.warning50)
                             : (isDark ? TsColors.darkSurfaceElevated : TsColors.slate100),
+                        onTap: unanswered > 0 ? () => _showUnansweredDialog(ctx, isDark) : null,
                       ),
                     ),
                   ],
                 ),
                 if (unanswered > 0) ...[
                   const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: isDark ? TsColors.amber900.withValues(alpha: 0.2) : AppColors.warning50,
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => _showUnansweredDialog(ctx, isDark),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.warning500.withValues(alpha: 0.4)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.info_outline_rounded, color: AppColors.warning600, size: 18),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'You still have $unanswered unanswered question${unanswered == 1 ? '' : 's'}.',
-                            style: const TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.warning700,
-                            ),
-                          ),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isDark ? TsColors.amber900.withValues(alpha: 0.2) : AppColors.warning50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.warning500.withValues(alpha: 0.4)),
                         ),
-                      ],
+                        child: Row(
+                          children: [
+                            const Icon(Icons.info_outline_rounded, color: AppColors.warning600, size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'You still have $unanswered unanswered question${unanswered == 1 ? '' : 's'}. Tap to view.',
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.warning700,
+                                ),
+                              ),
+                            ),
+                            const Icon(Icons.chevron_right_rounded, color: AppColors.warning600, size: 18),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -1625,35 +1824,70 @@ class _SummaryPill extends StatelessWidget {
   final String value;
   final Color color;
   final Color bgColor;
+  final VoidCallback? onTap;
 
   const _SummaryPill({
     required this.label,
     required this.value,
     required this.color,
     required this.bgColor,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final pill = Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(14),
+        border: onTap != null
+            ? Border.all(color: color.withValues(alpha: 0.4), width: 1.2)
+            : null,
       ),
       child: Column(
         children: [
-          Text(
-            value,
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: color),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: color,
+                ),
+              ),
+              if (onTap != null) ...[
+                const SizedBox(width: 4),
+                Icon(Icons.touch_app_rounded, size: 14, color: color),
+              ],
+            ],
           ),
           const SizedBox(height: 2),
           Text(
             label,
-            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: color),
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
           ),
         ],
       ),
     );
+
+    if (onTap != null) {
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: pill,
+        ),
+      );
+    }
+    return pill;
   }
 }

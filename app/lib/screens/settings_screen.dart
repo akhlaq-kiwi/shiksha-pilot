@@ -1290,7 +1290,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  'All dashboards, fees, and student records will show $nextName data until you switch back.\n\nFees deposited for inactive or alumni students will be credited to the active academic year.',
+                  nextStatus.toUpperCase() == 'ARCHIVED'
+                      ? 'All dashboards, fees, and student records will show $nextName data until you switch back.\n\nFees deposited for inactive or alumni students will be credited to the active academic year.'
+                      : 'All dashboards, fees, and student records will show $nextName data until you switch back.',
                   style: const TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.45),
                 ),
                 const SizedBox(height: 18),

@@ -1368,6 +1368,11 @@ class _TestSeriesLeaderboardScreenState
     final second = _toppers.length >= 2 ? _toppers[1] : null;
     final third = _toppers.length >= 3 ? _toppers[2] : null;
 
+    final rawClass = (_series['full_class_name'] ?? _series['class_name'] ?? _series['class'] ?? '').toString().trim();
+    final podiumTitle = rawClass.isNotEmpty
+        ? '${rawClass.toUpperCase()} TEST SERIES TOPPERS'
+        : 'TEST SERIES TOPPERS';
+
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 18, 14, 18),
       decoration: BoxDecoration(
@@ -1396,7 +1401,7 @@ class _TestSeriesLeaderboardScreenState
               const SizedBox(width: 8),
               Flexible(
                 child: Text(
-                  '${(_series['title'] ?? 'Test Series').toString()} · Toppers',
+                  podiumTitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -1421,7 +1426,7 @@ class _TestSeriesLeaderboardScreenState
                         podiumHeight: 68,
                         accentColor: const Color(0xFFE2E8F0),
                         badgeText: '#2',
-                        avatarRadius: 28,
+                        avatarRadius: 35,
                         negEnabled: _negEnabled,
                       )
                     : const SizedBox.shrink(),
@@ -1435,7 +1440,7 @@ class _TestSeriesLeaderboardScreenState
                         podiumHeight: 92,
                         accentColor: TsColors.amber300,
                         badgeText: '#1',
-                        avatarRadius: 36,
+                        avatarRadius: 45,
                         isCrown: true,
                         negEnabled: _negEnabled,
                       )
@@ -1450,7 +1455,7 @@ class _TestSeriesLeaderboardScreenState
                         podiumHeight: 54,
                         accentColor: const Color(0xFFF59E0B),
                         badgeText: '#3',
-                        avatarRadius: 26,
+                        avatarRadius: 32.5,
                         negEnabled: _negEnabled,
                       )
                     : const SizedBox.shrink(),
@@ -1571,7 +1576,7 @@ class _TestSeriesLeaderboardScreenState
                 StudentAvatarCircle(
                   photoUrl: resolvedPhotoUrl,
                   name: name,
-                  radius: 22,
+                  radius: 27.5,
                   borderColor: isTopper ? TsColors.amber400 : TsColors.border,
                   baseUrl: _effectiveBaseUrl,
                   heroTag: heroTag,
@@ -1991,7 +1996,7 @@ class _PodiumSpot extends StatelessWidget {
               borderColor: accentColor,
               borderWidth: isCrown ? 3.5 : 2.5,
               heroTag: 'topper_avatar_${entry['student_id']}_$badgeText',
-              enableZoom: true,
+              enableZoom: false,
             ),
             Positioned(
               bottom: -6,

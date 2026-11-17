@@ -197,4 +197,57 @@ class AuthService {
       throw Exception(resData['message'] ?? 'Failed to disable App Lock.');
     }
   }
+
+  /// Request a 4-digit OTP sent to registered email for Forgot PIN
+  Future<Map<String, dynamic>> requestAppLockForgotPinOtp(String token) async {
+    final uri = Uri.parse('$baseUrl/api/auth/app-lock/forgot-pin/request-otp');
+    final response = await http.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    final resData = json.decode(response.body);
+    if (response.statusCode != 200) {
+      final code = resData['code']?.toString() ?? '';
+      final msg = resData['message']?.toString() ?? 'Failed to send OTP.';
+      if (code == 'NO_EMAIL_REGISTERED' || msg.toLowerCase().contains('email address is not registered')) {
+        throw NoEmailRegisteredException(msg);
+      }
+      throw Exception(msg);
+    }
+
+    return Map<String, dynamic>.from(resData['data'] ?? {});
+  }
+
+  /// Verify 4-digit OTP and reset App Lock PIN
+  Future<void> resetAppLockPinWithOtp(String token, String otp, String newPin) async {
+    final uri = Uri.parse('$baseUrl/api/auth/app-lock/forgot-pin/verify-otp');
+    final response = await http.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: json.encode({
+        'otp': otp,
+        'new_pin': newPin,
+      }),
+    );
+
+    final resData = json.decode(response.body);
+    if (response.statusCode != 200) {
+      throw Exception(resData['message'] ?? 'Failed to reset App Lock PIN.');
+    }
+  }
+}
+
+class NoEmailRegisteredException implements Exception {
+  final String message;
+  NoEmailRegisteredException(this.message);
+
+  @override
+  String toString() => message;
 }

@@ -27,6 +27,8 @@ return function (App $app) {
     $app->post('/api/auth/app-lock', [AuthController::class, 'enableAppLock']);
     $app->post('/api/auth/app-lock/verify', [AuthController::class, 'verifyAppLock']);
     $app->post('/api/auth/app-lock/disable', [AuthController::class, 'disableAppLock']);
+    $app->post('/api/auth/app-lock/forgot-pin/request-otp', [AuthController::class, 'requestAppLockForgotPinOtp']);
+    $app->post('/api/auth/app-lock/forgot-pin/verify-otp', [AuthController::class, 'verifyAppLockForgotPinOtp']);
     $app->get('/api/auth/profile', [AuthController::class, 'getProfile']);
     
     // Platform / Super Admin Domain

@@ -1704,8 +1704,10 @@ class SchoolAdminService extends BaseService
         }
 
         // Email and phone formats
-        if (!empty($data['student_email']) && !filter_var($data['student_email'], FILTER_VALIDATE_EMAIL)) {
-            $errors['student_email'] = 'Invalid student email format';
+        $rawStudentEmail = !empty($data['student_email']) ? trim((string)$data['student_email']) : (!empty($data['email']) ? trim((string)$data['email']) : null);
+        if (!empty($rawStudentEmail) && !filter_var($rawStudentEmail, FILTER_VALIDATE_EMAIL)) {
+            $errors['student_email'] = 'Please enter a valid email address.';
+            $errors['email'] = 'Please enter a valid email address.';
         }
         if (!empty($data['student_mobile']) && !preg_match('/^[0-9]{10}$/', trim($data['student_mobile']))) {
             $errors['student_mobile'] = 'Mobile No should be exactly 10 digits';
@@ -1893,6 +1895,8 @@ class SchoolAdminService extends BaseService
         $parentPhone = $studentMobile;
         $fatherPhone = $studentMobile;
 
+        $studentEmail = !empty($data['student_email']) ? strtolower(trim((string)$data['student_email'])) : (!empty($data['email']) ? strtolower(trim((string)$data['email'])) : null);
+
         // Unconditionally check if entered phone is a Super Admin or School Admin number
         $this->checkAdminOrSuperAdminPhoneConflict($pdo, array_filter([$studentMobile]));
 
@@ -1902,13 +1906,21 @@ class SchoolAdminService extends BaseService
             $this->checkActiveStudentPhoneConflictInOtherSchools($pdo, $schoolId, array_filter([$studentMobile]));
         }
 
+        if ($studentEmail !== null) {
+            $this->checkAdminOrSuperAdminEmailConflict($pdo, [$studentEmail]);
+            $this->checkTeacherStudentEmailConflict($pdo, $schoolId, [$studentEmail], null, 0);
+            if (strcasecmp($status, 'ACTIVE') === 0 || strcasecmp($status, 'Active') === 0) {
+                $this->checkActiveStudentEmailConflictInOtherSchools($pdo, $schoolId, [$studentEmail], 0);
+            }
+        }
+
         $id = $this->studentRepo->create([
             'school_id'    => $schoolId,
             'name'         => $name,
             'admission_no' => null,
             'class_id'     => $classId,
             'parent_phone' => $parentPhone,
-            'email'        => $data['student_email'] ?? null,
+            'email'        => $studentEmail,
             'status'       => $status,
             'dob'          => $data['dob'] ?? null,
             'address'      => $data['current_address_line'] ?? null,
@@ -1924,7 +1936,7 @@ class SchoolAdminService extends BaseService
             'religion' => $data['religion'] ?? null,
             'aadhaar_no' => $data['aadhaar_no'] ?? null,
             'student_mobile' => $data['student_mobile'] ?? null,
-            'student_email' => $data['student_email'] ?? null,
+            'student_email' => $studentEmail,
             'academic_year_id' => $academicYearId > 0 ? $academicYearId : null,
             'admission_date' => $admissionDate,
             'admission_fee' => $admissionFee,
@@ -1996,7 +2008,7 @@ class SchoolAdminService extends BaseService
         }
 
         // Auto-sync active user account for student/parent mobile login
-        $this->syncUserAccountForStudent($pdo, $schoolId, $name, $parentPhone, $data['student_email'] ?? null);
+        $this->syncUserAccountForStudent($pdo, $schoolId, $name, $parentPhone, $studentEmail, $status);
 
         $student = $this->studentRepo->findDetailById($schoolId, $id);
         if ($student === null) {
@@ -2053,8 +2065,10 @@ class SchoolAdminService extends BaseService
         }
 
         // Email and phone formats
-        if (!empty($data['student_email']) && !filter_var($data['student_email'], FILTER_VALIDATE_EMAIL)) {
-            $errors['student_email'] = 'Invalid student email format';
+        $rawStudentEmail = !empty($data['student_email']) ? trim((string)$data['student_email']) : (!empty($data['email']) ? trim((string)$data['email']) : null);
+        if (!empty($rawStudentEmail) && !filter_var($rawStudentEmail, FILTER_VALIDATE_EMAIL)) {
+            $errors['student_email'] = 'Please enter a valid email address.';
+            $errors['email'] = 'Please enter a valid email address.';
         }
         if (!empty($data['student_mobile']) && !preg_match('/^[0-9]{10}$/', trim($data['student_mobile']))) {
             $errors['student_mobile'] = 'Mobile No should be exactly 10 digits';
@@ -2190,6 +2204,12 @@ class SchoolAdminService extends BaseService
         $parentPhone = $studentMobile;
         $fatherPhone = $studentMobile;
 
+        $studentEmail = array_key_exists('student_email', $data)
+            ? (!empty($data['student_email']) ? strtolower(trim((string)$data['student_email'])) : null)
+            : (array_key_exists('email', $data)
+                ? (!empty($data['email']) ? strtolower(trim((string)$data['email'])) : null)
+                : (!empty($student['student_email']) ? strtolower(trim((string)$student['student_email'])) : (!empty($student['email']) ? strtolower(trim((string)$student['email'])) : null)));
+
         $existingStatus = strtoupper($student['status'] ?? 'ACTIVE');
         $newStatus = strtoupper($status);
         $isReactivating = ($existingStatus === 'INACTIVE' && $newStatus === 'ACTIVE');
@@ -2197,6 +2217,14 @@ class SchoolAdminService extends BaseService
         $this->checkAdminOrSuperAdminPhoneConflict($pdo, array_filter([$studentMobile]), $isReactivating);
 
         $this->checkTeacherStudentPhoneConflict($pdo, $schoolId, array_filter([$studentMobile]), null, $id, $isReactivating);
+
+        if ($studentEmail !== null) {
+            $this->checkAdminOrSuperAdminEmailConflict($pdo, [$studentEmail], $isReactivating);
+            $this->checkTeacherStudentEmailConflict($pdo, $schoolId, [$studentEmail], null, $id, $isReactivating);
+            if ($newStatus === 'ACTIVE') {
+                $this->checkActiveStudentEmailConflictInOtherSchools($pdo, $schoolId, [$studentEmail], $id, $isReactivating);
+            }
+        }
 
         $oldParentPhone = trim((string)($student['parent_phone'] ?? ''));
         $oldFatherPhone = trim((string)($student['father_phone'] ?? ''));
@@ -2244,7 +2272,7 @@ class SchoolAdminService extends BaseService
             'admission_no' => null,
             'class_id'     => $classId,
             'parent_phone' => $parentPhone,
-            'email'        => $data['student_email'] ?? null,
+            'email'        => $studentEmail,
             'status'       => $status,
             'dob'          => $data['dob'] ?? null,
             'address'      => $data['current_address_line'] ?? null,
@@ -2261,7 +2289,7 @@ class SchoolAdminService extends BaseService
             'religion' => $data['religion'] ?? null,
             'aadhaar_no' => $data['aadhaar_no'] ?? null,
             'student_mobile' => $data['student_mobile'] ?? null,
-            'student_email' => $data['student_email'] ?? null,
+            'student_email' => $studentEmail,
             'academic_year_id' => $academicYearId > 0 ? $academicYearId : null,
             'admission_date' => $data['admission_date'] ?? $student['admission_date'],
             'roll_no' => $rollNo,
@@ -2329,7 +2357,7 @@ class SchoolAdminService extends BaseService
         $updatedClassId = !empty($data['class_name']) ? (int)$data['class_name'] : (int)$student['class_id'];
         $updatedCategory = array_key_exists('student_category', $data) ? $data['student_category'] : ($student['student_category'] ?? null);
         // Auto-sync user account status for student/parent login
-        $this->syncUserAccountForStudent($pdo, $schoolId, $name, $parentPhone, $data['student_email'] ?? null, $status);
+        $this->syncUserAccountForStudent($pdo, $schoolId, $name, $parentPhone, $studentEmail, $status);
 
         return $this->studentRepo->findDetailById($schoolId, $id);
     }
@@ -3258,7 +3286,12 @@ class SchoolAdminService extends BaseService
         if (empty($data['phone']) || !preg_match('/^[0-9]{10}$/', trim($data['phone']))) {
             throw new ValidationException(['phone' => 'Contact number must be exactly 10 digits.']);
         }
-        // emergency_phone and email validations removed as fields are no longer required for teachers
+        $staffEmail = !empty($data['email']) ? strtolower(trim((string)$data['email'])) : null;
+        if ($staffEmail !== null) {
+            if (!filter_var($staffEmail, FILTER_VALIDATE_EMAIL)) {
+                throw new ValidationException(['email' => 'Please enter a valid email address.']);
+            }
+        }
         if (empty($data['joining_date']) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', trim($data['joining_date']))) {
             throw new ValidationException(['joining_date' => 'Joining date is required.']);
         }
@@ -3286,7 +3319,10 @@ class SchoolAdminService extends BaseService
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
         $ayid = $workingYear ? (int)$workingYear['id'] : null;
 
-        // 2. Uniqueness Checks
+        // 2. Status Mapping
+        $status = !empty($data['exit_date']) ? 'Inactive' : ($data['status'] ?? 'ACTIVE');
+
+        // 3. Uniqueness Checks
         if ($ayid !== null) {
             $stmtCheckContact = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND phone = :phone AND (academic_year_id = :ayid OR academic_year_id IS NULL) LIMIT 1");
             $stmtCheckContact->execute([':sid' => $schoolId, ':phone' => trim($data['phone']), ':ayid' => $ayid]);
@@ -3298,8 +3334,24 @@ class SchoolAdminService extends BaseService
             throw new ValidationException(['phone' => 'This contact number is already registered.']);
         }
 
-        // 3. Status Mapping
-        $status = !empty($data['exit_date']) ? 'Inactive' : ($data['status'] ?? 'ACTIVE');
+        if ($staffEmail !== null) {
+            if ($ayid !== null) {
+                $stmtCheckEmail = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND LOWER(email) = :email AND (academic_year_id = :ayid OR academic_year_id IS NULL) LIMIT 1");
+                $stmtCheckEmail->execute([':sid' => $schoolId, ':email' => $staffEmail, ':ayid' => $ayid]);
+            } else {
+                $stmtCheckEmail = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND LOWER(email) = :email LIMIT 1");
+                $stmtCheckEmail->execute([':sid' => $schoolId, ':email' => $staffEmail]);
+            }
+            if ($stmtCheckEmail->fetchColumn() !== false) {
+                throw new ValidationException(['email' => 'This email address is already registered.']);
+            }
+
+            $this->checkAdminOrSuperAdminEmailConflict($pdo, [$staffEmail]);
+            $this->checkTeacherStudentEmailConflict($pdo, $schoolId, [$staffEmail], 0, null);
+            if (strcasecmp($status, 'ACTIVE') === 0) {
+                $this->checkActiveStaffEmailConflictInOtherSchools($pdo, $schoolId, $staffEmail);
+            }
+        }
 
         $this->checkTeacherStudentPhoneConflict($pdo, $schoolId, $data['phone'], 0, null);
 
@@ -3316,7 +3368,7 @@ class SchoolAdminService extends BaseService
             'role'                    => $data['role'] ?? 'Teacher',
             'department'              => $data['department'] ?? null,
             'phone'                   => $data['phone'],
-            'email'                   => null,
+            'email'                   => $staffEmail,
             'status'                  => $status,
             'salary'                  => $data['salary'] ?? null,
             'joining_date'            => $data['joining_date'],
@@ -3359,7 +3411,7 @@ class SchoolAdminService extends BaseService
         }
 
         // Auto-sync active user account for mobile app login
-        $this->syncUserAccountForStaff($pdo, $schoolId, $data['name'], $data['phone'], $data['role'] ?? 'Teacher');
+        $this->syncUserAccountForStaff($pdo, $schoolId, $data['name'], $data['phone'], $data['role'] ?? 'Teacher', $status, $staffEmail);
 
         $this->log('Staff member created', ['id' => $id, 'school_id' => $schoolId]);
         return $this->getStaffDetails($user, $id);
@@ -3389,7 +3441,12 @@ class SchoolAdminService extends BaseService
         if (empty($data['phone']) || !preg_match('/^[0-9]{10}$/', trim($data['phone']))) {
             throw new ValidationException(['phone' => 'Contact number must be exactly 10 digits.']);
         }
-        // emergency_phone and email validations removed as fields are no longer required for teachers
+        $staffEmail = !empty($data['email']) ? strtolower(trim((string)$data['email'])) : null;
+        if ($staffEmail !== null) {
+            if (!filter_var($staffEmail, FILTER_VALIDATE_EMAIL)) {
+                throw new ValidationException(['email' => 'Please enter a valid email address.']);
+            }
+        }
         if (empty($data['joining_date']) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', trim($data['joining_date']))) {
             throw new ValidationException(['joining_date' => 'Joining date is required.']);
         }
@@ -3416,7 +3473,14 @@ class SchoolAdminService extends BaseService
 
         $ayid = $member ? $member['academic_year_id'] : null;
 
-        // 2. Uniqueness Checks
+        // 2. Status Mapping
+        $exitDate = !empty($data['exit_date']) ? trim((string)$data['exit_date']) : null;
+        $status = $exitDate !== null ? 'Inactive' : (!empty($data['status']) ? $data['status'] : 'ACTIVE');
+        $existingStatus = strtoupper($member['status'] ?? 'ACTIVE');
+        $newStatus = strtoupper($status);
+        $isReactivating = ($existingStatus === 'INACTIVE' && $newStatus === 'ACTIVE');
+
+        // 3. Uniqueness Checks
         if ($ayid !== null) {
             $stmtCheckContact = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND phone = :phone AND id != :id AND (academic_year_id = :ayid OR academic_year_id IS NULL) LIMIT 1");
             $stmtCheckContact->execute([':sid' => $schoolId, ':phone' => trim($data['phone']), ':id' => $id, ':ayid' => $ayid]);
@@ -3428,12 +3492,24 @@ class SchoolAdminService extends BaseService
             throw new ValidationException(['phone' => 'This contact number is already registered.']);
         }
 
-        // 3. Status Mapping
-        $exitDate = !empty($data['exit_date']) ? trim((string)$data['exit_date']) : null;
-        $status = $exitDate !== null ? 'Inactive' : (!empty($data['status']) ? $data['status'] : 'ACTIVE');
-        $existingStatus = strtoupper($member['status'] ?? 'ACTIVE');
-        $newStatus = strtoupper($status);
-        $isReactivating = ($existingStatus === 'INACTIVE' && $newStatus === 'ACTIVE');
+        if ($staffEmail !== null) {
+            if ($ayid !== null) {
+                $stmtCheckEmail = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND LOWER(email) = :email AND id != :id AND (academic_year_id = :ayid OR academic_year_id IS NULL) LIMIT 1");
+                $stmtCheckEmail->execute([':sid' => $schoolId, ':email' => $staffEmail, ':id' => $id, ':ayid' => $ayid]);
+            } else {
+                $stmtCheckEmail = $pdo->prepare("SELECT id FROM staff WHERE school_id = :sid AND LOWER(email) = :email AND id != :id LIMIT 1");
+                $stmtCheckEmail->execute([':sid' => $schoolId, ':email' => $staffEmail, ':id' => $id]);
+            }
+            if ($stmtCheckEmail->fetchColumn() !== false) {
+                throw new ValidationException(['email' => 'This email address is already registered.']);
+            }
+
+            $this->checkAdminOrSuperAdminEmailConflict($pdo, [$staffEmail], $isReactivating);
+            $this->checkTeacherStudentEmailConflict($pdo, $schoolId, [$staffEmail], $id, null, $isReactivating);
+            if ($newStatus === 'ACTIVE') {
+                $this->checkActiveStaffEmailConflictInOtherSchools($pdo, $schoolId, $staffEmail, $id, $isReactivating);
+            }
+        }
 
         $oldPhone = trim((string)($member['phone'] ?? ''));
         $newPhone = trim((string)($data['phone'] ?? ''));
@@ -3458,7 +3534,7 @@ class SchoolAdminService extends BaseService
             'role'                    => $data['role'] ?? 'Teacher',
             'department'              => $data['department'] ?? null,
             'phone'                   => $data['phone'],
-            'email'                   => null,
+            'email'                   => $staffEmail,
             'status'                  => $status,
             'salary'                  => $data['salary'] ?? null,
             'joining_date'            => $data['joining_date'],
@@ -3500,7 +3576,7 @@ class SchoolAdminService extends BaseService
         }
 
         // Auto-sync user account status for login
-        $this->syncUserAccountForStaff($pdo, $schoolId, $data['name'], $data['phone'], $data['role'] ?? 'Teacher', $status);
+        $this->syncUserAccountForStaff($pdo, $schoolId, $data['name'], $data['phone'], $data['role'] ?? 'Teacher', $status, $staffEmail);
 
         return $this->getStaffDetails($user, $id);
     }
@@ -3527,14 +3603,7 @@ class SchoolAdminService extends BaseService
         $stmtCheck->execute([':phone' => $phone]);
         $existing = $stmtCheck->fetch(PDO::FETCH_ASSOC);
 
-        $cleanEmail = !empty($email) ? trim((string)$email) : null;
-        if (!empty($cleanEmail)) {
-            $stmtEmailCheck = $pdo->prepare("SELECT id FROM users WHERE LOWER(email) = LOWER(:email) AND id != :ex_id LIMIT 1");
-            $stmtEmailCheck->execute([':email' => $cleanEmail, ':ex_id' => $existing ? (int)$existing['id'] : 0]);
-            if ($stmtEmailCheck->fetchColumn() !== false) {
-                $cleanEmail = null;
-            }
-        }
+        $cleanEmail = !empty($email) ? strtolower(trim((string)$email)) : null;
 
         if (!$existing) {
             $defaultPassword = 'Test@123';
@@ -3562,12 +3631,13 @@ class SchoolAdminService extends BaseService
         }
     }
 
-    private function syncUserAccountForStaff(PDO $pdo, int $schoolId, string $name, string $phone, string $role = 'TEACHER', string $status = 'ACTIVE'): void
+    private function syncUserAccountForStaff(PDO $pdo, int $schoolId, string $name, string $phone, string $role = 'TEACHER', string $status = 'ACTIVE', ?string $email = null): void
     {
         $phone = trim($phone);
         if (empty($phone) || strlen($phone) < 10) return;
 
         $targetStatus = (strcasecmp($status, 'ACTIVE') === 0) ? 'ACTIVE' : 'INACTIVE';
+        $cleanEmail = !empty($email) ? strtolower(trim((string)$email)) : null;
 
         $stmtCheck = $pdo->prepare("SELECT id FROM users WHERE phone = :phone LIMIT 1");
         $stmtCheck->execute([':phone' => $phone]);
@@ -3577,11 +3647,12 @@ class SchoolAdminService extends BaseService
             $defaultPassword = 'Test@123';
             $hashedPassword = password_hash($defaultPassword, PASSWORD_BCRYPT);
             $stmtInsert = $pdo->prepare("
-                INSERT INTO users (phone, password, plain_password, role, name, status, school_id, force_password_change)
-                VALUES (:phone, :pwd, :plain, 'TEACHER', :name, :status, :sid, 0)
+                INSERT INTO users (phone, email, password, plain_password, role, name, status, school_id, force_password_change)
+                VALUES (:phone, :email, :pwd, :plain, 'TEACHER', :name, :status, :sid, 0)
             ");
             $stmtInsert->execute([
                 ':phone'  => $phone,
+                ':email'  => $cleanEmail,
                 ':pwd'    => $hashedPassword,
                 ':plain'  => $defaultPassword,
                 ':name'   => trim($name),
@@ -3591,10 +3662,10 @@ class SchoolAdminService extends BaseService
         } else {
             $stmtUpdate = $pdo->prepare("
                 UPDATE users 
-                SET status = :status, school_id = :sid, name = :name
+                SET status = :status, school_id = :sid, name = :name, email = COALESCE(:email, email)
                 WHERE id = :id
             ");
-            $stmtUpdate->execute([':status' => $targetStatus, ':sid' => $schoolId, ':name' => trim($name), ':id' => $existing['id']]);
+            $stmtUpdate->execute([':status' => $targetStatus, ':sid' => $schoolId, ':name' => trim($name), ':email' => $cleanEmail, ':id' => $existing['id']]);
         }
     }
 
@@ -3648,6 +3719,62 @@ class SchoolAdminService extends BaseService
                 throw new ValidationException([
                     'student_mobile' => $errMsg,
                     'phone' => $errMsg
+                ], $errMsg);
+            }
+        }
+    }
+
+    private function checkAdminOrSuperAdminEmailConflict(PDO $pdo, array|string $emails, ?bool $isReactivating = false): void
+    {
+        $isReactivating = (bool)$isReactivating;
+        $emailList = is_array($emails) ? $emails : [$emails];
+        $validEmails = [];
+        foreach ($emailList as $e) {
+            $cleaned = strtolower(trim((string)$e));
+            if (!empty($cleaned) && filter_var($cleaned, FILTER_VALIDATE_EMAIL)) {
+                $validEmails[] = $cleaned;
+            }
+        }
+        $validEmails = array_unique($validEmails);
+        if (empty($validEmails)) {
+            return;
+        }
+
+        foreach ($validEmails as $email) {
+            // 1. Check users table for SUPER_ADMIN, SCHOOL_ADMIN, ADMIN roles
+            $stmtUser = $pdo->prepare("
+                SELECT email, role 
+                FROM users 
+                WHERE LOWER(email) = :email
+                  AND (UPPER(role) IN ('SUPER_ADMIN', 'SCHOOL_ADMIN', 'ADMIN', 'TENANT_ADMIN'))
+                  AND UPPER(status) = 'ACTIVE'
+                LIMIT 1
+            ");
+            $stmtUser->execute([':email' => $email]);
+            $userConflict = $stmtUser->fetch(PDO::FETCH_ASSOC);
+
+            if (!$userConflict) {
+                // 2. Check schools table for contact_email
+                $stmtSchool = $pdo->prepare("
+                    SELECT id, name FROM schools 
+                    WHERE LOWER(contact_email) = :email
+                      AND UPPER(COALESCE(status, 'ACTIVE')) = 'ACTIVE'
+                    LIMIT 1
+                ");
+                $stmtSchool->execute([':email' => $email]);
+                $schoolConflict = $stmtSchool->fetch(PDO::FETCH_ASSOC);
+                if ($schoolConflict) {
+                    $userConflict = ['role' => 'SCHOOL_ADMIN'];
+                }
+            }
+
+            if ($userConflict) {
+                $errMsg = $isReactivating 
+                    ? "This Email address is already registered please update Email address."
+                    : "Entered email address already registered to an admin account";
+                throw new ValidationException([
+                    'student_email' => $errMsg,
+                    'email' => $errMsg
                 ], $errMsg);
             }
         }
@@ -3747,8 +3874,9 @@ class SchoolAdminService extends BaseService
         int $currentSchoolId,
         array|string $emails,
         ?int $excludeStudentId = null,
-        bool $isReactivating = false
+        ?bool $isReactivating = false
     ): void {
+        $isReactivating = (bool)$isReactivating;
         $emailList = is_array($emails) ? $emails : [$emails];
         $validEmails = [];
         foreach ($emailList as $e) {
@@ -3879,8 +4007,9 @@ class SchoolAdminService extends BaseService
         int $currentSchoolId,
         ?string $email,
         ?int $excludeStaffId = null,
-        bool $isReactivating = false
+        ?bool $isReactivating = false
     ): void {
+        $isReactivating = (bool)$isReactivating;
         $email = strtolower(trim((string)$email));
         if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) return;
 
@@ -4048,6 +4177,119 @@ class SchoolAdminService extends BaseService
                         'parent_phone' => $errMsg,
                         'father_phone' => $errMsg,
                         'phone' => $errMsg
+                    ], $errMsg);
+                }
+            }
+        }
+    }
+
+    private function checkTeacherStudentEmailConflict(
+        PDO $pdo,
+        int $schoolId,
+        array|string $emails,
+        ?int $excludeStaffId = null,
+        ?int $excludeStudentId = null,
+        ?bool $isReactivating = false
+    ): void {
+        $isReactivating = (bool)$isReactivating;
+        $emailList = is_array($emails) ? $emails : [$emails];
+        $validEmails = [];
+        foreach ($emailList as $e) {
+            $cleaned = strtolower(trim((string)$e));
+            if (!empty($cleaned) && filter_var($cleaned, FILTER_VALIDATE_EMAIL)) {
+                $validEmails[] = $cleaned;
+            }
+        }
+        $validEmails = array_unique($validEmails);
+        if (empty($validEmails)) {
+            return;
+        }
+
+        foreach ($validEmails as $email) {
+            // 1. When saving/updating a Staff/Teacher: check if matches any ACTIVE Student in the same school
+            if ($excludeStaffId !== null) {
+                $stmtStudent = $pdo->prepare("
+                    SELECT id, TRIM(CONCAT(first_name, ' ', COALESCE(last_name, ''))) AS student_name 
+                    FROM students 
+                    WHERE school_id = :sid 
+                      AND UPPER(status) = 'ACTIVE'
+                      AND (
+                        LOWER(COALESCE(email, '')) = :e1
+                        OR LOWER(COALESCE(student_email, '')) = :e2
+                        OR LOWER(COALESCE(father_email, '')) = :e3
+                      )
+                      " . ($excludeStudentId !== null ? "AND id != {$excludeStudentId}" : "") . "
+                    LIMIT 1
+                ");
+                $stmtStudent->execute([':sid' => $schoolId, ':e1' => $email, ':e2' => $email, ':e3' => $email]);
+                $studentMatch = $stmtStudent->fetch(PDO::FETCH_ASSOC);
+                if ($studentMatch) {
+                    $sName = $studentMatch['student_name'] ?? 'a student';
+                    $errMsg = $isReactivating 
+                        ? "This Email address is already registered please update Email address."
+                        : "This email address is already registered to a student ({$sName}). Teacher and student email addresses cannot be the same.";
+                    throw new ValidationException(['email' => $errMsg], $errMsg);
+                }
+
+                $stmtUserStudent = $pdo->prepare("
+                    SELECT name, role 
+                    FROM users 
+                    WHERE LOWER(email) = :email 
+                      AND UPPER(role) IN ('STUDENT', 'PARENT')
+                      AND UPPER(status) = 'ACTIVE'
+                    LIMIT 1
+                ");
+                $stmtUserStudent->execute([':email' => $email]);
+                $uMatch = $stmtUserStudent->fetch(PDO::FETCH_ASSOC);
+                if ($uMatch) {
+                    $errMsg = $isReactivating 
+                        ? "This Email address is already registered please update Email address."
+                        : "This email address is already registered to a student/parent account ({$uMatch['name']}). Teacher and student email addresses cannot be the same.";
+                    throw new ValidationException(['email' => $errMsg], $errMsg);
+                }
+            }
+
+            // 2. When saving/updating a Student: check if matches any ACTIVE Teacher/Staff in the same school
+            if ($excludeStudentId !== null) {
+                $stmtStaff = $pdo->prepare("
+                    SELECT id, name, role 
+                    FROM staff 
+                    WHERE school_id = :sid 
+                      AND UPPER(status) = 'ACTIVE'
+                      AND LOWER(email) = :email
+                      " . ($excludeStaffId !== null ? "AND id != {$excludeStaffId}" : "") . "
+                    LIMIT 1
+                ");
+                $stmtStaff->execute([':sid' => $schoolId, ':email' => $email]);
+                $staffMatch = $stmtStaff->fetch(PDO::FETCH_ASSOC);
+                if ($staffMatch) {
+                    $stName = $staffMatch['name'] ?? 'a staff member';
+                    $errMsg = $isReactivating 
+                        ? "This Email address is already registered please update Email address."
+                        : "This email address is already registered to teacher/staff ({$stName}). Student and teacher email addresses cannot be the same.";
+                    throw new ValidationException([
+                        'student_email' => $errMsg,
+                        'email' => $errMsg
+                    ], $errMsg);
+                }
+
+                $stmtUserStaff = $pdo->prepare("
+                    SELECT name, role 
+                    FROM users 
+                    WHERE LOWER(email) = :email 
+                      AND UPPER(role) IN ('TEACHER', 'STAFF')
+                      AND UPPER(status) = 'ACTIVE'
+                    LIMIT 1
+                ");
+                $stmtUserStaff->execute([':email' => $email]);
+                $uMatch = $stmtUserStaff->fetch(PDO::FETCH_ASSOC);
+                if ($uMatch) {
+                    $errMsg = $isReactivating 
+                        ? "This Email address is already registered please update Email address."
+                        : "This email address is already registered to a teacher/staff account ({$uMatch['name']}). Student and teacher email addresses cannot be the same.";
+                    throw new ValidationException([
+                        'student_email' => $errMsg,
+                        'email' => $errMsg
                     ], $errMsg);
                 }
             }

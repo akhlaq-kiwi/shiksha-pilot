@@ -1290,6 +1290,20 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                       {errors.student_mobile && <p className="text-[11px] text-red-500 font-semibold">{errors.student_mobile}</p>}
                     </div>
 
+                    <div className="space-y-1.5">
+                      <label htmlFor="student_email" className="text-xs font-bold text-text-secondary uppercase">Email Address (Optional)</label>
+                      <Input 
+                        id="student_email" 
+                        type="email" 
+                        name="student_email" 
+                        value={formData.student_email || ''} 
+                        onChange={handleTextChange} 
+                        placeholder="e.g. student@domain.com" 
+                        className={errors.student_email ? 'border-red-500' : ''} 
+                      />
+                      {errors.student_email && <p className="text-[11px] text-red-500 font-semibold">{errors.student_email}</p>}
+                    </div>
+
                     {isFirstYear ? (
                       <div className="space-y-1.5">
                         <label htmlFor="sr_no" className="text-xs font-bold text-text-secondary uppercase">SR Number <span className="text-red-500">*</span></label>

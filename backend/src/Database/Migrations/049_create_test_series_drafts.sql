@@ -12,3 +12,4 @@ CREATE TABLE IF NOT EXISTS test_series_drafts (
     KEY idx_tsd_teacher_class (school_id, teacher_user_id, class_id),
     KEY idx_tsd_school (school_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+

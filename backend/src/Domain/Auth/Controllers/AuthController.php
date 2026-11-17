@@ -182,6 +182,51 @@ class AuthController extends BaseController
     }
 
     /**
+     * POST /api/auth/app-lock/forgot-pin/request-otp
+     *
+     * Sends a 4-digit OTP to user's registered email.
+     * Requires a valid auth token.
+     */
+    public function requestAppLockForgotPinOtp(Request $request, Response $response): Response
+    {
+        $claims = $this->authenticate($request);
+        $result = $this->authService->requestAppLockForgotPinOtp((int) $claims['id']);
+
+        if (isset($result['code']) && $result['code'] === 'NO_EMAIL_REGISTERED') {
+            $body = [
+                'status'  => 'error',
+                'code'    => 'NO_EMAIL_REGISTERED',
+                'message' => $result['message'],
+                'data'    => null,
+            ];
+            return \App\Shared\Http\ResponseFormatter::write($response, $body, 400);
+        }
+
+        return $this->success($response, $result, $result['message'] ?? 'OTP sent successfully.');
+    }
+
+    /**
+     * POST /api/auth/app-lock/forgot-pin/verify-otp
+     *
+     * Body: { "otp": "1234", "new_pin": "5678" }
+     * Requires a valid auth token.
+     */
+    public function verifyAppLockForgotPinOtp(Request $request, Response $response): Response
+    {
+        $claims = $this->authenticate($request);
+        $body = RequestParser::body($request);
+        RequestParser::required($body, ['otp', 'new_pin']);
+
+        $result = $this->authService->resetAppLockPinWithOtp(
+            (int) $claims['id'],
+            (string) $body['otp'],
+            (string) $body['new_pin']
+        );
+
+        return $this->success($response, $result, 'App Lock PIN reset successfully.');
+    }
+
+    /**
      * GET /api/auth/profile
      *
      * Requires a valid auth token.

@@ -836,15 +836,17 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 1),
-                const Text(
-                  'Inactive & alumni students enabled · Deposits credited to active year',
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFFB45309),
+                if (isArchived) ...[
+                  const SizedBox(height: 1),
+                  const Text(
+                    'Inactive & alumni students enabled · Deposits credited to active year',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFFB45309),
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),

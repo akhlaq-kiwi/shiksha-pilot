@@ -28,6 +28,21 @@ class AuthRepository extends BaseRepository
             if ($stmtHash !== false && $stmtHash->rowCount() === 0) {
                 $this->pdo->exec("ALTER TABLE users ADD COLUMN app_lock_pin_hash VARCHAR(255) NULL DEFAULT NULL");
             }
+            $this->pdo->exec("
+                CREATE TABLE IF NOT EXISTS `app_lock_otps` (
+                    `id` INT AUTO_INCREMENT PRIMARY KEY,
+                    `school_id` INT NULL,
+                    `user_id` INT NOT NULL,
+                    `email` VARCHAR(255) NOT NULL,
+                    `otp_code` VARCHAR(10) NOT NULL,
+                    `attempts` INT DEFAULT 0,
+                    `is_used` TINYINT(1) DEFAULT 0,
+                    `expires_at` DATETIME NOT NULL,
+                    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX `idx_alo_user` (`user_id`, `otp_code`, `is_used`, `expires_at`),
+                    INDEX `idx_alo_email` (`email`, `otp_code`, `is_used`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+            ");
         } catch (\Throwable $e) {
             // Ignore if columns already exist or schema cannot be inspected in restricted mode
         }

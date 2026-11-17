@@ -1215,6 +1215,7 @@ class _TeacherDetailsScreenState extends State<_TeacherDetailsScreen> {
                         _buildDetailRow("Father's Name", t['father_name']?.toString() ?? '—'),
                         _buildDetailRow("Mother's Name", t['mother_name']?.toString() ?? '—'),
                         _buildDetailRow("Contact Phone", t['phone']?.toString() ?? '—'),
+                        _buildDetailRow("Email Address", t['email']?.toString() ?? '—'),
                         _buildDetailRow("Joining Date", t['joining_date']?.toString() ?? '—'),
                         if (t['exit_date'] != null && t['exit_date'].toString().isNotEmpty)
                           _buildDetailRow("Exit Date", t['exit_date'].toString(), isAlert: true),
@@ -1790,6 +1791,7 @@ class _AddEditTeacherModalState extends State<_AddEditTeacherModal> {
   late TextEditingController _fatherNameCtrl;
   late TextEditingController _motherNameCtrl;
   late TextEditingController _phoneCtrl;
+  late TextEditingController _emailCtrl;
   late TextEditingController _salaryCtrl;
   late TextEditingController _departmentCtrl;
   late TextEditingController _joiningDateCtrl;
@@ -1820,6 +1822,7 @@ class _AddEditTeacherModalState extends State<_AddEditTeacherModal> {
   late String _initFatherName;
   late String _initMotherName;
   late String _initPhone;
+  late String _initEmail;
   late String _initSalary;
   late String _initDepartment;
   late String _initJoiningDate;
@@ -1845,6 +1848,7 @@ class _AddEditTeacherModalState extends State<_AddEditTeacherModal> {
     _fatherNameCtrl = TextEditingController(text: t['father_name']?.toString() ?? '');
     _motherNameCtrl = TextEditingController(text: t['mother_name']?.toString() ?? '');
     _phoneCtrl = TextEditingController(text: t['phone']?.toString() ?? '');
+    _emailCtrl = TextEditingController(text: t['email']?.toString() ?? '');
     _salaryCtrl = TextEditingController(text: t['salary']?.toString() ?? '');
     _departmentCtrl = TextEditingController(text: t['department']?.toString() ?? '');
     _joiningDateCtrl = TextEditingController(text: t['joining_date']?.toString() ?? DateTime.now().toIso8601String().split('T')[0]);
@@ -1871,6 +1875,7 @@ class _AddEditTeacherModalState extends State<_AddEditTeacherModal> {
     _initFatherName = _fatherNameCtrl.text.trim();
     _initMotherName = _motherNameCtrl.text.trim();
     _initPhone = _phoneCtrl.text.trim();
+    _initEmail = _emailCtrl.text.trim();
     _initSalary = _salaryCtrl.text.trim();
     _initDepartment = _departmentCtrl.text.trim();
     _initJoiningDate = _joiningDateCtrl.text.trim();
@@ -1912,6 +1917,7 @@ class _AddEditTeacherModalState extends State<_AddEditTeacherModal> {
     if (_fatherNameCtrl.text.trim() != _initFatherName) return true;
     if (_motherNameCtrl.text.trim() != _initMotherName) return true;
     if (_phoneCtrl.text.trim() != _initPhone) return true;
+    if (_emailCtrl.text.trim() != _initEmail) return true;
     if (_salaryCtrl.text.trim() != _initSalary) return true;
     if (_departmentCtrl.text.trim() != _initDepartment) return true;
     if (_joiningDateCtrl.text.trim() != _initJoiningDate) return true;
@@ -1977,6 +1983,7 @@ class _AddEditTeacherModalState extends State<_AddEditTeacherModal> {
     _fatherNameCtrl.dispose();
     _motherNameCtrl.dispose();
     _phoneCtrl.dispose();
+    _emailCtrl.dispose();
     _salaryCtrl.dispose();
     _departmentCtrl.dispose();
     _joiningDateCtrl.dispose();
@@ -2324,6 +2331,7 @@ class _AddEditTeacherModalState extends State<_AddEditTeacherModal> {
       'father_name': _fatherNameCtrl.text.trim(),
       'mother_name': _motherNameCtrl.text.trim(),
       'phone': phone,
+      'email': _emailCtrl.text.trim().isNotEmpty ? _emailCtrl.text.trim() : null,
       'salary': double.tryParse(_salaryCtrl.text.trim()) ?? 0,
       'department': _departmentCtrl.text.trim(),
       'joining_date': _joiningDateCtrl.text.trim(),
@@ -2516,6 +2524,8 @@ class _AddEditTeacherModalState extends State<_AddEditTeacherModal> {
                     _buildTextField(_motherNameCtrl, 'Mother Name', required: true, minLength: 3),
                     const SizedBox(height: 12),
                     _buildTextField(_phoneCtrl, 'Contact Number (10 digits)', required: true, isDigits: true, exactLength: 10),
+                    const SizedBox(height: 12),
+                    _buildTextField(_emailCtrl, 'Email Address (Optional)', required: false, isEmail: true, hint: 'teacher@example.com'),
                     const SizedBox(height: 12),
                     _buildDateField(_joiningDateCtrl, 'Joining Date', required: true),
                     const SizedBox(height: 12),

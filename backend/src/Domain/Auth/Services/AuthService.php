@@ -363,6 +363,209 @@ class AuthService extends BaseService
         return ['app_lock_enabled' => false];
     }
 
+    /**
+     * Request a 4-digit OTP for App Lock PIN Reset.
+     *
+     * @return array{success: bool, code?: string, message: string, email_masked?: string}
+     */
+    public function requestAppLockForgotPinOtp(int $userId): array
+    {
+        $this->repo->ensureAppLockSchema();
+        $user = $this->repo->findById($userId);
+        if ($user === null) {
+            throw new NotFoundException('User not found.');
+        }
+
+        $pdo = $this->repo->getPdo();
+        $email = !empty($user['email']) ? trim((string)$user['email']) : '';
+
+        // If email not set on users table, check staff or students table
+        $userRole = strtoupper((string)($user['role'] ?? ''));
+        $phone = trim((string)($user['phone'] ?? ''));
+        $schoolId = (int)($user['school_id'] ?? 0);
+
+        if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            if (!empty($phone)) {
+                if (in_array($userRole, ['TEACHER', 'STAFF', 'PRINCIPAL'], true)) {
+                    $stmt = $pdo->prepare("SELECT email FROM staff WHERE phone = :phone " . ($schoolId > 0 ? "AND school_id = :sid " : "") . "AND email IS NOT NULL AND TRIM(email) != '' ORDER BY id DESC LIMIT 1");
+                    $params = [':phone' => $phone];
+                    if ($schoolId > 0) $params[':sid'] = $schoolId;
+                    $stmt->execute($params);
+                    $found = $stmt->fetchColumn();
+                    if ($found && filter_var(trim((string)$found), FILTER_VALIDATE_EMAIL)) {
+                        $email = trim((string)$found);
+                        $pdo->prepare("UPDATE users SET email = :email WHERE id = :id")->execute([':email' => $email, ':id' => $userId]);
+                    }
+                } elseif (in_array($userRole, ['STUDENT', 'PARENT'], true)) {
+                    $stmt = $pdo->prepare("SELECT COALESCE(student_email, email) AS email FROM students WHERE (student_mobile = :p1 OR parent_phone = :p2 OR father_phone = :p3) " . ($schoolId > 0 ? "AND school_id = :sid " : "") . "AND (student_email IS NOT NULL OR email IS NOT NULL) ORDER BY id DESC LIMIT 1");
+                    $params = [':p1' => $phone, ':p2' => $phone, ':p3' => $phone];
+                    if ($schoolId > 0) $params[':sid'] = $schoolId;
+                    $stmt->execute($params);
+                    $found = $stmt->fetchColumn();
+                    if ($found && filter_var(trim((string)$found), FILTER_VALIDATE_EMAIL)) {
+                        $email = trim((string)$found);
+                        $pdo->prepare("UPDATE users SET email = :email WHERE id = :id")->execute([':email' => $email, ':id' => $userId]);
+                    }
+                }
+            }
+        }
+
+        if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return [
+                'success' => false,
+                'code' => 'NO_EMAIL_REGISTERED',
+                'message' => 'Your email address is not registered. Please contact your school administrator to register your email address. You will be able to change your PIN after verifying your email.'
+            ];
+        }
+
+        // Generate 4-digit OTP
+        $otpCode = sprintf('%04d', random_int(1000, 9999));
+
+        // Invalidate previous unused OTPs
+        $stmtExpire = $pdo->prepare("UPDATE app_lock_otps SET is_used = 1 WHERE user_id = :uid AND is_used = 0");
+        $stmtExpire->execute([':uid' => $userId]);
+
+        // Insert new OTP with 10 minute expiry
+        $stmtIns = $pdo->prepare("
+            INSERT INTO app_lock_otps (school_id, user_id, email, otp_code, expires_at)
+            VALUES (:sid, :uid, :email, :code, DATE_ADD(NOW(), INTERVAL 10 MINUTE))
+        ");
+        $stmtIns->execute([
+            ':sid'   => $schoolId > 0 ? $schoolId : null,
+            ':uid'   => $userId,
+            ':email' => strtolower($email),
+            ':code'  => $otpCode,
+        ]);
+
+        // Mask email for user privacy (e.g. b***l@gmail.com)
+        $parts = explode('@', $email);
+        $local = $parts[0];
+        $domain = $parts[1] ?? '';
+        if (strlen($local) <= 2) {
+            $maskedLocal = substr($local, 0, 1) . '*';
+        } else {
+            $maskedLocal = substr($local, 0, 1) . str_repeat('*', max(1, strlen($local) - 2)) . substr($local, -1);
+        }
+        $maskedEmail = $maskedLocal . '@' . $domain;
+
+        // Send Email via SmtpMailer
+        $displayName = $user['name'] ?? 'User';
+        $subject = "App Lock PIN Reset OTP - ShikshaPilot";
+        $bodyHtml = "
+        <div style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 520px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);\">
+            <div style=\"background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); padding: 28px 24px; text-align: center;\">
+                <h1 style=\"color: #ffffff; margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.5px;\">ShikshaPilot</h1>
+                <p style=\"color: #e0f2fe; margin: 6px 0 0; font-size: 13px;\">Security Verification Code</p>
+            </div>
+            <div style=\"padding: 32px 28px;\">
+                <p style=\"font-size: 15px; color: #1e293b; margin-top: 0; line-height: 1.5;\">Hello <strong>" . htmlspecialchars($displayName, ENT_QUOTES, 'UTF-8') . "</strong>,</p>
+                <p style=\"font-size: 14px; color: #475569; line-height: 1.6;\">You requested to reset your App Lock Security PIN. Use the following 4-digit verification code to complete your PIN reset:</p>
+                
+                <div style=\"margin: 28px 0; text-align: center;\">
+                    <span style=\"display: inline-block; font-size: 32px; font-weight: 800; letter-spacing: 10px; color: #0284c7; background: #f0f9ff; border: 2px dashed #0284c7; border-radius: 12px; padding: 12px 24px; font-family: monospace;\">
+                        {$otpCode}
+                    </span>
+                </div>
+
+                <p style=\"font-size: 13px; color: #64748b; line-height: 1.5; margin-bottom: 0;\">
+                    This verification code is valid for <strong>10 minutes</strong>. If you did not request this, please ignore this email or contact your administrator immediately.
+                </p>
+            </div>
+            <div style=\"background: #f8fafc; padding: 16px 24px; border-top: 1px solid #e2e8f0; text-align: center;\">
+                <p style=\"font-size: 11px; color: #94a3b8; margin: 0;\">&copy; " . date('Y') . " ShikshaPilot. All rights reserved.</p>
+            </div>
+        </div>";
+
+        try {
+            \App\Domain\SchoolAdmin\Services\SmtpMailer::send(
+                $email,
+                $subject,
+                $bodyHtml,
+                '',
+                ''
+            );
+        } catch (\Throwable $e) {
+            $this->log('Failed to send App Lock OTP email', ['error' => $e->getMessage(), 'email' => $email]);
+            throw new ValidationException(['email' => 'Failed to send OTP email. Please try again later.'], 'Failed to send OTP email: ' . $e->getMessage());
+        }
+
+        $this->log('App Lock Forgot PIN OTP sent', ['id' => $userId, 'email' => $email]);
+
+        return [
+            'success' => true,
+            'email_masked' => $maskedEmail,
+            'message' => 'A 4-digit OTP has been sent to your registered email address.'
+        ];
+    }
+
+    /**
+     * Verify 4-digit OTP and reset App Lock PIN.
+     *
+     * @return array{app_lock_enabled: bool, message: string}
+     */
+    public function resetAppLockPinWithOtp(int $userId, string $otp, string $newPin): array
+    {
+        $this->repo->ensureAppLockSchema();
+        $user = $this->repo->findById($userId);
+        if ($user === null) {
+            throw new NotFoundException('User not found.');
+        }
+
+        $cleanOtp = trim($otp);
+        if (preg_match('/^\d{4}$/', $cleanOtp) !== 1) {
+            throw new ValidationException(['otp' => 'OTP must be exactly 4 numeric digits.'], 'OTP must be exactly 4 numeric digits.');
+        }
+
+        $cleanPin = trim($newPin);
+        if (preg_match('/^\d{4}$/', $cleanPin) !== 1) {
+            throw new ValidationException(['new_pin' => 'New PIN must be exactly 4 numeric digits.'], 'New PIN must be exactly 4 numeric digits.');
+        }
+
+        $pdo = $this->repo->getPdo();
+        $stmt = $pdo->prepare("
+            SELECT id, otp_code, attempts, expires_at 
+            FROM app_lock_otps 
+            WHERE user_id = :uid AND is_used = 0 
+            ORDER BY id DESC LIMIT 1
+        ");
+        $stmt->execute([':uid' => $userId]);
+        $otpRow = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+        if (!$otpRow) {
+            throw new ValidationException(['otp' => 'No active OTP found. Please request a new OTP.'], 'No active OTP found. Please request a new OTP.');
+        }
+
+        if (strtotime((string)$otpRow['expires_at']) < time()) {
+            $pdo->prepare("UPDATE app_lock_otps SET is_used = 1 WHERE id = :id")->execute([':id' => (int)$otpRow['id']]);
+            throw new ValidationException(['otp' => 'OTP has expired. Please request a new OTP.'], 'OTP has expired. Please request a new OTP.');
+        }
+
+        if ((int)$otpRow['attempts'] >= 5) {
+            $pdo->prepare("UPDATE app_lock_otps SET is_used = 1 WHERE id = :id")->execute([':id' => (int)$otpRow['id']]);
+            throw new ValidationException(['otp' => 'Too many failed attempts. Please request a new OTP.'], 'Too many failed attempts. Please request a new OTP.');
+        }
+
+        if ($cleanOtp !== (string)$otpRow['otp_code']) {
+            $pdo->prepare("UPDATE app_lock_otps SET attempts = attempts + 1 WHERE id = :id")->execute([':id' => (int)$otpRow['id']]);
+            throw new ValidationException(['otp' => 'Invalid OTP code. Please enter the correct 4-digit code.'], 'Invalid OTP code.');
+        }
+
+        // OTP is valid! Mark as used
+        $pdo->prepare("UPDATE app_lock_otps SET is_used = 1 WHERE id = :id")->execute([':id' => (int)$otpRow['id']]);
+
+        // Hash and update App Lock PIN
+        $pinHash = password_hash($cleanPin, PASSWORD_BCRYPT);
+        $this->repo->setAppLock($userId, $pinHash);
+
+        $this->log('App Lock PIN reset successfully via OTP', ['id' => $userId]);
+        $this->logAuditDirect($user, 'Security', 'App Lock PIN Reset', 'App Lock PIN successfully reset via Email OTP for "' . ($user['name'] ?? $user['phone'] ?? $user['email']) . '"');
+
+        return [
+            'app_lock_enabled' => true,
+            'message' => 'App Lock PIN reset successfully.'
+        ];
+    }
+
     private function logAuditDirect(
         array $actorUser,
         string $module,

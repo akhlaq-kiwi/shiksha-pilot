@@ -2814,6 +2814,7 @@ class _StudentDetailsScreenState extends State<_StudentDetailsScreen> {
     final father = (s['father_name'] ?? '—').toString();
     final mother = (s['mother_name'] ?? '—').toString();
     final phone = (s['student_mobile'] ?? s['phone'] ?? s['parent_phone'] ?? s['father_phone'] ?? '—').toString();
+    final email = (s['student_email'] ?? s['email'] ?? '—').toString();
     final gender = (s['gender'] ?? '—').toString();
     final dob = (s['dob'] ?? s['date_of_birth'] ?? '—').toString();
     final admissionDate = (s['admission_date'] ?? '—').toString();
@@ -2914,6 +2915,7 @@ class _StudentDetailsScreenState extends State<_StudentDetailsScreen> {
                         _buildRow("Father's Name", father),
                         _buildRow("Mother's Name", mother),
                         _buildRow("Contact Phone", phone),
+                        _buildRow("Email Address", email.trim().isNotEmpty ? email : '—'),
                         _buildRow("Gender", gender),
                         _buildRow("Date of Birth", dob),
                         _buildRow("Admission Date", admissionDate),
@@ -3298,6 +3300,7 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
   String? _religion;
   final TextEditingController _aadhaarCtrl = TextEditingController();
   final TextEditingController _mobileCtrl = TextEditingController();
+  final TextEditingController _emailCtrl = TextEditingController();
   final TextEditingController _srNoCtrl = TextEditingController();
   final TextEditingController _rollCtrl = TextEditingController();
   final TextEditingController _exitDateCtrl = TextEditingController();
@@ -3403,6 +3406,7 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
         _religion = _normalizeReligion(studentData['religion']?.toString());
         _aadhaarCtrl.text = studentData['aadhaar_no']?.toString() ?? '';
         _mobileCtrl.text = studentData['student_mobile']?.toString() ?? studentData['phone']?.toString() ?? '';
+        _emailCtrl.text = studentData['student_email']?.toString() ?? studentData['email']?.toString() ?? '';
         _srNoCtrl.text = studentData['admission_no']?.toString() ?? studentData['sr_no']?.toString() ?? '';
         _rollCtrl.text = studentData['roll_no']?.toString() ?? studentData['roll']?.toString() ?? '';
         _exitDateCtrl.text = studentData['exit_date']?.toString() ?? '';
@@ -3594,6 +3598,7 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
       'religion': _religion ?? '',
       'aadhaar_no': _aadhaarCtrl.text.trim(),
       'student_mobile': _mobileCtrl.text.trim(),
+      'student_email': _emailCtrl.text.trim(),
       'sr_no': _srNoCtrl.text.trim(),
       'roll_no': _rollCtrl.text.trim(),
       'exit_date': _exitDateCtrl.text.trim(),
@@ -3635,6 +3640,7 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
         (_religion ?? '') != _initialSnapshot['religion'] ||
         _aadhaarCtrl.text.trim() != _initialSnapshot['aadhaar_no'] ||
         _mobileCtrl.text.trim() != _initialSnapshot['student_mobile'] ||
+        _emailCtrl.text.trim() != _initialSnapshot['student_email'] ||
         _srNoCtrl.text.trim() != _initialSnapshot['sr_no'] ||
         _rollCtrl.text.trim() != _initialSnapshot['roll_no'] ||
         _exitDateCtrl.text.trim() != _initialSnapshot['exit_date'] ||
@@ -3709,6 +3715,7 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
     _admissionFeeCtrl.dispose();
     _aadhaarCtrl.dispose();
     _mobileCtrl.dispose();
+    _emailCtrl.dispose();
     _srNoCtrl.dispose();
     _rollCtrl.dispose();
     _exitDateCtrl.dispose();
@@ -3764,6 +3771,13 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
         _errors['student_mobile'] = 'Contact Number is required.';
       } else if (!RegExp(r'^\d{10}$').hasMatch(_mobileCtrl.text.trim())) {
         _errors['student_mobile'] = 'Mobile No should be exactly 10 digits';
+      }
+      if (_emailCtrl.text.trim().isNotEmpty) {
+        final emailVal = _emailCtrl.text.trim();
+        final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+        if (!emailRegex.hasMatch(emailVal)) {
+          _errors['student_email'] = 'Please enter a valid email address.';
+        }
       }
       if (_aadhaarCtrl.text.trim().isNotEmpty && !RegExp(r'^\d{12}$').hasMatch(_aadhaarCtrl.text.trim())) {
         _errors['aadhaar_no'] = 'Aadhaar number must contain exactly 12 numeric digits.';
@@ -3981,6 +3995,8 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
         'aadhaar_no': _aadhaarCtrl.text.trim(),
         'student_mobile': _mobileCtrl.text.trim(),
         'phone': _mobileCtrl.text.trim(),
+        'student_email': _emailCtrl.text.trim().isNotEmpty ? _emailCtrl.text.trim() : null,
+        'email': _emailCtrl.text.trim().isNotEmpty ? _emailCtrl.text.trim() : null,
         'sr_no': _srNoCtrl.text.trim(),
         'admission_no': _srNoCtrl.text.trim(),
         'roll_no': _rollCtrl.text.trim(),
@@ -4627,6 +4643,14 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
         ),
         const SizedBox(height: 14),
 
+        _buildFieldLabel('EMAIL ADDRESS (OPTIONAL)'),
+        _buildTextInput(
+          _emailCtrl,
+          'student@example.com',
+          errorKey: 'student_email',
+        ),
+        const SizedBox(height: 14),
+
         if (_isFirstYear) ...[
           _buildFieldLabel('SR NUMBER', required: true),
           _buildTextInput(
@@ -5196,6 +5220,7 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
             _buildReviewRow('Gender / DOB', '${_gender.toUpperCase()} / ${_dobCtrl.text.trim()}'),
             _buildReviewRow('Aadhaar No', _aadhaarCtrl.text.trim().isNotEmpty ? _aadhaarCtrl.text.trim() : '-'),
             _buildReviewRow('Contact Mobile', _mobileCtrl.text.trim().isNotEmpty ? _mobileCtrl.text.trim() : '-'),
+            _buildReviewRow('Email Address', _emailCtrl.text.trim().isNotEmpty ? _emailCtrl.text.trim() : '-'),
             if (_bloodGroup != null && _bloodGroup!.isNotEmpty) _buildReviewRow('Blood Group', _bloodGroup!),
             if (_category != null && _category!.isNotEmpty) _buildReviewRow('Category', _category!),
             if (_religion != null && _religion!.isNotEmpty) _buildReviewRow('Religion', _religion!),

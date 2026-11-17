@@ -887,6 +887,14 @@ export default function StaffPage() {
       errors.department = "Subject is required.";
     }
 
+    // Email Validation (Optional)
+    if (newStaff.email && newStaff.email.trim() !== '') {
+      const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+      if (!emailRegex.test(newStaff.email.trim())) {
+        errors.email = "Please enter a valid email address.";
+      }
+    }
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -958,6 +966,10 @@ export default function StaffPage() {
 
       if (!fieldErrors.phone && err.message && (err.message.includes('contact number') || err.message.includes('phone') || err.message.includes('registered') || err.message.includes('exists') || err.message.includes('other school') || err.message.includes('inactive') || err.message.includes('Inactive'))) {
         fieldErrors.phone = err.message;
+      }
+
+      if (!fieldErrors.email && err.message && (err.message.toLowerCase().includes('email'))) {
+        fieldErrors.email = err.message;
       }
 
       setFormErrors(fieldErrors);
@@ -2011,8 +2023,8 @@ export default function StaffPage() {
           <div className="space-y-4 border-b border-border pb-4">
             <h3 className="text-sm font-bold text-text-primary tracking-tight font-display">Basic Details</h3>
             
-            {/* Row 1: Full Name, Father Name, Mother Name, Contact Number */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Row 1: Full Name, Father Name, Mother Name */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-1.5">
                 <label htmlFor="name" className="text-xs font-bold text-text-secondary uppercase">Full Name <span className="text-red-500">*</span></label>
                 <Input id="name" name="name" value={newStaff.name} onChange={handleTextChange} placeholder="e.g. Ms. Anita Sharma" className="rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border" required />
@@ -2030,16 +2042,49 @@ export default function StaffPage() {
                 <Input id="mother_name" name="mother_name" value={newStaff.mother_name} onChange={handleTextChange} placeholder="e.g. Shabana Begum" className="rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border" required />
                 {formErrors.mother_name && <p className="text-[11px] text-red-500 font-semibold">{formErrors.mother_name}</p>}
               </div>
+            </div>
 
+            {/* Row 2: Contact Number, Email Address, Subject */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-1.5">
                 <label htmlFor="phone" className="text-xs font-bold text-text-secondary uppercase">Contact Number <span className="text-red-500">*</span></label>
                 <Input id="phone" name="phone" value={newStaff.phone} onChange={handleTextChange} placeholder="10-digit mobile number" className={`rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border ${formErrors.phone ? 'border-red-500' : ''}`} required />
                 {formErrors.phone && <p className="text-[11px] text-red-500 font-semibold">{formErrors.phone}</p>}
               </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="email" className="text-xs font-bold text-text-secondary uppercase">Email Address (Optional)</label>
+                <Input 
+                  id="email" 
+                  name="email" 
+                  type="email" 
+                  value={newStaff.email || ''} 
+                  onChange={handleTextChange} 
+                  placeholder="e.g. anita@school.com" 
+                  className={`rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border ${formErrors.email ? 'border-red-500' : ''}`} 
+                />
+                {formErrors.email && <p className="text-[11px] text-red-500 font-semibold">{formErrors.email}</p>}
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="subject" className="text-xs font-bold text-text-secondary uppercase font-display">Subject <span className="text-red-500">*</span></label>
+                <Input id="subject" 
+                  placeholder="e.g. English"
+                  value={newStaff.department || ''} 
+                  onChange={e => {
+                    const val = e.target.value;
+                    setNewStaff(p => ({ ...p, department: val }));
+                    if (formErrors.department) setFormErrors(prev => ({ ...prev, department: '' }));
+                  }}
+                  className={`rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border ${formErrors.department ? 'border-red-500' : ''}`}
+                  required 
+                />
+                {formErrors.department && <p className="text-[11px] text-red-500 font-semibold">{formErrors.department}</p>}
+              </div>
             </div>
 
-            {/* Row 2: Joining Date, Exit Date, Salary, Subject */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Row 3: Joining Date, Exit Date, Salary */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-1.5">
                 <label htmlFor="joining_date" className="text-xs font-bold text-text-secondary uppercase">Joining Date <span className="text-red-500">*</span></label>
                 <Input id="joining_date" 
@@ -2088,22 +2133,6 @@ export default function StaffPage() {
                   required 
                 />
                 {formErrors.salary && <p className="text-[11px] text-red-500 font-semibold">{formErrors.salary}</p>}
-              </div>
-
-              <div className="space-y-1.5">
-                <label htmlFor="subject" className="text-xs font-bold text-text-secondary uppercase font-display">Subject <span className="text-red-500">*</span></label>
-                <Input id="subject" 
-                  placeholder="e.g. English"
-                  value={newStaff.department || ''} 
-                  onChange={e => {
-                    const val = e.target.value;
-                    setNewStaff(p => ({ ...p, department: val }));
-                    if (formErrors.department) setFormErrors(prev => ({ ...prev, department: '' }));
-                  }}
-                  className={`rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border ${formErrors.department ? 'border-red-500' : ''}`}
-                  required 
-                />
-                {formErrors.department && <p className="text-[11px] text-red-500 font-semibold">{formErrors.department}</p>}
               </div>
             </div>
           </div>

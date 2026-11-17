@@ -161,11 +161,11 @@ Future<http.Response> _executeWithFallback(
     final isKnownWorking = (base == _inMemoryWorkingBase);
 
     final timeoutDuration = isLoopback
-        ? const Duration(milliseconds: 1500)
+        ? const Duration(seconds: 25)
         : isKnownWorking
-            ? const Duration(seconds: 15)
+            ? const Duration(seconds: 25)
             : isLocalLan
-                ? const Duration(milliseconds: 2500)
+                ? const Duration(seconds: 20)
                 : const Duration(seconds: 25);
 
     final bool allowRetryForBase = retryOnTransientFailure &&
@@ -235,7 +235,7 @@ Future<http.Response> _executeWithFallback(
           ? '${originalUrl.path}?${originalUrl.query}'
           : originalUrl.path;
       final retryUri = Uri.parse('$_kUsbBaseUrl$pathAndQuery');
-      final response = await requestFn(retryUri).timeout(const Duration(milliseconds: 2000));
+      final response = await requestFn(retryUri).timeout(const Duration(seconds: 15));
       _checkUnauthorized(response);
       _saveWorkingBaseUrl(_kUsbBaseUrl);
       return response;
