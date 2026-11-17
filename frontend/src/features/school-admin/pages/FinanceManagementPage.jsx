@@ -137,7 +137,7 @@ export default function FinanceManagementPage() {
 
   useEffect(() => {
     const tab = location.state?.tab || new URLSearchParams(location.search).get('tab');
-    if (tab && ['expenses', 'additional-fee', 'late-payment-penalty'].includes(tab)) {
+    if (tab && ['expenses', 'admission-fee', 'additional-fee', 'late-payment-penalty', 'transport-fee'].includes(tab)) {
       setActiveTab(tab);
     }
   }, [location]);
@@ -302,6 +302,116 @@ export default function FinanceManagementPage() {
   // Delete Additional Fee Confirmation
   const [deletingFeeTypeId, setDeletingFeeTypeId] = useState(null);
 
+  // Admission Fee Configuration State
+  const [admissionFeeConfig, setAdmissionFeeConfig] = useState(null);
+  const [isAdmissionFeeModalOpen, setIsAdmissionFeeModalOpen] = useState(false);
+  const [admissionFeeApplyType, setAdmissionFeeApplyType] = useState('school'); // 'school' | 'classes'
+  const [admissionFeeAmount, setAdmissionFeeAmount] = useState('');
+  const [admissionFeeClassAmountsMap, setAdmissionFeeClassAmountsMap] = useState({});
+  const [admissionFeeSubmitting, setAdmissionFeeSubmitting] = useState(false);
+  const [admissionFeeFormErrors, setAdmissionFeeFormErrors] = useState({});
+  const [isAdmissionFeeConfirmOpen, setIsAdmissionFeeConfirmOpen] = useState(false);
+
+  const handleAdmissionFeeModalOpen = () => {
+    setAdmissionFeeApplyType('school');
+    setAdmissionFeeAmount('');
+    const initialMap = {};
+    uniqueClasses.forEach(uc => {
+      initialMap[uc.name] = '';
+    });
+    setAdmissionFeeClassAmountsMap(initialMap);
+    setAdmissionFeeFormErrors({});
+    setIsAdmissionFeeConfirmOpen(false);
+    setIsAdmissionFeeModalOpen(true);
+  };
+
+  const handleAdmissionFeeInitialSubmit = (e) => {
+    if (e) e.preventDefault();
+    const errors = {};
+    if (admissionFeeApplyType === 'school') {
+      if (!admissionFeeAmount || parseFloat(admissionFeeAmount) <= 0) {
+        errors.amount = 'Admission Fee amount must be greater than 0.';
+      } else if (parseFloat(admissionFeeAmount) > 10000000) {
+        errors.amount = 'Admission Fee amount exceeds system maximum.';
+      }
+    } else {
+      if (!uniqueClasses || uniqueClasses.length === 0) {
+        errors.classes = 'No classes available for Class-Wise configuration.';
+      } else {
+        const missingClasses = [];
+        const invalidClasses = [];
+        uniqueClasses.forEach(uc => {
+          const val = admissionFeeClassAmountsMap[uc.name];
+          if (val === undefined || val === null || val.trim() === '') {
+            missingClasses.push(uc.name);
+          } else {
+            const amt = parseFloat(val);
+            if (isNaN(amt) || amt <= 0) {
+              invalidClasses.push(uc.name);
+            }
+          }
+        });
+        if (missingClasses.length > 0) {
+          errors.classes = `Fee amount for all classes is mandatory. Missing for: ${missingClasses.join(', ')}`;
+        } else if (invalidClasses.length > 0) {
+          errors.classes = `Fee amount must be greater than zero for all classes. Invalid for: ${invalidClasses.join(', ')}`;
+        }
+      }
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setAdmissionFeeFormErrors(errors);
+      return;
+    }
+
+    setAdmissionFeeFormErrors({});
+    setIsAdmissionFeeConfirmOpen(true);
+  };
+
+  const handleSaveAdmissionFee = async () => {
+    setError('');
+    setSuccess('');
+    setAdmissionFeeSubmitting(true);
+    try {
+      const classAmountsPayload = {};
+      if (admissionFeeApplyType === 'classes') {
+        uniqueClasses.forEach(uc => {
+          const val = admissionFeeClassAmountsMap[uc.name];
+          if (val && val.trim() !== '' && parseFloat(val) > 0) {
+            classAmountsPayload[uc.name] = parseFloat(val);
+          }
+        });
+      }
+
+      await schoolService.createAdmissionFee({
+        apply_type: admissionFeeApplyType,
+        amount: admissionFeeAmount,
+        class_amounts: classAmountsPayload
+      });
+      setSuccess('Admission Fee configured successfully.');
+      setIsAdmissionFeeConfirmOpen(false);
+      setIsAdmissionFeeModalOpen(false);
+      await loadData();
+    } catch (err) {
+      const errData = err?.data || err?.response?.data;
+      let errorMsg = 'Failed to configure admission fee.';
+      if (errData?.errors && typeof errData.errors === 'object') {
+        const errorVals = Object.values(errData.errors).filter(Boolean);
+        if (errorVals.length > 0) {
+          errorMsg = errorVals.join(' ');
+        }
+      } else if (errData?.message && errData.message !== 'Validation failed.') {
+        errorMsg = errData.message;
+      } else if (err?.message && err.message !== 'Validation failed.') {
+        errorMsg = err.message;
+      }
+      setError(errorMsg);
+      setIsAdmissionFeeConfirmOpen(false);
+    } finally {
+      setAdmissionFeeSubmitting(false);
+    }
+  };
+
   // Annual Fee Form & Confirmation Dialog State
   const [isAnnualFeeModalOpen, setIsAnnualFeeModalOpen] = useState(false);
   const [annualFeeApplyType, setAnnualFeeApplyType] = useState('school'); // 'school' | 'classes'
@@ -413,18 +523,20 @@ export default function FinanceManagementPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [clsList, ayList, typesList, transList, studList] = await Promise.all([
+      const [clsList, ayList, typesList, transList, studList, admFeeCfg] = await Promise.all([
         schoolService.getClasses(),
         schoolService.getAcademicYears(),
         schoolService.getAdditionalFeeTypes(),
         schoolService.getTransportFees(),
-        schoolService.getStudents({ limit: 1000 })
+        schoolService.getStudents({ limit: 1000 }),
+        schoolService.getAdmissionFee().catch(() => ({ configured: false }))
       ]);
       setClasses(clsList || []);
       setAcademicYears(ayList || []);
       setFeeTypes(typesList || []);
       setTransportFees(transList || []);
       setStudentsList(studList || []);
+      setAdmissionFeeConfig(admFeeCfg || { configured: false });
 
       // Fetch expenses
       await loadExpensesList();
@@ -1416,6 +1528,16 @@ export default function FinanceManagementPage() {
             💸 Expenses
           </button>
           <button 
+            onClick={() => { setActiveTab('admission-fee'); setError(''); setSuccess(''); }}
+            className={`pb-3 text-xs font-bold uppercase tracking-wider border-b-2 px-4 transition-all ${
+              activeTab === 'admission-fee' 
+                ? 'border-primary text-primary' 
+                : 'border-transparent text-text-muted hover:text-text-primary'
+            }`}
+          >
+            🎓 Admission Fee
+          </button>
+          <button 
             onClick={() => { setActiveTab('additional-fee'); setError(''); setSuccess(''); }}
             className={`pb-3 text-xs font-bold uppercase tracking-wider border-b-2 px-4 transition-all ${
               activeTab === 'additional-fee' 
@@ -1460,6 +1582,116 @@ export default function FinanceManagementPage() {
       )}
 
 
+
+      {/* Admission Fee View */}
+      {!loading && activeTab === 'admission-fee' && (
+        <div className="flex-1 flex flex-col min-h-0 space-y-4 overflow-y-auto pb-6">
+          {/* Info Banner */}
+          <div className="flex items-start gap-3 p-4 bg-amber-500/10 border border-amber-500/20 text-amber-900 dark:text-amber-200 rounded-2xl">
+            <Info className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <p className="text-xs leading-relaxed font-medium">
+              Configure Admission Fee once per academic session for the entire school or class-wise. It automatically applies to every <strong>New Admission</strong> student enrolled in this academic year. Existing students are automatically excluded.
+            </p>
+          </div>
+
+          {admissionFeeConfig?.configured ? (
+            <div className="bg-surface border border-emerald-500/40 rounded-2xl p-6 shadow-2xs space-y-5">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="space-y-1.5">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[11px] font-bold uppercase tracking-wider">
+                    <CheckCircle className="h-3.5 w-3.5" />
+                    Configured For Current Session
+                  </div>
+                  <h3 className="text-xl font-bold text-text-primary tracking-tight font-display">Admission Fee</h3>
+                  <p className="text-xs text-text-secondary font-medium">
+                    Applies To: <span className="font-bold text-text-primary">{admissionFeeConfig.assigned_to || 'All New Admissions'}</span>
+                    {' · '}
+                    New Students Assigned: <span className="font-bold text-text-primary">{admissionFeeConfig.total_students || 0}</span>
+                  </p>
+                </div>
+                {admissionFeeConfig.apply_type === 'school' && (
+                  <div className="text-right">
+                    <span className="text-[11px] uppercase tracking-wider font-bold text-text-muted block">Configured Fee</span>
+                    <span className="text-2xl font-extrabold text-primary font-sans">
+                      {formatCurrency(admissionFeeConfig.amount)}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Metrics */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-border pt-4">
+                <div className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-border">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-text-muted">Total Billed</span>
+                  <p className="text-lg font-extrabold text-text-primary mt-0.5">{formatCurrency(admissionFeeConfig.total_amount || 0)}</p>
+                </div>
+                <div className="p-3.5 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Collected</span>
+                  <p className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5">{formatCurrency(admissionFeeConfig.collected_amount || 0)}</p>
+                </div>
+                <div className="p-3.5 rounded-xl bg-red-500/5 border border-red-500/20">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-red-700 dark:text-red-400">Pending</span>
+                  <p className="text-lg font-extrabold text-red-600 dark:text-red-400 mt-0.5">{formatCurrency(admissionFeeConfig.pending_amount || 0)}</p>
+                </div>
+              </div>
+
+              {/* Class-Wise Allocation Table */}
+              {admissionFeeConfig.class_amounts && admissionFeeConfig.class_amounts.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-text-secondary">Class-Wise Allocation</h4>
+                  <div className="border border-border rounded-xl overflow-hidden">
+                    <Table className="text-xs">
+                      <TableHeader className="bg-[#FAF6EC] dark:bg-zinc-900">
+                        <TableRow className="border-b border-border">
+                          <TableHead className="font-bold text-[11px] uppercase py-2.5 text-text-primary">CLASS</TableHead>
+                          <TableHead className="font-bold text-[11px] uppercase py-2.5 text-text-primary text-right">ADMISSION FEE (₹)</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody className="divide-y divide-border/60">
+                        {admissionFeeConfig.class_amounts.map((ca, idx) => (
+                          <TableRow key={`${ca.class_name}-${idx}`}>
+                            <TableCell className="font-bold text-text-primary py-2.5">
+                              {formatDisplayClassName(ca.class_name)}
+                            </TableCell>
+                            <TableCell className="text-right font-bold text-primary py-2.5">
+                              {formatCurrency(ca.amount)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-zinc-100/80 dark:bg-zinc-800/60 text-text-secondary text-xs font-medium">
+                <AlertCircle className="h-4 w-4 text-text-muted shrink-0" />
+                <span>Admission Fee is automatically applied to all New Admission students enrolled in this session and cannot be edited or deleted once configured.</span>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-surface border border-border rounded-2xl p-10 flex flex-col items-center text-center space-y-4 shadow-2xs">
+              <div className="w-14 h-14 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-600">
+                <Landmark className="h-6 w-6" />
+              </div>
+              <div className="space-y-1.5 max-w-md">
+                <h3 className="text-base font-bold text-text-primary">No Admission Fee Configured</h3>
+                <p className="text-xs text-text-secondary leading-relaxed">
+                  Configure Admission Fee once for this academic session. It will automatically apply to every new student enrolled during this academic year (existing students are automatically excluded).
+                </p>
+              </div>
+              <Button
+                onClick={handleAdmissionFeeModalOpen}
+                disabled={currentYear?.status === 'Archived'}
+                className="font-bold text-xs px-5 h-10 rounded-full flex items-center gap-2 mt-1"
+              >
+                <Plus className="h-4 w-4" />
+                Configure Admission Fee
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Tab 1: Expenses View */}
       {!loading && activeTab === 'expenses' && (
@@ -3264,6 +3496,162 @@ export default function FinanceManagementPage() {
             </p>
           </div>
           <p>Annual Fee will be applied only to eligible existing students. New admissions in the current academic session will automatically be excluded.</p>
+          <p className="font-bold text-text-primary">Are you sure you want to proceed?</p>
+        </div>
+      </Dialog>
+
+      {/* Configure Admission Fee Modal */}
+      <Dialog
+        isOpen={isAdmissionFeeModalOpen}
+        onClose={() => setIsAdmissionFeeModalOpen(false)}
+        title="Configure Admission Fee"
+        description="Set a one-time Admission Fee for this academic session (automatically applies to New Admissions only)."
+        footer={
+          <div className="flex justify-end gap-2.5">
+            <Button variant="outline" onClick={() => setIsAdmissionFeeModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAdmissionFeeInitialSubmit}>
+              Next Step
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-900 dark:text-amber-200 rounded-xl text-xs leading-relaxed font-medium">
+            Admission Fee will automatically apply to all New Admission students in this academic year. Existing students are automatically excluded. Once configured, it cannot be edited or deleted.
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[11px] font-bold text-text-secondary uppercase tracking-wider block">Application Type *</label>
+            <div className="grid grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={() => { setAdmissionFeeApplyType('school'); setAdmissionFeeFormErrors({}); }}
+                className={`p-3 rounded-xl border text-xs font-bold transition-all ${
+                  admissionFeeApplyType === 'school'
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-border bg-surface text-text-secondary hover:border-primary/40'
+                }`}
+              >
+                Entire School
+              </button>
+              <button
+                type="button"
+                onClick={() => { setAdmissionFeeApplyType('classes'); setAdmissionFeeFormErrors({}); }}
+                className={`p-3 rounded-xl border text-xs font-bold transition-all ${
+                  admissionFeeApplyType === 'classes'
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-border bg-surface text-text-secondary hover:border-primary/40'
+                }`}
+              >
+                Class-Wise
+              </button>
+            </div>
+          </div>
+
+          {admissionFeeApplyType === 'school' ? (
+            <div className="space-y-1.5">
+              <label htmlFor="admission-fee-amount" className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">
+                Admission Fee Amount (₹) *
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-2.5 text-xs font-bold text-text-muted">₹</span>
+                <Input
+                  id="admission-fee-amount"
+                  type="number"
+                  placeholder="2000"
+                  value={admissionFeeAmount}
+                  onChange={e => setAdmissionFeeAmount(e.target.value)}
+                  min="0"
+                  step="any"
+                  className="pl-7 text-xs"
+                />
+              </div>
+              {admissionFeeFormErrors.amount && (
+                <p className="text-[11px] text-red-500 font-bold mt-1">{admissionFeeFormErrors.amount}</p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Class-Wise Fee Allocation *</label>
+                {admissionFeeFormErrors.classes && (
+                  <p className="text-[11px] text-red-500 font-bold">{admissionFeeFormErrors.classes}</p>
+                )}
+              </div>
+              <div className="border border-border rounded-xl overflow-hidden shadow-2xs">
+                <div className="max-h-[220px] overflow-y-auto scrollbar-thin">
+                  <Table className="text-xs">
+                    <TableHeader className="sticky top-0 bg-[#FAF6EC] dark:bg-zinc-900 z-10 shadow-2xs">
+                      <TableRow className="bg-[#FAF6EC] dark:bg-zinc-900 border-b border-border">
+                        <TableHead className="font-bold text-[11px] uppercase py-2.5 bg-[#FAF6EC] dark:bg-zinc-900 text-text-primary">CLASS</TableHead>
+                        <TableHead className="font-bold text-[11px] uppercase py-2.5 bg-[#FAF6EC] dark:bg-zinc-900 text-text-primary text-right w-40">ADMISSION FEE (₹)</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody className="divide-y divide-border/60">
+                      {uniqueClasses.map(uc => (
+                        <TableRow key={uc.name} className="hover:bg-primary/5 transition-colors">
+                          <TableCell className="font-bold text-xs py-2.5 text-text-primary">
+                            {uc.displayName || formatDisplayClassName(uc.name)}
+                          </TableCell>
+                          <TableCell className="text-right py-1.5">
+                            <Input
+                              id={`admission-fee-class-${uc.name}`}
+                              type="number"
+                              placeholder="Enter Amount"
+                              value={admissionFeeClassAmountsMap[uc.name] || ''}
+                              onChange={e => setAdmissionFeeClassAmountsMap({
+                                ...admissionFeeClassAmountsMap,
+                                [uc.name]: e.target.value
+                              })}
+                              min="0"
+                              step="any"
+                              className="h-8 w-28 ml-auto text-right text-xs rounded-full border border-border"
+                            />
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </Dialog>
+
+      {/* Confirmation Dialog Before Admission Fee Creation */}
+      <Dialog
+        isOpen={isAdmissionFeeConfirmOpen}
+        onClose={() => setIsAdmissionFeeConfirmOpen(false)}
+        title="Confirm Admission Fee Configuration"
+        description="Please review the confirmation notice before saving Admission Fee."
+        footer={
+          <div className="flex justify-end gap-2.5">
+            <Button variant="outline" onClick={() => setIsAdmissionFeeConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveAdmissionFee}
+              disabled={admissionFeeSubmitting}
+            >
+              {admissionFeeSubmitting ? 'Saving...' : 'Confirm & Save'}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-3.5 text-xs leading-relaxed text-text-secondary">
+          <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 text-amber-900 dark:text-amber-200 rounded-xl space-y-1.5">
+            <div className="flex items-center gap-2 font-bold text-amber-800 dark:text-amber-300">
+              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
+              <span className="uppercase tracking-wider text-[11px]">Notice</span>
+            </div>
+            <p className="text-xs leading-relaxed font-medium">
+              Once configured for this academic year, Admission Fee cannot be edited or deleted.
+            </p>
+          </div>
+          <p>Admission Fee will automatically apply to all current and future New Admission students in this academic session. Existing students are automatically excluded.</p>
           <p className="font-bold text-text-primary">Are you sure you want to proceed?</p>
         </div>
       </Dialog>

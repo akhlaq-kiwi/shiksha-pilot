@@ -39,6 +39,7 @@ class _ManageFinanceFeesScreenState extends State<ManageFinanceFeesScreen> with 
 
   // Data
   List<dynamic> _feeTypes = [];
+  Map<String, dynamic>? _admissionFeeConfig;
   List<dynamic> _transportFees = [];
   List<dynamic> _classes = [];
   List<dynamic> _students = [];
@@ -71,7 +72,7 @@ class _ManageFinanceFeesScreenState extends State<ManageFinanceFeesScreen> with 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 6, vsync: this);
     _loadAllData();
   }
 
@@ -110,17 +111,19 @@ class _ManageFinanceFeesScreenState extends State<ManageFinanceFeesScreen> with 
         widget.feeService.getStudents(limit: 1000),
         widget.feeService.getClassFeeConfigurations(academicYearId: activeYearId),
         widget.feeService.getClassCourseFeeConfigurations(academicYearId: activeYearId),
+        widget.feeService.getAdmissionFee().catchError((_) => <String, dynamic>{'configured': false}),
       ]);
 
       if (mounted) {
         setState(() {
           _academicYears = years;
-          _feeTypes = results[0];
-          _transportFees = results[1];
-          _classes = results[2];
-          _students = results[3];
-          _classFeeConfigs = results[4];
-          _classCourseFeeConfigs = results[5];
+          _feeTypes = results[0] as List<dynamic>;
+          _transportFees = results[1] as List<dynamic>;
+          _classes = results[2] as List<dynamic>;
+          _students = results[3] as List<dynamic>;
+          _classFeeConfigs = results[4] as List<dynamic>;
+          _classCourseFeeConfigs = results[5] as List<dynamic>;
+          _admissionFeeConfig = results[6] is Map ? Map<String, dynamic>.from(results[6] as Map) : {'configured': false};
           _isLoading = false;
         });
       }
@@ -151,6 +154,17 @@ class _ManageFinanceFeesScreenState extends State<ManageFinanceFeesScreen> with 
       if (mounted) {
         setState(() {
           _feeTypes = list;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _reloadAdmissionFee() async {
+    try {
+      final cfg = await widget.feeService.getAdmissionFee();
+      if (mounted) {
+        setState(() {
+          _admissionFeeConfig = cfg;
         });
       }
     } catch (_) {}
@@ -392,15 +406,18 @@ class _ManageFinanceFeesScreenState extends State<ManageFinanceFeesScreen> with 
         ),
         bottom: TabBar(
           controller: _tabController,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
           indicatorColor: const Color(0xFFD97706),
           indicatorWeight: 3,
           labelColor: const Color(0xFFD97706),
           unselectedLabelColor: const Color(0xFF64748B),
-          labelPadding: const EdgeInsets.symmetric(horizontal: 2),
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: -0.3),
-          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11, letterSpacing: -0.3),
+          labelPadding: const EdgeInsets.symmetric(horizontal: 14),
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: -0.2),
+          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11, letterSpacing: -0.2),
           tabs: const [
             Tab(text: 'ADDITIONAL', icon: Icon(Icons.local_offer_outlined, size: 17)),
+            Tab(text: 'ADMISSION', icon: Icon(Icons.person_add_alt_1_outlined, size: 17)),
             Tab(text: 'ANNUAL', icon: Icon(Icons.calendar_month_outlined, size: 17)),
             Tab(text: 'TRANSPORT', icon: Icon(Icons.directions_bus_outlined, size: 17)),
             Tab(text: 'MONTHLY', icon: Icon(Icons.event_repeat_rounded, size: 17)),
@@ -421,6 +438,7 @@ class _ManageFinanceFeesScreenState extends State<ManageFinanceFeesScreen> with 
                   physics: const BouncingScrollPhysics(),
                   children: [
                     _buildAdditionalFeeTab(),
+                    _buildAdmissionFeeTab(),
                     _buildAnnualFeeTab(),
                     _buildTransportFeeTab(),
                     _buildMonthlyFeeTab(),
@@ -785,6 +803,272 @@ class _ManageFinanceFeesScreenState extends State<ManageFinanceFeesScreen> with 
   // ===========================================================================
   // TAB 2: ANNUAL FEE
   // ===========================================================================
+
+  Widget _buildAdmissionFeeTab() {
+    final cfg = _admissionFeeConfig;
+    final bool isConfigured = cfg != null && cfg['configured'] == true;
+
+    return RefreshIndicator(
+      onRefresh: _reloadAdmissionFee,
+      color: const Color(0xFFD97706),
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        children: [
+          // Info banner
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFFBEB),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFFDE68A)),
+            ),
+            child: const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.info_outline_rounded, color: Color(0xFFD97706), size: 20),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Configure Admission Fee once per academic session for the entire school or class-wise. It will automatically apply to every New Admission student enrolled in this academic year. Existing students are automatically excluded.',
+                    style: TextStyle(
+                      color: Color(0xFF92400E),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          if (isConfigured) ...[
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFF86EFAC)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.green.withValues(alpha: 0.05),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDCFCE7),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 14),
+                            SizedBox(width: 4),
+                            Text(
+                              'CONFIGURED FOR CURRENT SESSION',
+                              style: TextStyle(
+                                color: Color(0xFF16A34A),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 10.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (cfg['apply_type'] == 'school')
+                        Text(
+                          _formatCurrency(cfg['amount']),
+                          style: const TextStyle(
+                            color: Color(0xFF0F172A),
+                            fontWeight: FontWeight.w800,
+                            fontSize: 18,
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'Admission Fee',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Applies To: ${cfg['assigned_to'] ?? 'All New Admissions'}',
+                    style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'New Students Assigned: ${cfg['total_students'] ?? 0}',
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600),
+                  ),
+                  const Divider(height: 24),
+
+                  // Summary metrics
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildMetricTile(
+                          'Total',
+                          _formatCurrency(cfg['total_amount'] ?? 0),
+                          const Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildMetricTile(
+                          'Collected',
+                          _formatCurrency(cfg['collected_amount'] ?? 0),
+                          const Color(0xFF16A34A),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildMetricTile(
+                          'Pending',
+                          _formatCurrency(cfg['pending_amount'] ?? 0),
+                          const Color(0xFFDC2626),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Class-wise breakdown if present
+                  if (cfg['class_amounts'] != null && (cfg['class_amounts'] as List).isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Class-Wise Allocation',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        children: (cfg['class_amounts'] as List).map<Widget>((ca) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4.0),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  formatShortClassName(ca['class_name']?.toString()),
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                ),
+                                Text(
+                                  _formatCurrency(ca['amount']),
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFD97706)),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.lock_rounded, size: 16, color: Color(0xFF64748B)),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Admission Fee is auto-applied to all New Admission students in this session and cannot be edited or deleted once configured.',
+                            style: TextStyle(fontSize: 11, color: Color(0xFF475569), fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            // Empty state card with action button
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 36),
+              child: Column(
+                children: [
+                  Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFFBEB),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xFFFDE68A)),
+                    ),
+                    child: const Icon(Icons.person_add_alt_1_rounded, color: Color(0xFFD97706), size: 28),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'No Admission Fee Configured',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Set up Admission Fee once for this academic session. It will automatically apply to all new students enrolled in this year (existing students are excluded).',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.4),
+                  ),
+                  const SizedBox(height: 22),
+                  ElevatedButton.icon(
+                    onPressed: _openConfigureAdmissionFeeModal,
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text('Configure Admission Fee', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFD97706),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 
   Widget _buildAnnualFeeTab() {
     final annualFee = _appliedAnnualFee;
@@ -2294,6 +2578,360 @@ class _ManageFinanceFeesScreenState extends State<ManageFinanceFeesScreen> with 
             child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
+      ),
+    );
+  }
+
+  // Configure Admission Fee Modal
+  void _openConfigureAdmissionFeeModal() {
+    final uniqueClasses = _getUniqueClasses();
+    String applyType = 'school'; // 'school' | 'classes'
+    String amount = '';
+    final Map<String, String> classAmounts = {for (var uc in uniqueClasses) uc['name'] as String: ''};
+    String error = '';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (modalCtx, setModalState) {
+            final keyboardPadding = MediaQuery.of(modalCtx).viewInsets.bottom;
+            return Container(
+              margin: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 30),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: EdgeInsets.fromLTRB(20, 14, 20, 20 + keyboardPadding),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    const Text('Configure Admission Fee', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFFBEB),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFFDE68A)),
+                      ),
+                      child: const Text(
+                        'Admission Fee will automatically apply to every New Admission student in this academic year. Existing students are automatically excluded. Once configured, it cannot be modified or deleted.',
+                        style: TextStyle(fontSize: 11, color: Color(0xFF92400E), height: 1.35, fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    if (error.isNotEmpty) ...[
+                      Text(error, style: const TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 10),
+                    ],
+
+                    const Text('APPLICATION TYPE *', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        _buildRadioOption('Entire School', 'school', applyType, (val) => setModalState(() {
+                          applyType = val;
+                          error = '';
+                        })),
+                        const SizedBox(width: 8),
+                        _buildRadioOption('Class-Wise', 'classes', applyType, (val) => setModalState(() {
+                          applyType = val;
+                          error = '';
+                        })),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+
+                    if (applyType == 'school') ...[
+                      const Text('ADMISSION FEE AMOUNT (₹) *', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFCBD5E1)),
+                        ),
+                        child: TextField(
+                          keyboardType: TextInputType.number,
+                          onChanged: (val) => setModalState(() => amount = val),
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                          decoration: const InputDecoration(
+                            hintText: 'e.g. 2000',
+                            hintStyle: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                            border: InputBorder.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ] else ...[
+                      const Text('CLASS ALLOCATION *', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                      const SizedBox(height: 6),
+                      if (uniqueClasses.isEmpty)
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: const Color(0xFFCBD5E1)),
+                          ),
+                          child: const Text(
+                            'No classes found. Please add classes first or use Entire School mode.',
+                            style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                          ),
+                        )
+                      else
+                        Container(
+                          constraints: const BoxConstraints(maxHeight: 220),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: const Color(0xFFCBD5E1)),
+                          ),
+                          child: ListView.separated(
+                            shrinkWrap: true,
+                            itemCount: uniqueClasses.length,
+                            separatorBuilder: (_, __) => const Divider(height: 1),
+                            itemBuilder: (_, i) {
+                              final uc = uniqueClasses[i];
+                              final ucName = uc['name'] as String;
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        uc['displayName'] ?? ucName,
+                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                    SizedBox(
+                                      width: 100,
+                                      height: 38,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius: BorderRadius.circular(10),
+                                          border: Border.all(color: const Color(0xFFCBD5E1)),
+                                        ),
+                                        child: TextField(
+                                          keyboardType: TextInputType.number,
+                                          onChanged: (val) => classAmounts[ucName] = val,
+                                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                          decoration: const InputDecoration(
+                                            hintText: '₹ Amount',
+                                            hintStyle: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                                            border: InputBorder.none,
+                                            isDense: true,
+                                            contentPadding: EdgeInsets.symmetric(vertical: 8),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(modalCtx),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
+                            child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              if (applyType == 'school') {
+                                final amt = double.tryParse(amount.trim());
+                                if (amt == null || amt <= 0) {
+                                  setModalState(() => error = 'Admission Fee amount must be greater than 0.');
+                                  return;
+                                }
+                                if (amt > 10000000) {
+                                  setModalState(() => error = 'Admission Fee amount exceeds system maximum.');
+                                  return;
+                                }
+                              } else {
+                                if (uniqueClasses.isEmpty) {
+                                  setModalState(() => error = 'No classes available for Class-Wise configuration.');
+                                  return;
+                                }
+                                final missing = <String>[];
+                                final invalid = <String>[];
+                                for (final uc in uniqueClasses) {
+                                  final val = classAmounts[uc['name'] as String]?.trim() ?? '';
+                                  if (val.isEmpty) {
+                                    missing.add(uc['displayName'] ?? uc['name']);
+                                  } else {
+                                    final amt = double.tryParse(val);
+                                    if (amt == null || amt <= 0) {
+                                      invalid.add(uc['displayName'] ?? uc['name']);
+                                    }
+                                  }
+                                }
+                                if (missing.isNotEmpty) {
+                                  setModalState(() => error = 'Fee amount for all classes is mandatory. Missing: ${missing.join(', ')}');
+                                  return;
+                                }
+                                if (invalid.isNotEmpty) {
+                                  setModalState(() => error = 'Fee amount must be greater than zero for: ${invalid.join(', ')}');
+                                  return;
+                                }
+                              }
+
+                              Navigator.pop(modalCtx);
+                              _showAdmissionFeeConfirmDialog(applyType, amount, classAmounts, uniqueClasses);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFD97706),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
+                            child: const Text('Next Step', style: TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showAdmissionFeeConfirmDialog(
+    String applyType,
+    String amount,
+    Map<String, String> classAmounts,
+    List<Map<String, dynamic>> uniqueClasses,
+  ) {
+    bool isSubmitting = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dlgCtx) => StatefulBuilder(
+        builder: (ctx, setDlgState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Color(0xFFD97706), size: 24),
+              SizedBox(width: 8),
+              Flexible(child: Text('Confirm Admission Fee', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+            ],
+          ),
+          content: const Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Please review carefully before configuring:',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B)),
+              ),
+              SizedBox(height: 8),
+              Text(
+                '• Once configured for this academic year, Admission Fee cannot be edited or deleted.',
+                style: TextStyle(fontSize: 12, color: Color(0xFF475569), height: 1.3),
+              ),
+              SizedBox(height: 4),
+              Text(
+                '• It will automatically apply to all current and future New Admission students in this academic session. Existing students are automatically excluded.',
+                style: TextStyle(fontSize: 12, color: Color(0xFF475569), height: 1.3),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: isSubmitting ? null : () => Navigator.pop(dlgCtx),
+              child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
+            ),
+            ElevatedButton(
+              onPressed: isSubmitting
+                  ? null
+                  : () async {
+                      setDlgState(() => isSubmitting = true);
+                      try {
+                        final payload = <String, dynamic>{
+                          'apply_type': applyType,
+                          'amount': amount,
+                        };
+                        if (applyType == 'classes') {
+                          final classAmountsPayload = <String, dynamic>{};
+                          for (final uc in uniqueClasses) {
+                            final name = uc['name'] as String;
+                            final val = classAmounts[name]?.trim();
+                            if (val != null && val.isNotEmpty) {
+                              classAmountsPayload[name] = double.tryParse(val) ?? 0;
+                            }
+                          }
+                          payload['class_amounts'] = classAmountsPayload;
+                        }
+
+                        await widget.feeService.createAdmissionFee(payload);
+                        if (context.mounted) {
+                          Navigator.pop(dlgCtx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Admission Fee configured successfully.')),
+                          );
+                        }
+                        await _reloadAdmissionFee();
+                      } catch (err) {
+                        setDlgState(() => isSubmitting = false);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(err.toString().replaceAll('Exception:', '').trim()),
+                              backgroundColor: Colors.redAccent,
+                            ),
+                          );
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFD97706),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: isSubmitting
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(Colors.white)))
+                  : const Text('Confirm & Save', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -465,6 +465,14 @@ export const schoolService = {
     return apiClient.post('/api/school/additional-fees/types', data);
   },
 
+  getAdmissionFee() {
+    return apiClient.get('/api/school/admission-fees');
+  },
+
+  createAdmissionFee(data) {
+    return apiClient.post('/api/school/admission-fees', data);
+  },
+
   createAnnualFee(data) {
     return apiClient.post('/api/school/annual-fees', data);
   },

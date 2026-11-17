@@ -1008,22 +1008,8 @@ class SchoolAdminService extends BaseService
                 ]);
                 $cfgRow = $stmtFallbackCfg->fetch(PDO::FETCH_ASSOC);
 
-                if (!$cfgRow) {
-                    // Fallback 2: Check if any fee configuration exists for this school & academic year
-                    $stmtAnyCfg = $pdo->prepare("
-                        SELECT * FROM class_fee_configurations 
-                        WHERE school_id = :school_id AND academic_year_id = :academic_year_id
-                        ORDER BY id ASC LIMIT 1
-                    ");
-                    $stmtAnyCfg->execute([
-                        ':school_id' => $schoolId,
-                        ':academic_year_id' => $workingYearId
-                    ]);
-                    $cfgRow = $stmtAnyCfg->fetch(PDO::FETCH_ASSOC);
-                }
-
                 if ($cfgRow) {
-                    // Auto-sync for this class section ID
+                    // Auto-sync only when another section of the SAME class name is already configured
                     try {
                         $stmtInsSync = $pdo->prepare("
                             INSERT INTO class_fee_configurations (school_id, class_id, academic_year_id, mode, monthly_fees, is_locked)
@@ -1398,19 +1384,24 @@ class SchoolAdminService extends BaseService
                     $classFeeConfig = is_string($cfgRow['monthly_fees']) ? json_decode($cfgRow['monthly_fees'], true) : $cfgRow['monthly_fees'];
                 }
             }
-            if (!$classFeeConfig && $targetAyId > 0) {
-                $stmtAnyCfg = $pdo->prepare("
-                    SELECT monthly_fees FROM class_fee_configurations 
-                    WHERE school_id = :school_id AND academic_year_id = :academic_year_id 
-                    ORDER BY id ASC LIMIT 1
+            if (!$classFeeConfig && $targetClassId > 0 && $targetAyId > 0) {
+                // Fallback only to another section of the SAME class name
+                $stmtSameClassCfg = $pdo->prepare("
+                    SELECT cfg.monthly_fees
+                    FROM class_fee_configurations cfg
+                    JOIN classes c1 ON cfg.class_id = c1.id
+                    JOIN classes c2 ON c1.name COLLATE utf8mb4_unicode_ci = c2.name COLLATE utf8mb4_unicode_ci AND c1.school_id = c2.school_id
+                    WHERE cfg.school_id = :school_id AND c2.id = :class_id AND cfg.academic_year_id = :academic_year_id
+                    LIMIT 1
                 ");
-                $stmtAnyCfg->execute([
+                $stmtSameClassCfg->execute([
                     ':school_id' => $schoolId,
+                    ':class_id' => $targetClassId,
                     ':academic_year_id' => $targetAyId
                 ]);
-                $anyRow = $stmtAnyCfg->fetch(PDO::FETCH_ASSOC);
-                if ($anyRow && !empty($anyRow['monthly_fees'])) {
-                    $classFeeConfig = is_string($anyRow['monthly_fees']) ? json_decode($anyRow['monthly_fees'], true) : $anyRow['monthly_fees'];
+                $sameClassRow = $stmtSameClassCfg->fetch(PDO::FETCH_ASSOC);
+                if ($sameClassRow && !empty($sameClassRow['monthly_fees'])) {
+                    $classFeeConfig = is_string($sameClassRow['monthly_fees']) ? json_decode($sameClassRow['monthly_fees'], true) : $sameClassRow['monthly_fees'];
                 }
             }
 
@@ -1887,8 +1878,14 @@ class SchoolAdminService extends BaseService
             }
         }
 
-        if (strcasecmp($studentCategory ?? '', 'Existing Student') === 0 && $admissionFee !== null && $admissionFee > 0) {
-            throw new ValidationException(['admission_fee' => 'Not allowed for existing student']);
+        if (strcasecmp($studentCategory ?? '', 'Existing Student') === 0) {
+            if ($admissionFee !== null && $admissionFee > 0) {
+                throw new ValidationException(['admission_fee' => 'Not allowed for existing student']);
+            }
+            $admissionFee = null;
+        } elseif ($admissionFee === null && $academicYearId > 0) {
+            // Automatically apply configured Admission Fee for New Admission students
+            $admissionFee = $this->resolveConfiguredAdmissionFee($pdo, $schoolId, $academicYearId, (int)$classId);
         }
 
         $studentMobile = !empty($data['student_mobile']) ? trim((string)$data['student_mobile']) : (!empty($data['parent_phone']) ? trim((string)$data['parent_phone']) : (!empty($data['father_phone']) ? trim((string)$data['father_phone']) : null));
@@ -2018,11 +2015,6 @@ class SchoolAdminService extends BaseService
         if ($admissionFee !== null && $admissionFee > 0) {
             $this->syncAdmissionFeePayment($pdo, $schoolId, $id, $academicYearId, $admissionFee);
         }
-
-        $this->syncExistingAnnualFeePayment($pdo, $schoolId, $id, (int)$classId, $academicYearId, $studentCategory);
-
-        $this->log('Student created', ['id' => $id, 'school_id' => $schoolId]);
-        return $student;
 
         $this->syncExistingAnnualFeePayment($pdo, $schoolId, $id, (int)$classId, $academicYearId, $studentCategory);
 
@@ -5596,19 +5588,6 @@ class SchoolAdminService extends BaseService
                 ':academic_year_id' => $academicYearId
             ]);
             $cfgRow = $stmtFallback->fetch(PDO::FETCH_ASSOC);
-
-            if (!$cfgRow) {
-                $stmtAnyCfg = $pdo->prepare("
-                    SELECT monthly_fees FROM class_fee_configurations 
-                    WHERE school_id = :school_id AND academic_year_id = :academic_year_id 
-                    ORDER BY id ASC LIMIT 1
-                ");
-                $stmtAnyCfg->execute([
-                    ':school_id' => $schoolId,
-                    ':academic_year_id' => $academicYearId
-                ]);
-                $cfgRow = $stmtAnyCfg->fetch(PDO::FETCH_ASSOC);
-            }
         }
 
         $monthlyFees = [];
@@ -8271,19 +8250,23 @@ class SchoolAdminService extends BaseService
             if ($cfgRow) {
                 $classFeeConfig = json_decode($cfgRow['monthly_fees'], true);
             } else {
-                // Fallback: check any class fee config in the school for this academic year
-                $stmtAnyCfg = $pdo->prepare("
-                    SELECT monthly_fees FROM class_fee_configurations 
-                    WHERE school_id = :school_id AND academic_year_id = :academic_year_id 
-                    ORDER BY id ASC LIMIT 1
+                // Fallback only to another section of the SAME class name
+                $stmtSameClassCfg = $pdo->prepare("
+                    SELECT cfg.monthly_fees
+                    FROM class_fee_configurations cfg
+                    JOIN classes c1 ON cfg.class_id = c1.id
+                    JOIN classes c2 ON c1.name COLLATE utf8mb4_unicode_ci = c2.name COLLATE utf8mb4_unicode_ci AND c1.school_id = c2.school_id
+                    WHERE cfg.school_id = :school_id AND c2.id = :class_id AND cfg.academic_year_id = :academic_year_id
+                    LIMIT 1
                 ");
-                $stmtAnyCfg->execute([
+                $stmtSameClassCfg->execute([
                     ':school_id' => $schoolId,
+                    ':class_id' => $classId,
                     ':academic_year_id' => $academicYearId
                 ]);
-                $anyRow = $stmtAnyCfg->fetch(PDO::FETCH_ASSOC);
-                if ($anyRow) {
-                    $classFeeConfig = is_string($anyRow['monthly_fees']) ? json_decode($anyRow['monthly_fees'], true) : $anyRow['monthly_fees'];
+                $sameClassRow = $stmtSameClassCfg->fetch(PDO::FETCH_ASSOC);
+                if ($sameClassRow) {
+                    $classFeeConfig = is_string($sameClassRow['monthly_fees']) ? json_decode($sameClassRow['monthly_fees'], true) : $sameClassRow['monthly_fees'];
                 }
             }
         }
@@ -14347,6 +14330,318 @@ Only approve the settlement after reviewing all financial records.
                 'academic_year_id' => $academicYearId,
                 'assigned_count' => count($studentsToApply)
             ];
+        } catch (\Exception $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+    }
+
+    private function ensureAdmissionFeeConfigTable(PDO $pdo): void
+    {
+        static $ensured = false;
+        if ($ensured) {
+            return;
+        }
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS `admission_fee_configurations` (
+                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                `school_id` INT NOT NULL,
+                `academic_year_id` INT NOT NULL,
+                `apply_type` ENUM('school', 'classes') NOT NULL DEFAULT 'school',
+                `amount` DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+                `class_amounts` JSON NULL,
+                `created_by` INT NULL,
+                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY `uq_afc_school_ay` (`school_id`, `academic_year_id`),
+                INDEX `idx_afc_school` (`school_id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        ");
+        $ensured = true;
+    }
+
+    private function resolveConfiguredAdmissionFee(PDO $pdo, int $schoolId, int $academicYearId, int $classId): ?float
+    {
+        if ($academicYearId <= 0) {
+            return null;
+        }
+        try {
+            $this->ensureAdmissionFeeConfigTable($pdo);
+            $stmt = $pdo->prepare("
+                SELECT apply_type, amount, class_amounts
+                FROM admission_fee_configurations
+                WHERE school_id = :sid AND academic_year_id = :ayid
+                LIMIT 1
+            ");
+            $stmt->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+            $cfg = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$cfg) {
+                return null;
+            }
+            if (($cfg['apply_type'] ?? 'school') === 'school') {
+                $amt = (float)($cfg['amount'] ?? 0);
+                return $amt > 0 ? $amt : null;
+            }
+            $classAmounts = is_string($cfg['class_amounts'] ?? null)
+                ? json_decode($cfg['class_amounts'], true)
+                : ($cfg['class_amounts'] ?? []);
+            if (!is_array($classAmounts) || empty($classAmounts)) {
+                return null;
+            }
+            // Direct class_id match
+            if (isset($classAmounts[(string)$classId]) && (float)$classAmounts[(string)$classId] > 0) {
+                return (float)$classAmounts[(string)$classId];
+            }
+            // Class-name match (handles multiple sections of the same class)
+            if ($classId > 0) {
+                $stmtC = $pdo->prepare("SELECT name FROM classes WHERE id = :cid AND school_id = :sid LIMIT 1");
+                $stmtC->execute([':cid' => $classId, ':sid' => $schoolId]);
+                $className = trim((string)($stmtC->fetchColumn() ?: ''));
+                if ($className !== '') {
+                    foreach ($classAmounts as $k => $v) {
+                        if (strcasecmp(trim((string)$k), $className) === 0 && (float)$v > 0) {
+                            return (float)$v;
+                        }
+                    }
+                }
+            }
+            return null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    public function getAdmissionFeeConfig(array $user): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->staffRepo->getPdo();
+        $this->ensureAdmissionFeeConfigTable($pdo);
+
+        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+        $workingYearId = $workingYear ? (int)$workingYear['id'] : null;
+
+        if ($workingYearId === null) {
+            return [
+                'configured' => false,
+                'academic_year_id' => null,
+            ];
+        }
+
+        $stmt = $pdo->prepare("
+            SELECT * FROM admission_fee_configurations
+            WHERE school_id = :sid AND academic_year_id = :ayid
+            LIMIT 1
+        ");
+        $stmt->execute([':sid' => $schoolId, ':ayid' => $workingYearId]);
+        $cfg = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$cfg) {
+            return [
+                'configured' => false,
+                'academic_year_id' => $workingYearId,
+                'academic_year_name' => $workingYear['name'] ?? null,
+            ];
+        }
+
+        // Aggregate live collection stats for Admission Fee payments in this academic year
+        $stmtStats = $pdo->prepare("
+            SELECT
+                COUNT(afp.id) AS total_students,
+                SUM(CASE WHEN LOWER(afp.status) IN ('paid', 'partial') THEN 1 ELSE 0 END) AS collected_students,
+                SUM(CASE WHEN LOWER(afp.status) IN ('pending', 'partial') THEN 1 ELSE 0 END) AS pending_students,
+                COALESCE(SUM(COALESCE(afp.amount_paid, 0)), 0) AS collected_amount,
+                COALESCE(SUM(GREATEST(0, afp.amount - (COALESCE(afp.amount_paid, 0) + COALESCE(afp.discount_amount, 0)))), 0) AS pending_amount
+            FROM additional_fee_payments afp
+            JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+            WHERE afp.school_id = :sid
+              AND aft.academic_year_id = :ayid
+              AND (aft.name = 'Admission Fee' OR aft.category = 'Admission Fee')
+        ");
+        $stmtStats->execute([':sid' => $schoolId, ':ayid' => $workingYearId]);
+        $stats = $stmtStats->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        $classAmountsList = [];
+        $decodedClassAmounts = is_string($cfg['class_amounts'] ?? null)
+            ? json_decode($cfg['class_amounts'], true)
+            : ($cfg['class_amounts'] ?? []);
+        if (is_array($decodedClassAmounts)) {
+            foreach ($decodedClassAmounts as $cname => $amt) {
+                $val = (float)$amt;
+                if ($val > 0) {
+                    $classAmountsList[] = [
+                        'class_name' => (string)$cname,
+                        'amount' => $val,
+                    ];
+                }
+            }
+        }
+
+        $collectedAmt = (float)($stats['collected_amount'] ?? 0);
+        $pendingAmt = (float)($stats['pending_amount'] ?? 0);
+
+        return [
+            'configured' => true,
+            'id' => (int)$cfg['id'],
+            'academic_year_id' => $workingYearId,
+            'academic_year_name' => $workingYear['name'] ?? null,
+            'apply_type' => (string)$cfg['apply_type'],
+            'amount' => (float)$cfg['amount'],
+            'assigned_to' => $cfg['apply_type'] === 'school' ? 'For All Classes (New Admissions)' : 'For Selected Classes (New Admissions)',
+            'class_amounts' => $classAmountsList,
+            'total_students' => (int)($stats['total_students'] ?? 0),
+            'collected_students' => (int)($stats['collected_students'] ?? 0),
+            'pending_students' => (int)($stats['pending_students'] ?? 0),
+            'collected_amount' => $collectedAmt,
+            'pending_amount' => $pendingAmt,
+            'total_amount' => $collectedAmt + $pendingAmt,
+            'created_at' => $cfg['created_at'] ?? null,
+        ];
+    }
+
+    public function createAdmissionFee(array $user, array $data): array
+    {
+        $schoolId = $this->getSchoolId($user);
+        $pdo = $this->staffRepo->getPdo();
+        $this->requireWritableAcademicYear($pdo, $schoolId);
+        $this->ensureAdmissionFeeConfigTable($pdo);
+
+        $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
+        if (!$workingYear) {
+            throw new ValidationException(['academic_year' => 'No academic year found. Please create an Academic Year first.']);
+        }
+        $academicYearId = (int)$workingYear['id'];
+
+        // Duplicate check: only once per academic year
+        $stmtDup = $pdo->prepare("
+            SELECT id FROM admission_fee_configurations
+            WHERE school_id = :sid AND academic_year_id = :ayid
+            LIMIT 1
+        ");
+        $stmtDup->execute([':sid' => $schoolId, ':ayid' => $academicYearId]);
+        if ($stmtDup->fetchColumn() !== false) {
+            throw new ValidationException(['duplicate' => 'Admission Fee is already configured for this academic year and cannot be added again.']);
+        }
+
+        $applyType = ($data['apply_type'] ?? 'school') === 'classes' ? 'classes' : 'school';
+        $amount = 0.0;
+        $normalizedClassAmounts = []; // canonical class_name => float amount
+
+        if ($applyType === 'school') {
+            $amount = isset($data['amount']) ? (float)$data['amount'] : 0.0;
+            if ($amount <= 0) {
+                throw new ValidationException(['amount' => 'Admission Fee amount must be greater than 0.']);
+            }
+            if ($amount > 10000000) {
+                throw new ValidationException(['amount' => 'Admission Fee amount exceeds system maximum.']);
+            }
+        } else {
+            if (empty($data['class_amounts']) || !is_array($data['class_amounts'])) {
+                throw new ValidationException(['classes' => 'At least one class configuration is required when Class Wise is selected.']);
+            }
+
+            // Build class_id => class_name lookup so either class_id or class_name keys work seamlessly
+            $stmtCls = $pdo->prepare("SELECT id, name FROM classes WHERE school_id = :sid");
+            $stmtCls->execute([':sid' => $schoolId]);
+            $classIdToName = [];
+            foreach ($stmtCls->fetchAll(PDO::FETCH_ASSOC) as $cRow) {
+                $classIdToName[(string)$cRow['id']] = trim((string)$cRow['name']);
+            }
+
+            foreach ($data['class_amounts'] as $key => $amt) {
+                $classAmt = (float)$amt;
+                if ($classAmt <= 0) {
+                    continue;
+                }
+                if ($classAmt > 10000000) {
+                    throw new ValidationException(['amount' => 'Class fee amount exceeds system maximum.']);
+                }
+                $keyStr = trim((string)$key);
+                $canonicalName = $classIdToName[$keyStr] ?? $keyStr;
+                if ($canonicalName !== '') {
+                    $normalizedClassAmounts[$canonicalName] = $classAmt;
+                }
+            }
+
+            if (empty($normalizedClassAmounts)) {
+                throw new ValidationException(['classes' => 'Please enter a valid fee amount greater than 0 for at least one class.']);
+            }
+            $amount = max(array_values($normalizedClassAmounts));
+        }
+
+        $pdo->beginTransaction();
+        try {
+            $stmtIns = $pdo->prepare("
+                INSERT INTO admission_fee_configurations (school_id, academic_year_id, apply_type, amount, class_amounts, created_by)
+                VALUES (:sid, :ayid, :apply_type, :amount, :class_amounts, :created_by)
+            ");
+            $stmtIns->execute([
+                ':sid' => $schoolId,
+                ':ayid' => $academicYearId,
+                ':apply_type' => $applyType,
+                ':amount' => $amount,
+                ':class_amounts' => $applyType === 'classes' ? json_encode($normalizedClassAmounts) : null,
+                ':created_by' => isset($user['id']) ? (int)$user['id'] : null,
+            ]);
+
+            // Apply immediately to all active NEW ADMISSION students already enrolled in this academic year
+            // Existing students are strictly excluded!
+            $stmtNewStudents = $pdo->prepare("
+                SELECT s.id, s.class_id, c.name AS class_name
+                FROM students s
+                LEFT JOIN classes c ON c.id = s.class_id
+                WHERE s.school_id = :sid
+                  AND s.status = 'ACTIVE'
+                  AND s.academic_year_id = :ayid
+                  AND UPPER(TRIM(COALESCE(s.student_category, ''))) = 'NEW ADMISSION'
+            ");
+            $stmtNewStudents->execute([
+                ':sid' => $schoolId,
+                ':ayid' => $academicYearId,
+            ]);
+            $newStudentRows = $stmtNewStudents->fetchAll(PDO::FETCH_ASSOC);
+
+            $stmtUpdStudent = $pdo->prepare("UPDATE students SET admission_fee = :amt WHERE id = :id AND school_id = :sid");
+            $assignedCount = 0;
+
+            foreach ($newStudentRows as $st) {
+                $targetAmt = null;
+                if ($applyType === 'school') {
+                    $targetAmt = $amount;
+                } else {
+                    $stClassName = trim((string)($st['class_name'] ?? ''));
+                    if ($stClassName !== '') {
+                        foreach ($normalizedClassAmounts as $cname => $cAmt) {
+                            if (strcasecmp(trim($cname), $stClassName) === 0 && $cAmt > 0) {
+                                $targetAmt = $cAmt;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if ($targetAmt !== null && $targetAmt > 0) {
+                    $stmtUpdStudent->execute([
+                        ':amt' => $targetAmt,
+                        ':id' => (int)$st['id'],
+                        ':sid' => $schoolId,
+                    ]);
+                    $this->syncAdmissionFeePayment($pdo, $schoolId, (int)$st['id'], $academicYearId, $targetAmt);
+                    $assignedCount++;
+                }
+            }
+
+            $pdo->commit();
+
+            $this->log('Admission Fee Configured', [
+                'school_id' => $schoolId,
+                'academic_year_id' => $academicYearId,
+                'apply_type' => $applyType,
+                'assigned_count' => $assignedCount,
+            ]);
+
+            $result = $this->getAdmissionFeeConfig($user);
+            $result['assigned_count'] = $assignedCount;
+            return $result;
         } catch (\Exception $e) {
             $pdo->rollBack();
             throw $e;
@@ -20529,16 +20824,20 @@ Only approve the settlement after reviewing all financial records.
         ]);
         $cfgRow = $stmtCfg->fetch(PDO::FETCH_ASSOC);
         if (!$cfgRow) {
-            $stmtAnyCfg = $pdo->prepare("
-                SELECT monthly_fees FROM class_fee_configurations 
-                WHERE school_id = :school_id AND academic_year_id = :academic_year_id 
-                ORDER BY id ASC LIMIT 1
+            $stmtSameClassCfg = $pdo->prepare("
+                SELECT cfg.monthly_fees
+                FROM class_fee_configurations cfg
+                JOIN classes c1 ON cfg.class_id = c1.id
+                JOIN classes c2 ON c1.name COLLATE utf8mb4_unicode_ci = c2.name COLLATE utf8mb4_unicode_ci AND c1.school_id = c2.school_id
+                WHERE cfg.school_id = :school_id AND c2.id = :class_id AND cfg.academic_year_id = :academic_year_id
+                LIMIT 1
             ");
-            $stmtAnyCfg->execute([
+            $stmtSameClassCfg->execute([
                 ':school_id' => $schoolId,
+                ':class_id' => $classId,
                 ':academic_year_id' => $academicYearId
             ]);
-            $cfgRow = $stmtAnyCfg->fetch(PDO::FETCH_ASSOC);
+            $cfgRow = $stmtSameClassCfg->fetch(PDO::FETCH_ASSOC);
         }
         $monthlyFees = [];
         if ($cfgRow) {

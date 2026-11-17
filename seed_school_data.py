@@ -4,7 +4,7 @@ Seed Script for ShikshaPilot School Data
 Adds teachers and students across all classes with realistic, unique data.
 
 Usage:
-  python seed_school_data.py --url http://localhost:3000 --phone 9998887776 --password Test@123 --teachers 10 --students-per-class 10
+  python seed_school_data.py --url https://qa.shikshapilot.com --phone 1112223333 --password Test@123 --teachers 10 --new-students 5 --existing-students 5
 """
 
 import argparse
@@ -197,10 +197,11 @@ def seed_teachers(base_url, token, count=10):
     return created
 
 
-def seed_students(base_url, token, classes, students_per_class=10):
+def seed_students(base_url, token, classes, new_students_per_class=5, existing_students_per_class=5):
+    students_per_class = new_students_per_class + existing_students_per_class
     total_to_create = len(classes) * students_per_class
     print(f"\n==========================================")
-    print(f" SEEDING {total_to_create} STUDENTS ({students_per_class} PER CLASS)")
+    print(f" SEEDING {total_to_create} STUDENTS ({students_per_class} PER CLASS: {new_students_per_class} NEW, {existing_students_per_class} EXISTING)")
     print(f"==========================================")
     url = f"{base_url.rstrip('/')}/api/school/students"
 
@@ -216,7 +217,13 @@ def seed_students(base_url, token, classes, students_per_class=10):
         # Age based on class index (Class 1 -> ~2020 birth, Class 5 -> ~2016 birth)
         birth_year = 2020 - c_idx
 
-        for roll in range(1, students_per_class + 1):
+        # Build exact ordered list of categories for this class: New Admissions first, then Existing Students
+        class_categories = (
+            ["New Admission"] * new_students_per_class
+            + ["Existing Student"] * existing_students_per_class
+        )
+
+        for roll, student_category in enumerate(class_categories, start=1):
             is_male = (roll % 2 == 1)
             first_name = (MALE_FIRST_NAMES if is_male else FEMALE_FIRST_NAMES)[(global_sr - 1) % 50]
             mid_name = MIDDLE_NAMES[(global_sr - 1) % len(MIDDLE_NAMES)]
@@ -237,13 +244,6 @@ def seed_students(base_url, token, classes, students_per_class=10):
             student_mobile = f"98300{global_sr:05d}"
             student_email = f"student{global_sr:03d}.sp@shikshapilot.com"
 
-            # Category requirement:
-            # - "New student" (New Admission) -> Admission Fee = 1000
-            # - "Existing student" (Existing Student) -> Admission Fee = None (blank)
-            is_new = (roll % 2 == 1)
-            student_category = "New Admission" if is_new else "Existing Student"
-            admission_fee = 1000 if is_new else None
-
             # Parents
             f_first = MALE_FIRST_NAMES[(global_sr + 7) % 50]
             father_name = f"{f_first} {mid_name} {last_name}"
@@ -257,6 +257,7 @@ def seed_students(base_url, token, classes, students_per_class=10):
             address = f"House {200 + global_sr}, {colony}"
             pin_code = f"1100{(global_sr % 90) + 10:02d}"
 
+            # Note: admission_fee is intentionally omitted; backend auto-applies configured Admission Fee to New Admissions
             payload = {
                 "first_name": first_name,
                 "middle_name": mid_name,
@@ -274,7 +275,6 @@ def seed_students(base_url, token, classes, students_per_class=10):
                 "sr_no": str(global_sr),
                 "admission_date": "2026-04-01",
                 "student_category": student_category,
-                "admission_fee": admission_fee,
                 "status": "ACTIVE",
                 "exit_date": None,
                 "father_name": father_name,
@@ -297,8 +297,7 @@ def seed_students(base_url, token, classes, students_per_class=10):
             if status in (200, 201):
                 total_created += 1
                 s_id = res.get("data", {}).get("id")
-                adm_fee_str = f"Rs.{admission_fee}" if admission_fee else "Blank"
-                print(f"  [SR #{global_sr:02d}] {first_name} {last_name} | Roll: {roll} | Category: {student_category} | Fee: {adm_fee_str} | ID: {s_id}")
+                print(f"  [SR #{global_sr:02d}] {first_name} {last_name} | Roll: {roll} | Category: {student_category} | ID: {s_id}")
             else:
                 print(f"  [FAIL] SR #{global_sr:02d} ({first_name} {last_name}) failed ({status}): {res}")
 
@@ -314,28 +313,54 @@ def main():
     parser.add_argument("--phone", default="9998887776", help="School Admin Phone / Username")
     parser.add_argument("--password", default="Test@123", help="School Admin Password")
     parser.add_argument("--teachers", type=int, default=10, help="Number of teachers to add (default: 10)")
-    parser.add_argument("--students-per-class", type=int, default=10, help="Number of students per class (default: 10)")
+    parser.add_argument("--students-per-class", type=int, default=None, help="Total students per class (auto-split 50/50 if --new-students / --existing-students not specified)")
+    parser.add_argument("--new-students", type=int, default=None, help="Number of New Admission students per class")
+    parser.add_argument("--existing-students", type=int, default=None, help="Number of Existing Student students per class")
 
     args = parser.parse_args()
+
+    if args.new_students is not None or args.existing_students is not None:
+        new_count = args.new_students if args.new_students is not None else 0
+        existing_count = args.existing_students if args.existing_students is not None else 0
+    else:
+        total_per_class = args.students_per_class if args.students_per_class is not None else 10
+        new_count = (total_per_class + 1) // 2
+        existing_count = total_per_class // 2
+
+    if args.teachers < 0 or new_count < 0 or existing_count < 0:
+        print("[ERROR] Counts (--teachers, --new-students, --existing-students) cannot be negative.")
+        sys.exit(1)
+
+    total_students_per_class = new_count + existing_count
 
     print("================================================================")
     print(" SHIKSHAPILOT AUTOMATED DATA FEEDING SCRIPT")
     print("================================================================")
-    print(f" Target URL          : {args.url}")
-    print(f" Admin Credentials   : Phone={args.phone}, Password={'*' * len(args.password)}")
-    print(f" Teachers to add     : {args.teachers}")
-    print(f" Students / Class    : {args.students_per_class}")
+    print(f" Target URL                : {args.url}")
+    print(f" Admin Credentials         : Phone={args.phone}, Password={'*' * len(args.password)}")
+    print(f" Teachers to add           : {args.teachers}")
+    print(f" New Students / Class      : {new_count}")
+    print(f" Existing Students / Class : {existing_count}")
+    print(f" Total Students / Class    : {total_students_per_class}")
     print("================================================================\n")
 
     token = login(args.url, args.phone, args.password)
     classes = get_classes(args.url, token)
 
-    if not classes:
+    if not classes and total_students_per_class > 0:
         print("[FAIL] No classes found in the school. Please create classes first.")
         sys.exit(1)
 
-    seed_teachers(args.url, token, count=args.teachers)
-    seed_students(args.url, token, classes, students_per_class=args.students_per_class)
+    if args.teachers > 0:
+        seed_teachers(args.url, token, count=args.teachers)
+    if total_students_per_class > 0:
+        seed_students(
+            args.url,
+            token,
+            classes,
+            new_students_per_class=new_count,
+            existing_students_per_class=existing_count,
+        )
 
     print("\n================================================================")
     print(" ALL DATA CREATION COMPLETED SUCCESSFULLY!")

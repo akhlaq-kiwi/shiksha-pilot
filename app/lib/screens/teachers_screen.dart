@@ -1786,6 +1786,18 @@ class _AddEditTeacherModal extends StatefulWidget {
 
 class _AddEditTeacherModalState extends State<_AddEditTeacherModal> {
   final _formKey = GlobalKey<FormState>();
+  final FocusNode _blankFocusNode = FocusNode(skipTraversal: true);
+
+  void _dismissFocus() {
+    if (!mounted) return;
+    FocusScope.of(context).requestFocus(_blankFocusNode);
+    FocusManager.instance.primaryFocus?.unfocus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      FocusScope.of(context).requestFocus(_blankFocusNode);
+      FocusManager.instance.primaryFocus?.unfocus();
+    });
+  }
 
   late TextEditingController _nameCtrl;
   late TextEditingController _fatherNameCtrl;
@@ -1979,6 +1991,7 @@ class _AddEditTeacherModalState extends State<_AddEditTeacherModal> {
 
   @override
   void dispose() {
+    _blankFocusNode.dispose();
     _nameCtrl.dispose();
     _fatherNameCtrl.dispose();
     _motherNameCtrl.dispose();
@@ -2099,7 +2112,7 @@ class _AddEditTeacherModalState extends State<_AddEditTeacherModal> {
   }
 
   void _openStatePicker({required bool isCurrent}) {
-    FocusManager.instance.primaryFocus?.unfocus();
+    _dismissFocus();
     final stateList = kIndianStatesAndCities.keys.toList()..sort();
     final currentVal = isCurrent ? _currStateCtrl.text : _permStateCtrl.text;
 
@@ -2122,7 +2135,7 @@ class _AddEditTeacherModalState extends State<_AddEditTeacherModal> {
   }
 
   void _openCityPicker({required bool isCurrent}) {
-    FocusManager.instance.primaryFocus?.unfocus();
+    _dismissFocus();
     final selectedState = isCurrent ? _currStateCtrl.text.trim() : _permStateCtrl.text.trim();
     if (selectedState.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2156,7 +2169,7 @@ class _AddEditTeacherModalState extends State<_AddEditTeacherModal> {
     required String selectedValue,
     required ValueChanged<String> onSelected,
   }) async {
-    FocusManager.instance.primaryFocus?.unfocus();
+    _dismissFocus();
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -2259,6 +2272,7 @@ class _AddEditTeacherModalState extends State<_AddEditTeacherModal> {
         );
       },
     );
+    _dismissFocus();
   }
 
   Future<void> _handleSubmit() async {
@@ -2389,6 +2403,7 @@ class _AddEditTeacherModalState extends State<_AddEditTeacherModal> {
         ),
         child: Column(
           children: [
+            Focus(focusNode: _blankFocusNode, skipTraversal: true, child: const SizedBox.shrink()),
             // Header Bar
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
@@ -2412,9 +2427,7 @@ class _AddEditTeacherModalState extends State<_AddEditTeacherModal> {
           Expanded(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: () {
-                FocusManager.instance.primaryFocus?.unfocus();
-              },
+              onTap: _dismissFocus,
               child: SingleChildScrollView(
                 keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: const EdgeInsets.all(20),
@@ -2583,27 +2596,30 @@ class _AddEditTeacherModalState extends State<_AddEditTeacherModal> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text('PERMANENT ADDRESS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF64748B))),
-                        InkWell(
-                          onTap: () {
-                            FocusManager.instance.primaryFocus?.unfocus();
-                            setState(() => _sameAsCurrent = !_sameAsCurrent);
-                          },
-                          borderRadius: BorderRadius.circular(8),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Checkbox(
-                                  value: _sameAsCurrent,
-                                  activeColor: const Color(0xFFD97706),
-                                  onChanged: (val) {
-                                    FocusManager.instance.primaryFocus?.unfocus();
-                                    setState(() => _sameAsCurrent = val ?? false);
-                                  },
-                                ),
-                                const Text('Same as Current', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                              ],
+                        ExcludeFocus(
+                          child: InkWell(
+                            canRequestFocus: false,
+                            onTap: () {
+                              _dismissFocus();
+                              setState(() => _sameAsCurrent = !_sameAsCurrent);
+                            },
+                            borderRadius: BorderRadius.circular(8),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Checkbox(
+                                    value: _sameAsCurrent,
+                                    activeColor: const Color(0xFFD97706),
+                                    onChanged: (val) {
+                                      _dismissFocus();
+                                      setState(() => _sameAsCurrent = val ?? false);
+                                    },
+                                  ),
+                                  const Text('Same as Current', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -2665,8 +2681,9 @@ class _AddEditTeacherModalState extends State<_AddEditTeacherModal> {
                           child: Builder(
                             builder: (btnContext) {
                               return InkWell(
+                                canRequestFocus: false,
                                 onTap: () async {
-                                  FocusManager.instance.primaryFocus?.unfocus();
+                                  _dismissFocus();
                                   final renderBox = btnContext.findRenderObject() as RenderBox?;
                                   if (renderBox == null) return;
                                   final offset = renderBox.localToGlobal(Offset.zero);
@@ -2707,6 +2724,7 @@ class _AddEditTeacherModalState extends State<_AddEditTeacherModal> {
                                     }).toList(),
                                   );
 
+                                  _dismissFocus();
                                   if (selected != null) {
                                     setState(() => _selectedDocCat = selected);
                                   }
@@ -2881,7 +2899,7 @@ class _AddEditTeacherModalState extends State<_AddEditTeacherModal> {
           controller: ctrl,
           maxLength: maxLength,
           textInputAction: textInputAction,
-          onFieldSubmitted: onFieldSubmitted ?? (_) => FocusScope.of(context).nextFocus(),
+          onFieldSubmitted: onFieldSubmitted,
           keyboardType: isDigits || isNumber
               ? TextInputType.number
               : isEmail
@@ -2938,12 +2956,11 @@ class _AddEditTeacherModalState extends State<_AddEditTeacherModal> {
           ),
         ),
         const SizedBox(height: 6),
-        TextFormField(
-          controller: ctrl,
-          readOnly: true,
-          style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A), fontWeight: FontWeight.w500),
+        InkWell(
+          canRequestFocus: false,
+          borderRadius: BorderRadius.circular(10),
           onTap: () async {
-            FocusManager.instance.primaryFocus?.unfocus();
+            _dismissFocus();
             final now = DateTime.now();
             final picked = await showDatePicker(
               context: context,
@@ -2951,28 +2968,41 @@ class _AddEditTeacherModalState extends State<_AddEditTeacherModal> {
               firstDate: DateTime(1980),
               lastDate: DateTime(2050),
             );
+            _dismissFocus();
             if (picked != null) {
-              ctrl.text = picked.toIso8601String().split('T')[0];
+              setState(() {
+                ctrl.text = picked.toIso8601String().split('T')[0];
+              });
             }
           },
-          decoration: InputDecoration(
-            hintText: 'Select $label',
-            hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-            suffixIcon: const Icon(Icons.calendar_today_rounded, size: 18, color: Color(0xFF64748B)),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            isDense: true,
-            filled: true,
-            fillColor: const Color(0xFFF8FAFC),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFD97706), width: 1.5)),
-            errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFDC2626))),
-            focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFDC2626), width: 1.5)),
+          child: ExcludeFocus(
+            child: IgnorePointer(
+              child: TextFormField(
+                controller: ctrl,
+                readOnly: true,
+                showCursor: false,
+                style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A), fontWeight: FontWeight.w500),
+                decoration: InputDecoration(
+                  hintText: 'Select $label',
+                  hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                  suffixIcon: const Icon(Icons.calendar_today_rounded, size: 18, color: Color(0xFF64748B)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  isDense: true,
+                  filled: true,
+                  fillColor: const Color(0xFFF8FAFC),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFD97706), width: 1.5)),
+                  errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFDC2626))),
+                  focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFDC2626), width: 1.5)),
+                ),
+                validator: (val) {
+                  if (required && (val == null || val.trim().isEmpty)) return '$label is required.';
+                  return null;
+                },
+              ),
+            ),
           ),
-          validator: (val) {
-            if (required && (val == null || val.trim().isEmpty)) return '$label is required.';
-            return null;
-          },
         ),
       ],
     );
@@ -2999,8 +3029,9 @@ class _AddEditTeacherModalState extends State<_AddEditTeacherModal> {
         ),
         const SizedBox(height: 6),
         InkWell(
+          canRequestFocus: false,
           onTap: () {
-            FocusManager.instance.primaryFocus?.unfocus();
+            _dismissFocus();
             onTap();
           },
           borderRadius: BorderRadius.circular(10),

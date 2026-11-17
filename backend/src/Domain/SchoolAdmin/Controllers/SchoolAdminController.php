@@ -2295,6 +2295,27 @@ class SchoolAdminController extends BaseController
         return $this->success($response, $data, 'Additional fee type created and assigned', 201);
     }
 
+    public function getAdmissionFee(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $data = $this->service->getAdmissionFeeConfig($user);
+
+        return $this->success($response, $data);
+    }
+
+    public function createAdmissionFee(Request $request, Response $response): Response
+    {
+        $user = $this->authenticate($request);
+        $this->requireRole($user, ['SCHOOL_ADMIN']);
+
+        $body = RequestParser::body($request);
+        $data = $this->service->createAdmissionFee($user, $body);
+
+        return $this->success($response, $data, 'Admission Fee configured successfully.', 201);
+    }
+
     public function createAnnualFee(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);

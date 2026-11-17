@@ -12,6 +12,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:school_hub/screens/teachers_screen.dart' show kIndianStatesAndCities;
 import 'package:school_hub/services/class_management_service.dart';
 import 'package:school_hub/services/http_service.dart' as http_svc;
@@ -3279,7 +3280,19 @@ class _StudentEnrollModal extends StatefulWidget {
 }
 
 class _StudentEnrollModalState extends State<_StudentEnrollModal> {
+  final FocusNode _blankFocusNode = FocusNode(skipTraversal: true);
   int _activeTab = 0; // 0: Basic Details, 1: Address, 2: Document Uploads, 3: Review & Submit
+
+  void _dismissFocus() {
+    if (!mounted) return;
+    FocusScope.of(context).requestFocus(_blankFocusNode);
+    FocusManager.instance.primaryFocus?.unfocus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      FocusScope.of(context).requestFocus(_blankFocusNode);
+      FocusManager.instance.primaryFocus?.unfocus();
+    });
+  }
   bool _loading = true;
   bool _submitting = false;
   String _error = '';
@@ -3467,26 +3480,46 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
         // Enroll / New Student
         _admissionDateCtrl.text = DateTime.now().toIso8601String().split('T')[0];
 
-        // Academic Year Selection (current or draft or first)
-        final currentYear = _academicYears.firstWhere(
-          (y) => y['is_current'] == 1 || y['is_current'] == true,
-          orElse: () => _academicYears.firstWhere(
-            (y) => y['status'] == 'Draft',
-            orElse: () => _academicYears.isNotEmpty ? _academicYears.first : <String, dynamic>{},
-          ),
-        );
-        if (currentYear.isNotEmpty) {
-          _selectedAcademicYearId = int.tryParse(currentYear['id'].toString());
+        // Academic Year Selection: prefer user's switched working academic year from SharedPreferences
+        int? switchedAyId;
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final dynamic savedRaw = prefs.get('selected_academic_year_id');
+          if (savedRaw is int) {
+            switchedAyId = savedRaw;
+          } else if (savedRaw != null) {
+            switchedAyId = int.tryParse(savedRaw.toString());
+          }
+        } catch (_) {}
+
+        Map<String, dynamic> targetYear = <String, dynamic>{};
+        if (switchedAyId != null) {
+          targetYear = _academicYears.firstWhere(
+            (y) => y['id']?.toString() == switchedAyId.toString(),
+            orElse: () => <String, dynamic>{},
+          );
+        }
+        if (targetYear.isEmpty) {
+          targetYear = _academicYears.firstWhere(
+            (y) => y['is_current'] == 1 || y['is_current'] == true,
+            orElse: () => _academicYears.firstWhere(
+              (y) => y['status'] == 'Draft',
+              orElse: () => _academicYears.isNotEmpty ? _academicYears.first : <String, dynamic>{},
+            ),
+          );
+        }
+        if (targetYear.isNotEmpty) {
+          _selectedAcademicYearId = int.tryParse(targetYear['id'].toString());
         }
 
         _resolveClassAndSection(widget.defaultClassName);
 
-        // If not first year session, pre-fetch next SR No
+        // If not first year session, student is always a New Admission and SR No is auto-generated
         if (!_isFirstYear) {
+          _studentCategory = 'New Admission';
           final nextSr = await widget.classService.getNextSrNo();
           if (nextSr.isNotEmpty) {
             _srNoCtrl.text = nextSr;
-            _studentCategory = 'New Admission';
           }
         }
       }
@@ -3706,6 +3739,7 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
 
   @override
   void dispose() {
+    _blankFocusNode.dispose();
     _studentNameCtrl.dispose();
     _fatherNameCtrl.dispose();
     _motherNameCtrl.dispose();
@@ -3757,12 +3791,6 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
       }
       if (_admissionDateCtrl.text.trim().isEmpty) {
         _errors['admission_date'] = 'Admission Date is required';
-      }
-      if (_shouldShowAdmissionFee && _admissionFeeCtrl.text.trim().isNotEmpty) {
-        final fee = double.tryParse(_admissionFeeCtrl.text.trim()) ?? 0;
-        if (fee < 0) {
-          _errors['admission_fee'] = 'Admission Fee cannot be negative.';
-        }
       }
       if (_isFirstYear && widget.existingStudent == null && (_studentCategory == null || _studentCategory!.isEmpty)) {
         _errors['student_category'] = 'Student Category is required.';
@@ -4031,10 +4059,6 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
         'additional_docs_path': _additionalDocsPath,
       };
 
-      if (_shouldShowAdmissionFee && _admissionFeeCtrl.text.trim().isNotEmpty) {
-        payload['admission_fee'] = _admissionFeeCtrl.text.trim();
-      }
-
       if (widget.existingStudent != null) {
         final sId = int.parse(widget.existingStudent!['id'].toString());
         await widget.classService.updateStudent(sId, payload);
@@ -4121,7 +4145,7 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
 
   // Date Pickers
   Future<void> _pickDob() async {
-    FocusManager.instance.primaryFocus?.unfocus();
+    _dismissFocus();
     final now = DateTime.now();
     final current = DateTime.tryParse(_dobCtrl.text) ?? DateTime(now.year - 6, now.month, now.day);
     final picked = await showDatePicker(
@@ -4130,6 +4154,7 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
       firstDate: DateTime(1980),
       lastDate: now,
     );
+    _dismissFocus();
     if (picked != null) {
       setState(() {
         _dobCtrl.text = "${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
@@ -4139,7 +4164,7 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
   }
 
   Future<void> _pickAdmissionDate() async {
-    FocusManager.instance.primaryFocus?.unfocus();
+    _dismissFocus();
     final now = DateTime.now();
     final current = DateTime.tryParse(_admissionDateCtrl.text) ?? now;
     final picked = await showDatePicker(
@@ -4148,6 +4173,7 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
     );
+    _dismissFocus();
     if (picked != null) {
       setState(() {
         _admissionDateCtrl.text = "${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
@@ -4157,7 +4183,7 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
   }
 
   Future<void> _pickExitDate() async {
-    FocusManager.instance.primaryFocus?.unfocus();
+    _dismissFocus();
     final now = DateTime.now();
     final current = DateTime.tryParse(_exitDateCtrl.text) ?? now;
     final picked = await showDatePicker(
@@ -4166,6 +4192,7 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
     );
+    _dismissFocus();
     if (picked != null) {
       setState(() {
         _exitDateCtrl.text = "${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
@@ -4180,7 +4207,7 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
     required String currentVal,
     required ValueChanged<String> onSelected,
   }) async {
-    FocusManager.instance.primaryFocus?.unfocus();
+    _dismissFocus();
     String query = '';
     await showModalBottomSheet(
       context: context,
@@ -4291,6 +4318,7 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
         );
       },
     );
+    _dismissFocus();
   }
 
   @override
@@ -4324,6 +4352,7 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
         ),
         child: Column(
           children: [
+            Focus(focusNode: _blankFocusNode, skipTraversal: true, child: const SizedBox.shrink()),
             // Top Bar
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 10),
@@ -4546,13 +4575,16 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
 
         _buildFieldLabel('DATE OF BIRTH', required: true),
         InkWell(
+          canRequestFocus: false,
           onTap: _pickDob,
-          child: IgnorePointer(
-            child: _buildTextInput(
-              _dobCtrl,
-              'YYYY-MM-DD',
-              errorKey: 'dob',
-              suffixIcon: const Icon(Icons.calendar_today_rounded, size: 18, color: Color(0xFF94A3B8)),
+          child: ExcludeFocus(
+            child: IgnorePointer(
+              child: _buildTextInput(
+                _dobCtrl,
+                'YYYY-MM-DD',
+                errorKey: 'dob',
+                suffixIcon: const Icon(Icons.calendar_today_rounded, size: 18, color: Color(0xFF94A3B8)),
+              ),
             ),
           ),
         ),
@@ -4560,29 +4592,20 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
 
         _buildFieldLabel('ADMISSION DATE', required: true),
         InkWell(
+          canRequestFocus: false,
           onTap: _pickAdmissionDate,
-          child: IgnorePointer(
-            child: _buildTextInput(
-              _admissionDateCtrl,
-              'YYYY-MM-DD',
-              errorKey: 'admission_date',
-              suffixIcon: const Icon(Icons.calendar_today_rounded, size: 18, color: Color(0xFF94A3B8)),
+          child: ExcludeFocus(
+            child: IgnorePointer(
+              child: _buildTextInput(
+                _admissionDateCtrl,
+                'YYYY-MM-DD',
+                errorKey: 'admission_date',
+                suffixIcon: const Icon(Icons.calendar_today_rounded, size: 18, color: Color(0xFF94A3B8)),
+              ),
             ),
           ),
         ),
         const SizedBox(height: 14),
-
-        if (_shouldShowAdmissionFee) ...[
-          _buildFieldLabel('ADMISSION FEE'),
-          _buildTextInput(
-            _admissionFeeCtrl,
-            '0.00',
-            isNumeric: true,
-            prefixText: '₹ ',
-            errorKey: 'admission_fee',
-          ),
-          const SizedBox(height: 14),
-        ],
 
         if (_isFirstYear && !isEdit) ...[
           _buildFieldLabel('STUDENT CATEGORY', required: true),
@@ -4716,22 +4739,25 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
         if (isEdit) ...[
           _buildFieldLabel('EXIT DATE (OPTIONAL)'),
           InkWell(
+            canRequestFocus: false,
             onTap: _pickExitDate,
-            child: IgnorePointer(
-              child: _buildTextInput(
-                _exitDateCtrl,
-                'YYYY-MM-DD',
-                suffixIcon: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_exitDateCtrl.text.isNotEmpty)
-                      IconButton(
-                        icon: const Icon(Icons.clear, size: 16),
-                        onPressed: () => setState(() => _exitDateCtrl.clear()),
-                      ),
-                    const Icon(Icons.calendar_today_rounded, size: 18, color: Color(0xFF94A3B8)),
-                    const SizedBox(width: 8),
-                  ],
+            child: ExcludeFocus(
+              child: IgnorePointer(
+                child: _buildTextInput(
+                  _exitDateCtrl,
+                  'YYYY-MM-DD',
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_exitDateCtrl.text.isNotEmpty)
+                        IconButton(
+                          icon: const Icon(Icons.clear, size: 16),
+                          onPressed: () => setState(() => _exitDateCtrl.clear()),
+                        ),
+                      const Icon(Icons.calendar_today_rounded, size: 18, color: Color(0xFF94A3B8)),
+                      const SizedBox(width: 8),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -4770,8 +4796,9 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
 
         _buildFieldLabel('STATE', required: true),
         InkWell(
+          canRequestFocus: false,
           onTap: () {
-            FocusManager.instance.primaryFocus?.unfocus();
+            _dismissFocus();
             _showSearchablePicker(
               title: 'State',
               items: stateList,
@@ -4795,8 +4822,9 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
 
         _buildFieldLabel('CITY', required: true),
         InkWell(
+          canRequestFocus: false,
           onTap: () {
-            FocusManager.instance.primaryFocus?.unfocus();
+            _dismissFocus();
             if (_currentState.isEmpty) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Please select a state first.')),
@@ -4838,51 +4866,54 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
         const SizedBox(height: 20),
 
         // Same as current checkbox (tap on either checkbox or label toggles)
-        InkWell(
-          onTap: () {
-            FocusManager.instance.primaryFocus?.unfocus();
-            setState(() {
-              _sameAsCurrent = !_sameAsCurrent;
-              if (_sameAsCurrent) {
-                _permAddress1Ctrl.text = _currentAddress1Ctrl.text;
-                _permAddress2Ctrl.text = _currentAddress2Ctrl.text;
-                _permState = _currentState;
-                _permCity = _currentCity;
-                _permCountryCtrl.text = _currentCountryCtrl.text;
-                _permPinCtrl.text = _currentPinCtrl.text;
-              }
-            });
-          },
-          borderRadius: BorderRadius.circular(8),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              children: [
-                Checkbox(
-                  value: _sameAsCurrent,
-                  activeColor: const Color(0xFFD97706),
-                  onChanged: (val) {
-                    FocusManager.instance.primaryFocus?.unfocus();
-                    setState(() {
-                      _sameAsCurrent = val ?? true;
-                      if (_sameAsCurrent) {
-                        _permAddress1Ctrl.text = _currentAddress1Ctrl.text;
-                        _permAddress2Ctrl.text = _currentAddress2Ctrl.text;
-                        _permState = _currentState;
-                        _permCity = _currentCity;
-                        _permCountryCtrl.text = _currentCountryCtrl.text;
-                        _permPinCtrl.text = _currentPinCtrl.text;
-                      }
-                    });
-                  },
-                ),
-                const Expanded(
-                  child: Text(
-                    'PERMANENT ADDRESS SAME AS CURRENT ADDRESS',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF1E293B)),
+        ExcludeFocus(
+          child: InkWell(
+            canRequestFocus: false,
+            onTap: () {
+              _dismissFocus();
+              setState(() {
+                _sameAsCurrent = !_sameAsCurrent;
+                if (_sameAsCurrent) {
+                  _permAddress1Ctrl.text = _currentAddress1Ctrl.text;
+                  _permAddress2Ctrl.text = _currentAddress2Ctrl.text;
+                  _permState = _currentState;
+                  _permCity = _currentCity;
+                  _permCountryCtrl.text = _currentCountryCtrl.text;
+                  _permPinCtrl.text = _currentPinCtrl.text;
+                }
+              });
+            },
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Checkbox(
+                    value: _sameAsCurrent,
+                    activeColor: const Color(0xFFD97706),
+                    onChanged: (val) {
+                      _dismissFocus();
+                      setState(() {
+                        _sameAsCurrent = val ?? true;
+                        if (_sameAsCurrent) {
+                          _permAddress1Ctrl.text = _currentAddress1Ctrl.text;
+                          _permAddress2Ctrl.text = _currentAddress2Ctrl.text;
+                          _permState = _currentState;
+                          _permCity = _currentCity;
+                          _permCountryCtrl.text = _currentCountryCtrl.text;
+                          _permPinCtrl.text = _currentPinCtrl.text;
+                        }
+                      });
+                    },
                   ),
-                ),
-              ],
+                  const Expanded(
+                    child: Text(
+                      'PERMANENT ADDRESS SAME AS CURRENT ADDRESS',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF1E293B)),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -4906,8 +4937,9 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
 
           _buildFieldLabel('STATE', required: true),
           InkWell(
+            canRequestFocus: false,
             onTap: () {
-              FocusManager.instance.primaryFocus?.unfocus();
+              _dismissFocus();
               _showSearchablePicker(
                 title: 'Permanent State',
                 items: stateList,
@@ -4931,8 +4963,9 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
 
           _buildFieldLabel('CITY', required: true),
           InkWell(
+            canRequestFocus: false,
             onTap: () {
-              FocusManager.instance.primaryFocus?.unfocus();
+              _dismissFocus();
               if (_permState.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Please select permanent state first.')),
@@ -5240,8 +5273,6 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
             _buildReviewRow('Roll Number', _rollCtrl.text.trim().isNotEmpty ? _rollCtrl.text.trim() : '-'),
             _buildReviewRow('SR Number', _srNoCtrl.text.trim().isNotEmpty ? _srNoCtrl.text.trim() : 'Auto Assigned'),
             _buildReviewRow('Admission Date', _admissionDateCtrl.text.trim()),
-            if (_shouldShowAdmissionFee && _admissionFeeCtrl.text.trim().isNotEmpty)
-              _buildReviewRow('Admission Fee', '₹ ${_admissionFeeCtrl.text.trim()}'),
             if (_exitDateCtrl.text.trim().isNotEmpty)
               _buildReviewRow('Exit Date', _exitDateCtrl.text.trim(), isDestructive: true),
           ],
@@ -5409,7 +5440,7 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
           onTapOutside: (_) => FocusScope.of(context).unfocus(),
           keyboardType: isNumeric ? TextInputType.number : TextInputType.text,
           textInputAction: textInputAction,
-          onSubmitted: onSubmitted ?? (_) => FocusScope.of(context).nextFocus(),
+          onSubmitted: onSubmitted,
           inputFormatters: isNumeric ? [FilteringTextInputFormatter.digitsOnly] : null,
           maxLength: maxLength,
           style: TextStyle(
@@ -5479,10 +5510,11 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
         Builder(
           builder: (btnContext) {
             return InkWell(
+              canRequestFocus: false,
               onTap: items.isEmpty
                   ? null
                   : () async {
-                      FocusManager.instance.primaryFocus?.unfocus();
+                      _dismissFocus();
                       final renderBox = btnContext.findRenderObject() as RenderBox?;
                       if (renderBox == null) return;
                       final offset = renderBox.localToGlobal(Offset.zero);
@@ -5524,6 +5556,7 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
                         }).toList(),
                       );
 
+                      _dismissFocus();
                       if (selected != null) {
                         onChanged(selected);
                         if (hasErr) setState(() => _errors.remove(errorKey));

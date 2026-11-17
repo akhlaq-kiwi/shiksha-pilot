@@ -127,6 +127,8 @@ return function (App $app) {
     $app->delete('/api/school/expenses/{id}', [SchoolAdminController::class, 'deleteSchoolExpense']);
     $app->get('/api/school/additional-fees/types', [SchoolAdminController::class, 'getAdditionalFeeTypes']);
     $app->post('/api/school/additional-fees/types', [SchoolAdminController::class, 'createAdditionalFeeType']);
+    $app->get('/api/school/admission-fees', [SchoolAdminController::class, 'getAdmissionFee']);
+    $app->post('/api/school/admission-fees', [SchoolAdminController::class, 'createAdmissionFee']);
     $app->post('/api/school/annual-fees', [SchoolAdminController::class, 'createAnnualFee']);
     $app->put('/api/school/additional-fees/types/{id}', [SchoolAdminController::class, 'updateAdditionalFeeType']);
     $app->delete('/api/school/additional-fees/types/{id}', [SchoolAdminController::class, 'deleteAdditionalFeeType']);

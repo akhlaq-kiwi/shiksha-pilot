@@ -223,6 +223,40 @@ class FeeService {
     }
   }
 
+  /// Get configured Admission Fee for current working academic year
+  Future<Map<String, dynamic>> getAdmissionFee() async {
+    final uri = Uri.parse('$baseUrl/api/school/admission-fees');
+    final res = await http.get(uri, headers: _headers);
+    if (res.statusCode == 200) {
+      final decoded = json.decode(res.body);
+      if (decoded is Map && decoded['data'] is Map) {
+        return Map<String, dynamic>.from(decoded['data'] as Map);
+      }
+      return {'configured': false};
+    } else {
+      throw Exception('Failed to load admission fee configuration (${res.statusCode})');
+    }
+  }
+
+  /// Configure Admission Fee for current working academic year
+  Future<Map<String, dynamic>> createAdmissionFee(Map<String, dynamic> data) async {
+    final uri = Uri.parse('$baseUrl/api/school/admission-fees');
+    final res = await http.post(uri, headers: _headers, body: json.encode(data));
+    final decoded = json.decode(res.body);
+    if (res.statusCode == 200 || res.statusCode == 201) {
+      return decoded is Map ? Map<String, dynamic>.from(decoded) : {};
+    } else {
+      String msg = 'Failed to configure admission fee';
+      if (decoded is Map && decoded['message'] != null) {
+        msg = decoded['message'].toString();
+      } else if (decoded is Map && decoded['errors'] != null) {
+        final errs = decoded['errors'];
+        msg = errs is Map ? errs.values.first.toString() : errs.toString();
+      }
+      throw Exception(msg);
+    }
+  }
+
   /// Create Annual Fee
   Future<Map<String, dynamic>> createAnnualFee(Map<String, dynamic> data) async {
     final uri = Uri.parse('$baseUrl/api/school/annual-fees');

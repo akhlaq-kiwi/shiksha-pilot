@@ -1552,19 +1552,23 @@ class StudentService extends BaseService
                     $classFeeConfig = is_string($cfgRow['monthly_fees']) ? json_decode($cfgRow['monthly_fees'], true) : $cfgRow['monthly_fees'];
                 }
             }
-            if (!$classFeeConfig && $targetAyId > 0) {
-                $stmtAnyCfg = $pdo->prepare("
-                    SELECT monthly_fees FROM class_fee_configurations 
-                    WHERE school_id = :school_id AND academic_year_id = :academic_year_id 
-                    ORDER BY id ASC LIMIT 1
+            if (!$classFeeConfig && $targetClassId > 0 && $targetAyId > 0) {
+                $stmtSameClassCfg = $pdo->prepare("
+                    SELECT cfg.monthly_fees
+                    FROM class_fee_configurations cfg
+                    JOIN classes c1 ON cfg.class_id = c1.id
+                    JOIN classes c2 ON c1.name COLLATE utf8mb4_unicode_ci = c2.name COLLATE utf8mb4_unicode_ci AND c1.school_id = c2.school_id
+                    WHERE cfg.school_id = :school_id AND c2.id = :class_id AND cfg.academic_year_id = :academic_year_id
+                    LIMIT 1
                 ");
-                $stmtAnyCfg->execute([
+                $stmtSameClassCfg->execute([
                     ':school_id' => $schoolId,
+                    ':class_id' => $targetClassId,
                     ':academic_year_id' => $targetAyId
                 ]);
-                $anyRow = $stmtAnyCfg->fetch(PDO::FETCH_ASSOC);
-                if ($anyRow && !empty($anyRow['monthly_fees'])) {
-                    $classFeeConfig = is_string($anyRow['monthly_fees']) ? json_decode($anyRow['monthly_fees'], true) : $anyRow['monthly_fees'];
+                $sameClassRow = $stmtSameClassCfg->fetch(PDO::FETCH_ASSOC);
+                if ($sameClassRow && !empty($sameClassRow['monthly_fees'])) {
+                    $classFeeConfig = is_string($sameClassRow['monthly_fees']) ? json_decode($sameClassRow['monthly_fees'], true) : $sameClassRow['monthly_fees'];
                 }
             }
 

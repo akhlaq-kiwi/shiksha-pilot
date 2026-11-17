@@ -229,18 +229,7 @@ class _FeesPortalScreenState extends State<FeesPortalScreen> {
       final studentAyId = int.tryParse(s['academic_year_id']?.toString() ?? '') ?? 0;
       final studentClassId = int.tryParse(s['class_id']?.toString() ?? '') ?? 0;
       final configKey = '${studentAyId}_$studentClassId';
-      Map<String, dynamic> monthlyFees = configMap[configKey] ?? {};
-      if (monthlyFees.isEmpty) {
-        final ayFallbackKey = configMap.keys.firstWhere(
-          (k) => k.startsWith('${studentAyId}_'),
-          orElse: () => '',
-        );
-        if (ayFallbackKey.isNotEmpty) {
-          monthlyFees = configMap[ayFallbackKey] ?? {};
-        } else if (configMap.isNotEmpty) {
-          monthlyFees = configMap.values.first;
-        }
-      }
+      final Map<String, dynamic> monthlyFees = configMap[configKey] ?? {};
 
 
       double outstandingDues = 0.0;
@@ -2345,7 +2334,54 @@ class _StudentLedgerSheetState extends State<StudentLedgerSheet> {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  ListView.separated(
+                  if (monthRows.every((m) => (m['fee'] as num) == 0) && payments.isEmpty)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFFDF7),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFFDE68A), width: 1.2),
+                      ),
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFFEF3C7),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.info_outline_rounded,
+                              color: Color(0xFFD97706),
+                              size: 26,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'Fee Structure Not Configured',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Monthly tuition fees have not been configured for this class yet. Please configure the class fee structure manually first.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              height: 1.45,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    ListView.separated(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: monthRows.length,

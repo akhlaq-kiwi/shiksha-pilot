@@ -990,9 +990,7 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
         class_name: selectedClassName
       };
 
-      if (!shouldShowAdmissionFee) {
-        delete submitPayload.admission_fee;
-      }
+      delete submitPayload.admission_fee;
 
       if (studentId) {
         await schoolService.updateStudent(studentId, submitPayload);
@@ -1188,25 +1186,6 @@ export default function StudentEnrollmentForm({ studentId, currentClassName, cur
                       </div>
                       {errors.admission_date && <p className="text-[11px] text-red-500 font-semibold">{errors.admission_date}</p>}
                     </div>
-                    {shouldShowAdmissionFee && (
-                      <div className="space-y-1.5">
-                        <label htmlFor="admission_fee" className="text-xs font-bold text-text-secondary uppercase">Admission Fee</label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-2 text-xs font-bold text-text-muted">₹</span>
-                          <Input id="admission_fee"
-                            type="number"
-                            name="admission_fee"
-                            placeholder="0.00"
-                            value={formData.admission_fee}
-                            onChange={handleTextChange}
-                            min="0"
-                            step="any"
-                            className="pl-7 text-text-primary text-sm"
-                          />
-                        </div>
-                        {errors.admission_fee && <p className="text-[11px] text-red-500 font-semibold">{errors.admission_fee}</p>}
-                      </div>
-                    )}
 
                     {isFirstYear && (
                       <div className="space-y-1.5">
