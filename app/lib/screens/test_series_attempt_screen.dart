@@ -419,7 +419,7 @@ class _TestSeriesAttemptScreenState extends State<TestSeriesAttemptScreen>
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
                                       color: isDark
-                                          ? TsColors.amber700.withValues(alpha: 0.6)
+                                          ? TsColors.amber800.withValues(alpha: 0.6)
                                           : AppColors.warning500.withValues(alpha: 0.6),
                                       width: 1.2,
                                     ),
