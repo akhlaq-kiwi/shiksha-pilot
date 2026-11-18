@@ -1168,6 +1168,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: Colors.indigo.shade800,
                                           foregroundColor: Colors.white,
+                                          disabledBackgroundColor: Colors.indigo.shade800.withValues(alpha: 0.78),
+                                          disabledForegroundColor: Colors.white,
                                           padding: const EdgeInsets.symmetric(vertical: 16),
                                           shape: RoundedRectangleBorder(
                                             borderRadius: BorderRadius.circular(12),
@@ -1175,13 +1177,28 @@ class _LoginScreenState extends State<LoginScreen> {
                                           elevation: 3,
                                         ),
                                         child: _isLoading
-                                            ? const SizedBox(
-                                                height: 20,
-                                                width: 20,
-                                                child: CircularProgressIndicator(
-                                                  strokeWidth: 2.5,
-                                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                                ),
+                                            ? const Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                children: [
+                                                  SizedBox(
+                                                    height: 18,
+                                                    width: 18,
+                                                    child: CircularProgressIndicator(
+                                                      strokeWidth: 2.2,
+                                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                                    ),
+                                                  ),
+                                                  SizedBox(width: 10),
+                                                  Text(
+                                                    'Signing in...',
+                                                    style: TextStyle(
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 15,
+                                                      color: Colors.white,
+                                                    ),
+                                                  ),
+                                                ],
                                               )
                                             : const Text(
                                                 'SIGN IN',

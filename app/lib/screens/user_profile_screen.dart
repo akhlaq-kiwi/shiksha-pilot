@@ -189,6 +189,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFFD97706),
                                   foregroundColor: Colors.white,
+                                  disabledBackgroundColor: const Color(0xFFD97706).withValues(alpha: 0.78),
+                                  disabledForegroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 10),
                                   elevation: 0,
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                 ),
@@ -201,13 +204,32 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                         await _handleLogout();
                                       },
                                 child: isLoggingOut
-                                    ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2.2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                        ),
+                                    ? const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          SizedBox(
+                                            width: 15,
+                                            height: 15,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2.0,
+                                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                            ),
+                                          ),
+                                          SizedBox(width: 8),
+                                          Flexible(
+                                            child: Text(
+                                              'Logging out...',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w800,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       )
                                     : const Text(
                                         'Log Out',
