@@ -10,6 +10,7 @@ Usage:
 import argparse
 import json
 import sys
+import time
 import urllib.request
 import urllib.error
 
@@ -66,7 +67,7 @@ COLONIES = [
 CITIES = ["New Delhi", "Noida", "Gurugram", "Ghaziabad", "Faridabad", "Jaipur", "Lucknow", "Indore"]
 
 
-def make_request(url, method="GET", payload=None, token=None):
+def make_request(url, method="GET", payload=None, token=None, max_retries=3):
     headers = {
         "Content-Type": "application/json",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
@@ -75,20 +76,30 @@ def make_request(url, method="GET", payload=None, token=None):
         headers["Authorization"] = f"Bearer {token}"
 
     data = json.dumps(payload).encode("utf-8") if payload is not None else None
-    req = urllib.request.Request(url, data=data, headers=headers, method=method)
 
-    try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            body = resp.read().decode("utf-8")
-            return resp.status, json.loads(body) if body else {}
-    except urllib.error.HTTPError as e:
-        err_body = e.read().decode("utf-8")
+    for attempt in range(1, max_retries + 1):
+        req = urllib.request.Request(url, data=data, headers=headers, method=method)
         try:
-            return e.code, json.loads(err_body)
-        except Exception:
-            return e.code, {"error": err_body}
-    except Exception as e:
-        return 500, {"error": str(e)}
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                body = resp.read().decode("utf-8")
+                # Polite delay between successful requests to prevent server rate limiting
+                time.sleep(0.3)
+                return resp.status, json.loads(body) if body else {}
+        except urllib.error.HTTPError as e:
+            if e.code == 429:
+                wait_time = attempt * 4
+                print(f"  [429 RATE LIMIT] Server throttled request. Backing off for {wait_time}s (attempt {attempt}/{max_retries})...")
+                time.sleep(wait_time)
+                continue
+            err_body = e.read().decode("utf-8")
+            try:
+                return e.code, json.loads(err_body)
+            except Exception:
+                return e.code, {"error": err_body}
+        except Exception as e:
+            return 500, {"error": str(e)}
+
+    return 429, {"error": "Request failed after maximum retries due to rate limiting (HTTP 429)."}
 
 
 def login(base_url, phone, password):

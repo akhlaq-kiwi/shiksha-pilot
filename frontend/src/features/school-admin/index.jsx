@@ -449,7 +449,7 @@ export default function SchoolAdminPortal() {
       }
     };
 
-    const interval = setInterval(fetchPermissions, 3000);
+    const interval = setInterval(fetchPermissions, 60000);
     return () => clearInterval(interval);
   }, [accessRemoved]);
 

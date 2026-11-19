@@ -86,10 +86,7 @@ const CustomSelect = ({
 
 export default function DashboardPage({ onNavigate }) {
   const { currentYear } = useAcademicYear();
-  const [students, setStudents] = useState([]);
-  const [staff, setStaff] = useState([]);
   const [exams, setExams] = useState([]);
-  const [feePayments, setFeePayments] = useState([]);
   const [dbStats, setDbStats] = useState({
     students_count: 0,
     staff_count: 0,
@@ -113,11 +110,7 @@ export default function DashboardPage({ onNavigate }) {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      const [stuData, stfData, exData, fpData, statsData, classesList, settings, feeStructData] = await Promise.all([
-        schoolService.getStudents().catch(() => []),
-        schoolService.getStaff().catch(() => []),
-        schoolService.getExams().catch(() => []),
-        schoolService.getFeePayments().catch(() => []),
+      const [statsData, classesList, settings, feeStructData, exData] = await Promise.all([
         schoolService.getStats().catch(() => ({
           students_count: 0,
           staff_count: 0,
@@ -129,12 +122,10 @@ export default function DashboardPage({ onNavigate }) {
         })),
         schoolService.getClasses().catch(() => []),
         schoolAdminService.getTimetableSettings().catch(() => null),
-        schoolService.getFeeStructures().catch(() => [])
+        schoolService.getFeeStructures().catch(() => []),
+        schoolService.getExams().catch(() => [])
       ]);
-      setStudents(stuData || []);
-      setStaff(stfData || []);
       setExams(exData || []);
-      setFeePayments(fpData || []);
       setDbStats(statsData || {
         students_count: 0,
         staff_count: 0,
@@ -175,11 +166,9 @@ export default function DashboardPage({ onNavigate }) {
     };
 
     window.addEventListener('fee-payment-updated', handleRefresh);
-    window.addEventListener('focus', handleRefresh);
 
     return () => {
       window.removeEventListener('fee-payment-updated', handleRefresh);
-      window.removeEventListener('focus', handleRefresh);
     };
   }, [currentYear?.id]);
 
@@ -353,11 +342,11 @@ export default function DashboardPage({ onNavigate }) {
     );
   }
 
-  const totalStudents = students.length;
-  const activeStudents = students.filter(s => s.status === 'ACTIVE').length;
-  const totalStaff = staff.length;
-  const totalFeeCollected = dbStats.total_collected !== undefined && dbStats.total_collected !== null ? dbStats.total_collected : feePayments.filter(f => f.status === 'PAID').reduce((sum, f) => sum + parseFloat(f.amount_paid || 0), 0);
-  const pendingFees = dbStats.pending_fees || 0;
+  const totalStudents = Number(dbStats.students_count || 0);
+  const activeStudents = Number(dbStats.students_count || 0);
+  const totalStaff = Number(dbStats.staff_count || 0);
+  const totalFeeCollected = Number(dbStats.total_collected || 0);
+  const pendingFees = Number(dbStats.pending_fees || 0);
 
   const stats = {
     totalStudents,
@@ -379,8 +368,8 @@ export default function DashboardPage({ onNavigate }) {
         items={[
           { id: 'classes', label: 'Add classes & sections', done: classes.length > 0, onClick: () => onNavigate?.('classes') },
           { id: 'fee-structure', label: 'Set up a fee structure', done: feeStructures.length > 0, onClick: () => onNavigate?.('finance') },
-          { id: 'teachers', label: 'Add teachers', done: staff.length > 0, onClick: () => onNavigate?.('staff') },
-          { id: 'students', label: 'Enrol students', done: students.length > 0, onClick: () => onNavigate?.('classes') },
+          { id: 'teachers', label: 'Add teachers', done: totalStaff > 0, onClick: () => onNavigate?.('staff') },
+          { id: 'students', label: 'Enrol students', done: totalStudents > 0, onClick: () => onNavigate?.('classes') },
           { id: 'timetable', label: 'Build the timetable', done: !!timetableSettings, onClick: () => onNavigate?.('timetable') },
           { id: 'exams', label: 'Create an examination', done: exams.length > 0, onClick: () => onNavigate?.('exams') },
         ]}
