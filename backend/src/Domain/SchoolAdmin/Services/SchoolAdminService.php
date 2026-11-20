@@ -525,8 +525,64 @@ class SchoolAdminService extends BaseService
                 }
 
                 if (!empty($activeStudents)) {
+                    // High-performance batched calculation (replaces O(N) loop of thousands of SQL queries)
+                    $stmtCfgs = $pdo->prepare("
+                        SELECT class_id, monthly_fees 
+                        FROM class_fee_configurations 
+                        WHERE school_id = :sid AND academic_year_id = :ayid
+                    ");
+                    $stmtCfgs->execute([':sid' => $schoolId, ':ayid' => $activeYear['id']]);
+                    $cfgsByClass = [];
+                    while ($cfgRow = $stmtCfgs->fetch(\PDO::FETCH_ASSOC)) {
+                        $cfgsByClass[(int)$cfgRow['class_id']] = is_string($cfgRow['monthly_fees']) 
+                            ? json_decode($cfgRow['monthly_fees'], true) 
+                            : $cfgRow['monthly_fees'];
+                    }
+
+                    $stmtAllPaid = $pdo->prepare("
+                        SELECT student_id, fee_month, COALESCE(SUM(amount_paid + COALESCE(discount_amount, 0)), 0) AS total_paid 
+                        FROM fee_payments 
+                        WHERE school_id = :sid 
+                          AND academic_year_id = :ayid 
+                          AND UPPER(status) IN ('PAID', 'PARTIAL', 'COMPLETED')
+                        GROUP BY student_id, fee_month
+                    ");
+                    $stmtAllPaid->execute([':sid' => $schoolId, ':ayid' => $activeYear['id']]);
+                    $paidByStudent = [];
+                    while ($pRow = $stmtAllPaid->fetch(\PDO::FETCH_ASSOC)) {
+                        $stId = (int)$pRow['student_id'];
+                        $mKey = strtoupper(trim((string)$pRow['fee_month']));
+                        $paidByStudent[$stId][$mKey] = (float)$pRow['total_paid'];
+                    }
+
+                    $stmtAddPending = $pdo->prepare("
+                        SELECT afp.student_id, COALESCE(SUM(afp.amount - (COALESCE(afp.amount_paid, 0) + COALESCE(afp.discount_amount, 0))), 0) AS add_pending
+                        FROM additional_fee_payments afp
+                        JOIN additional_fee_types aft ON afp.fee_type_id = aft.id
+                        WHERE afp.school_id = :sid
+                          AND LOWER(afp.status) IN ('pending', 'partial')
+                          AND (aft.academic_year_id = :ayid OR aft.academic_year_id IS NULL OR aft.name = 'Previous Year Dues')
+                        GROUP BY afp.student_id
+                    ");
+                    $stmtAddPending->execute([':sid' => $schoolId, ':ayid' => $activeYear['id']]);
+                    $addPendingByStudent = [];
+                    while ($addRow = $stmtAddPending->fetch(\PDO::FETCH_ASSOC)) {
+                        $addPendingByStudent[(int)$addRow['student_id']] = (float)$addRow['add_pending'];
+                    }
+
                     foreach ($activeStudents as $student) {
-                        $pendingFeesTotal += $this->getStudentCurrentOutstandingBalance($pdo, (int)$student['id'], $schoolId, (int)$activeYear['id']);
+                        $stId = (int)$student['id'];
+                        $cid = (int)($student['class_id'] ?? 0);
+                        $monthlyFees = $cfgsByClass[$cid] ?? [];
+
+                        foreach ($monthsDue as $m) {
+                            $mUpper = strtoupper(trim($m));
+                            $totalConfigured = isset($monthlyFees[$m]) ? (float)$monthlyFees[$m] : 0.0;
+                            $alreadyPaid = $paidByStudent[$stId][$mUpper] ?? 0.0;
+                            $pendingFeesTotal += max(0.0, round($totalConfigured - $alreadyPaid, 2));
+                        }
+
+                        $pendingFeesTotal += ($addPendingByStudent[$stId] ?? 0.0);
                     }
                 }
             }
@@ -830,22 +886,31 @@ class SchoolAdminService extends BaseService
         $schoolId = $this->getSchoolId($user);
         $pdo = $this->studentRepo->getPdo();
 
-        // Auto-reassign any unsectioned students whose class now has sections to Section A
+        // Auto-reassign any unsectioned students whose class now has sections to Section A only if needed
         try {
-            $stmtAutoReassign = $pdo->prepare("
-                UPDATE students s
-                JOIN classes c_old ON s.class_id = c_old.id
-                JOIN classes c_new ON c_old.school_id = c_new.school_id 
-                                  AND c_old.name COLLATE utf8mb4_unicode_ci = c_new.name COLLATE utf8mb4_unicode_ci
-                                  AND (c_old.academic_year_id = c_new.academic_year_id OR (c_old.academic_year_id IS NULL AND c_new.academic_year_id IS NULL))
-                SET s.class_id = c_new.id
-                WHERE s.school_id = :sid 
-                  AND (c_old.section IS NULL OR TRIM(c_old.section) = '')
-                  AND c_new.section IS NOT NULL 
-                  AND TRIM(c_new.section) != ''
-                  AND (s.academic_year_id = c_old.academic_year_id OR (s.academic_year_id IS NULL AND c_old.academic_year_id IS NULL))
+            $stmtCheck = $pdo->prepare("
+                SELECT 1 FROM students s 
+                JOIN classes c_old ON s.class_id = c_old.id 
+                WHERE s.school_id = :sid AND (c_old.section IS NULL OR TRIM(c_old.section) = '') 
+                LIMIT 1
             ");
-            $stmtAutoReassign->execute([':sid' => $schoolId]);
+            $stmtCheck->execute([':sid' => $schoolId]);
+            if ($stmtCheck->fetchColumn()) {
+                $stmtAutoReassign = $pdo->prepare("
+                    UPDATE students s
+                    JOIN classes c_old ON s.class_id = c_old.id
+                    JOIN classes c_new ON c_old.school_id = c_new.school_id 
+                                      AND c_old.name COLLATE utf8mb4_unicode_ci = c_new.name COLLATE utf8mb4_unicode_ci
+                                      AND (c_old.academic_year_id = c_new.academic_year_id OR (c_old.academic_year_id IS NULL AND c_new.academic_year_id IS NULL))
+                    SET s.class_id = c_new.id
+                    WHERE s.school_id = :sid 
+                      AND (c_old.section IS NULL OR TRIM(c_old.section) = '')
+                      AND c_new.section IS NOT NULL 
+                      AND TRIM(c_new.section) != ''
+                      AND (s.academic_year_id = c_old.academic_year_id OR (s.academic_year_id IS NULL AND c_old.academic_year_id IS NULL))
+                ");
+                $stmtAutoReassign->execute([':sid' => $schoolId]);
+            }
         } catch (\Throwable $e) {}
 
         if (empty($filters['academic_year_id'])) {

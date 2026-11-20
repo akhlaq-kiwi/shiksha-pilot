@@ -523,19 +523,17 @@ export default function FinanceManagementPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [clsList, ayList, typesList, transList, studList, admFeeCfg] = await Promise.all([
+      const [clsList, ayList, typesList, transList, admFeeCfg] = await Promise.all([
         schoolService.getClasses(),
         schoolService.getAcademicYears(),
         schoolService.getAdditionalFeeTypes(),
         schoolService.getTransportFees(),
-        schoolService.getStudents({ limit: 1000 }),
         schoolService.getAdmissionFee().catch(() => ({ configured: false }))
       ]);
       setClasses(clsList || []);
       setAcademicYears(ayList || []);
       setFeeTypes(typesList || []);
       setTransportFees(transList || []);
-      setStudentsList(studList || []);
       setAdmissionFeeConfig(admFeeCfg || { configured: false });
 
       // Fetch expenses
@@ -547,6 +545,15 @@ export default function FinanceManagementPage() {
       setLoading(false);
     }
   };
+
+  // Lazily load students only when transport modal or individual student fee modal is opened
+  useEffect(() => {
+    if ((isTransportModalOpen || (isApplyFeeModalOpen && applyType === 'student')) && studentsList.length === 0) {
+      schoolService.getStudents({ limit: 1000 })
+        .then(res => setStudentsList(res || []))
+        .catch(err => console.error('Failed to load students for modal', err));
+    }
+  }, [isTransportModalOpen, isApplyFeeModalOpen, applyType]);
 
   const loadTransportFeesList = async () => {
     try {
