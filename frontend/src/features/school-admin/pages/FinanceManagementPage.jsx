@@ -137,7 +137,7 @@ export default function FinanceManagementPage() {
 
   useEffect(() => {
     const tab = location.state?.tab || new URLSearchParams(location.search).get('tab');
-    if (tab && ['expenses', 'admission-fee', 'additional-fee', 'late-payment-penalty', 'transport-fee'].includes(tab)) {
+    if (tab && ['expenses', 'admission-fee', 'annual-fee', 'additional-fee', 'late-payment-penalty', 'transport-fee'].includes(tab)) {
       setActiveTab(tab);
     }
   }, [location]);
@@ -252,13 +252,15 @@ export default function FinanceManagementPage() {
   const [isFetchingMoreExpenses, setIsFetchingMoreExpenses] = useState(false);
   const expensesContainerRef = useRef(null);
 
-  // Additional Fee Tab State & Filters
+  // Additional & Annual Fee Tab State & Filters
   const [feeSearch, setFeeSearch] = useState('');
+  const [annualFeeSearch, setAnnualFeeSearch] = useState('');
 
-  // Additional Fee Lazy Loading
+  // Fee Lists Lazy Loading
   const [visibleFeesCount, setVisibleFeesCount] = useState(25);
   const [isFetchingMoreFees, setIsFetchingMoreFees] = useState(false);
   const feesContainerRef = useRef(null);
+  const annualFeesContainerRef = useRef(null);
 
   // Three-dot Action Dropdowns State
   const [activeExpenseDropdownId, setActiveExpenseDropdownId] = useState(null);
@@ -1451,7 +1453,7 @@ export default function FinanceManagementPage() {
     if (isFetchingMoreFees) return;
     const target = e.target;
     if (target.scrollHeight - target.scrollTop <= target.clientHeight + 60) {
-      if (visibleFeesCount < filteredFeeTypes.length) {
+      if (visibleFeesCount < filteredAdditionalFeeTypes.length) {
         setIsFetchingMoreFees(true);
         setTimeout(() => {
           setVisibleFeesCount(prev => prev + 25);
@@ -1461,14 +1463,49 @@ export default function FinanceManagementPage() {
     }
   };
 
-  // Filter Fee Types List based on Description keyword match
-  const filteredFeeTypes = feeTypes.filter(ft => {
-    // Exclude system-generated internal fee types
-    if (ft.name === 'Transport Fees' || ft.name === 'Admission Fee' || ft.category === 'System Generated') {
+  const handleAnnualFeesScroll = (e) => {
+    if (isFetchingMoreFees) return;
+    const target = e.target;
+    if (target.scrollHeight - target.scrollTop <= target.clientHeight + 60) {
+      if (visibleFeesCount < filteredAnnualFeeTypes.length) {
+        setIsFetchingMoreFees(true);
+        setTimeout(() => {
+          setVisibleFeesCount(prev => prev + 25);
+          setIsFetchingMoreFees(false);
+        }, 450);
+      }
+    }
+  };
+
+  // Filter Fee Types List based on Description keyword match (Excludes Annual Fee)
+  const filteredAdditionalFeeTypes = feeTypes.filter(ft => {
+    // Exclude system-generated internal fee types and Annual Fee
+    if (
+      ft.name === 'Transport Fees' || 
+      ft.name === 'Admission Fee' || 
+      ft.category === 'System Generated' ||
+      ft.name?.trim().toLowerCase() === 'annual fee'
+    ) {
       return false;
     }
 
     const term = feeSearch.toLowerCase().trim();
+    if (!term) return true;
+    
+    const words = term.split(/\s+/);
+    const feeName = (ft.name || '').toLowerCase();
+    
+    return words.every(word => feeName.includes(word));
+  });
+  const filteredFeeTypes = filteredAdditionalFeeTypes;
+
+  // Filter Annual Fee Types
+  const filteredAnnualFeeTypes = feeTypes.filter(ft => {
+    if (ft.name?.trim().toLowerCase() !== 'annual fee') {
+      return false;
+    }
+
+    const term = annualFeeSearch.toLowerCase().trim();
     if (!term) return true;
     
     const words = term.split(/\s+/);
@@ -1491,7 +1528,8 @@ export default function FinanceManagementPage() {
   });
 
   const paginatedExpenses = expenses.slice(0, visibleExpensesCount);
-  const paginatedFees = filteredFeeTypes.slice(0, visibleFeesCount);
+  const paginatedFees = filteredAdditionalFeeTypes.slice(0, visibleFeesCount);
+  const paginatedAnnualFees = filteredAnnualFeeTypes.slice(0, visibleFeesCount);
 
   // Compute dynamic monthly totals for expenses listing
   const filteredTotalExpensesAmount = expenses.reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
@@ -1535,7 +1573,7 @@ export default function FinanceManagementPage() {
             💸 Expenses
           </button>
           <button 
-            onClick={() => { setActiveTab('admission-fee'); setError(''); setSuccess(''); }}
+            onClick={() => { setActiveTab('admission-fee'); setError(''); setSuccess(''); setActiveFeeDropdownId(null); }}
             className={`pb-3 text-xs font-bold uppercase tracking-wider border-b-2 px-4 transition-all ${
               activeTab === 'admission-fee' 
                 ? 'border-primary text-primary' 
@@ -1545,7 +1583,17 @@ export default function FinanceManagementPage() {
             🎓 Admission Fee
           </button>
           <button 
-            onClick={() => { setActiveTab('additional-fee'); setError(''); setSuccess(''); }}
+            onClick={() => { setActiveTab('annual-fee'); setError(''); setSuccess(''); setActiveFeeDropdownId(null); }}
+            className={`pb-3 text-xs font-bold uppercase tracking-wider border-b-2 px-4 transition-all ${
+              activeTab === 'annual-fee' 
+                ? 'border-primary text-primary' 
+                : 'border-transparent text-text-muted hover:text-text-primary'
+            }`}
+          >
+            📅 Annual Fee
+          </button>
+          <button 
+            onClick={() => { setActiveTab('additional-fee'); setError(''); setSuccess(''); setActiveFeeDropdownId(null); }}
             className={`pb-3 text-xs font-bold uppercase tracking-wider border-b-2 px-4 transition-all ${
               activeTab === 'additional-fee' 
                 ? 'border-primary text-primary' 
@@ -1885,6 +1933,159 @@ export default function FinanceManagementPage() {
         </div>
       )}
 
+      {/* Tab: Annual Fee View */}
+      {!loading && activeTab === 'annual-fee' && (
+        <div className="flex-1 flex flex-col min-h-0 space-y-4 animate-in fade-in duration-200">
+          
+          {/* Header Row */}
+          <div className="flex-shrink-0 bg-zinc-50/50 dark:bg-zinc-900/50 border border-border p-5 rounded-2xl shadow-2xs space-y-4">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="relative flex-1 max-w-md w-full">
+                <Input aria-label="Search Annual Fee..." 
+                  placeholder="Search Annual Fee..." 
+                  value={annualFeeSearch} 
+                  onChange={e => setAnnualFeeSearch(e.target.value)} 
+                  className="text-xs w-full rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border"
+                />
+              </div>
+
+              {!isReadOnly && (
+                <div className="flex flex-col sm:flex-row items-center justify-end gap-2.5 w-full sm:w-auto">
+                  <Button 
+                    className="w-full sm:w-auto font-bold uppercase tracking-wider text-xs flex items-center justify-center gap-1.5 shadow-2xs"
+                    onClick={handleAnnualFeeModalOpen}
+                  >
+                    <Plus className="h-4 w-4" /> Annual Fee
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Annual Fee Types definitions list Table */}
+          <div className="flex-1 min-h-0 border border-border rounded-2xl bg-surface shadow-2xs relative overflow-hidden flex flex-col">
+            <div 
+              ref={annualFeesContainerRef}
+              onScroll={handleAnnualFeesScroll}
+              className="flex-1 min-h-0 flex flex-col"
+            >
+              {filteredAnnualFeeTypes.length === 0 ? (
+                <div className="p-12 text-center text-text-muted text-xs font-bold leading-relaxed flex flex-col items-center justify-center gap-3">
+                  <span>No annual fee created.</span>
+                  {!isReadOnly && (
+                    <Button 
+                      onClick={handleAnnualFeeModalOpen}
+                      className="font-bold text-xs px-5 h-9 rounded-full flex items-center gap-2 mt-1"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Configure Annual Fee
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <Table containerClassName="border-0 rounded-none shadow-none bg-transparent flex-1 min-h-0 overflow-y-auto">
+                    <TableHeader className="sticky top-0 z-10 border-b border-border bg-[#FAF6EC] dark:bg-zinc-900/50 backdrop-blur-xs">
+                      <TableRow className="bg-[#FAF6EC] dark:bg-zinc-900/50">
+                        <TableHead className="text-xs uppercase font-bold text-text-secondary bg-[#FAF6EC] dark:bg-zinc-900/50">Fee Description</TableHead>
+                        <TableHead className="text-xs uppercase font-bold text-text-secondary bg-[#FAF6EC] dark:bg-zinc-900/50">Class</TableHead>
+                        <TableHead className="text-xs uppercase font-bold text-text-secondary bg-[#FAF6EC] dark:bg-zinc-900/50">Due Date</TableHead>
+                        <TableHead className="text-xs uppercase font-bold text-text-secondary bg-[#FAF6EC] dark:bg-zinc-900/50">Amount</TableHead>
+                        <TableHead className="text-right text-xs uppercase font-bold text-text-secondary bg-[#FAF6EC] dark:bg-zinc-900/50 w-24">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedAnnualFees.map((ft) => (
+                        <TableRow key={ft.id}>
+                          <TableCell className="font-bold text-text-primary text-xs uppercase tracking-wider py-3.5 max-w-[200px] truncate">{ft.name}</TableCell>
+                          <TableCell className="text-xs text-text-secondary font-bold py-3.5 truncate max-w-[170px]">{formatClassColumnText(ft.assigned_to)}</TableCell>
+                          <TableCell className="text-xs text-text-muted font-mono whitespace-nowrap py-3.5">{formatDateFull(ft.due_date)}</TableCell>
+                          <TableCell className="text-xs text-text-primary font-bold font-sans py-3.5">{formatCurrency(ft.amount)}</TableCell>
+                          <TableCell className="text-right py-3.5 relative whitespace-nowrap">
+                            <button 
+                              onClick={(ev) => {
+                                ev.stopPropagation();
+                                if (activeFeeDropdownId === ft.id) {
+                                  setActiveFeeDropdownId(null);
+                                  setDropdownCoords(null);
+                                } else {
+                                  const rect = ev.currentTarget.getBoundingClientRect();
+                                  setDropdownCoords({
+                                    top: rect.bottom + window.scrollY,
+                                    left: rect.right - 128 + window.scrollX,
+                                  });
+                                  setActiveFeeDropdownId(ft.id);
+                                }
+                              }}
+                              className="p-1.5 hover:bg-zinc-100 rounded-lg transition-all"
+                            >
+                              <MoreVertical className="h-4 w-4 text-text-muted" />
+                            </button>
+
+                            {/* Dropdown Menu Overlay via Portal */}
+                            {activeFeeDropdownId === ft.id && dropdownCoords && createPortal(
+                              <div 
+                                ref={dropdownRef}
+                                style={{
+                                  position: 'absolute',
+                                  top: `${dropdownCoords.top}px`,
+                                  left: `${dropdownCoords.left}px`,
+                                }}
+                                className="w-32 bg-surface border border-border shadow-md rounded-xl py-1.5 z-[9999] text-left text-xs text-text-primary animate-in fade-in duration-100"
+                              >
+                                <button 
+                                  onClick={() => { setViewingFeeType(ft); setActiveFeeDropdownId(null); }}
+                                  className="w-full px-3 py-1.5 hover:bg-zinc-50 flex items-center gap-1.5 font-semibold"
+                                >
+                                  <Eye className="h-3.5 w-3.5 text-text-muted" /> View Details
+                                </button>
+                                
+                                {ft.category !== 'System Generated' && ft.name?.trim().toLowerCase() !== 'annual fee' && !isReadOnly && (
+                                  <button 
+                                    onClick={() => handleEditFeeTypeClick(ft)}
+                                    className="w-full px-3 py-1.5 hover:bg-zinc-50 border-t border-border flex items-center gap-1.5 font-semibold text-zinc-700"
+                                  >
+                                    <Edit className="h-3.5 w-3.5 text-text-muted" /> Edit
+                                  </button>
+                                )}
+                                
+                                {ft.category !== 'System Generated' && ft.name?.trim().toLowerCase() !== 'annual fee' && !isReadOnly && (
+                                  <button 
+                                    onClick={() => handleDeleteFeeTypeClick(ft)}
+                                    className="w-full px-3 py-1.5 hover:bg-zinc-50 flex items-center gap-1.5 font-semibold text-red-600"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5 text-red-400" /> Delete
+                                  </button>
+                                )}
+
+                                {isReadOnly && (
+                                  <div className="px-3 py-1.5 text-text-muted font-bold italic border-t border-border flex flex-col">
+                                    <span className="text-[11px] uppercase tracking-wider text-amber-600 flex items-center gap-0.5"><AlertTriangle className="h-3 w-3" /> Read Only</span>
+                                    <span className="text-[8px] text-text-muted mt-0.5">Archived Year</span>
+                                  </div>
+                                )}
+                              </div>,
+                              document.body
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  
+                  {isFetchingMoreFees && (
+                    <div className="py-4 flex flex-col items-center justify-center gap-2 border-t border-border bg-zinc-50/50 dark:bg-zinc-900/10">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                      <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Loading more fees...</span>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Tab 2: Additional Fee View */}
       {!loading && activeTab === 'additional-fee' && (
         <div className="flex-1 flex flex-col min-h-0 space-y-4 animate-in fade-in duration-200">
@@ -1908,12 +2109,6 @@ export default function FinanceManagementPage() {
                     onClick={handleApplyFeeModalOpen}
                   >
                     <Plus className="h-4 w-4" /> Additional Fee
-                  </Button>
-                  <Button 
-                    className="w-full sm:w-auto font-bold uppercase tracking-wider text-xs flex items-center justify-center gap-1.5 shadow-2xs"
-                    onClick={handleAnnualFeeModalOpen}
-                  >
-                    <Plus className="h-4 w-4" /> Annual Fee
                   </Button>
                 </div>
               )}
