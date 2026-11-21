@@ -1184,7 +1184,7 @@ class _QuestionPaperDesignerScreenState extends State<QuestionPaperDesignerScree
                           final item = papers[index];
                           final title = item['paper_title'] ?? 'Untitled Paper';
                           final cls = item['class_name'] ?? 'Class';
-                          final sub = item['subject_name'] ?? 'Subject';
+                          final sub = (item['subject_name'] ?? 'Subject').toString().toUpperCase();
                           final date = item['updated_at'] != null
                               ? item['updated_at'].toString().split('T').first
                               : '';

@@ -2126,7 +2126,7 @@ class TeacherService extends BaseService
         $stmtScheme = $pdo->prepare("
             SELECT ep.id, ep.subject_id, ep.exam_date, ep.start_time, ep.end_time, ep.max_marks, ep.passing_marks, ep.room,
                    CASE WHEN ep.max_marks = 0 THEN 'grade' ELSE 'marks' END AS evaluation_type,
-                   s.name AS subject_name, ep.class_id
+                   UPPER(s.name) AS subject_name, ep.class_id
             FROM examination_papers ep
             JOIN subjects s ON ep.subject_id = s.id
             WHERE ep.exam_id = :exam_id AND ep.class_id = :class_id
@@ -2273,10 +2273,10 @@ class TeacherService extends BaseService
 
         // Fetch Paper Details
         if ($classId > 0) {
-            $stmtPaper = $pdo->prepare("SELECT ep.*, s.name AS subject_name FROM examination_papers ep JOIN subjects s ON ep.subject_id = s.id WHERE ep.exam_id = :exam_id AND (ep.class_id = :class_id OR ep.class_id IS NULL OR ep.class_id = 0) AND ep.subject_id = :subid LIMIT 1");
+            $stmtPaper = $pdo->prepare("SELECT ep.*, UPPER(s.name) AS subject_name FROM examination_papers ep JOIN subjects s ON ep.subject_id = s.id WHERE ep.exam_id = :exam_id AND (ep.class_id = :class_id OR ep.class_id IS NULL OR ep.class_id = 0) AND ep.subject_id = :subid LIMIT 1");
             $stmtPaper->execute([':exam_id' => $examId, ':class_id' => $classId, ':subid' => $subjectId]);
         } else {
-            $stmtPaper = $pdo->prepare("SELECT ep.*, s.name AS subject_name FROM examination_papers ep JOIN subjects s ON ep.subject_id = s.id WHERE ep.exam_id = :exam_id AND ep.subject_id = :subid LIMIT 1");
+            $stmtPaper = $pdo->prepare("SELECT ep.*, UPPER(s.name) AS subject_name FROM examination_papers ep JOIN subjects s ON ep.subject_id = s.id WHERE ep.exam_id = :exam_id AND ep.subject_id = :subid LIMIT 1");
             $stmtPaper->execute([':exam_id' => $examId, ':subid' => $subjectId]);
         }
         $paper = $stmtPaper->fetch(PDO::FETCH_ASSOC);
@@ -2299,7 +2299,7 @@ class TeacherService extends BaseService
 
         // Fetch Class Students
         $stmtStudents = $pdo->prepare("
-            SELECT id, roll_no, name 
+            SELECT id, roll_no, name, sr_no, photo_path 
             FROM students 
             WHERE class_id = :cid AND school_id = :sid AND (status = 'ACTIVE' OR status IS NULL)
             ORDER BY CAST(roll_no AS UNSIGNED) ASC, name ASC
@@ -2332,6 +2332,8 @@ class TeacherService extends BaseService
                 'student_id' => $studentId,
                 'student_name' => $s['name'],
                 'roll_no' => $s['roll_no'] ?? '',
+                'sr_no' => $s['sr_no'] ?? '',
+                'photo_path' => $s['photo_path'] ?? '',
                 'marks_obtained' => ($rawMarks !== null && $rawMarks !== '') ? ($isGradePaper ? (string)$rawMarks : (float)$rawMarks) : null,
                 'is_absent' => (int)$m['is_absent'],
                 'remarks' => $m['remarks'] ?: ''

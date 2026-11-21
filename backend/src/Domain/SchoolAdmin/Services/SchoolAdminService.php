@@ -7724,12 +7724,16 @@ class SchoolAdminService extends BaseService
             $stmt->execute([':sid' => $schoolId]);
         }
 
-        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        return array_map(function($r) {
+            $r['name'] = strtoupper((string)($r['name'] ?? ''));
+            return $r;
+        }, $rows);
     }
 
     public function createSubject(array $user, array $data): array
     {
-        $name = isset($data['name']) ? trim($data['name']) : '';
+        $name = isset($data['name']) ? strtoupper(trim($data['name'])) : '';
         if (empty($name)) {
             throw new ValidationException(['name' => 'Subject name is required']);
         }
@@ -7794,7 +7798,7 @@ class SchoolAdminService extends BaseService
 
     public function updateSubject(array $user, int $id, array $data): array
     {
-        $name = isset($data['name']) ? trim($data['name']) : '';
+        $name = isset($data['name']) ? strtoupper(trim($data['name'])) : '';
         if (empty($name)) {
             throw new ValidationException(['name' => 'Subject name is required']);
         }
@@ -17631,7 +17635,7 @@ Only approve the settlement after reviewing all financial records.
         $stmt = $pdo->prepare("
             SELECT 
                 ep.*, 
-                s.name AS subject_name,
+                UPPER(s.name) AS subject_name,
                 (SELECT COUNT(*) FROM students stud WHERE stud.class_id = ep.class_id AND stud.school_id = :sid_student) AS total_students,
                 (SELECT COUNT(*) FROM examination_marks em WHERE em.exam_id = ep.exam_id AND em.paper_id = ep.id AND (em.marks_obtained IS NOT NULL OR em.is_absent = 1)) AS entered_marks_count
             FROM examination_papers ep
@@ -17834,12 +17838,17 @@ Only approve the settlement after reviewing all financial records.
         $stmtPaper->execute([':exam_id' => $examId, ':class_id' => $classId, ':subid' => $subjectId]);
         $paper = $stmtPaper->fetch(PDO::FETCH_ASSOC);
         if (!$paper) {
+            $stmtPaper = $pdo->prepare("SELECT * FROM examination_papers WHERE exam_id = :exam_id AND (class_id = :class_id OR class_id IS NULL OR class_id = 0) AND subject_id = :subid LIMIT 1");
+            $stmtPaper->execute([':exam_id' => $examId, ':class_id' => $classId, ':subid' => $subjectId]);
+            $paper = $stmtPaper->fetch(PDO::FETCH_ASSOC);
+        }
+        if (!$paper) {
             throw new ValidationException(['subject_id' => 'This subject is not scheduled in the exam timetable.']);
         }
 
         // Fetch Class Students
         $stmtStudents = $pdo->prepare("
-            SELECT id, roll_no, name 
+            SELECT id, roll_no, name, sr_no, photo_path 
             FROM students 
             WHERE class_id = :cid AND school_id = :sid 
             ORDER BY CAST(roll_no AS UNSIGNED) ASC, name ASC
@@ -17880,6 +17889,8 @@ Only approve the settlement after reviewing all financial records.
                 'student_id' => $studentId,
                 'student_name' => $s['name'],
                 'roll_no' => $s['roll_no'],
+                'sr_no' => $s['sr_no'] ?? '',
+                'photo_path' => $s['photo_path'] ?? '',
                 'marks_obtained' => $valObtained,
                 'is_absent' => (int)$m['is_absent'],
                 'remarks' => $m['remarks'] ?: ''
@@ -17952,6 +17963,11 @@ Only approve the settlement after reviewing all financial records.
         $stmtPaper = $pdo->prepare("SELECT * FROM examination_papers WHERE exam_id = :exam_id AND class_id = :class_id AND subject_id = :subid LIMIT 1");
         $stmtPaper->execute([':exam_id' => $examId, ':class_id' => $classId, ':subid' => $subjectId]);
         $paper = $stmtPaper->fetch(PDO::FETCH_ASSOC);
+        if (!$paper) {
+            $stmtPaper = $pdo->prepare("SELECT * FROM examination_papers WHERE exam_id = :exam_id AND (class_id = :class_id OR class_id IS NULL OR class_id = 0) AND subject_id = :subid LIMIT 1");
+            $stmtPaper->execute([':exam_id' => $examId, ':class_id' => $classId, ':subid' => $subjectId]);
+            $paper = $stmtPaper->fetch(PDO::FETCH_ASSOC);
+        }
         if (!$paper) {
             throw new ValidationException(['subject_id' => 'Subject is not scheduled in the exam timetable.']);
         }
@@ -18367,9 +18383,7 @@ Only approve the settlement after reviewing all financial records.
         } elseif ($type === 'RESULT') {
             $eventKey = 'EXAM_RESULT_PUBLISHED';
             $title = $examName . " - Report Card";
-            $message = $className !== '' 
-                ? "The report card / examination result for {$className} has been published. Tap here to view."
-                : "The report card / examination result has been published. Tap here to view.";
+            $message = "The report card of {$examName} has been published. Tap here to view.";
         } elseif ($type === 'UNPUBLISH_SCHEME') {
             $eventKey = 'EXAM_SCHEME_UNPUBLISHED';
             $title = $examName . " - Exam Scheme Update";

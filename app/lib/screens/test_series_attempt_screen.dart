@@ -974,7 +974,7 @@ class _TestSeriesAttemptScreenState extends State<TestSeriesAttemptScreen>
               ),
               if ((_seriesInfo['subject_name'] ?? '').toString().trim().isNotEmpty)
                 Text(
-                  _seriesInfo['subject_name'].toString(),
+                  _seriesInfo['subject_name'].toString().toUpperCase(),
                   style: TextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w700,

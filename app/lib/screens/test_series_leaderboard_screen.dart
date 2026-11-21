@@ -200,7 +200,7 @@ class _TestSeriesLeaderboardScreenState
     );
 
     final testTitle = (_series['title'] ?? 'Test Series').toString();
-    final subjectName = (_series['subject_name'] ?? '').toString().trim();
+    final subjectName = (_series['subject_name'] ?? '').toString().trim().toUpperCase();
     final schoolName = (_series['school_name'] ?? 'School').toString();
     final teacherName = (_series['created_by_name'] ?? 'Teacher').toString();
     final sessionName = (_series['academic_year_name'] ?? '')
@@ -618,7 +618,7 @@ class _TestSeriesLeaderboardScreenState
     );
     final schoolName = (_series['school_name'] ?? 'School').toString();
     final testTitle = (_series['title'] ?? 'Test Series').toString();
-    final subjectName = (_series['subject_name'] ?? '').toString().trim();
+    final subjectName = (_series['subject_name'] ?? '').toString().trim().toUpperCase();
     final teacherName = (_series['created_by_name'] ?? 'Teacher').toString();
     final sessionName = (_series['academic_year_name'] ?? '').toString();
     final medal = rank == 1 ? '🥇' : (rank == 2 ? '🥈' : '🥉');

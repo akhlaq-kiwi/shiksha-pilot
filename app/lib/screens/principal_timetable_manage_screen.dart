@@ -709,7 +709,7 @@ class _PrincipalTimetableManageScreenState
 
                 final p = item['data'];
                 final periodNum = p['period_number'] ?? '';
-                final subName = p['subject_name'] ?? 'Subject';
+                final subName = (p['subject_name'] ?? 'Subject').toString().toUpperCase();
                 final isBackup = p['is_backup'] == true || p['is_backup'] == 1;
                 final teacherName = isBackup
                     ? '${p['backup_teacher_name'] ?? 'Backup'} (Backup)'
@@ -1016,7 +1016,7 @@ class _PrincipalTimetableManageScreenState
                       border: Border.all(color: const Color(0xFFFDE68A)),
                     ),
                     child: Text(
-                      'Period ${period['period_number']}: ${period['subject_name']}${period['teacher_name'] != null ? " • ${period['teacher_name']}" : ""}',
+                      'Period ${period['period_number']}: ${(period['subject_name'] ?? '').toString().toUpperCase()}${period['teacher_name'] != null ? " • ${period['teacher_name']}" : ""}',
                       style: const TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w800,
@@ -1286,7 +1286,7 @@ class _PrincipalTimetableManageScreenState
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Period ${period['period_number']}: ${period['subject_name']}',
+                    'Period ${period['period_number']}: ${(period['subject_name'] ?? '').toString().toUpperCase()}',
                     style: TextStyle(fontSize: 13, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 16),
@@ -2271,7 +2271,7 @@ class _PrincipalTimetableManageScreenState
                                 // Split by comma (Requirement 7)
                                 final names = rawInput
                                     .split(',')
-                                    .map((n) => n.trim())
+                                    .map((n) => n.trim().toUpperCase())
                                     .where((n) => n.isNotEmpty)
                                     .toList();
 
@@ -2387,7 +2387,7 @@ class _PrincipalTimetableManageScreenState
                                 contentPadding: EdgeInsets.zero,
                                 leading: const Icon(Icons.book_outlined, color: Color(0xFFC26600), size: 20),
                                 title: Text(
-                                  sub['name'] ?? '',
+                                  (sub['name'] ?? '').toString().toUpperCase(),
                                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                                 ),
                                 trailing: isThisDeleting
@@ -2937,10 +2937,10 @@ class _PrincipalTimetableManageScreenState
 
     // Display text for currently selected subject & teacher in inline add form
     final currentSubId = _selectedSubjectIdPerDay[dayName];
-    final currentSubName = availableSubjects.firstWhere(
+    final currentSubName = (availableSubjects.firstWhere(
       (s) => s['id'] == currentSubId,
       orElse: () => null,
-    )?['name'] ?? '';
+    )?['name'] ?? '').toString().toUpperCase();
 
     final currentTeacherId = _selectedTeacherIdPerDay[dayName];
     final currentTeacherName = availableTeachers.firstWhere(
@@ -3163,7 +3163,7 @@ class _PrincipalTimetableManageScreenState
               itemBuilder: (ctx, idx) {
                 final p = periodsList[idx];
                 final periodNum = p['period_number'] ?? (idx + 1);
-                final subName = p['subject_name'] ?? 'Subject';
+                final subName = (p['subject_name'] ?? 'Subject').toString().toUpperCase();
                 final isBackup = p['is_backup'] == true;
                 final teacherName = isBackup
                     ? (p['backup_teacher_name'] ?? 'Backup Teacher')
@@ -3381,7 +3381,7 @@ class _PrincipalTimetableManageScreenState
                       items: availableSubjects.map((s) {
                         return DropdownMenuItemModel<int>(
                           value: s['id'] as int,
-                          label: s['name'] ?? '',
+                          label: (s['name'] ?? '').toString().toUpperCase(),
                         );
                       }).toList(),
                       onChanged: (val) {

@@ -22,18 +22,20 @@ class DueRestrictionScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFFAF8F5),
       appBar: AppBar(
         title: Text(
           title,
           style: const TextStyle(
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            fontSize: 16,
+            color: Color(0xFF0F172A),
           ),
         ),
-        backgroundColor: Colors.indigo.shade800,
-        iconTheme: const IconThemeData(color: Colors.white),
+        backgroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Color(0xFF0F172A)),
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
       ),
       body: SafeArea(
         child: Padding(
@@ -47,14 +49,14 @@ class DueRestrictionScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: Colors.amber.shade50,
+                  color: const Color(0xFFFEF3C7),
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.amber.shade200, width: 2),
+                  border: Border.all(color: const Color(0xFFFDE68A), width: 2),
                 ),
-                child: Icon(
+                child: const Icon(
                   Icons.lock_clock_rounded,
                   size: 72,
-                  color: Colors.amber.shade700,
+                  color: Color(0xFFD97706),
                 ),
               ),
               const SizedBox(height: 32),
@@ -63,10 +65,10 @@ class DueRestrictionScreen extends StatelessWidget {
               Text(
                 title,
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey.shade900,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A),
                 ),
               ),
               const SizedBox(height: 24),
@@ -76,9 +78,16 @@ class DueRestrictionScreen extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.grey.shade200),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.02),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: Column(
                   children: [
@@ -87,7 +96,7 @@ class DueRestrictionScreen extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
-                        color: Colors.grey,
+                        color: Color(0xFF64748B),
                         letterSpacing: 1.0,
                       ),
                     ),
@@ -97,7 +106,7 @@ class DueRestrictionScreen extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.w900,
-                        color: Colors.redAccent,
+                        color: Color(0xFFDC2626),
                       ),
                     ),
                   ],
@@ -109,90 +118,48 @@ class DueRestrictionScreen extends StatelessWidget {
               Text(
                 message,
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
+                style: const TextStyle(
+                  fontSize: 13.5,
                   height: 1.6,
-                  color: Colors.grey.shade600,
+                  color: Color(0xFF64748B),
                 ),
               ),
               const Spacer(),
               const Spacer(),
               
-              // Buttons
-              Column(
-                children: [
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => FeesCardScreen(
-                              baseUrl: baseUrl,
-                              token: token,
-                              studentId: studentId,
-                            ),
-                          ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.indigo.shade800,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: const Text(
-                        'View Fee Details',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+              // Button
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => FeesCardScreen(
+                          baseUrl: baseUrl,
+                          token: token,
+                          studentId: studentId,
                         ),
                       ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFD97706),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    'View Fee Details',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: OutlinedButton(
-                      onPressed: () {
-                        showDialog(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text('Contact School'),
-                            content: const Text(
-                              'Please contact the school administrative office for any queries regarding fee payment or to request temporary access.',
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context),
-                                child: const Text('Close'),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.indigo.shade800,
-                        side: BorderSide(color: Colors.indigo.shade800, width: 1.5),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text(
-                        'Contact School',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ],
           ),

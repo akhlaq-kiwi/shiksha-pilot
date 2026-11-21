@@ -998,7 +998,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> with SingleTick
                       ),
                       ...subjects.map((s) => TableRow(
                             children: [
-                              Padding(padding: const EdgeInsets.all(6), child: Text(s['subject_name'] ?? '', style: const TextStyle(fontSize: 11))),
+                              Padding(padding: const EdgeInsets.all(6), child: Text((s['subject_name'] ?? '').toString().toUpperCase(), style: const TextStyle(fontSize: 11))),
                               Padding(padding: const EdgeInsets.all(6), child: Text('${s['marks_obtained']}', textAlign: TextAlign.right, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
                               Padding(padding: const EdgeInsets.all(6), child: Text('${s['grade']}', textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
                             ],

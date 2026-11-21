@@ -1091,6 +1091,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                       TextFormField(
                                         controller: _phoneController,
                                         keyboardType: TextInputType.phone,
+                                        inputFormatters: [
+                                          FilteringTextInputFormatter.digitsOnly,
+                                          LengthLimitingTextInputFormatter(10),
+                                        ],
                                         onChanged: (val) {
                                           if (_phoneValidationError != null) {
                                             setState(() {

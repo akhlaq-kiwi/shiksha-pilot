@@ -3645,13 +3645,13 @@ export default function ExamsPage() {
                 )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* CARD 1: Exam Timetable */}
+                {/* CARD 1: Create Scheme */}
                 <Card className="hover:border-primary/20 transition-all shadow-xs flex flex-col justify-between">
                   <CardContent className="p-6 space-y-4 flex-1 flex flex-col justify-between">
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 text-primary">
                         <Calendar className="h-5 w-5" />
-                        <h4 className="text-base font-bold text-text-primary">Exam Timetable</h4>
+                        <h4 className="text-base font-bold text-text-primary">Create Scheme</h4>
                       </div>
                       <p className="text-xs text-text-secondary leading-relaxed">
                         Configure exam papers, schedule dates/times, max marks, and room assignments for {currentClass.name}.
@@ -3659,7 +3659,7 @@ export default function ExamsPage() {
                     </div>
                     <div className="pt-2">
                       <Button className="w-full flex items-center justify-center gap-2 text-xs font-bold cursor-pointer" onClick={() => handleOpenTimetable(selectedExam, targetClassId)}>
-                        <Calendar className="h-4 w-4" /> Open Timetable
+                        <Calendar className="h-4 w-4" /> Create Scheme
                       </Button>
                     </div>
                   </CardContent>

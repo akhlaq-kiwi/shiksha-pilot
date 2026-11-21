@@ -711,7 +711,7 @@ class _TimetableScreenState extends State<TimetableScreen> {
                   children: [
                     Expanded(
                       child: Text(
-                        p['subject_name'] ?? 'No Subject',
+                        (p['subject_name'] ?? 'No Subject').toString().toUpperCase(),
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w900,
@@ -840,7 +840,7 @@ class _TimetableScreenState extends State<TimetableScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      p['subject_name'] ?? 'No Subject',
+                      (p['subject_name'] ?? 'No Subject').toString().toUpperCase(),
                       style: const TextStyle(
                         fontSize: 15.5,
                         fontWeight: FontWeight.w900,

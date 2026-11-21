@@ -498,7 +498,7 @@ class SchoolAdminController extends BaseController
     public function getExaminations(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'PRINCIPAL', 'TEACHER']);
         $data = $this->service->getExaminations($user);
         return $this->success($response, $data);
     }
@@ -515,7 +515,7 @@ class SchoolAdminController extends BaseController
     public function getExaminationDetails(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'PRINCIPAL', 'TEACHER']);
         $id = (int)$args['id'];
         $data = $this->service->getExaminationDetails($user, $id);
         return $this->success($response, $data);
@@ -554,7 +554,7 @@ class SchoolAdminController extends BaseController
     public function getAllExamSchemes(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'PRINCIPAL', 'TEACHER']);
         $examId = (int)$args['id'];
         $data = $this->service->getAllExamSchemes($user, $examId);
         return $this->success($response, $data);
@@ -563,7 +563,7 @@ class SchoolAdminController extends BaseController
     public function getExamTimetable(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'PRINCIPAL', 'TEACHER']);
         $examId = (int)$args['id'];
         $params = $request->getQueryParams();
         $classId = isset($params['class_id']) ? (int)$params['class_id'] : 0;
@@ -586,7 +586,7 @@ class SchoolAdminController extends BaseController
     public function getExamMarksSheet(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'PRINCIPAL', 'TEACHER']);
         $examId = (int)$args['id'];
         $params = $request->getQueryParams();
         $classId = isset($params['class_id']) ? (int)$params['class_id'] : 0;
@@ -598,7 +598,7 @@ class SchoolAdminController extends BaseController
     public function saveExamMark(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'PRINCIPAL', 'TEACHER']);
         $examId = (int)$args['id'];
         $body = RequestParser::body($request);
         $data = $this->service->saveExamMark($user, $examId, $body);
@@ -1407,7 +1407,7 @@ class SchoolAdminController extends BaseController
             }
         }
 
-        // Principal Examinations route authorization
+        // Principal & Teacher Examinations route authorization
         if (str_contains($uri, '/api/school/exams-new') || 
             str_contains($uri, '/api/school/exams') || 
             str_contains($uri, '/api/school/exam-marks') || 
@@ -1417,6 +1417,20 @@ class SchoolAdminController extends BaseController
                     throw new \App\Shared\Exceptions\ForbiddenException('Subscription Expired. Access Denied.');
                 }
                 return;
+            }
+            if ($userRole === 'TEACHER') {
+                if ($this->service->checkSubscriptionExpired($user)) {
+                    throw new \App\Shared\Exceptions\ForbiddenException('Subscription Expired. Access Denied.');
+                }
+                $allowed = is_array($roles) ? $roles : [$roles];
+                if (in_array('TEACHER', $allowed, true) || 
+                    str_contains($uri, '/marks') || 
+                    str_contains($uri, '/timetable') || 
+                    str_contains($uri, '/grade-configurations') || 
+                    str_contains($uri, '/all-schemes') ||
+                    $method === 'GET') {
+                    return;
+                }
             }
         }
 
@@ -1501,6 +1515,7 @@ class SchoolAdminController extends BaseController
                     '/api/school/period-configurations',
                     '/api/school/timetable-settings',
                     '/api/school/academic-years',
+                    '/api/school/exams-new',
                 ];
                 foreach ($sharedGetPaths as $path) {
                     if (str_contains($uri, $path)) {

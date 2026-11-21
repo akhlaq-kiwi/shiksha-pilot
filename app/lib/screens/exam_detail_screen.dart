@@ -12,6 +12,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:flutter/services.dart';
 import 'package:school_hub/screens/due_restriction_screen.dart';
 import 'package:school_hub/utils/class_formatter.dart';
+import 'package:school_hub/screens/marks_spreadsheet_screen.dart';
 
 class ExamDetailScreen extends StatefulWidget {
   final ExamService examService;
@@ -315,7 +316,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
   }
 
   Widget _buildPaperItemCard(dynamic paper) {
-    final sub = paper['subject_name'] ?? 'Subject';
+    final sub = (paper['subject_name'] ?? 'Subject').toString().toUpperCase();
     final date = paper['exam_date'] ?? '';
     final start = paper['start_time'] ?? '';
     final end = paper['end_time'] ?? '';
@@ -524,6 +525,61 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
     Future.delayed(const Duration(seconds: 3), () {
       overlayEntry.remove();
     });
+  }
+
+  void _openMarksSpreadsheet() async {
+    List<dynamic> scheme = (_details['scheme'] as List<dynamic>?) ?? [];
+    if (scheme.isEmpty) {
+      try {
+        final freshData = await widget.examService.getExamDetails(
+          widget.examId,
+          widget.userRole,
+          widget.studentId,
+        );
+        if (mounted) {
+          setState(() {
+            _details = freshData;
+          });
+        }
+        scheme = (freshData['scheme'] as List<dynamic>?) ?? [];
+      } catch (_) {}
+    }
+
+    if (scheme.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No scheduled subjects found for this exam timetable.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
+    final rawClassName = (_details['class_name'] ?? _details['full_class_name'] ?? '').toString();
+    final className = rawClassName.isNotEmpty ? rawClassName : 'Class';
+    final cid = _selectedClassId ?? (scheme.isNotEmpty ? int.tryParse(scheme.first['class_id']?.toString() ?? '0') : null) ?? 0;
+    final assigned = (_details['assigned_classes'] as List<dynamic>?) ?? [];
+
+    if (!mounted) return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MarksSpreadsheetScreen(
+          examId: widget.examId,
+          examName: widget.examName,
+          classId: cid,
+          className: className,
+          assignedClasses: assigned,
+          initialSubjects: scheme,
+          baseUrl: widget.examService.baseUrl,
+          token: widget.examService.token,
+          userRole: widget.userRole,
+        ),
+      ),
+    );
   }
 
   void _showEnterMarksModal() async {
@@ -855,7 +911,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                           final subId = (item['subject_id'] is int)
                               ? item['subject_id'] as int
                               : int.tryParse(item['subject_id'].toString()) ?? 0;
-                          final subName = item['subject_name'] ?? 'Subject';
+                          final subName = (item['subject_name'] ?? 'Subject').toString().toUpperCase();
                           final isSelected = subId == selectedSubjectId;
 
                           return GestureDetector(
@@ -3402,8 +3458,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
   Widget build(BuildContext context) {
     final bool schemePub = _details['scheme_published'] == 1;
     final bool admitPub = _details['admit_card_published'] == 1;
-    final bool resultPub = (_details['result_published'] == 1 || _details['result_published'] == true) &&
-        (_details['result'] != null || _details['report_card'] != null);
+    final bool resultPub = (_details['result_published'] == 1 || _details['result_published'] == true);
     final bool hasPapers = (_details['has_papers'] == 1) || (_details['scheme'] is List && (_details['scheme'] as List).isNotEmpty);
     
     final bool admitCardRestricted = _details['admit_card_restricted'] == true;
@@ -3523,7 +3578,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                         icon: Icons.edit_note_rounded,
                         isPublished: hasPapers,
                         disabledMessage: 'No papers have been added for this examination yet.',
-                        onTap: _showEnterMarksModal,
+                        onTap: _openMarksSpreadsheet,
                       ),
 
                     // 2. Admit Card Card (STUDENT/PARENT only)
@@ -3568,7 +3623,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                   MaterialPageRoute(
                                     builder: (context) => DueRestrictionScreen(
                                       title: 'Exam Result Temporarily Unavailable',
-                                      message: 'Your exam result is temporarily unavailable because your outstanding fee amount is higher than the limit set by the school. Please clear the pending dues or contact the school office for assistance.',
+                                      message: 'Your exam result is temporarily unavailable because your outstanding fee amount is higher than the limit set by the school. Please clear the pending dues or contact the school office to access your exam result.',
                                       outstandingDue: outstandingDue,
                                       baseUrl: widget.examService.baseUrl,
                                       token: widget.examService.token,

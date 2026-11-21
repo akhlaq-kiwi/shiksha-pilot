@@ -14,6 +14,7 @@ import 'package:school_hub/services/notification_helper.dart';
 import 'package:school_hub/services/school_examination_service.dart';
 import 'package:school_hub/utils/class_formatter.dart';
 import 'package:school_hub/screens/principal_seating_plan_screen.dart';
+import 'package:school_hub/screens/full_screen_image_screen.dart';
 
 class PrincipalExaminationsScreen extends StatefulWidget {
   final SchoolExaminationService examService;
@@ -577,6 +578,129 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
     return startStr;
   }
 
+  DateTime? _parseDmyOrIsoDate(String? s) {
+    if (s == null) return null;
+    final str = s.trim();
+    if (str.isEmpty || str == '-') return null;
+    final dmyMatch = RegExp(r'^(\d{1,2})-(\d{1,2})-(\d{4})$').firstMatch(str);
+    if (dmyMatch != null) {
+      final d = int.tryParse(dmyMatch.group(1)!);
+      final m = int.tryParse(dmyMatch.group(2)!);
+      final y = int.tryParse(dmyMatch.group(3)!);
+      if (d != null && m != null && y != null) {
+        return DateTime(y, m, d);
+      }
+    }
+    return DateTime.tryParse(str);
+  }
+
+  String _formatDateDmy(DateTime d) {
+    return '${d.day.toString().padLeft(2, '0')}-${d.month.toString().padLeft(2, '0')}-${d.year.toString().padLeft(4, '0')}';
+  }
+
+  String _formatIsoToDmy(dynamic iso) {
+    if (iso == null) return '';
+    final str = iso.toString().trim();
+    if (str.isEmpty || str == '-') return '';
+    final dt = _parseDmyOrIsoDate(str);
+    if (dt == null) return str;
+    return _formatDateDmy(dt);
+  }
+
+  int _calculateExamWorkingDays(String? startStr, String? endStr, List<dynamic> holidays) {
+    if (startStr == null || startStr.trim().isEmpty || endStr == null || endStr.trim().isEmpty) {
+      return 0;
+    }
+    final start = _parseDmyOrIsoDate(startStr.trim());
+    final end = _parseDmyOrIsoDate(endStr.trim());
+    if (start == null || end == null || start.isAfter(end)) {
+      return 0;
+    }
+
+    final Set<String> holidayDates = {};
+    for (final h in holidays) {
+      if (h == null) continue;
+      final raw = (h['date'] ?? h['holiday_date'] ?? h['start_date'] ?? h['date_from'] ?? '').toString().trim();
+      final endRaw = (h['end_date'] ?? h['date_to'] ?? '').toString().trim();
+      if (raw.isNotEmpty) {
+        final sDateStr = raw.split(' ')[0].split('T')[0];
+        final eDateStr = endRaw.isNotEmpty ? endRaw.split(' ')[0].split('T')[0] : sDateStr;
+        final hStart = DateTime.tryParse(sDateStr);
+        final hEnd = DateTime.tryParse(eDateStr);
+        if (hStart != null && hEnd != null) {
+          DateTime curr = hStart;
+          while (!curr.isAfter(hEnd)) {
+            holidayDates.add("${curr.year.toString().padLeft(4, '0')}-${curr.month.toString().padLeft(2, '0')}-${curr.day.toString().padLeft(2, '0')}");
+            curr = curr.add(const Duration(days: 1));
+          }
+        } else if (sDateStr.length >= 10) {
+          holidayDates.add(sDateStr);
+        }
+      }
+    }
+
+    int count = 0;
+    DateTime cur = start;
+    while (!cur.isAfter(end)) {
+      final isSunday = cur.weekday == DateTime.sunday;
+      final dateKey = "${cur.year.toString().padLeft(4, '0')}-${cur.month.toString().padLeft(2, '0')}-${cur.day.toString().padLeft(2, '0')}";
+      final isHoliday = holidayDates.contains(dateKey);
+
+      if (!isSunday && !isHoliday) {
+        count++;
+      }
+      cur = cur.add(const Duration(days: 1));
+    }
+    return count;
+  }
+
+  bool _isDaySelectable(DateTime day) {
+    if (day.weekday == DateTime.sunday) return false;
+    final dateKey = "${day.year.toString().padLeft(4, '0')}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}";
+    final isHoliday = _holidays.any((h) {
+      if (h == null) return false;
+      final raw = (h['date'] ?? h['holiday_date'] ?? h['start_date'] ?? h['date_from'] ?? '').toString().trim();
+      final endRaw = (h['end_date'] ?? h['date_to'] ?? '').toString().trim();
+      if (raw.isEmpty) return false;
+      final sDateStr = raw.split(' ')[0].split('T')[0];
+      final eDateStr = endRaw.isNotEmpty ? endRaw.split(' ')[0].split('T')[0] : sDateStr;
+      final hStart = DateTime.tryParse(sDateStr);
+      final hEnd = DateTime.tryParse(eDateStr);
+      if (hStart != null && hEnd != null) {
+        final d = DateTime(day.year, day.month, day.day);
+        final s = DateTime(hStart.year, hStart.month, hStart.day);
+        final e = DateTime(hEnd.year, hEnd.month, hEnd.day);
+        return !d.isBefore(s) && !d.isAfter(e);
+      }
+      return sDateStr == dateKey;
+    });
+    return !isHoliday;
+  }
+
+  DateTime _findFirstSelectableDate(DateTime preferred, DateTime firstLimit, DateTime lastLimit) {
+    DateTime candidate = preferred;
+    if (candidate.isBefore(firstLimit)) candidate = firstLimit;
+    if (candidate.isAfter(lastLimit)) candidate = lastLimit;
+
+    if (_isDaySelectable(candidate)) return candidate;
+
+    // Search forward within limits
+    DateTime forward = candidate.add(const Duration(days: 1));
+    while (!forward.isAfter(lastLimit)) {
+      if (_isDaySelectable(forward)) return forward;
+      forward = forward.add(const Duration(days: 1));
+    }
+
+    // Search backward within limits
+    DateTime backward = candidate.subtract(const Duration(days: 1));
+    while (!backward.isBefore(firstLimit)) {
+      if (_isDaySelectable(backward)) return backward;
+      backward = backward.subtract(const Duration(days: 1));
+    }
+
+    return candidate;
+  }
+
   String _formatDisplayTime(TimeOfDay tod) {
     final hour = tod.hourOfPeriod == 0 ? 12 : tod.hourOfPeriod;
     final minute = tod.minute.toString().padLeft(2, '0');
@@ -952,20 +1076,14 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
     final endDate = DateTime.tryParse(endStr ?? '') ?? DateTime(2035);
 
     DateTime initialDate = DateTime.tryParse(_ttExamDate) ?? startDate;
-    if (initialDate.isBefore(startDate)) initialDate = startDate;
-    if (initialDate.isAfter(endDate)) initialDate = endDate;
+    initialDate = _findFirstSelectableDate(initialDate, startDate, endDate);
 
     final picked = await showDatePicker(
       context: context,
       initialDate: initialDate,
       firstDate: startDate,
       lastDate: endDate,
-      selectableDayPredicate: (DateTime day) {
-        if (day.weekday == DateTime.sunday) return false;
-        final dateKey = "${day.year.toString().padLeft(4, '0')}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}";
-        final isHoliday = _holidays.any((h) => h['date']?.toString() == dateKey);
-        return !isHoliday;
-      },
+      selectableDayPredicate: _isDaySelectable,
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -1127,7 +1245,7 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
       (s) => s['id']?.toString() == _ttSubjectId.toString(),
       orElse: () => null,
     );
-    final subjectName = matchedSubject != null ? (matchedSubject['name'] ?? 'Subject') : 'Subject';
+    final subjectName = (matchedSubject != null ? (matchedSubject['name'] ?? 'Subject') : 'Subject').toString().toUpperCase();
 
     final paperData = {
       'subject_id': _ttSubjectId,
@@ -3517,18 +3635,6 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
     );
   }
 
-  int _getSubTestRank(String name) {
-    final lower = name.toLowerCase();
-    final match = RegExp(r'(?:unit\s*test|ut|test|term)\s*(\d+)', caseSensitive: false).firstMatch(lower);
-    if (match != null) {
-      return int.tryParse(match.group(1) ?? '') ?? 99;
-    }
-    if (lower.contains('quarterly')) return 1;
-    if (lower.contains('half')) return 2;
-    if (lower.contains('annual')) return 3;
-    return 99;
-  }
-
   DateTime? _getExamMinStartDate(dynamic targetTest, dynamic parentTerm) {
     List<dynamic> siblings = [];
     if (parentTerm != null && parentTerm['sub_tests'] is List) {
@@ -3548,20 +3654,11 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
 
     if (siblings.isEmpty) return null;
 
-    final sorted = List<dynamic>.from(siblings)..sort((a, b) {
-      final rA = _getSubTestRank((a['name'] ?? '').toString());
-      final rB = _getSubTestRank((b['name'] ?? '').toString());
-      if (rA != rB) return rA.compareTo(rB);
-      final idA = int.tryParse(a['id']?.toString() ?? '') ?? 0;
-      final idB = int.tryParse(b['id']?.toString() ?? '') ?? 0;
-      return idA.compareTo(idB);
-    });
-
     final targetId = targetTest['id']?.toString();
-    final targetIdx = targetId != null ? sorted.indexWhere((e) => e['id']?.toString() == targetId) : -1;
+    final targetIdx = targetId != null ? siblings.indexWhere((e) => e['id']?.toString() == targetId) : -1;
 
-    final preceding = sorted.where((e) {
-      final idx = sorted.indexOf(e);
+    final preceding = siblings.where((e) {
+      final idx = siblings.indexOf(e);
       final isBefore = (targetIdx == -1 || idx < targetIdx) && e['id']?.toString() != targetId;
       final hasEnd = (e['end_date'] ?? '').toString().trim().isNotEmpty;
       return isBefore && hasEnd;
@@ -3569,17 +3666,19 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
 
     if (preceding.isEmpty) return null;
 
-    String latestEndDate = '';
+    DateTime? latestEndDate;
     for (final e in preceding) {
       final ed = (e['end_date'] ?? '').toString().trim();
-      if (latestEndDate.isEmpty || ed.compareTo(latestEndDate) > 0) {
-        latestEndDate = ed;
+      final dt = _parseDmyOrIsoDate(ed);
+      if (dt != null) {
+        if (latestEndDate == null || dt.isAfter(latestEndDate)) {
+          latestEndDate = dt;
+        }
       }
     }
 
-    if (latestEndDate.isEmpty) return null;
-    final dt = DateTime.tryParse(latestEndDate);
-    return dt != null ? dt.add(const Duration(days: 1)) : null;
+    if (latestEndDate == null) return null;
+    return latestEndDate.add(const Duration(days: 1));
   }
 
   DateTime? _getExamMaxEndDate(dynamic targetTest, dynamic parentTerm) {
@@ -3601,21 +3700,12 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
 
     if (siblings.isEmpty) return null;
 
-    final sorted = List<dynamic>.from(siblings)..sort((a, b) {
-      final rA = _getSubTestRank((a['name'] ?? '').toString());
-      final rB = _getSubTestRank((b['name'] ?? '').toString());
-      if (rA != rB) return rA.compareTo(rB);
-      final idA = int.tryParse(a['id']?.toString() ?? '') ?? 0;
-      final idB = int.tryParse(b['id']?.toString() ?? '') ?? 0;
-      return idA.compareTo(idB);
-    });
-
     final targetId = targetTest['id']?.toString();
-    final targetIdx = targetId != null ? sorted.indexWhere((e) => e['id']?.toString() == targetId) : -1;
+    final targetIdx = targetId != null ? siblings.indexWhere((e) => e['id']?.toString() == targetId) : -1;
     if (targetIdx == -1) return null;
 
-    final succeeding = sorted.where((e) {
-      final idx = sorted.indexOf(e);
+    final succeeding = siblings.where((e) {
+      final idx = siblings.indexOf(e);
       final isAfter = idx > targetIdx && e['id']?.toString() != targetId;
       final hasStart = (e['start_date'] ?? '').toString().trim().isNotEmpty;
       return isAfter && hasStart;
@@ -3623,17 +3713,19 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
 
     if (succeeding.isEmpty) return null;
 
-    String earliestStartDate = '';
+    DateTime? earliestStartDate;
     for (final e in succeeding) {
       final sd = (e['start_date'] ?? '').toString().trim();
-      if (earliestStartDate.isEmpty || sd.compareTo(earliestStartDate) < 0) {
-        earliestStartDate = sd;
+      final dt = _parseDmyOrIsoDate(sd);
+      if (dt != null) {
+        if (earliestStartDate == null || dt.isBefore(earliestStartDate)) {
+          earliestStartDate = dt;
+        }
       }
     }
 
-    if (earliestStartDate.isEmpty) return null;
-    final dt = DateTime.tryParse(earliestStartDate);
-    return dt != null ? dt.subtract(const Duration(days: 1)) : null;
+    if (earliestStartDate == null) return null;
+    return earliestStartDate.subtract(const Duration(days: 1));
   }
 
   String _formatDateIso(DateTime d) {
@@ -3646,8 +3738,8 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
   Future<void> _showEditTestBottomSheet(dynamic test, dynamic parentTerm) async {
     final nameCtrl = TextEditingController(text: test['name'] ?? '');
     final maxMarksCtrl = TextEditingController(text: _formatMarksInt(test['max_marks']));
-    final startCtrl = TextEditingController(text: test['start_date'] ?? '');
-    final endCtrl = TextEditingController(text: test['end_date'] ?? '');
+    final startCtrl = TextEditingController(text: _formatIsoToDmy(test['start_date']));
+    final endCtrl = TextEditingController(text: _formatIsoToDmy(test['end_date']));
     final minAllowedStart = _getExamMinStartDate(test, parentTerm);
     final maxAllowedEnd = _getExamMaxEndDate(test, parentTerm);
     String? localError;
@@ -3697,12 +3789,27 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
                       ),
                     ),
                     const SizedBox(height: 4),
-                    const Text(
-                      'Update details for this test or component.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF64748B),
-                      ),
+                    Builder(
+                      builder: (_) {
+                        final workingDays = _calculateExamWorkingDays(startCtrl.text, endCtrl.text, _holidays);
+                        final label = workingDays == 1
+                            ? '1 Exam Day (Excludes Sundays & Holidays)'
+                            : '$workingDays Exam Days (Excludes Sundays & Holidays)';
+                        return Row(
+                          children: [
+                            const Icon(Icons.event_available_rounded, size: 14, color: Color(0xFFD97706)),
+                            const SizedBox(width: 5),
+                            Text(
+                              label,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFD97706),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
                     const SizedBox(height: 16),
 
@@ -3826,15 +3933,15 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
                                 onTap: () async {
                                   final firstStartLimit = minAllowedStart ?? DateTime(2020);
                                   final lastStartLimit = maxAllowedEnd ?? DateTime(2035);
-                                  DateTime cur = DateTime.tryParse(startCtrl.text) ?? (minAllowedStart ?? DateTime.now());
-                                  if (cur.isBefore(firstStartLimit)) cur = firstStartLimit;
-                                  if (cur.isAfter(lastStartLimit)) cur = lastStartLimit;
+                                  DateTime cur = _parseDmyOrIsoDate(startCtrl.text) ?? (minAllowedStart ?? DateTime.now());
+                                  cur = _findFirstSelectableDate(cur, firstStartLimit, lastStartLimit);
 
                                   final picked = await showDatePicker(
                                     context: context,
                                     initialDate: cur,
                                     firstDate: firstStartLimit,
                                     lastDate: lastStartLimit,
+                                    selectableDayPredicate: _isDaySelectable,
                                     builder: (context, child) {
                                       return Theme(
                                         data: Theme.of(context).copyWith(
@@ -3849,12 +3956,12 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
                                     },
                                   );
                                   if (picked != null) {
-                                    final pickedStr = _formatDateIso(picked);
+                                    final pickedDmy = _formatDateDmy(picked);
                                     setSheetState(() {
-                                      startCtrl.text = pickedStr;
-                                      final curEnd = DateTime.tryParse(endCtrl.text);
+                                      startCtrl.text = pickedDmy;
+                                      final curEnd = _parseDmyOrIsoDate(endCtrl.text);
                                       if (curEnd != null && curEnd.isBefore(picked)) {
-                                        endCtrl.text = pickedStr;
+                                        endCtrl.text = pickedDmy;
                                       }
                                     });
                                   }
@@ -3864,7 +3971,7 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
                                     controller: startCtrl,
                                     style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
                                     decoration: InputDecoration(
-                                      hintText: 'YYYY-MM-DD',
+                                      hintText: 'DD-MM-YYYY',
                                       hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
                                       suffixIcon: const Icon(Icons.calendar_today_rounded, size: 16, color: Color(0xFFD97706)),
                                       filled: true,
@@ -3903,18 +4010,18 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
                               InkWell(
                                 borderRadius: BorderRadius.circular(12),
                                 onTap: () async {
-                                  final selectedStart = DateTime.tryParse(startCtrl.text);
+                                  final selectedStart = _parseDmyOrIsoDate(startCtrl.text);
                                   final firstEndLimit = selectedStart ?? minAllowedStart ?? DateTime(2020);
                                   final lastEndLimit = maxAllowedEnd ?? DateTime(2035);
-                                  DateTime cur = DateTime.tryParse(endCtrl.text) ?? (selectedStart ?? minAllowedStart ?? DateTime.now());
-                                  if (cur.isBefore(firstEndLimit)) cur = firstEndLimit;
-                                  if (cur.isAfter(lastEndLimit)) cur = lastEndLimit;
+                                  DateTime cur = _parseDmyOrIsoDate(endCtrl.text) ?? (selectedStart ?? minAllowedStart ?? DateTime.now());
+                                  cur = _findFirstSelectableDate(cur, firstEndLimit, lastEndLimit);
 
                                   final picked = await showDatePicker(
                                     context: context,
                                     initialDate: cur,
                                     firstDate: firstEndLimit,
                                     lastDate: lastEndLimit,
+                                    selectableDayPredicate: _isDaySelectable,
                                     builder: (context, child) {
                                       return Theme(
                                         data: Theme.of(context).copyWith(
@@ -3930,7 +4037,7 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
                                   );
                                   if (picked != null) {
                                     setSheetState(() {
-                                      endCtrl.text = _formatDateIso(picked);
+                                      endCtrl.text = _formatDateDmy(picked);
                                     });
                                   }
                                 },
@@ -3939,7 +4046,7 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
                                     controller: endCtrl,
                                     style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
                                     decoration: InputDecoration(
-                                      hintText: 'YYYY-MM-DD',
+                                      hintText: 'DD-MM-YYYY',
                                       hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
                                       suffixIcon: const Icon(Icons.calendar_today_rounded, size: 16, color: Color(0xFFD97706)),
                                       filled: true,
@@ -4010,12 +4117,22 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
                                       }
                                     }
 
-                                    final sDate = startCtrl.text.trim();
-                                    final eDate = endCtrl.text.trim();
-                                    if (sDate.isEmpty || eDate.isEmpty) {
+                                    final sDateDmy = startCtrl.text.trim();
+                                    final eDateDmy = endCtrl.text.trim();
+                                    if (sDateDmy.isEmpty || eDateDmy.isEmpty) {
                                       setSheetState(() => localError = 'Please select both Start Date and End Date.');
                                       return;
                                     }
+
+                                    final sDateParsed = _parseDmyOrIsoDate(sDateDmy);
+                                    final eDateParsed = _parseDmyOrIsoDate(eDateDmy);
+                                    if (sDateParsed == null || eDateParsed == null) {
+                                      setSheetState(() => localError = 'Invalid date format. Expected DD-MM-YYYY.');
+                                      return;
+                                    }
+
+                                    final sDate = _formatDateIso(sDateParsed);
+                                    final eDate = _formatDateIso(eDateParsed);
 
                                     if (eDate.compareTo(sDate) < 0) {
                                       setSheetState(() => localError = 'End Date cannot be before Start Date.');
@@ -4024,13 +4141,13 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
 
                                     // Sibling date sequence checks (matching web exactly)
                                     if (minAllowedStart != null && sDate.compareTo(_formatDateIso(minAllowedStart)) < 0) {
-                                      final prevEnd = _formatDateIso(minAllowedStart.subtract(const Duration(days: 1)));
-                                      setSheetState(() => localError = 'Start Date cannot be before ${_formatDateIso(minAllowedStart)} because previous test/examination is scheduled until $prevEnd.');
+                                      final prevEnd = _formatDateDmy(minAllowedStart.subtract(const Duration(days: 1)));
+                                      setSheetState(() => localError = 'Start Date cannot be before ${_formatDateDmy(minAllowedStart)} because previous test/examination is scheduled until $prevEnd.');
                                       return;
                                     }
                                     if (maxAllowedEnd != null && eDate.compareTo(_formatDateIso(maxAllowedEnd)) > 0) {
-                                      final nextStart = _formatDateIso(maxAllowedEnd.add(const Duration(days: 1)));
-                                      setSheetState(() => localError = 'End Date cannot be after ${_formatDateIso(maxAllowedEnd)} because subsequent test/examination is scheduled to start on $nextStart.');
+                                      final nextStart = _formatDateDmy(maxAllowedEnd.add(const Duration(days: 1)));
+                                      setSheetState(() => localError = 'End Date cannot be after ${_formatDateDmy(maxAllowedEnd)} because subsequent test/examination is scheduled to start on $nextStart.');
                                       return;
                                     }
 
@@ -4295,12 +4412,12 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
         if (_selectedClassId == null)
           const Center(child: Text('Select a class above to open its workspace.'))
         else ...[
-          // Card 1: Exam Timetable
+          // Card 1: Create Scheme
           _buildWorkspaceCard(
             icon: Icons.calendar_month_rounded,
-            title: 'Exam Timetable',
+            title: 'Create Scheme',
             subtitle: 'Configure exam papers, schedule dates/times, max marks, and room assignments for $className.',
-            buttonLabel: 'Open Timetable',
+            buttonLabel: 'Create Scheme',
             onTap: _openTimetable,
           ),
           const SizedBox(height: 14),
@@ -4736,15 +4853,16 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
                               p['subject_id']?.toString() == sid?.toString() &&
                               (_editingPaper == null || _editingPaper!['subject_id']?.toString() != sid?.toString())
                             );
+                            final sName = (s['name'] ?? 'Subject').toString().toUpperCase();
                             return DropdownMenuItem<int>(
                               value: sid,
                               enabled: !isCreated,
                               child: Text(
-                                '${s['name'] ?? 'Subject'}${isCreated ? ' (Created)' : ''}',
-                                style: TextStyle(
+                                '$sName${isCreated ? ' (Created)' : ''}',
+                                style: const TextStyle(
                                   fontSize: 13,
-                                  fontWeight: isCreated ? FontWeight.normal : FontWeight.w600,
-                                  color: isCreated ? Colors.grey : const Color(0xFF0F172A),
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF0F172A),
                                 ),
                               ),
                             );
@@ -5093,7 +5211,7 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
                                 Row(
                                   children: [
                                     Text(
-                                      p['subject_name'] ?? 'Subject',
+                                      (p['subject_name'] ?? 'Subject').toString().toUpperCase(),
                                       style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Color(0xFF0F172A)),
                                     ),
                                     if (isGrade) ...[
@@ -5189,9 +5307,32 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
     }
     if (cleanInitials.isEmpty) cleanInitials = 'ST';
 
-    if (photo.toString().trim().isNotEmpty) {
-      final fullUrl = _resolveStudentPhotoUrl(photo.toString().trim());
-      return Container(
+    final hasPhoto = photo.toString().trim().isNotEmpty;
+    final fullUrl = hasPhoto ? _resolveStudentPhotoUrl(photo.toString().trim()) : '';
+
+    return GestureDetector(
+      onTap: () {
+        if (fullUrl.isNotEmpty) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => FullScreenImageScreen(
+                imageUrl: fullUrl,
+                title: name,
+              ),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('No profile photo uploaded for $name.'),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      },
+      child: Container(
         width: size,
         height: size,
         decoration: BoxDecoration(
@@ -5199,18 +5340,19 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
           border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
         ),
         child: ClipOval(
-          child: CachedNetworkImage(
-            imageUrl: fullUrl,
-            width: size,
-            height: size,
-            fit: BoxFit.cover,
-            placeholder: (_, __) => _avatarFallback(size, cleanInitials),
-            errorWidget: (_, __, ___) => _avatarFallback(size, cleanInitials),
-          ),
+          child: hasPhoto
+              ? CachedNetworkImage(
+                  imageUrl: fullUrl,
+                  width: size,
+                  height: size,
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) => _avatarFallback(size, cleanInitials),
+                  errorWidget: (_, __, ___) => _avatarFallback(size, cleanInitials),
+                )
+              : _avatarFallback(size, cleanInitials),
         ),
-      );
-    }
-    return _avatarFallback(size, cleanInitials);
+      ),
+    );
   }
 
   Widget _avatarFallback(double size, String initials) {
@@ -5882,19 +6024,7 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
         final studentName = (card['student_name'] ?? 'Student').toString();
         final rollNo = (card['roll_no']?.toString() ?? '').trim();
         final srNo = (card['admission_no']?.toString() ?? card['sr_no']?.toString() ?? '').trim();
-        final totalMarks = card['total_max'] != null 
-            ? '${_formatMarksNumber(card['total_obtained'])}/${_formatMarksNumber(card['total_max'])}' 
-            : '${card['total_marks'] ?? '-'}';
-        final percentage = card['percentage'] != null 
-            ? '${double.tryParse(card['percentage'].toString())?.toStringAsFixed(2) ?? card['percentage']}%' 
-            : '-';
-        final grade = (card['grade']?.toString() ?? '-').trim();
         final rank = (card['class_rank']?.toString() ?? '1').split(' ')[0].replaceAll('#', '');
-
-        final rollSrStr = [
-          if (rollNo.isNotEmpty && rollNo != '-') 'Roll: $rollNo',
-          if (srNo.isNotEmpty && srNo != '-') 'SR: $srNo',
-        ].join(' • ');
 
         return Container(
           padding: const EdgeInsets.all(12),
@@ -5913,18 +6043,20 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // 1. LEFT: STUDENT PROFILE AVATAR
-              _buildMarksStudentAvatar(card, size: 44),
-              const SizedBox(width: 10),
+              // 1. LEFT: STUDENT PROFILE AVATAR (Consistent size with marks entry: 68)
+              _buildMarksStudentAvatar(card, size: 68),
+              const SizedBox(width: 12),
 
-              // 2. CENTER: NAME, RANK, ROLL/SR, SCORE, PCT, GRADE
+              // 2. CENTER: NAME + RANK BADGE (3px gap), ROLL NO & SR NO BADGES
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Expanded(
+                        Flexible(
                           child: Text(
                             studentName,
                             style: const TextStyle(
@@ -5936,7 +6068,7 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 3),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
@@ -5955,33 +6087,49 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
                         ),
                       ],
                     ),
-                    if (rollSrStr.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        rollSrStr,
-                        style: const TextStyle(
-                          fontSize: 10.5,
-                          color: Color(0xFF64748B),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 6),
-                    // Score, Percentage, Grade Chips Row (Single line with FittedBox to prevent wrap)
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+                    if ((rollNo.isNotEmpty && rollNo != '-') || (srNo.isNotEmpty && srNo != '-')) ...[
+                      const SizedBox(height: 6),
+                      Row(
                         children: [
-                          _buildReportCardMetricChip(label: 'Score', value: totalMarks, color: const Color(0xFF0F172A)),
-                          const SizedBox(width: 4),
-                          _buildReportCardMetricChip(label: 'Pct', value: percentage, color: const Color(0xFF2563EB)),
-                          const SizedBox(width: 4),
-                          _buildReportCardMetricChip(label: 'Grade', value: grade, color: const Color(0xFF16A34A)),
+                          if (rollNo.isNotEmpty && rollNo != '-')
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: Text(
+                                'Roll No: $rollNo',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF475569),
+                                ),
+                              ),
+                            ),
+                          if (rollNo.isNotEmpty && rollNo != '-' && srNo.isNotEmpty && srNo != '-')
+                            const SizedBox(width: 6),
+                          if (srNo.isNotEmpty && srNo != '-')
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: Text(
+                                'SR No: $srNo',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF475569),
+                                ),
+                              ),
+                            ),
                         ],
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -5992,16 +6140,16 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFD97706),
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   elevation: 0,
-                  minimumSize: const Size(0, 32),
+                  minimumSize: const Size(0, 34),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
-                icon: const Icon(Icons.visibility_rounded, size: 13, color: Colors.white),
+                icon: const Icon(Icons.visibility_rounded, size: 14, color: Colors.white),
                 label: const Text(
                   'View',
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11, letterSpacing: 0.2),
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11.5, letterSpacing: 0.2),
                 ),
                 onPressed: () => _showReportCardViewer(card),
               ),
@@ -6451,25 +6599,6 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
     );
   }
 
-  Widget _buildReportCardMetricChip({required String label, required String value, required Color color}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: RichText(
-        text: TextSpan(
-          style: const TextStyle(fontSize: 9.5),
-          children: [
-            TextSpan(text: '$label: ', style: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
-            TextSpan(text: value, style: TextStyle(color: color, fontWeight: FontWeight.w800)),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 

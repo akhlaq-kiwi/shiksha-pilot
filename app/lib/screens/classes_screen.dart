@@ -2948,146 +2948,152 @@ class _StudentDetailsScreenState extends State<_StudentDetailsScreen> {
                   const SizedBox(height: 16),
 
                   // Documents Collapsible
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        InkWell(
-                          onTap: () => setState(() => _docsExpanded = !_docsExpanded),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            InkWell(
+                              borderRadius: BorderRadius.circular(16),
+                              onTap: () => setState(() => _docsExpanded = !_docsExpanded),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    const Icon(Icons.folder_open_rounded, size: 18, color: Color(0xFFD97706)),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'DOCUMENTS (${documents.length})',
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing: 0.5,
-                                        color: Color(0xFF475569),
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.folder_open_rounded, size: 18, color: Color(0xFFD97706)),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'DOCUMENTS (${documents.length})',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 0.5,
+                                            color: Color(0xFF475569),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    AnimatedRotation(
+                                      turns: _docsExpanded ? 0.5 : 0.0,
+                                      duration: const Duration(milliseconds: 200),
+                                      child: const Icon(
+                                        Icons.keyboard_arrow_down_rounded,
+                                        color: Color(0xFF64748B),
                                       ),
                                     ),
                                   ],
                                 ),
-                                AnimatedRotation(
-                                  turns: _docsExpanded ? 0.5 : 0.0,
-                                  duration: const Duration(milliseconds: 200),
-                                  child: const Icon(
-                                    Icons.keyboard_arrow_down_rounded,
-                                    color: Color(0xFF64748B),
-                                  ),
-                                ),
-                              ],
+                              ),
                             ),
-                          ),
-                        ),
-                        AnimatedCrossFade(
-                          firstChild: const SizedBox(width: double.infinity, height: 0),
-                          secondChild: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Divider(height: 1, color: Color(0xFFE2E8F0)),
-                              if (documents.isEmpty)
-                                const Padding(
-                                  padding: EdgeInsets.all(16),
-                                  child: Text(
-                                    'No joining documents uploaded for this student.',
-                                    style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                                  ),
-                                )
-                              else
-                                ListView.separated(
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  padding: const EdgeInsets.all(12),
-                                  itemCount: documents.length,
-                                  separatorBuilder: (_, __) => const SizedBox(height: 8),
-                                  itemBuilder: (context, idx) {
-                                    final doc = documents[idx];
-                                    final rawPath = doc['file_path'] ?? doc['path'] ?? '';
-                                    final cat = doc['category'] ?? doc['file_name'] ?? 'Document';
-                                    return Container(
-                                      padding: const EdgeInsets.all(10),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFF8FAFC),
-                                        borderRadius: BorderRadius.circular(10),
-                                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                            AnimatedCrossFade(
+                              firstChild: const SizedBox(width: double.infinity, height: 0),
+                              secondChild: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                                  if (documents.isEmpty)
+                                    const Padding(
+                                      padding: EdgeInsets.all(16),
+                                      child: Text(
+                                        'No joining documents uploaded for this student.',
+                                        style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                                       ),
-                                      child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  cat.toString().toUpperCase(),
-                                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF1E293B)),
-                                                ),
-                                                Text(
-                                                  doc['file_name']?.toString() ?? '',
-                                                  style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                              ],
-                                            ),
+                                    )
+                                  else
+                                    ListView.separated(
+                                      shrinkWrap: true,
+                                      physics: const NeverScrollableScrollPhysics(),
+                                      padding: const EdgeInsets.all(12),
+                                      itemCount: documents.length,
+                                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                                      itemBuilder: (context, idx) {
+                                        final doc = documents[idx];
+                                        final rawPath = doc['file_path'] ?? doc['path'] ?? '';
+                                        final cat = doc['category'] ?? doc['file_name'] ?? 'Document';
+                                        return Container(
+                                          padding: const EdgeInsets.all(10),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFF8FAFC),
+                                            borderRadius: BorderRadius.circular(10),
+                                            border: Border.all(color: const Color(0xFFE2E8F0)),
                                           ),
-                                          if (rawPath.toString().isNotEmpty)
-                                            TextButton.icon(
-                                              onPressed: () {
-                                                final galleryList = documents.map((docItem) {
-                                                  final itemMap = docItem;
-                                                  final itemRaw = (itemMap['file_path'] ?? itemMap['path'] ?? '').toString();
-                                                  final catName = (itemMap['category'] ?? itemMap['file_name'] ?? 'Document').toString();
-                                                  final fileName = (itemMap['file_name'] != null && itemMap['file_name'].toString().isNotEmpty)
-                                                      ? itemMap['file_name'].toString()
-                                                      : catName;
-                                                  final isPdf = fileName.toLowerCase().endsWith('.pdf') || itemRaw.toLowerCase().endsWith('.pdf');
-                                                  return {
-                                                    'file_path': itemRaw,
-                                                    'file_name': fileName,
-                                                    'category': catName,
-                                                    'file_type': isPdf ? 'pdf' : 'image',
-                                                  };
-                                                }).toList();
-
-                                                Navigator.push(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                    builder: (context) => AttachmentGalleryScreen(
-                                                      attachments: galleryList,
-                                                      initialIndex: idx,
-                                                      baseUrl: widget.classService.baseUrl,
+                                          child: Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      cat.toString().toUpperCase(),
+                                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF1E293B)),
                                                     ),
-                                                  ),
-                                                );
-                                              },
-                                              icon: const Icon(Icons.visibility_outlined, size: 14),
-                                              label: const Text('View', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                                            ),
-                                        ],
-                                      ),
-                                    );
-                                  },
-                                ),
-                            ],
-                          ),
-                          crossFadeState: _docsExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-                          duration: const Duration(milliseconds: 200),
+                                                    Text(
+                                                      doc['file_name']?.toString() ?? '',
+                                                      style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              if (rawPath.toString().isNotEmpty)
+                                                TextButton.icon(
+                                                  onPressed: () {
+                                                    final galleryList = documents.map((docItem) {
+                                                      final itemMap = docItem;
+                                                      final itemRaw = (itemMap['file_path'] ?? itemMap['path'] ?? '').toString();
+                                                      final catName = (itemMap['category'] ?? itemMap['file_name'] ?? 'Document').toString();
+                                                      final fileName = (itemMap['file_name'] != null && itemMap['file_name'].toString().isNotEmpty)
+                                                          ? itemMap['file_name'].toString()
+                                                          : catName;
+                                                      final isPdf = fileName.toLowerCase().endsWith('.pdf') || itemRaw.toLowerCase().endsWith('.pdf');
+                                                      return {
+                                                        'file_path': itemRaw,
+                                                        'file_name': fileName,
+                                                        'category': catName,
+                                                        'file_type': isPdf ? 'pdf' : 'image',
+                                                      };
+                                                    }).toList();
+
+                                                    Navigator.push(
+                                                      context,
+                                                      MaterialPageRoute(
+                                                        builder: (context) => AttachmentGalleryScreen(
+                                                          attachments: galleryList,
+                                                          initialIndex: idx,
+                                                          baseUrl: widget.classService.baseUrl,
+                                                        ),
+                                                      ),
+                                                    );
+                                                  },
+                                                  icon: const Icon(Icons.visibility_outlined, size: 14),
+                                                  label: const Text('View', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                                                ),
+                                            ],
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                ],
+                              ),
+                              crossFadeState: _docsExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+                              duration: const Duration(milliseconds: 200),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   ),
                 ],

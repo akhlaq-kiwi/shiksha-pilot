@@ -556,100 +556,122 @@ class _PrincipalSeatingPlanScreenState extends State<PrincipalSeatingPlanScreen>
   }
 
   void _showPublishAdmitDialog() {
+    bool isPublishing = false;
     showDialog(
       context: context,
       barrierDismissible: true,
-      builder: (ctx) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        backgroundColor: Colors.white,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-        child: Padding(
-          padding: const EdgeInsets.all(22),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFDCFCE7),
-                      borderRadius: BorderRadius.circular(10),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          backgroundColor: Colors.white,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Padding(
+            padding: const EdgeInsets.all(22),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDCFCE7),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.check_circle_outline_rounded,
+                        color: Color(0xFF16A34A),
+                        size: 24,
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.check_circle_outline_rounded,
-                      color: Color(0xFF16A34A),
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text(
-                        'Publish Admit Cards',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w900,
-                          color: Color(0xFF0F172A),
-                          letterSpacing: 0.2,
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          'Publish Admit Cards',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF0F172A),
+                            letterSpacing: 0.2,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              const Text(
-                'You are about to publish the admit cards. Once published, students will be able to access the admit cards in the mobile application.',
-                style: TextStyle(fontSize: 12.5, color: Color(0xFF475569), height: 1.45),
-              ),
-              const SizedBox(height: 16),
-              const Divider(color: Color(0xFFE2E8F0), height: 1),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  Expanded(
-                    child: SizedBox(
-                      height: 44,
-                      child: OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Color(0xFFCBD5E1)),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          foregroundColor: const Color(0xFF475569),
-                        ),
-                        onPressed: () => Navigator.pop(ctx),
-                        child: const Text('Cancel', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: SizedBox(
-                      height: 44,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF16A34A),
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          _confirmPublishAdmitCards();
-                        },
-                        child: const Text(
-                          'Publish',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 0.3),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  'You are about to publish the admit cards. Once published, students will be able to access the admit cards in the mobile application.',
+                  style: TextStyle(fontSize: 12.5, color: Color(0xFF475569), height: 1.45),
+                ),
+                const SizedBox(height: 16),
+                const Divider(color: Color(0xFFE2E8F0), height: 1),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 44,
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFFCBD5E1)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            foregroundColor: const Color(0xFF475569),
+                          ),
+                          onPressed: isPublishing ? null : () => Navigator.pop(ctx),
+                          child: const Text('Cancel', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
                         ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: SizedBox(
+                        height: 44,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF16A34A),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onPressed: isPublishing
+                              ? null
+                              : () async {
+                                  setDialogState(() => isPublishing = true);
+                                  await _confirmPublishAdmitCards();
+                                  if (ctx.mounted) Navigator.pop(ctx);
+                                },
+                          child: isPublishing
+                              ? const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Publishing',
+                                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 0.3),
+                                    ),
+                                  ],
+                                )
+                              : const Text(
+                                  'Publish',
+                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 0.3),
+                                ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -676,100 +698,122 @@ class _PrincipalSeatingPlanScreenState extends State<PrincipalSeatingPlanScreen>
   }
 
   void _showUnpublishAdmitDialog() {
+    bool isReverting = false;
     showDialog(
       context: context,
       barrierDismissible: true,
-      builder: (ctx) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        backgroundColor: Colors.white,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-        child: Padding(
-          padding: const EdgeInsets.all(22),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFEF3C7),
-                      borderRadius: BorderRadius.circular(10),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          backgroundColor: Colors.white,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Padding(
+            padding: const EdgeInsets.all(22),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.undo_rounded,
+                        color: Color(0xFFD97706),
+                        size: 24,
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.undo_rounded,
-                      color: Color(0xFFD97706),
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text(
-                        'Revert Admit Cards to Draft',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w900,
-                          color: Color(0xFF0F172A),
-                          letterSpacing: 0.2,
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          'Revert Admit Cards to Draft',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF0F172A),
+                            letterSpacing: 0.2,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              const Text(
-                'Are you sure you want to revert the admit cards to Draft? Once reverted, they will disappear from the mobile application, and students/parents will receive a notification alert.',
-                style: TextStyle(fontSize: 12.5, color: Color(0xFF475569), height: 1.45),
-              ),
-              const SizedBox(height: 16),
-              const Divider(color: Color(0xFFE2E8F0), height: 1),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  Expanded(
-                    child: SizedBox(
-                      height: 44,
-                      child: OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Color(0xFFCBD5E1)),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          foregroundColor: const Color(0xFF475569),
-                        ),
-                        onPressed: () => Navigator.pop(ctx),
-                        child: const Text('Cancel', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: SizedBox(
-                      height: 44,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFD97706),
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          _confirmUnpublishAdmitCards();
-                        },
-                        child: const Text(
-                          'Confirm Revert',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 0.3),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  'Are you sure you want to revert the admit cards to Draft? Once reverted, they will disappear from the mobile application, and students/parents will receive a notification alert.',
+                  style: TextStyle(fontSize: 12.5, color: Color(0xFF475569), height: 1.45),
+                ),
+                const SizedBox(height: 16),
+                const Divider(color: Color(0xFFE2E8F0), height: 1),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 44,
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFFCBD5E1)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            foregroundColor: const Color(0xFF475569),
+                          ),
+                          onPressed: isReverting ? null : () => Navigator.pop(ctx),
+                          child: const Text('Cancel', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
                         ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: SizedBox(
+                        height: 44,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFD97706),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onPressed: isReverting
+                              ? null
+                              : () async {
+                                  setDialogState(() => isReverting = true);
+                                  await _confirmUnpublishAdmitCards();
+                                  if (ctx.mounted) Navigator.pop(ctx);
+                                },
+                          child: isReverting
+                              ? const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Reverting',
+                                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 0.3),
+                                    ),
+                                  ],
+                                )
+                              : const Text(
+                                  'Confirm Revert',
+                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 0.3),
+                                ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -990,10 +1034,17 @@ class _PrincipalSeatingPlanScreenState extends State<PrincipalSeatingPlanScreen>
 
           // 3. Footer Bar: Official Admit Card
           pw.Container(
+            height: 0.8,
+            color: PdfColors.grey400,
+          ),
+          pw.Container(
             padding: const pw.EdgeInsets.symmetric(vertical: 2.5),
             decoration: const pw.BoxDecoration(
               color: PdfColors.grey100,
-              border: pw.Border(top: pw.BorderSide(color: PdfColors.grey400, width: 0.8)),
+              borderRadius: pw.BorderRadius.only(
+                bottomLeft: pw.Radius.circular(6.2),
+                bottomRight: pw.Radius.circular(6.2),
+              ),
             ),
             child: pw.Center(
               child: pw.Text(
@@ -1912,8 +1963,17 @@ class _PrincipalSeatingPlanScreenState extends State<PrincipalSeatingPlanScreen>
                     child: _allAdmitCardsPublished
                         ? OutlinedButton.icon(
                             onPressed: _submittingUnpublishAdmit ? null : _showUnpublishAdmitDialog,
-                            icon: const Icon(Icons.undo_rounded, size: 16, color: Color(0xFFE11D48)),
-                            label: const Text('Revert to Draft', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                            icon: _submittingUnpublishAdmit
+                                ? const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFE11D48)),
+                                  )
+                                : const Icon(Icons.undo_rounded, size: 16, color: Color(0xFFE11D48)),
+                            label: Text(
+                              _submittingUnpublishAdmit ? 'Reverting' : 'Revert to Draft',
+                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+                            ),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: const Color(0xFFE11D48),
                               side: const BorderSide(color: Color(0xFFFECDD3)),
@@ -1923,8 +1983,17 @@ class _PrincipalSeatingPlanScreenState extends State<PrincipalSeatingPlanScreen>
                           )
                         : OutlinedButton.icon(
                             onPressed: _submittingPublishAdmit ? null : _showPublishAdmitDialog,
-                            icon: const Icon(Icons.check_circle_outline_rounded, size: 16, color: Color(0xFF16A34A)),
-                            label: const Text('Publish Cards', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                            icon: _submittingPublishAdmit
+                                ? const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF16A34A)),
+                                  )
+                                : const Icon(Icons.check_circle_outline_rounded, size: 16, color: Color(0xFF16A34A)),
+                            label: Text(
+                              _submittingPublishAdmit ? 'Publishing' : 'Publish Cards',
+                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+                            ),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: const Color(0xFF16A34A),
                               side: const BorderSide(color: Color(0xFFBBF7D0)),
