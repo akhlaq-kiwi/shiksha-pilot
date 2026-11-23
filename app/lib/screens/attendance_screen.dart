@@ -97,41 +97,53 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     _offlineRetryTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
       // 1. Sync pending offline submissions whenever possible
       try {
-        final synced = await AttendanceOfflineManager.syncPendingSubmissions(widget.attendanceService);
-        if (synced.isNotEmpty && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.cloud_done_rounded, color: Colors.white, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Synced offline attendance for ${synced.join(", ")} to database successfully!',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+        final pendingCount = await AttendanceOfflineManager.getPendingQueueCount();
+        if (pendingCount > 0) {
+          final synced = await AttendanceOfflineManager.syncPendingSubmissions(widget.attendanceService);
+          if (synced.isNotEmpty && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    const Icon(Icons.cloud_done_rounded, color: Colors.white, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Synced offline attendance for ${synced.join(", ")} to database successfully!',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
+                behavior: SnackBarBehavior.floating,
+                backgroundColor: Colors.green.shade700,
+                duration: const Duration(seconds: 3),
               ),
-              behavior: SnackBarBehavior.floating,
-              backgroundColor: Colors.green.shade700,
-              duration: const Duration(seconds: 3),
-            ),
-          );
-          _fetchTeacherAttendanceForDate();
+            );
+            _fetchTeacherAttendanceForDate(forceReload: true);
+          }
         }
       } catch (_) {}
 
-      // 2. Retry connection if offline
+      // 2. Lightweight connection check when offline - DO NOT touch _tempAttendance or call _fetchTeacherAttendanceForDate!
       if (_isOffline) {
-        if (isTeacherRole) {
-          if (_classes.isEmpty) {
-            _loadTeacherData();
-          } else {
-            _fetchTeacherAttendanceForDate();
+        try {
+          final uri = Uri.parse('${widget.attendanceService.baseUrl}/api/school/holidays');
+          final res = await http.get(uri, headers: {
+            'Authorization': 'Bearer ${widget.attendanceService.token}',
+          }).timeout(const Duration(seconds: 3));
+
+          if (res.statusCode == 200 && mounted) {
+            setState(() {
+              _isOffline = false;
+            });
+            if (_classes.isEmpty) {
+              _loadTeacherData();
+            }
           }
-        } else {
-          _loadStudentData();
+        } catch (_) {
+          // Still offline. Silently wait. Absolutely DO NOT call _fetchTeacherAttendanceForDate()
+          // or touch _tempAttendance while the user is actively marking attendance!
         }
       }
     });
@@ -390,10 +402,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       }
     }
 
-    await _fetchTeacherAttendanceForDate();
+    await _fetchTeacherAttendanceForDate(forceReload: true);
   }
 
-  Future<void> _fetchTeacherAttendanceForDate() async {
+  Future<void> _fetchTeacherAttendanceForDate({bool forceReload = false}) async {
     if (_selectedClassId == null || _teacherSelectedDate == null) return;
     final dateStr = _formatYmd(_teacherSelectedDate!);
 
@@ -425,11 +437,18 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           final markedCount = history.length;
           _isSubmittedForSelectedDate = totalStudentsCount > 0 && markedCount >= totalStudentsCount;
 
-          _tempAttendance.clear();
-          for (var record in history) {
-            final sId = int.tryParse(record['student_id']?.toString() ?? '') ?? 0;
-            final status = (record['status'] ?? 'Present').toString();
-            if (sId > 0) _tempAttendance[sId] = status;
+          // Only populate _tempAttendance if:
+          // 1) forceReload is true, OR
+          // 2) attendance for this date is already submitted, OR
+          // 3) user has not made any selections yet (_tempAttendance.isEmpty).
+          // NEVER wipe out the user's active, in-progress selections while they are taking attendance!
+          if (forceReload || _isSubmittedForSelectedDate || _tempAttendance.isEmpty) {
+            _tempAttendance.clear();
+            for (var record in history) {
+              final sId = int.tryParse(record['student_id']?.toString() ?? '') ?? 0;
+              final status = (record['status'] ?? 'Present').toString();
+              if (sId > 0) _tempAttendance[sId] = status;
+            }
           }
           _isLoadingAttendanceForDate = false;
         });
@@ -1416,6 +1435,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                                           matched['name']?.toString(),
                                           section: matched['section']?.toString(),
                                         );
+                                        _tempAttendance.clear();
                                       });
                                       _fetchTeacherStudentsAndHistory();
                                     }
@@ -1461,8 +1481,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 _teacherCurrentPageIndex = idx;
                 _teacherSelectedDate = _teacherAcademicYearStart.add(Duration(days: idx));
                 _isLoadingAttendanceForDate = true;
+                _tempAttendance.clear();
               });
-              _fetchTeacherAttendanceForDate();
+              _fetchTeacherAttendanceForDate(forceReload: true);
             },
             itemBuilder: (context, index) {
               final date = _teacherAcademicYearStart.add(Duration(days: index));
