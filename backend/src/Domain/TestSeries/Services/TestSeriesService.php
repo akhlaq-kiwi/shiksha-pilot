@@ -230,8 +230,10 @@ class TestSeriesService extends BaseService
         }
 
         $schoolId = (int)($user['school_id'] ?? 0);
-        $stmt = $this->pdo->prepare("
-            SELECT s.id AS staff_id, s.name, s.phone, s.department, s.role, s.is_principal, s.photo_path,
+        $activeAyId = $this->getActiveAcademicYearId($schoolId);
+
+        $sql = "
+            SELECT s.id AS staff_id, s.academic_year_id, s.name, s.phone, s.department, s.role, s.is_principal, s.photo_path,
                    COALESCE(tsp.can_create, 0) AS can_create
             FROM staff s
             LEFT JOIN test_series_permissions tsp
@@ -239,28 +241,54 @@ class TestSeriesService extends BaseService
             WHERE s.school_id = :sid
               AND (s.status IS NULL OR s.status = '' OR UPPER(s.status) = 'ACTIVE')
               AND s.exit_date IS NULL
-            ORDER BY s.name ASC, s.id ASC
-        ");
-        $stmt->execute([':sid' => $schoolId]);
+            ORDER BY " . ($activeAyId !== null ? "CASE WHEN s.academic_year_id = :ayid THEN 0 ELSE 1 END ASC, " : "") . "s.name ASC, s.id DESC
+        ";
+        $params = [':sid' => $schoolId];
+        if ($activeAyId !== null) {
+            $params[':ayid'] = $activeAyId;
+        }
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-        $teachers = [];
+        $teachersByKey = [];
         foreach ($rows as $r) {
             $isRowPrincipal = ((int)($r['is_principal'] ?? 0) === 1) || strtoupper((string)($r['role'] ?? '')) === 'PRINCIPAL';
             if ($isRowPrincipal) {
                 // Principal already has full creator access by default; exclude from delegation list
                 continue;
             }
-            $teachers[] = [
+
+            $phone = trim((string)($r['phone'] ?? ''));
+            $phone10 = substr(preg_replace('/[^0-9]/', '', $phone) ?? '', -10);
+            $key = (strlen($phone10) === 10) ? 'p_' . $phone10 : 'n_' . strtolower(trim((string)($r['name'] ?? '')));
+
+            $canCreate = ((int)($r['can_create'] ?? 0) === 1);
+
+            if (isset($teachersByKey[$key])) {
+                // Merge permissions: if any linked staff row for this teacher has can_create, mark true
+                if ($canCreate) {
+                    $teachersByKey[$key]['can_create'] = true;
+                }
+                continue;
+            }
+
+            $teachersByKey[$key] = [
                 'staff_id' => (int)$r['staff_id'],
                 'name' => (string)($r['name'] ?? 'Teacher'),
-                'phone' => (string)($r['phone'] ?? ''),
+                'phone' => $phone,
                 'designation' => (string)($r['department'] ?? ''),
                 'photo_path' => $r['photo_path'] ?? null,
                 'is_principal' => false,
-                'can_create' => ((int)($r['can_create'] ?? 0) === 1),
+                'can_create' => $canCreate,
             ];
         }
+
+        $teachers = array_values($teachersByKey);
+        usort($teachers, function ($a, $b) {
+            return strcasecmp($a['name'], $b['name']);
+        });
 
         return [
             'teachers' => $teachers,
@@ -302,6 +330,8 @@ class TestSeriesService extends BaseService
 
         $phone = trim((string)($staff['phone'] ?? ''));
         $targetUserId = null;
+        $allStaffIds = [$staffId];
+
         if ($phone !== '') {
             $phone10 = substr(preg_replace('/[^0-9]/', '', $phone) ?? '', -10);
             $stmtUser = $this->pdo->prepare("
@@ -318,6 +348,17 @@ class TestSeriesService extends BaseService
             if ($uidVal !== false) {
                 $targetUserId = (int)$uidVal;
             }
+
+            // Sync permission across all matching staff records for this teacher in this school
+            $stmtAllStaff = $this->pdo->prepare("
+                SELECT id FROM staff
+                WHERE school_id = :sid AND (phone = :p" . (strlen($phone10) === 10 ? " OR RIGHT(phone, 10) = :p10" : "") . ")
+            ");
+            $stmtAllStaff->execute($uParams);
+            $allFetched = $stmtAllStaff->fetchAll(PDO::FETCH_COLUMN) ?: [];
+            if (!empty($allFetched)) {
+                $allStaffIds = array_unique(array_map('intval', $allFetched));
+            }
         }
 
         $stmtUpsert = $this->pdo->prepare("
@@ -328,13 +369,16 @@ class TestSeriesService extends BaseService
                 user_id = COALESCE(VALUES(user_id), user_id),
                 granted_by_user_id = VALUES(granted_by_user_id)
         ");
-        $stmtUpsert->execute([
-            ':sid' => $schoolId,
-            ':stid' => $staffId,
-            ':uid' => $targetUserId,
-            ':can_create' => $canCreate ? 1 : 0,
-            ':granter' => $granterUserId,
-        ]);
+
+        foreach ($allStaffIds as $stId) {
+            $stmtUpsert->execute([
+                ':sid' => $schoolId,
+                ':stid' => $stId,
+                ':uid' => $targetUserId,
+                ':can_create' => $canCreate ? 1 : 0,
+                ':granter' => $granterUserId,
+            ]);
+        }
 
         return [
             'staff_id' => $staffId,

@@ -69,16 +69,22 @@ export const schoolService = {
     return apiClient.post(`/api/school/staff/${teacherId}/request-principal-otp`, { action });
   },
 
-  assignPrincipalRole(teacherId, otpCode, action = 'assign') {
-    return apiClient.post(`/api/school/staff/${teacherId}/assign-principal`, { otp_code: otpCode, action });
+  assignPrincipalRole(teacherId, otpCode = null, action = 'assign') {
+    return apiClient.post(`/api/school/staff/${teacherId}/assign-principal`, {
+      action,
+      ...(otpCode ? { otp_code: otpCode } : {})
+    });
   },
 
   requestFeeCollectorOtp(teacherId, action = 'assign') {
     return apiClient.post(`/api/school/staff/${teacherId}/request-fee-collector-otp`, { action });
   },
 
-  assignFeeCollectorRole(teacherId, otpCode, action = 'assign') {
-    return apiClient.post(`/api/school/staff/${teacherId}/assign-fee-collector`, { otp_code: otpCode, action });
+  assignFeeCollectorRole(teacherId, otpCode = null, action = 'assign') {
+    return apiClient.post(`/api/school/staff/${teacherId}/assign-fee-collector`, {
+      action,
+      ...(otpCode ? { otp_code: otpCode } : {})
+    });
   },
 
   getAvailableStaff() {

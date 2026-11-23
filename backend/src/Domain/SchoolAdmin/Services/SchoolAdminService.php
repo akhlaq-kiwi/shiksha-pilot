@@ -3372,6 +3372,12 @@ class SchoolAdminService extends BaseService
         if (!empty($data['permanent_address_line']) && mb_strlen(trim((string)$data['permanent_address_line'])) > 50) {
             throw new ValidationException(['permanent_address_line' => 'Address cannot exceed 50 characters.']);
         }
+        if (!empty($data['department'])) {
+            $deptWords = preg_split('/\s+/', trim((string)$data['department']), -1, PREG_SPLIT_NO_EMPTY);
+            if (count($deptWords) > 2) {
+                throw new ValidationException(['department' => 'Subject cannot exceed 2 words.']);
+            }
+        }
 
         $workingYear = $this->getWorkingAcademicYear($pdo, $schoolId);
         $ayid = $workingYear ? (int)$workingYear['id'] : null;
@@ -3526,6 +3532,12 @@ class SchoolAdminService extends BaseService
         }
         if (!empty($data['permanent_address_line']) && mb_strlen(trim((string)$data['permanent_address_line'])) > 50) {
             throw new ValidationException(['permanent_address_line' => 'Address cannot exceed 50 characters.']);
+        }
+        if (!empty($data['department'])) {
+            $deptWords = preg_split('/\s+/', trim((string)$data['department']), -1, PREG_SPLIT_NO_EMPTY);
+            if (count($deptWords) > 2) {
+                throw new ValidationException(['department' => 'Subject cannot exceed 2 words.']);
+            }
         }
 
         $ayid = $member ? $member['academic_year_id'] : null;
@@ -23407,14 +23419,10 @@ Only approve the settlement after reviewing all financial records.
         ];
     }
 
-    public function assignPrincipalRole(array $user, int $teacherId, ?string $otpCode, string $action = 'assign'): array
+    public function assignPrincipalRole(array $user, int $teacherId, ?string $otpCode = null, string $action = 'assign'): array
     {
         $pdo = $this->staffRepo->getPdo();
         $schoolId = $this->getSchoolId($user);
-
-        if (empty($otpCode)) {
-            throw new ValidationException(['otp' => 'OTP verification is required.']);
-        }
 
         // Fetch staff teacher
         $stmtTeacher = $pdo->prepare("SELECT id, name, phone, role FROM staff WHERE id = :id AND school_id = :sid LIMIT 1");
@@ -23423,43 +23431,6 @@ Only approve the settlement after reviewing all financial records.
         if (!$teacher) {
             throw new NotFoundException('Teacher member not found.');
         }
-
-        // Fetch active OTP
-        $stmt = $pdo->prepare("
-            SELECT * FROM principal_assign_otps
-            WHERE school_id = :sid AND teacher_id = :tid AND is_used = 0
-            ORDER BY id DESC LIMIT 1
-        ");
-        $stmt->execute([':sid' => $schoolId, ':tid' => $teacherId]);
-        $otpRow = $stmt->fetch(\PDO::FETCH_ASSOC);
-
-        if (!$otpRow) {
-            throw new ValidationException(['otp' => 'No active OTP request found. Please click Send OTP again.']);
-        }
-
-        if (strtotime($otpRow['expires_at']) < time()) {
-            $pdo->prepare("UPDATE principal_assign_otps SET is_used = 1 WHERE id = :id")->execute([':id' => $otpRow['id']]);
-            throw new ValidationException(['otp' => 'OTP code has expired. Please request a new OTP.']);
-        }
-
-        if ((int)$otpRow['attempts'] >= 3) {
-            $pdo->prepare("UPDATE principal_assign_otps SET is_used = 1 WHERE id = :id")->execute([':id' => $otpRow['id']]);
-            throw new ValidationException(['otp' => 'Maximum invalid attempts reached. Please request a new OTP.']);
-        }
-
-        if (trim((string)$otpCode) !== trim((string)$otpRow['otp_code'])) {
-            $newAttempts = (int)$otpRow['attempts'] + 1;
-            if ($newAttempts >= 3) {
-                $pdo->prepare("UPDATE principal_assign_otps SET attempts = :att, is_used = 1 WHERE id = :id")->execute([':att' => $newAttempts, ':id' => $otpRow['id']]);
-                throw new ValidationException(['otp' => 'Maximum invalid attempts reached. Please request a new OTP.']);
-            } else {
-                $pdo->prepare("UPDATE principal_assign_otps SET attempts = :att WHERE id = :id")->execute([':att' => $newAttempts, ':id' => $otpRow['id']]);
-                throw new ValidationException(['otp' => 'Invalid OTP code. Please try again.']);
-            }
-        }
-
-        // OTP Verified -> Mark as used
-        $pdo->prepare("UPDATE principal_assign_otps SET is_used = 1 WHERE id = :id")->execute([':id' => $otpRow['id']]);
 
         // Update is_principal column support in staff table
         try {
@@ -23754,14 +23725,10 @@ Only approve the settlement after reviewing all financial records.
         ];
     }
 
-    public function assignFeeCollectorRole(array $user, int $teacherId, ?string $otpCode, string $action = 'assign'): array
+    public function assignFeeCollectorRole(array $user, int $teacherId, ?string $otpCode = null, string $action = 'assign'): array
     {
         $pdo = $this->staffRepo->getPdo();
         $schoolId = $this->getSchoolId($user);
-
-        if (empty($otpCode)) {
-            throw new ValidationException(['otp' => 'OTP verification is required.']);
-        }
 
         // Fetch staff teacher
         $stmtTeacher = $pdo->prepare("SELECT id, name, phone, role FROM staff WHERE id = :id AND school_id = :sid LIMIT 1");
@@ -23770,43 +23737,6 @@ Only approve the settlement after reviewing all financial records.
         if (!$teacher) {
             throw new NotFoundException('Teacher member not found.');
         }
-
-        // Fetch active OTP
-        $stmt = $pdo->prepare("
-            SELECT * FROM fee_collector_assign_otps
-            WHERE school_id = :sid AND teacher_id = :tid AND is_used = 0
-            ORDER BY id DESC LIMIT 1
-        ");
-        $stmt->execute([':sid' => $schoolId, ':tid' => $teacherId]);
-        $otpRow = $stmt->fetch(\PDO::FETCH_ASSOC);
-
-        if (!$otpRow) {
-            throw new ValidationException(['otp' => 'No active OTP request found. Please click Send OTP again.']);
-        }
-
-        if (strtotime($otpRow['expires_at']) < time()) {
-            $pdo->prepare("UPDATE fee_collector_assign_otps SET is_used = 1 WHERE id = :id")->execute([':id' => $otpRow['id']]);
-            throw new ValidationException(['otp' => 'OTP code has expired. Please request a new OTP.']);
-        }
-
-        if ((int)$otpRow['attempts'] >= 3) {
-            $pdo->prepare("UPDATE fee_collector_assign_otps SET is_used = 1 WHERE id = :id")->execute([':id' => $otpRow['id']]);
-            throw new ValidationException(['otp' => 'Maximum invalid attempts reached. Please request a new OTP.']);
-        }
-
-        if (trim((string)$otpCode) !== trim((string)$otpRow['otp_code'])) {
-            $newAttempts = (int)$otpRow['attempts'] + 1;
-            if ($newAttempts >= 3) {
-                $pdo->prepare("UPDATE fee_collector_assign_otps SET attempts = :att, is_used = 1 WHERE id = :id")->execute([':att' => $newAttempts, ':id' => $otpRow['id']]);
-                throw new ValidationException(['otp' => 'Maximum invalid attempts reached. Please request a new OTP.']);
-            } else {
-                $pdo->prepare("UPDATE fee_collector_assign_otps SET attempts = :att WHERE id = :id")->execute([':att' => $newAttempts, ':id' => $otpRow['id']]);
-                throw new ValidationException(['otp' => 'Invalid OTP code. Please try again.']);
-            }
-        }
-
-        // OTP Verified -> Mark as used
-        $pdo->prepare("UPDATE fee_collector_assign_otps SET is_used = 1 WHERE id = :id")->execute([':id' => $otpRow['id']]);
 
         // Ensure is_fee_collector column in staff table
         try {

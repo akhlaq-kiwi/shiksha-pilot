@@ -232,20 +232,24 @@ class TeacherManagementService {
     }
   }
 
-  /// Verify OTP and assign Principal role
-  Future<Map<String, dynamic>> assignPrincipalRole(int teacherId, String otpCode, String action) async {
+  /// Assign or unassign Principal role
+  Future<Map<String, dynamic>> assignPrincipalRole(int teacherId, [String? otpCode, String action = 'assign']) async {
     final uri = Uri.parse('$baseUrl/api/school/staff/$teacherId/assign-principal');
+    final Map<String, dynamic> body = {'action': action};
+    if (otpCode != null && otpCode.isNotEmpty) {
+      body['otp_code'] = otpCode;
+    }
     final response = await http.post(
       uri,
       headers: _headers,
-      body: json.encode({'otp_code': otpCode, 'action': action}),
+      body: json.encode(body),
     );
     if (response.statusCode == 200) {
       final decoded = json.decode(response.body);
       return Map<String, dynamic>.from(decoded['data'] ?? {});
     } else {
       final err = _parseError(response.body);
-      throw Exception(err.isNotEmpty ? err : 'Failed to assign Principal role.');
+      throw Exception(err.isNotEmpty ? err : 'Failed to update Principal role.');
     }
   }
 
@@ -266,20 +270,24 @@ class TeacherManagementService {
     }
   }
 
-  /// Verify OTP and assign Fee Collector role
-  Future<Map<String, dynamic>> assignFeeCollectorRole(int teacherId, String otpCode, String action) async {
+  /// Assign or unassign Fee Collector role
+  Future<Map<String, dynamic>> assignFeeCollectorRole(int teacherId, [String? otpCode, String action = 'assign']) async {
     final uri = Uri.parse('$baseUrl/api/school/staff/$teacherId/assign-fee-collector');
+    final Map<String, dynamic> body = {'action': action};
+    if (otpCode != null && otpCode.isNotEmpty) {
+      body['otp_code'] = otpCode;
+    }
     final response = await http.post(
       uri,
       headers: _headers,
-      body: json.encode({'otp_code': otpCode, 'action': action}),
+      body: json.encode(body),
     );
     if (response.statusCode == 200) {
       final decoded = json.decode(response.body);
       return Map<String, dynamic>.from(decoded['data'] ?? {});
     } else {
       final err = _parseError(response.body);
-      throw Exception(err.isNotEmpty ? err : 'Failed to assign Fee Collector role.');
+      throw Exception(err.isNotEmpty ? err : 'Failed to update Fee Collector role.');
     }
   }
 

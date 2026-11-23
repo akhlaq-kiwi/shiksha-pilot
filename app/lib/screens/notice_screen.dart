@@ -507,7 +507,7 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
           final f = File(recordedPath);
           if (f.existsSync()) await f.delete();
         }
-        _showSnackBar('Hold longer to record announcement');
+        _showSnackBar('Hold or tap longer to record announcement');
         return;
       }
 
@@ -1960,7 +1960,7 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
           ),
         ),
 
-        // Active Recording Banner (Visible when holding mic)
+        // Active Recording Banner
         if (_isRecording)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -1976,6 +1976,11 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
                     fontWeight: FontWeight.w700,
                     fontSize: 13,
                   ),
+                ),
+                const Spacer(),
+                const Text(
+                  'Tap mic to stop',
+                  style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
                 ),
               ],
             ),
@@ -2519,12 +2524,16 @@ class _NoticeScreenState extends State<NoticeScreen> with SingleTickerProviderSt
             ),
             const SizedBox(width: 12),
 
-            // WhatsApp-style Hold-to-Record Mic Button
+            // Mic Button (Tap to Start/Stop or Hold-to-Record matching Homework)
             GestureDetector(
               onLongPressStart: (_) => _startVoiceRecording(),
               onLongPressEnd: (_) => _stopVoiceRecording(),
               onTap: () {
-                _showSnackBar('Hold mic to record voice note, release to send');
+                if (_isRecording) {
+                  _stopVoiceRecording();
+                } else {
+                  _startVoiceRecording();
+                }
               },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),

@@ -1776,12 +1776,28 @@ class _TestSeriesPermissionsSheetState
       final list = await widget.service.getPermissions();
       if (!mounted) return;
       setState(() {
-        _teachers = list.where((t) {
+        final Map<String, Map<String, dynamic>> deduped = {};
+        for (final raw in list) {
+          final t = Map<String, dynamic>.from(raw);
           final isPrin = t['is_principal'] == true ||
               (t['designation'] ?? '').toString().toLowerCase().contains('principal') ||
               (t['role'] ?? '').toString().toLowerCase().contains('principal');
-          return !isPrin;
-        }).toList();
+          if (isPrin) continue;
+
+          final phone = (t['phone'] ?? '').toString().replaceAll(RegExp(r'\D'), '');
+          final key = phone.length >= 10
+              ? phone.substring(phone.length - 10)
+              : (t['name'] ?? '').toString().trim().toLowerCase();
+
+          if (deduped.containsKey(key)) {
+            if (t['can_create'] == true) {
+              deduped[key]!['can_create'] = true;
+            }
+          } else {
+            deduped[key] = t;
+          }
+        }
+        _teachers = deduped.values.toList();
         _loading = false;
       });
     } catch (e) {

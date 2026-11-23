@@ -388,50 +388,22 @@ export default function StaffPage() {
   const [isPrincipalModalOpen, setIsPrincipalModalOpen] = useState(false);
   const [principalTeacherTarget, setPrincipalTeacherTarget] = useState(null);
   const [principalAction, setPrincipalAction] = useState('assign'); // 'assign' | 'unassign'
-  const [principalStep, setPrincipalStep] = useState('confirm'); // 'confirm' | 'otp'
-  const [principalOtpCode, setPrincipalOtpCode] = useState('');
-  const [principalMaskedEmail, setPrincipalMaskedEmail] = useState('');
   const [principalLoading, setPrincipalLoading] = useState(false);
   const [principalError, setPrincipalError] = useState('');
 
   const openPrincipalModal = (teacher, action = 'assign') => {
     setPrincipalTeacherTarget(teacher);
     setPrincipalAction(action);
-    setPrincipalStep('confirm');
-    setPrincipalOtpCode('');
-    setPrincipalMaskedEmail('');
     setPrincipalError('');
     setIsPrincipalModalOpen(true);
   };
 
-  const handleSendPrincipalOtp = async () => {
+  const handleConfirmPrincipalRole = async () => {
     if (!principalTeacherTarget) return;
     setPrincipalLoading(true);
     setPrincipalError('');
     try {
-      const res = await schoolService.requestPrincipalOtp(principalTeacherTarget.id, principalAction);
-      if (res?.email_masked) {
-        setPrincipalMaskedEmail(res.email_masked);
-      }
-      setPrincipalStep('otp');
-    } catch (err) {
-      console.error(err);
-      setPrincipalError(err.message || 'Failed to send OTP to registered email address.');
-    } finally {
-      setPrincipalLoading(false);
-    }
-  };
-
-  const handleVerifyAndAssignPrincipal = async () => {
-    if (!principalTeacherTarget) return;
-    if (!principalOtpCode || principalOtpCode.trim().length === 0) {
-      setPrincipalError('Please enter the verification OTP code.');
-      return;
-    }
-    setPrincipalLoading(true);
-    setPrincipalError('');
-    try {
-      await schoolService.assignPrincipalRole(principalTeacherTarget.id, principalOtpCode.trim(), principalAction);
+      await schoolService.assignPrincipalRole(principalTeacherTarget.id, null, principalAction);
       setIsPrincipalModalOpen(false);
       setSuccess(principalAction === 'unassign'
         ? `Principal role unassigned successfully from ${principalTeacherTarget.name}.`
@@ -439,7 +411,7 @@ export default function StaffPage() {
       loadStaff();
     } catch (err) {
       console.error(err);
-      setPrincipalError(err.message || (principalAction === 'unassign' ? 'Failed to verify OTP or unassign Principal role.' : 'Failed to verify OTP or assign Principal role.'));
+      setPrincipalError(err.message || (principalAction === 'unassign' ? 'Failed to unassign Principal role.' : 'Failed to assign Principal role.'));
     } finally {
       setPrincipalLoading(false);
     }
@@ -449,50 +421,22 @@ export default function StaffPage() {
   const [isFeeCollectorModalOpen, setIsFeeCollectorModalOpen] = useState(false);
   const [feeCollectorTeacherTarget, setFeeCollectorTeacherTarget] = useState(null);
   const [feeCollectorAction, setFeeCollectorAction] = useState('assign'); // 'assign' | 'unassign'
-  const [feeCollectorStep, setFeeCollectorStep] = useState('confirm'); // 'confirm' | 'otp'
-  const [feeCollectorOtpCode, setFeeCollectorOtpCode] = useState('');
-  const [feeCollectorMaskedEmail, setFeeCollectorMaskedEmail] = useState('');
   const [feeCollectorLoading, setFeeCollectorLoading] = useState(false);
   const [feeCollectorError, setFeeCollectorError] = useState('');
 
   const openFeeCollectorModal = (teacher, action = 'assign') => {
     setFeeCollectorTeacherTarget(teacher);
     setFeeCollectorAction(action);
-    setFeeCollectorStep('confirm');
-    setFeeCollectorOtpCode('');
-    setFeeCollectorMaskedEmail('');
     setFeeCollectorError('');
     setIsFeeCollectorModalOpen(true);
   };
 
-  const handleSendFeeCollectorOtp = async () => {
+  const handleConfirmFeeCollectorRole = async () => {
     if (!feeCollectorTeacherTarget) return;
     setFeeCollectorLoading(true);
     setFeeCollectorError('');
     try {
-      const res = await schoolService.requestFeeCollectorOtp(feeCollectorTeacherTarget.id, feeCollectorAction);
-      if (res?.email_masked) {
-        setFeeCollectorMaskedEmail(res.email_masked);
-      }
-      setFeeCollectorStep('otp');
-    } catch (err) {
-      console.error(err);
-      setFeeCollectorError(err.message || 'Failed to send OTP to registered email address.');
-    } finally {
-      setFeeCollectorLoading(false);
-    }
-  };
-
-  const handleVerifyAndAssignFeeCollector = async () => {
-    if (!feeCollectorTeacherTarget) return;
-    if (!feeCollectorOtpCode || feeCollectorOtpCode.trim().length === 0) {
-      setFeeCollectorError('Please enter the verification OTP code.');
-      return;
-    }
-    setFeeCollectorLoading(true);
-    setFeeCollectorError('');
-    try {
-      await schoolService.assignFeeCollectorRole(feeCollectorTeacherTarget.id, feeCollectorOtpCode.trim(), feeCollectorAction);
+      await schoolService.assignFeeCollectorRole(feeCollectorTeacherTarget.id, null, feeCollectorAction);
       setIsFeeCollectorModalOpen(false);
       setSuccess(feeCollectorAction === 'unassign'
         ? `Fee Collector role unassigned successfully from ${feeCollectorTeacherTarget.name}.`
@@ -500,7 +444,7 @@ export default function StaffPage() {
       loadStaff();
     } catch (err) {
       console.error(err);
-      setFeeCollectorError(err.message || (feeCollectorAction === 'unassign' ? 'Failed to verify OTP or unassign Fee Collector role.' : 'Failed to verify OTP or assign Fee Collector role.'));
+      setFeeCollectorError(err.message || (feeCollectorAction === 'unassign' ? 'Failed to unassign Fee Collector role.' : 'Failed to assign Fee Collector role.'));
     } finally {
       setFeeCollectorLoading(false);
     }
@@ -882,9 +826,14 @@ export default function StaffPage() {
       }
     }
 
-    // Subject Validation (department field)
+    // Subject Validation (department field - maximum 2 words)
     if (!newStaff.department || newStaff.department.trim() === '') {
       errors.department = "Subject is required.";
+    } else {
+      const words = newStaff.department.trim().split(/\s+/).filter(Boolean);
+      if (words.length > 2) {
+        errors.department = "Subject cannot exceed 2 words.";
+      }
     }
 
     // Email Validation (Optional)
@@ -2069,12 +2018,17 @@ export default function StaffPage() {
               <div className="space-y-1.5">
                 <label htmlFor="subject" className="text-xs font-bold text-text-secondary uppercase font-display">Subject <span className="text-red-500">*</span></label>
                 <Input id="subject" 
-                  placeholder="e.g. English"
+                  placeholder="Enter Primary Subject"
                   value={newStaff.department || ''} 
                   onChange={e => {
                     const val = e.target.value;
                     setNewStaff(p => ({ ...p, department: val }));
-                    if (formErrors.department) setFormErrors(prev => ({ ...prev, department: '' }));
+                    if (formErrors.department) {
+                      const words = val.trim().split(/\s+/).filter(Boolean);
+                      if (words.length <= 2 && val.trim().length > 0) {
+                        setFormErrors(prev => ({ ...prev, department: '' }));
+                      }
+                    }
                   }}
                   className={`rounded-full outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus:border-border focus-visible:border-border ${formErrors.department ? 'border-red-500' : ''}`}
                   required 
@@ -2964,7 +2918,7 @@ export default function StaffPage() {
         </div>
       </Dialog>
 
-      {/* PRINCIPAL ROLE ASSIGNMENT / UNASSIGNMENT MODAL */}
+      {/* PRINCIPAL ROLE ASSIGNMENT / UNASSIGNMENT CONFIRMATION MODAL */}
       <Dialog isOpen={isPrincipalModalOpen} onClose={() => !principalLoading && setIsPrincipalModalOpen(false)} hideHeader={true} maxWidth="max-w-md">
         <div className="space-y-4">
           <div className="flex items-center space-x-3 text-amber-600 dark:text-amber-400">
@@ -2973,11 +2927,9 @@ export default function StaffPage() {
             </div>
             <div>
               <h3 className="text-lg font-bold text-text-primary leading-tight">
-                {principalStep === 'confirm' 
-                  ? (principalAction === 'unassign' ? 'Unassign Principal Role' : 'Assign Principal Role') 
-                  : 'Verify Email OTP'}
+                {principalAction === 'unassign' ? 'Unassign Principal Role' : 'Assign Principal Role'}
               </h3>
-              <p className="text-xs text-text-muted">Security Verification</p>
+              <p className="text-xs text-text-muted">Role Assignment</p>
             </div>
           </div>
 
@@ -2988,103 +2940,43 @@ export default function StaffPage() {
             </div>
           )}
 
-          {principalStep === 'confirm' ? (
-            <div className="space-y-4">
-              <p className="text-sm text-text-secondary leading-relaxed">
-                {principalAction === 'unassign' ? (
-                  <>Are you sure you want to unassign the Principal role from <strong className="text-text-primary font-semibold">{principalTeacherTarget?.name}</strong>?</>
+          <div className="space-y-4">
+            <p className="text-sm text-text-secondary leading-relaxed">
+              {principalAction === 'unassign' ? (
+                <>Are you sure you want to unassign the Principal role from <strong className="text-text-primary font-semibold">{principalTeacherTarget?.name}</strong>?</>
+              ) : (
+                <>Are you sure you want to assign the Principal role to <strong className="text-text-primary font-semibold">{principalTeacherTarget?.name}</strong>?</>
+              )}
+            </p>
+
+            <div className="flex items-center justify-end space-x-3 pt-2">
+              <Button 
+                variant="outline" 
+                onClick={() => setIsPrincipalModalOpen(false)}
+                disabled={principalLoading}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleConfirmPrincipalRole} 
+                disabled={principalLoading}
+                className="bg-amber-600 hover:bg-amber-700 text-white font-medium"
+              >
+                {principalLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    Please wait...
+                  </>
                 ) : (
-                  <>Are you sure you want to assign the Principal role to <strong className="text-text-primary font-semibold">{principalTeacherTarget?.name}</strong>?</>
+                  principalAction === 'unassign' ? 'Unassign' : 'Assign'
                 )}
-              </p>
-
-              <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-900 dark:text-amber-200">
-                To proceed, click <strong>Send OTP</strong> below. A 4-digit verification code will be sent to your registered school admin email address.
-              </div>
-              
-              <div className="flex items-center justify-end space-x-3 pt-2">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setIsPrincipalModalOpen(false)}
-                  disabled={principalLoading}
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  onClick={handleSendPrincipalOtp} 
-                  disabled={principalLoading}
-                  className="bg-amber-600 hover:bg-amber-700 text-white font-medium"
-                >
-                  {principalLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                      Sending OTP...
-                    </>
-                  ) : (
-                    'Send OTP'
-                  )}
-                </Button>
-              </div>
+              </Button>
             </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-xs rounded-xl flex items-center gap-2">
-                <CheckCircle className="w-4 h-4 flex-shrink-0 text-emerald-600 dark:text-emerald-400" />
-                <span>
-                  OTP code sent to {principalMaskedEmail ? <strong className="font-semibold">{principalMaskedEmail}</strong> : 'your registered email'}. Please check your inbox or spam folder.
-                </span>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-text-muted uppercase tracking-wider">
-                  Verification OTP Code
-                </label>
-                <Input 
-                  type="text"
-                  maxLength={6}
-                  placeholder="Enter 4-digit OTP"
-                  value={principalOtpCode}
-                  onChange={(e) => setPrincipalOtpCode(e.target.value)}
-                  className="text-center text-lg tracking-widest font-mono font-bold"
-                  autoFocus
-                />
-              </div>
-
-              <div className="flex items-center justify-between pt-2">
-                <button
-                  type="button"
-                  onClick={handleSendPrincipalOtp}
-                  disabled={principalLoading}
-                  className="text-xs text-primary hover:underline font-medium disabled:opacity-50 flex items-center gap-1"
-                >
-                  {principalLoading ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
-                  Resend OTP
-                </button>
-                
-                <div className="flex items-center space-x-2">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setIsPrincipalModalOpen(false)}
-                    disabled={principalLoading}
-                  >
-                    Cancel
-                  </Button>
-                  <Button 
-                    onClick={handleVerifyAndAssignPrincipal} 
-                    disabled={principalLoading || !principalOtpCode.trim()}
-                    className="bg-amber-600 hover:bg-amber-700 text-white font-medium"
-                  >
-                    {principalLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                    {principalAction === 'unassign' ? 'Verify & Unassign' : 'Verify & Assign'}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
+          </div>
         </div>
       </Dialog>
 
-      {/* FEE COLLECTOR ROLE ASSIGNMENT / UNASSIGNMENT MODAL */}
+      {/* FEE COLLECTOR ROLE ASSIGNMENT / UNASSIGNMENT CONFIRMATION MODAL */}
       <Dialog isOpen={isFeeCollectorModalOpen} onClose={() => !feeCollectorLoading && setIsFeeCollectorModalOpen(false)} hideHeader={true} maxWidth="max-w-md">
         <div className="space-y-4">
           <div className="flex items-center space-x-3 text-emerald-600 dark:text-emerald-400">
@@ -3093,11 +2985,9 @@ export default function StaffPage() {
             </div>
             <div>
               <h3 className="text-lg font-bold text-text-primary leading-tight">
-                {feeCollectorStep === 'confirm' 
-                  ? (feeCollectorAction === 'unassign' ? 'Unassign Fee Collector Role' : 'Assign Fee Collector Role') 
-                  : 'Verify Email OTP'}
+                {feeCollectorAction === 'unassign' ? 'Unassign Fee Collector Role' : 'Assign Fee Collector Role'}
               </h3>
-              <p className="text-xs text-text-muted">Security Verification</p>
+              <p className="text-xs text-text-muted">Role Assignment</p>
             </div>
           </div>
 
@@ -3108,99 +2998,39 @@ export default function StaffPage() {
             </div>
           )}
 
-          {feeCollectorStep === 'confirm' ? (
-            <div className="space-y-4">
-              <p className="text-sm text-text-secondary leading-relaxed">
-                {feeCollectorAction === 'unassign' ? (
-                  <>Are you sure you want to unassign the Fee Collector role from <strong className="text-text-primary font-semibold">{feeCollectorTeacherTarget?.name}</strong>?</>
+          <div className="space-y-4">
+            <p className="text-sm text-text-secondary leading-relaxed">
+              {feeCollectorAction === 'unassign' ? (
+                <>Are you sure you want to unassign the Fee Collector role from <strong className="text-text-primary font-semibold">{feeCollectorTeacherTarget?.name}</strong>?</>
+              ) : (
+                <>Are you sure you want to assign the Fee Collector role to <strong className="text-text-primary font-semibold">{feeCollectorTeacherTarget?.name}</strong>?</>
+              )}
+            </p>
+
+            <div className="flex items-center justify-end space-x-3 pt-2">
+              <Button 
+                variant="outline" 
+                onClick={() => setIsFeeCollectorModalOpen(false)}
+                disabled={feeCollectorLoading}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleConfirmFeeCollectorRole} 
+                disabled={feeCollectorLoading}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
+              >
+                {feeCollectorLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    Please wait...
+                  </>
                 ) : (
-                  <>Are you sure you want to assign the Fee Collector role to <strong className="text-text-primary font-semibold">{feeCollectorTeacherTarget?.name}</strong>?</>
+                  feeCollectorAction === 'unassign' ? 'Unassign' : 'Assign'
                 )}
-              </p>
-
-              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs text-emerald-900 dark:text-emerald-200">
-                To proceed, click <strong>Send OTP</strong> below. A 4-digit verification code will be sent to your registered school admin email address.
-              </div>
-              
-              <div className="flex items-center justify-end space-x-3 pt-2">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setIsFeeCollectorModalOpen(false)}
-                  disabled={feeCollectorLoading}
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  onClick={handleSendFeeCollectorOtp} 
-                  disabled={feeCollectorLoading}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
-                >
-                  {feeCollectorLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                      Sending OTP...
-                    </>
-                  ) : (
-                    'Send OTP'
-                  )}
-                </Button>
-              </div>
+              </Button>
             </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-xs rounded-xl flex items-center gap-2">
-                <CheckCircle className="w-4 h-4 flex-shrink-0 text-emerald-600 dark:text-emerald-400" />
-                <span>
-                  OTP code sent to {feeCollectorMaskedEmail ? <strong className="font-semibold">{feeCollectorMaskedEmail}</strong> : 'your registered email'}. Please check your inbox or spam folder.
-                </span>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-text-muted uppercase tracking-wider">
-                  Verification OTP Code
-                </label>
-                <Input 
-                  type="text"
-                  maxLength={6}
-                  placeholder="Enter 4-digit OTP"
-                  value={feeCollectorOtpCode}
-                  onChange={(e) => setFeeCollectorOtpCode(e.target.value)}
-                  className="text-center text-lg tracking-widest font-mono font-bold"
-                  autoFocus
-                />
-              </div>
-
-              <div className="flex items-center justify-between pt-2">
-                <button
-                  type="button"
-                  onClick={handleSendFeeCollectorOtp}
-                  disabled={feeCollectorLoading}
-                  className="text-xs text-primary hover:underline font-medium disabled:opacity-50 flex items-center gap-1"
-                >
-                  {feeCollectorLoading ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
-                  Resend OTP
-                </button>
-                
-                <div className="flex items-center space-x-2">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setIsFeeCollectorModalOpen(false)}
-                    disabled={feeCollectorLoading}
-                  >
-                    Cancel
-                  </Button>
-                  <Button 
-                    onClick={handleVerifyAndAssignFeeCollector} 
-                    disabled={feeCollectorLoading || !feeCollectorOtpCode.trim()}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
-                  >
-                    {feeCollectorLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                    {feeCollectorAction === 'unassign' ? 'Verify & Unassign' : 'Verify & Assign'}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
+          </div>
         </div>
       </Dialog>
 
