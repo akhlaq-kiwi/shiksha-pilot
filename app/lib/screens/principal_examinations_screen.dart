@@ -738,12 +738,23 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
     return maxM != null && maxM == 0.0;
   }
 
-  void _resetTimetableForm({bool resetTime = false}) {
+  void _resetTimetableForm({bool resetTime = false, bool autoSelectNextSubject = false}) {
     _editingPaper = null;
     final examMaxDouble = double.tryParse(_selectedExam?['max_marks']?.toString() ?? '') ?? 30.0;
     final examMax = examMaxDouble.toInt();
     final examPass = (examMax * 0.33).ceil();
     _ttSubjectId = null;
+    if (autoSelectNextSubject && _subjects.isNotEmpty) {
+      final scheduledSubjectIds = _timetablePapers.map((p) => p['subject_id']?.toString()).toSet();
+      final availableSubjects = _subjects.where((s) {
+        final sid = s['id']?.toString();
+        return sid != null && !scheduledSubjectIds.contains(sid);
+      }).toList();
+      if (availableSubjects.isNotEmpty) {
+        availableSubjects.shuffle();
+        _ttSubjectId = int.tryParse(availableSubjects.first['id'].toString());
+      }
+    }
     _ttEvaluationType = 'marks';
     _ttGradingScale = 'A,B,C,D';
     if (resetTime) {
@@ -753,6 +764,503 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
     _ttMaxMarksCtrl.text = examMax.toString();
     _ttPassMarksCtrl.text = examPass.toString();
     _ttExamDate = _suggestNextExamDate(_selectedExam, _timetablePapers, _holidays);
+  }
+
+  void _showNoSubjectsDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFFFAF8F5),
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Color(0xFFE2E8F0)),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF3C7),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.menu_book_rounded, color: Color(0xFFD97706), size: 20),
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'No Subjects Found',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: Color(0xFF0F172A)),
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'No subjects have been added to your school yet. Please add subjects to schedule exam papers.',
+          style: TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFD97706),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _showManageSubjectsModal();
+            },
+            child: const Text('Add Subjects', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showManageSubjectsModal() {
+    final textController = TextEditingController();
+    bool isAdding = false;
+    int? deletingSubjectId;
+    String? subjectErrorMessage;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFFFAF8F5),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            return Container(
+              height: MediaQuery.of(ctx).size.height * 0.78,
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 14,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFCBD5E1),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEF3C7),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.menu_book_rounded, color: Color(0xFFD97706), size: 20),
+                          ),
+                          const SizedBox(width: 10),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: const [
+                              Text(
+                                'Manage Subjects',
+                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                'Create and delete subjects catalog.',
+                                style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      IconButton(
+                        icon: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFF1F5F9),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.close, size: 16, color: Color(0xFF64748B)),
+                        ),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // Add Subject Row
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: textController,
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                          decoration: InputDecoration(
+                            hintText: 'Add subject(s) e.g. Math, Science...',
+                            hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8), fontWeight: FontWeight.w500),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFD97706), width: 1.5),
+                            ),
+                            filled: true,
+                            fillColor: Colors.white,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFD97706),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                        ),
+                        onPressed: isAdding
+                            ? null
+                            : () async {
+                                final rawInput = textController.text.trim();
+                                if (rawInput.isEmpty) return;
+
+                                final names = rawInput
+                                    .split(',')
+                                    .map((n) => n.trim().toUpperCase())
+                                    .where((n) => n.isNotEmpty)
+                                    .toList();
+
+                                final toCreate = <String>[];
+                                for (final n in names) {
+                                  final inToCreate = toCreate.any((c) => c.toLowerCase() == n.toLowerCase());
+                                  final inExisting = _subjects.any((s) => (s['name'] ?? '').toString().toLowerCase() == n.toLowerCase());
+                                  if (!inToCreate && !inExisting) {
+                                    toCreate.add(n);
+                                  }
+                                }
+
+                                if (toCreate.isEmpty) {
+                                  final duplicateMsg = names.length == 1
+                                      ? 'This subject already exists.'
+                                      : 'All specified subjects already exist.';
+                                  setModalState(() {
+                                    subjectErrorMessage = duplicateMsg;
+                                  });
+                                  if (ctx.mounted) {
+                                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Row(
+                                          children: [
+                                            const Icon(Icons.info_outline, color: Colors.white, size: 20),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                duplicateMsg,
+                                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Colors.white),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        behavior: SnackBarBehavior.floating,
+                                        margin: EdgeInsets.only(
+                                          bottom: MediaQuery.of(context).size.height - 120,
+                                          left: 16,
+                                          right: 16,
+                                        ),
+                                        backgroundColor: const Color(0xFFD97706),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                        duration: const Duration(seconds: 3),
+                                      ),
+                                    );
+                                  }
+                                  return;
+                                }
+
+                                setModalState(() {
+                                  isAdding = true;
+                                  subjectErrorMessage = null;
+                                });
+                                try {
+                                  for (final name in toCreate) {
+                                    await widget.examService.createSubject(name);
+                                  }
+                                  textController.clear();
+                                  final updatedSubjects = await widget.examService.getSubjects();
+                                  setState(() {
+                                    _subjects = updatedSubjects;
+                                    if (_ttSubjectId == null && updatedSubjects.isNotEmpty) {
+                                      _ttSubjectId = int.tryParse(updatedSubjects.last['id'].toString());
+                                    }
+                                  });
+                                  setModalState(() {});
+                                } catch (e) {
+                                  final errText = e.toString().replaceAll('Exception: ', '');
+                                  setModalState(() {
+                                    subjectErrorMessage = errText;
+                                  });
+                                  if (ctx.mounted) {
+                                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(errText, style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white)),
+                                        behavior: SnackBarBehavior.floating,
+                                        margin: EdgeInsets.only(
+                                          bottom: MediaQuery.of(context).size.height - 120,
+                                          left: 16,
+                                          right: 16,
+                                        ),
+                                        backgroundColor: const Color(0xFFDC2626),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      ),
+                                    );
+                                  }
+                                } finally {
+                                  setModalState(() => isAdding = false);
+                                }
+                              },
+                        child: isAdding
+                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                            : const Text('Add', style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white)),
+                      ),
+                    ],
+                  ),
+                  if (subjectErrorMessage != null) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF2F2),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFFCA5A5)),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Padding(
+                            padding: EdgeInsets.only(top: 2),
+                            child: Icon(Icons.error_outline, size: 18, color: Color(0xFFDC2626)),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              subjectErrorMessage!,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFFDC2626),
+                                fontWeight: FontWeight.bold,
+                                height: 1.3,
+                              ),
+                            ),
+                          ),
+                          InkWell(
+                            onTap: () => setModalState(() => subjectErrorMessage = null),
+                            child: const Padding(
+                              padding: EdgeInsets.only(left: 4, top: 1),
+                              child: Icon(Icons.close, size: 16, color: Color(0xFFDC2626)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  const Text('Existing Subjects:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: _subjects.isEmpty
+                        ? const Center(
+                            child: Text(
+                              'No subjects added yet.',
+                              style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600),
+                            ),
+                          )
+                        : Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(14),
+                              child: ListView.separated(
+                                itemCount: _subjects.length,
+                                separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                                itemBuilder: (ctx, idx) {
+                                  final sub = _subjects[idx];
+                                  final subId = sub['id'] as int;
+                                  final isThisDeleting = deletingSubjectId == subId;
+
+                                  return ListTile(
+                                    dense: true,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                                    leading: Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFEF3C7),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Icon(Icons.menu_book_rounded, color: Color(0xFFD97706), size: 16),
+                                    ),
+                                    title: Text(
+                                      (sub['name'] ?? '').toString().toUpperCase(),
+                                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Color(0xFF0F172A)),
+                                    ),
+                                    trailing: isThisDeleting
+                                        ? const SizedBox(
+                                            width: 32,
+                                            height: 32,
+                                            child: Center(
+                                              child: SizedBox(
+                                                width: 18,
+                                                height: 18,
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  color: Color(0xFFD97706),
+                                                ),
+                                              ),
+                                            ),
+                                          )
+                                        : IconButton(
+                                            icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 20),
+                                            onPressed: (deletingSubjectId != null || isAdding)
+                                                ? null
+                                                : () async {
+                                                    setModalState(() => subjectErrorMessage = null);
+
+                                                    final confirmed = await showDialog<bool>(
+                                                      context: ctx,
+                                                      builder: (dCtx) => AlertDialog(
+                                                        backgroundColor: const Color(0xFFFAF8F5),
+                                                        surfaceTintColor: Colors.transparent,
+                                                        shape: RoundedRectangleBorder(
+                                                          borderRadius: BorderRadius.circular(16),
+                                                          side: const BorderSide(color: Color(0xFFE2E8F0)),
+                                                        ),
+                                                        title: const Text('Delete Subject', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: Color(0xFF0F172A))),
+                                                        content: Text('Are you sure you want to delete "${sub['name']}"? This action cannot be undone.', style: const TextStyle(fontSize: 13, color: Color(0xFF475569))),
+                                                        actions: [
+                                                          TextButton(
+                                                            onPressed: () => Navigator.pop(dCtx, false),
+                                                            child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
+                                                          ),
+                                                          ElevatedButton(
+                                                            style: ElevatedButton.styleFrom(
+                                                              backgroundColor: const Color(0xFFDC2626),
+                                                              foregroundColor: Colors.white,
+                                                              elevation: 0,
+                                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                            ),
+                                                            onPressed: () => Navigator.pop(dCtx, true),
+                                                            child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.w700)),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    );
+
+                                                    if (confirmed != true) return;
+
+                                                    setModalState(() {
+                                                      deletingSubjectId = subId;
+                                                      subjectErrorMessage = null;
+                                                    });
+
+                                                    try {
+                                                      await widget.examService.deleteSubject(subId);
+                                                      final updated = await widget.examService.getSubjects();
+                                                      setState(() {
+                                                        _subjects = updated;
+                                                        if (_ttSubjectId == subId) {
+                                                          _ttSubjectId = null;
+                                                        }
+                                                      });
+                                                      setModalState(() {});
+                                                    } catch (e) {
+                                                      final rawMsg = e.toString().replaceAll('Exception: ', '').trim();
+                                                      final validationMsg = rawMsg.isNotEmpty
+                                                          ? rawMsg
+                                                          : '${sub['name']} cannot be deleted';
+                                                      setModalState(() {
+                                                        subjectErrorMessage = validationMsg;
+                                                      });
+                                                      if (ctx.mounted) {
+                                                        showDialog(
+                                                          context: ctx,
+                                                          builder: (errCtx) => AlertDialog(
+                                                            backgroundColor: const Color(0xFFFAF8F5),
+                                                            surfaceTintColor: Colors.transparent,
+                                                            shape: RoundedRectangleBorder(
+                                                              borderRadius: BorderRadius.circular(16),
+                                                              side: const BorderSide(color: Color(0xFFE2E8F0)),
+                                                            ),
+                                                            title: const Row(
+                                                              children: [
+                                                                Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 22),
+                                                                SizedBox(width: 8),
+                                                                Text('Cannot Delete Subject', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: Color(0xFF0F172A))),
+                                                              ],
+                                                            ),
+                                                            content: Text(
+                                                              validationMsg,
+                                                              style: const TextStyle(fontSize: 13, color: Color(0xFF475569)),
+                                                            ),
+                                                            actions: [
+                                                              ElevatedButton(
+                                                                style: ElevatedButton.styleFrom(
+                                                                  backgroundColor: const Color(0xFFD97706),
+                                                                  foregroundColor: Colors.white,
+                                                                  elevation: 0,
+                                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                                ),
+                                                                onPressed: () => Navigator.pop(errCtx),
+                                                                child: const Text('OK', style: TextStyle(fontWeight: FontWeight.w700)),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        );
+                                                      }
+                                                    } finally {
+                                                      setModalState(() => deletingSubjectId = null);
+                                                    }
+                                                  },
+                                          ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _openTimetable() async {
@@ -770,6 +1278,13 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
       final papers = (data['papers'] as List<dynamic>?) ?? [];
       final curStatus = _examClassStatuses.firstWhere((c) => (c['class_id'] ?? c['id'])?.toString() == _selectedClassId?.toString(), orElse: () => null);
       final isPub = data['scheme_published'] == 1 || data['scheme_published'] == true || curStatus?['scheme_published'] == 1;
+
+      if (_subjects.isEmpty) {
+        try {
+          final fetchedSubs = await widget.examService.getSubjects();
+          if (mounted) setState(() => _subjects = fetchedSubs);
+        } catch (_) {}
+      }
 
       setState(() {
         _timetablePapers = papers;
@@ -1284,7 +1799,7 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
       setState(() {
         _timetablePapers = papers;
         _isSchemePublished = isPub;
-        _resetTimetableForm();
+        _resetTimetableForm(autoSelectNextSubject: true);
       });
       if (mounted) {
         _showAppSnackBar(_editingPaper != null ? 'Exam paper updated successfully.' : 'Exam paper added successfully.');
@@ -4612,13 +5127,19 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
     required String displayText,
     required List<DropdownMenuItemModel<T>> items,
     required ValueChanged<T?> onChanged,
+    VoidCallback? onEmptyTap,
+    bool enabled = true,
   }) {
     return Builder(
       builder: (btnContext) {
         return InkWell(
-          onTap: items.isEmpty
+          onTap: !enabled
               ? null
               : () async {
+                  if (items.isEmpty) {
+                    onEmptyTap?.call();
+                    return;
+                  }
                   final renderBox = btnContext.findRenderObject() as RenderBox?;
                   if (renderBox == null) return;
                   final offset = renderBox.localToGlobal(Offset.zero);
@@ -4644,15 +5165,21 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
                     ),
                     items: items.map((item) {
                       final isSelected = item.value == value;
+                      final isItemEnabled = item.enabled;
                       return PopupMenuItem<T>(
                         value: item.value,
+                        enabled: isItemEnabled,
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                         child: Text(
                           item.label,
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: isSelected ? FontWeight.w900 : FontWeight.bold,
-                            color: isSelected ? const Color(0xFFD97706) : const Color(0xFF0F172A),
+                            color: !isItemEnabled
+                                ? const Color(0xFF94A3B8)
+                                : isSelected
+                                    ? const Color(0xFFD97706)
+                                    : const Color(0xFF0F172A),
                           ),
                         ),
                       );
@@ -4832,46 +5359,36 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
                     // ROW 1: SELECT SUBJECT
                     const Text('SELECT SUBJECT', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF64748B), letterSpacing: 0.5)),
                     const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<int>(
-                          borderRadius: BorderRadius.circular(14),
-                          dropdownColor: Colors.white,
-                          value: _subjects.any((s) => int.tryParse(s['id'].toString()) == _ttSubjectId) ? _ttSubjectId : null,
-                          isExpanded: true,
-                          hint: const Text('-- Choose Subject --', style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
-                          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
-                          items: _subjects.map<DropdownMenuItem<int>>((s) {
-                            final sid = int.tryParse(s['id'].toString());
-                            final isCreated = _timetablePapers.any((p) =>
-                              p['subject_id']?.toString() == sid?.toString() &&
-                              (_editingPaper == null || _editingPaper!['subject_id']?.toString() != sid?.toString())
-                            );
-                            final sName = (s['name'] ?? 'Subject').toString().toUpperCase();
-                            return DropdownMenuItem<int>(
-                              value: sid,
-                              enabled: !isCreated,
-                              child: Text(
-                                '$sName${isCreated ? ' (Created)' : ''}',
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF0F172A),
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: _editingPaper != null ? null : (val) {
-                            if (val != null) setState(() => _ttSubjectId = val);
-                          },
-                        ),
-                      ),
+                    _buildDownwardDropdownAnchor<int>(
+                      context: context,
+                      hint: '-- Choose Subject --',
+                      value: _subjects.any((s) => int.tryParse(s['id'].toString()) == _ttSubjectId) ? _ttSubjectId : null,
+                      displayText: () {
+                        if (_ttSubjectId == null) return '-- Choose Subject --';
+                        final matched = _subjects.firstWhere(
+                          (s) => int.tryParse(s['id'].toString()) == _ttSubjectId,
+                          orElse: () => null,
+                        );
+                        return matched != null ? (matched['name'] ?? '').toString().toUpperCase() : '-- Choose Subject --';
+                      }(),
+                      items: _subjects.map<DropdownMenuItemModel<int>>((s) {
+                        final sid = int.tryParse(s['id'].toString()) ?? 0;
+                        final isCreated = _timetablePapers.any((p) =>
+                          p['subject_id']?.toString() == sid.toString() &&
+                          (_editingPaper == null || _editingPaper!['subject_id']?.toString() != sid.toString())
+                        );
+                        final sName = (s['name'] ?? 'Subject').toString().toUpperCase();
+                        return DropdownMenuItemModel<int>(
+                          value: sid,
+                          label: isCreated ? '$sName (Created)' : sName,
+                          enabled: !isCreated,
+                        );
+                      }).toList(),
+                      enabled: _editingPaper == null,
+                      onEmptyTap: _showNoSubjectsDialog,
+                      onChanged: (val) {
+                        if (val != null) setState(() => _ttSubjectId = val);
+                      },
                     ),
                     const SizedBox(height: 14),
 
@@ -4880,13 +5397,14 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
                     const SizedBox(height: 6),
                     InkWell(
                       onTap: _pickExamDate,
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(16),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        height: 48,
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
                         decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFCBD5E1)),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -4909,38 +5427,27 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
                     // ROW 3: EVALUATION TYPE
                     const Text('EVALUATION TYPE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF64748B), letterSpacing: 0.5)),
                     const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          borderRadius: BorderRadius.circular(14),
-                          dropdownColor: Colors.white,
-                          value: (_ttEvaluationType == 'grade') ? 'grade' : 'marks',
-                          isExpanded: true,
-                          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
-                          items: const [
-                            DropdownMenuItem(value: 'marks', child: Text('Marks Based (0-100)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)))),
-                            DropdownMenuItem(value: 'grade', child: Text('Grade Based (A, B, C, D)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)))),
-                          ],
-                          onChanged: (val) {
-                            if (val != null) {
-                              setState(() {
-                                _ttEvaluationType = val;
-                                if (val == 'marks') {
-                                  final examMax = int.tryParse(_selectedExam?['max_marks']?.toString() ?? '') ?? 30;
-                                  _ttMaxMarksCtrl.text = examMax.toString();
-                                  _ttPassMarksCtrl.text = (examMax * 0.33).ceil().toString();
-                                }
-                              });
+                    _buildDownwardDropdownAnchor<String>(
+                      context: context,
+                      hint: 'Select evaluation type',
+                      value: (_ttEvaluationType == 'grade') ? 'grade' : 'marks',
+                      displayText: (_ttEvaluationType == 'grade') ? 'Grade Based (A, B, C, D)' : 'Marks Based (0-100)',
+                      items: const [
+                        DropdownMenuItemModel<String>(value: 'marks', label: 'Marks Based (0-100)'),
+                        DropdownMenuItemModel<String>(value: 'grade', label: 'Grade Based (A, B, C, D)'),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() {
+                            _ttEvaluationType = val;
+                            if (val == 'marks') {
+                              final examMax = int.tryParse(_selectedExam?['max_marks']?.toString() ?? '') ?? 30;
+                              _ttMaxMarksCtrl.text = examMax.toString();
+                              _ttPassMarksCtrl.text = (examMax * 0.33).ceil().toString();
                             }
-                          },
-                        ),
-                      ),
+                          });
+                        }
+                      },
                     ),
                     const SizedBox(height: 14),
 
@@ -5012,28 +5519,17 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
                     if (_ttEvaluationType == 'grade') ...[
                       const Text('GRADING SCALE (DIRECT GRADE)', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFFD97706), letterSpacing: 0.5)),
                       const SizedBox(height: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            borderRadius: BorderRadius.circular(14),
-                            dropdownColor: Colors.white,
-                            value: 'A,B,C,D',
-                            isExpanded: true,
-                            icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
-                            items: const [
-                              DropdownMenuItem(value: 'A,B,C,D', child: Text('4-Tier Scale (A, B, C, D)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)))),
-                            ],
-                            onChanged: (val) {
-                              if (val != null) setState(() => _ttGradingScale = val);
-                            },
-                          ),
-                        ),
+                      _buildDownwardDropdownAnchor<String>(
+                        context: context,
+                        hint: 'Select grading scale',
+                        value: 'A,B,C,D',
+                        displayText: '4-Tier Scale (A, B, C, D)',
+                        items: const [
+                          DropdownMenuItemModel<String>(value: 'A,B,C,D', label: '4-Tier Scale (A, B, C, D)'),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) setState(() => _ttGradingScale = val);
+                        },
                       ),
                     ] else ...[
                       Row(
@@ -5254,16 +5750,44 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
                               ],
                             ),
                           ),
-                          // Action Buttons
-                          IconButton(
-                            icon: const Icon(Icons.edit_outlined, color: Color(0xFFD97706), size: 20),
-                            tooltip: 'Edit Paper',
-                            onPressed: () => _startEditPaper(Map<String, dynamic>.from(p)),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 20),
-                            tooltip: 'Delete Paper',
-                            onPressed: () => _confirmDeletePaper(Map<String, dynamic>.from(p), idx),
+                          // Action Menu (3-dots)
+                          PopupMenuButton<String>(
+                            icon: const Icon(Icons.more_vert_rounded, color: Color(0xFF64748B), size: 20),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            color: Colors.white,
+                            elevation: 4,
+                            padding: EdgeInsets.zero,
+                            onSelected: (val) {
+                              if (val == 'edit') {
+                                _startEditPaper(Map<String, dynamic>.from(p));
+                              } else if (val == 'delete') {
+                                _confirmDeletePaper(Map<String, dynamic>.from(p), idx);
+                              }
+                            },
+                            itemBuilder: (pCtx) => [
+                              const PopupMenuItem<String>(
+                                value: 'edit',
+                                height: 38,
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.edit_outlined, size: 16, color: Color(0xFFD97706)),
+                                    SizedBox(width: 8),
+                                    Text('Edit', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuItem<String>(
+                                value: 'delete',
+                                height: 38,
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.delete_outline_rounded, size: 16, color: Color(0xFFEF4444)),
+                                    SizedBox(width: 8),
+                                    Text('Delete', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFFEF4444))),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),

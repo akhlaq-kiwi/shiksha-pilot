@@ -102,7 +102,7 @@ bool _isTransientSocketError(Object error) {
 }
 
 const String _kUsbBaseUrl = 'http://127.0.0.1:8000';
-const String _kWifiBaseUrl = 'http://10.56.244.71:8000';
+const String _kWifiBaseUrl = 'http://10.83.63.71:8000';
 
 String? _inMemoryWorkingBase;
 String? get activeLocalBaseUrl => _inMemoryWorkingBase;

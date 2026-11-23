@@ -517,7 +517,13 @@ class _ClassesScreenState extends State<ClassesScreen> {
                   icon: const Icon(Icons.more_vert_rounded, size: 18, color: Color(0xFF64748B)),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  color: Colors.white,
+                  surfaceTintColor: Colors.transparent,
+                  elevation: 6,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    side: const BorderSide(color: Color(0xFFF1F5F9)),
+                  ),
                   onSelected: (action) => _handleClassMenuAction(action, gc),
                   itemBuilder: (context) => [
                     const PopupMenuItem(
@@ -526,7 +532,7 @@ class _ClassesScreenState extends State<ClassesScreen> {
                         children: [
                           Icon(Icons.tune_rounded, size: 16, color: Color(0xFFD97706)),
                           SizedBox(width: 8),
-                          Text('Manage Sections', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                          Text('Manage Sections', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
                         ],
                       ),
                     ),
@@ -537,7 +543,7 @@ class _ClassesScreenState extends State<ClassesScreen> {
                           children: [
                             Icon(Icons.swap_horiz_rounded, size: 16, color: Color(0xFF4F46E5)),
                             SizedBox(width: 8),
-                            Text('Transfer Students', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                            Text('Transfer Students', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
                           ],
                         ),
                       ),
@@ -547,7 +553,7 @@ class _ClassesScreenState extends State<ClassesScreen> {
                         children: [
                           Icon(Icons.delete_outline_rounded, size: 16, color: Color(0xFFDC2626)),
                           SizedBox(width: 8),
-                          Text('Delete Class', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFDC2626))),
+                          Text('Delete Class', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Color(0xFFDC2626))),
                         ],
                       ),
                     ),
@@ -2176,7 +2182,13 @@ class _ClassRosterScreenState extends State<_ClassRosterScreen> {
                     icon: const Icon(Icons.more_vert_rounded, size: 18, color: Color(0xFF64748B)),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    color: Colors.white,
+                    surfaceTintColor: Colors.transparent,
+                    elevation: 6,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      side: const BorderSide(color: Color(0xFFF1F5F9)),
+                    ),
                     onSelected: (action) {
                       if (action == 'edit') _openEnrollDialog(s);
                       if (action == 'credentials') _openCredentialsDialog(s);
@@ -2188,7 +2200,7 @@ class _ClassRosterScreenState extends State<_ClassRosterScreen> {
                           children: [
                             Icon(Icons.edit_outlined, size: 16, color: Color(0xFFD97706)),
                             SizedBox(width: 8),
-                            Text('Edit Profile', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                            Text('Edit Profile', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
                           ],
                         ),
                       ),
@@ -2198,7 +2210,7 @@ class _ClassRosterScreenState extends State<_ClassRosterScreen> {
                           children: [
                             Icon(Icons.lock_reset_rounded, size: 16, color: Color(0xFF4F46E5)),
                             SizedBox(width: 8),
-                            Text('Credentials', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                            Text('Credentials', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
                           ],
                         ),
                       ),
@@ -3419,7 +3431,18 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
         _dobCtrl.text = studentData['dob']?.toString() ?? studentData['date_of_birth']?.toString() ?? '';
         _admissionDateCtrl.text = studentData['admission_date']?.toString() ?? '';
         _admissionFeeCtrl.text = studentData['admission_fee'] != null ? studentData['admission_fee'].toString() : '';
-        _studentCategory = studentData['student_category']?.toString();
+        final rawCat = studentData['student_category']?.toString();
+        if (rawCat != null && rawCat.trim().isNotEmpty) {
+          if (rawCat.toLowerCase() == 'existing student') {
+            _studentCategory = 'Existing Student';
+          } else if (rawCat.toLowerCase() == 'new admission') {
+            _studentCategory = 'New Admission';
+          } else {
+            _studentCategory = rawCat;
+          }
+        } else {
+          _studentCategory = null;
+        }
         _bloodGroup = studentData['blood_group']?.toString();
         _category = studentData['category']?.toString();
         _religion = _normalizeReligion(studentData['religion']?.toString());
@@ -3708,8 +3731,13 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
     final result = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Discard Changes?', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+        backgroundColor: const Color(0xFFFAF8F5),
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Color(0xFFE2E8F0)),
+        ),
+        title: const Text('Discard Changes?', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: Color(0xFF0F172A))),
         content: const Text(
           'You have unsaved changes. Are you sure you want to discard them and exit?',
           style: TextStyle(fontSize: 13, color: Color(0xFF475569)),
@@ -3722,8 +3750,9 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFDC2626),
+              backgroundColor: const Color(0xFFD97706),
               foregroundColor: Colors.white,
+              elevation: 0,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
             child: const Text('Discard', style: TextStyle(fontWeight: FontWeight.w700)),
@@ -3798,7 +3827,7 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
       if (_admissionDateCtrl.text.trim().isEmpty) {
         _errors['admission_date'] = 'Admission Date is required';
       }
-      if (_isFirstYear && widget.existingStudent == null && (_studentCategory == null || _studentCategory!.isEmpty)) {
+      if (_isFirstYear && (_studentCategory == null || _studentCategory!.isEmpty)) {
         _errors['student_category'] = 'Student Category is required.';
       }
       if (_mobileCtrl.text.trim().isEmpty) {
@@ -4613,7 +4642,7 @@ class _StudentEnrollModalState extends State<_StudentEnrollModal> {
         ),
         const SizedBox(height: 14),
 
-        if (_isFirstYear && !isEdit) ...[
+        if (_isFirstYear) ...[
           _buildFieldLabel('STUDENT CATEGORY', required: true),
           _buildDropdownInput(
             value: _studentCategory,

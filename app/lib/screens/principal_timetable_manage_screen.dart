@@ -2198,6 +2198,7 @@ class _PrincipalTimetableManageScreenState
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: const Color(0xFFFAF8F5),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -2209,31 +2210,62 @@ class _PrincipalTimetableManageScreenState
               padding: EdgeInsets.only(
                 left: 20,
                 right: 20,
-                top: 20,
+                top: 14,
                 bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFCBD5E1),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text(
-                            'Manage Subjects',
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEF3C7),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.menu_book_rounded, color: Color(0xFFD97706), size: 20),
                           ),
-                          SizedBox(height: 2),
-                          Text(
-                            'Create and delete subjects catalog.',
-                            style: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold),
+                          const SizedBox(width: 10),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: const [
+                              Text(
+                                'Manage Subjects',
+                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                'Create and delete subjects catalog.',
+                                style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                              ),
+                            ],
                           ),
                         ],
                       ),
                       IconButton(
-                        icon: const Icon(Icons.close),
+                        icon: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFF1F5F9),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.close, size: 16, color: Color(0xFF64748B)),
+                        ),
                         onPressed: () => Navigator.pop(ctx),
                       ),
                     ],
@@ -2245,22 +2277,36 @@ class _PrincipalTimetableManageScreenState
                       Expanded(
                         child: TextField(
                           controller: textController,
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
                           decoration: InputDecoration(
                             hintText: 'Add subject(s) e.g. Math, Science...',
-                            hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+                            hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8), fontWeight: FontWeight.w500),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFD97706), width: 1.5),
+                            ),
                             filled: true,
-                            fillColor: Colors.grey.shade50,
+                            fillColor: Colors.white,
                           ),
                         ),
                       ),
                       const SizedBox(width: 8),
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFC26600),
+                          backgroundColor: const Color(0xFFD97706),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
                         ),
                         onPressed: isAdding
                             ? null
@@ -2285,13 +2331,37 @@ class _PrincipalTimetableManageScreenState
                                 }
 
                                 if (toCreate.isEmpty) {
+                                  final duplicateMsg = names.length == 1
+                                      ? 'This subject already exists.'
+                                      : 'All specified subjects already exist.';
+                                  setModalState(() {
+                                    subjectErrorMessage = duplicateMsg;
+                                  });
                                   if (ctx.mounted) {
-                                    ScaffoldMessenger.of(ctx).showSnackBar(
+                                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                    ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
-                                        content: Text(names.length == 1
-                                            ? 'This subject already exists.'
-                                            : 'All specified subjects already exist.'),
-                                        backgroundColor: Colors.amber.shade800,
+                                        content: Row(
+                                          children: [
+                                            const Icon(Icons.info_outline, color: Colors.white, size: 20),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                duplicateMsg,
+                                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Colors.white),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        behavior: SnackBarBehavior.floating,
+                                        margin: EdgeInsets.only(
+                                          bottom: MediaQuery.of(context).size.height - 120,
+                                          left: 16,
+                                          right: 16,
+                                        ),
+                                        backgroundColor: const Color(0xFFD97706),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                        duration: const Duration(seconds: 3),
                                       ),
                                     );
                                   }
@@ -2369,27 +2439,47 @@ class _PrincipalTimetableManageScreenState
                     ),
                   ],
                   const SizedBox(height: 16),
-                  const Text('Existing Subjects:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                  const Text('Existing Subjects:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
                   const SizedBox(height: 8),
                   Expanded(
                     child: _subjects.isEmpty
-                        ? const Center(child: Text('No subjects added yet.'))
-                        : ListView.separated(
-                            itemCount: _subjects.length,
-                            separatorBuilder: (_, __) => const Divider(height: 1),
-                            itemBuilder: (ctx, idx) {
-                              final sub = _subjects[idx];
-                              final subId = sub['id'] as int;
-                              final isThisDeleting = deletingSubjectId == subId;
+                        ? const Center(
+                            child: Text(
+                              'No subjects added yet.',
+                              style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600),
+                            ),
+                          )
+                        : Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(14),
+                              child: ListView.separated(
+                                itemCount: _subjects.length,
+                                separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                                itemBuilder: (ctx, idx) {
+                                  final sub = _subjects[idx];
+                                  final subId = sub['id'] as int;
+                                  final isThisDeleting = deletingSubjectId == subId;
 
-                              return ListTile(
-                                dense: true,
-                                contentPadding: EdgeInsets.zero,
-                                leading: const Icon(Icons.book_outlined, color: Color(0xFFC26600), size: 20),
-                                title: Text(
-                                  (sub['name'] ?? '').toString().toUpperCase(),
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                ),
+                                  return ListTile(
+                                    dense: true,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                                    leading: Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFEF3C7),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Icon(Icons.menu_book_rounded, color: Color(0xFFD97706), size: 16),
+                                    ),
+                                    title: Text(
+                                      (sub['name'] ?? '').toString().toUpperCase(),
+                                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Color(0xFF0F172A)),
+                                    ),
                                 trailing: isThisDeleting
                                     ? const SizedBox(
                                         width: 32,
@@ -2400,13 +2490,13 @@ class _PrincipalTimetableManageScreenState
                                             height: 18,
                                             child: CircularProgressIndicator(
                                               strokeWidth: 2,
-                                              color: Color(0xFFC26600),
+                                              color: Color(0xFFD97706),
                                             ),
                                           ),
                                         ),
                                       )
                                     : IconButton(
-                                        icon: Icon(Icons.delete_outline, color: Colors.red.shade400, size: 20),
+                                        icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 20),
                                         onPressed: (deletingSubjectId != null || isAdding)
                                             ? null
                                             : () async {
@@ -2416,21 +2506,28 @@ class _PrincipalTimetableManageScreenState
                                                 final confirmed = await showDialog<bool>(
                                                   context: ctx,
                                                   builder: (dCtx) => AlertDialog(
-                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                                                    title: const Text('Delete Subject', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                                                    content: Text('Are you sure you want to delete "${sub['name']}"? This action cannot be undone.'),
+                                                    backgroundColor: const Color(0xFFFAF8F5),
+                                                    surfaceTintColor: Colors.transparent,
+                                                    shape: RoundedRectangleBorder(
+                                                      borderRadius: BorderRadius.circular(16),
+                                                      side: const BorderSide(color: Color(0xFFE2E8F0)),
+                                                    ),
+                                                    title: const Text('Delete Subject', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: Color(0xFF0F172A))),
+                                                    content: Text('Are you sure you want to delete "${sub['name']}"? This action cannot be undone.', style: const TextStyle(fontSize: 13, color: Color(0xFF475569))),
                                                     actions: [
                                                       TextButton(
                                                         onPressed: () => Navigator.pop(dCtx, false),
-                                                        child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                                                        child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
                                                       ),
                                                       ElevatedButton(
                                                         style: ElevatedButton.styleFrom(
-                                                          backgroundColor: Colors.red.shade700,
-                                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                                          backgroundColor: const Color(0xFFDC2626),
+                                                          foregroundColor: Colors.white,
+                                                          elevation: 0,
+                                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                                         ),
                                                         onPressed: () => Navigator.pop(dCtx, true),
-                                                        child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                                                        child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.w700)),
                                                       ),
                                                     ],
                                                   ),
@@ -2462,22 +2559,33 @@ class _PrincipalTimetableManageScreenState
                                                     showDialog(
                                                       context: ctx,
                                                       builder: (errCtx) => AlertDialog(
-                                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                                        backgroundColor: const Color(0xFFFAF8F5),
+                                                        surfaceTintColor: Colors.transparent,
+                                                        shape: RoundedRectangleBorder(
+                                                          borderRadius: BorderRadius.circular(16),
+                                                          side: const BorderSide(color: Color(0xFFE2E8F0)),
+                                                        ),
                                                         title: const Row(
                                                           children: [
-                                                            Icon(Icons.warning_amber_rounded, color: Colors.red, size: 24),
+                                                            Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 22),
                                                             SizedBox(width: 8),
-                                                            Text('Cannot Delete Subject', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                                                            Text('Cannot Delete Subject', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: Color(0xFF0F172A))),
                                                           ],
                                                         ),
                                                         content: Text(
                                                           validationMsg,
-                                                          style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B), height: 1.4),
+                                                          style: const TextStyle(fontSize: 13, color: Color(0xFF475569)),
                                                         ),
                                                         actions: [
-                                                          TextButton(
+                                                          ElevatedButton(
+                                                            style: ElevatedButton.styleFrom(
+                                                              backgroundColor: const Color(0xFFD97706),
+                                                              foregroundColor: Colors.white,
+                                                              elevation: 0,
+                                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                            ),
                                                             onPressed: () => Navigator.pop(errCtx),
-                                                            child: const Text('OK', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFC26600))),
+                                                            child: const Text('OK', style: TextStyle(fontWeight: FontWeight.w700)),
                                                           ),
                                                         ],
                                                       ),
@@ -2491,6 +2599,8 @@ class _PrincipalTimetableManageScreenState
                               );
                             },
                           ),
+                        ),
+                      ),
                   ),
                 ],
               ),

@@ -1295,7 +1295,7 @@ class _PrincipalSeatingPlanScreenState extends State<PrincipalSeatingPlanScreen>
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(color: const Color(0xFFD97706), width: 1.5),
             boxShadow: [
               BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2)),
             ],
@@ -1433,7 +1433,7 @@ class _PrincipalSeatingPlanScreenState extends State<PrincipalSeatingPlanScreen>
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(color: const Color(0xFFD97706), width: 1.5),
             boxShadow: [
               BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2)),
             ],
@@ -2355,6 +2355,7 @@ class _PrincipalSeatingPlanScreenState extends State<PrincipalSeatingPlanScreen>
 class DropdownMenuItemModel<T> {
   final T value;
   final String label;
-  const DropdownMenuItemModel({required this.value, required this.label});
+  final bool enabled;
+  const DropdownMenuItemModel({required this.value, required this.label, this.enabled = true});
 }
 

@@ -11,7 +11,7 @@ const String kQaBaseUrl = 'https://qa.shikshapilot.com';
 const String kProductionBaseUrl = 'https://app.shikshapilot.com';
 
 /// Wi-Fi LAN IP address of local dev server.
-const String kWifiBaseUrl = 'http://10.56.244.71:8000';
+const String kWifiBaseUrl = 'http://10.83.63.71:8000';
 
 /// USB ADB reverse port forwarding URL.
 const String kUsbBaseUrl = 'http://127.0.0.1:8000';

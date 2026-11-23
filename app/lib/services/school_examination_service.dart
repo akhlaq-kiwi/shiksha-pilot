@@ -58,6 +58,33 @@ class SchoolExaminationService {
     }
   }
 
+  /// Create a subject
+  Future<Map<String, dynamic>> createSubject(String name) async {
+    final uri = Uri.parse('$baseUrl/api/school/subjects');
+    final response = await http.post(
+      uri,
+      headers: _headers,
+      body: jsonEncode({'name': name}),
+    );
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      final decoded = json.decode(response.body);
+      return (decoded['data'] as Map<String, dynamic>?) ?? {};
+    } else {
+      final err = json.decode(response.body);
+      throw Exception(err['message'] ?? 'Failed to create subject');
+    }
+  }
+
+  /// Delete a subject
+  Future<void> deleteSubject(int id) async {
+    final uri = Uri.parse('$baseUrl/api/school/subjects/$id');
+    final response = await http.delete(uri, headers: _headers);
+    if (response.statusCode != 200 && response.statusCode != 204) {
+      final err = json.decode(response.body);
+      throw Exception(err['message'] ?? 'Failed to delete subject');
+    }
+  }
+
   /// Fetch official holidays
   Future<List<dynamic>> getHolidays() async {
     try {

@@ -2,13 +2,16 @@
 """
 Seed Script for ShikshaPilot School Data
 Adds teachers and students across all classes with realistic, unique data.
+Generates dynamic random 10-digit mobile numbers with automatic collision detection and retry.
 
 Usage:
-  python seed_school_data.py --url https://qa.shikshapilot.com --phone 1112223333 --password Test@123 --teachers 10 --new-students 5 --existing-students 5
+  python seed_school_data.py --url https://qa.shikshapilot.com --phone 9758576076 --password Test@123 --teachers 10 --new-students 6 --existing-students 4
 """
 
 import argparse
 import json
+import random
+import string
 import sys
 import time
 import urllib.request
@@ -65,6 +68,62 @@ COLONIES = [
 ]
 
 CITIES = ["New Delhi", "Noida", "Gurugram", "Ghaziabad", "Faridabad", "Jaipur", "Lucknow", "Indore"]
+
+
+def generate_random_phone(used_phones=None):
+    """Generate a realistic 10-digit Indian mobile number starting with 6, 7, 8, or 9."""
+    while True:
+        first = random.choice(["6", "7", "8", "9"])
+        rest = "".join(random.choices(string.digits, k=9))
+        phone = f"{first}{rest}"
+        if used_phones is None or phone not in used_phones:
+            if used_phones is not None:
+                used_phones.add(phone)
+            return phone
+
+
+def is_duplicate_phone_error(res):
+    """Detect if the API error is due to an already registered/duplicate phone number."""
+    if not isinstance(res, dict):
+        return False
+    msg = (res.get("message") or "").lower()
+    if any(k in msg for k in ["already registered", "already exists", "number is already", "entered number already registered"]):
+        return True
+    errors = res.get("data", {}).get("errors", {})
+    if isinstance(errors, dict):
+        for field, err in errors.items():
+            err_str = str(err).lower()
+            field_str = str(field).lower()
+            if any(f in field_str for f in ["phone", "mobile"]):
+                return True
+            if any(k in err_str for k in ["already registered", "already exists", "number is already"]):
+                return True
+    return False
+
+
+def is_duplicate_email_error(res):
+    """Detect if the API error is due to an already registered email."""
+    if not isinstance(res, dict):
+        return False
+    msg = (res.get("message") or "").lower()
+    if "email" in msg and ("already" in msg or "registered" in msg or "exists" in msg):
+        return True
+    errors = res.get("data", {}).get("errors", {})
+    if isinstance(errors, dict):
+        for field, err in errors.items():
+            if "email" in str(field).lower() and ("already" in str(err).lower() or "registered" in str(err).lower()):
+                return True
+    return False
+
+
+def is_duplicate_sr_error(res):
+    """Detect if the API error is due to duplicate SR number."""
+    if not isinstance(res, dict):
+        return False
+    errors = res.get("data", {}).get("errors", {})
+    if isinstance(errors, dict) and "sr_no" in errors:
+        return True
+    return "sr_no" in str(res).lower() and ("already exists" in str(res).lower() or "duplicate" in str(res).lower())
 
 
 def make_request(url, method="GET", payload=None, token=None, max_retries=3):
@@ -147,6 +206,8 @@ def seed_teachers(base_url, token, count=10):
     url = f"{base_url.rstrip('/')}/api/school/staff"
 
     created = 0
+    used_phones = set()
+
     for i in range(1, count + 1):
         idx = i - 1
         sub = SUBJECTS[idx % len(SUBJECTS)]
@@ -160,49 +221,62 @@ def seed_teachers(base_url, token, count=10):
         m_first = FEMALE_FIRST_NAMES[(idx + 5) % 40]
         mother_name = f"{m_first} Devi"
 
-        phone = f"98200{i:05d}"
-        emergency_phone = f"98210{i:05d}"
-        email = f"teacher{i:02d}.sp@shikshapilot.com"
-
         colony = COLONIES[idx % len(COLONIES)]
         city = CITIES[idx % len(CITIES)]
         address = f"House {100 + i}, {colony}"
 
-        payload = {
-            "name": teacher_name,
-            "role": "Teacher",
-            "department": sub,
-            "email": email,
-            "phone": phone,
-            "photo_path": None,
-            "father_name": father_name,
-            "mother_name": mother_name,
-            "salary": 1000,
-            "emergency_phone": emergency_phone,
-            "joining_date": "2026-09-01",
-            "exit_date": None,
-            "status": "ACTIVE",
-            "current_address_line": address,
-            "current_city": city,
-            "current_state": "Delhi",
-            "current_country": "India",
-            "current_pin_code": f"1100{i:02d}",
-            "permanent_address_line": address,
-            "permanent_city": city,
-            "permanent_state": "Delhi",
-            "permanent_country": "India",
-            "permanent_pin_code": f"1100{i:02d}",
-            "same_as_current": 1
-        }
+        max_attempts = 10
+        success = False
 
-        status, res = make_request(url, method="POST", payload=payload, token=token)
-        if status in (200, 201):
-            created += 1
-            t_id = res.get("data", {}).get("id")
-            emp_id = res.get("data", {}).get("employee_id")
-            print(f"[{created}/{count}] Added Teacher: {teacher_name} ({emp_id}) | Subject: {sub} | Phone: {phone} | Salary: 1000")
-        else:
-            print(f"[FAIL] Teacher {i} ({teacher_name}) failed ({status}): {res}")
+        for attempt in range(1, max_attempts + 1):
+            phone = generate_random_phone(used_phones)
+            emergency_phone = generate_random_phone(used_phones)
+            rand_suffix = random.randint(1000, 9999)
+            email = f"{first_name.lower()}.{last_name.lower()}{rand_suffix}@shikshapilot.qa"
+
+            payload = {
+                "name": teacher_name,
+                "role": "Teacher",
+                "department": sub,
+                "email": email,
+                "phone": phone,
+                "photo_path": None,
+                "father_name": father_name,
+                "mother_name": mother_name,
+                "salary": 1000,
+                "emergency_phone": emergency_phone,
+                "joining_date": "2026-09-01",
+                "exit_date": None,
+                "status": "ACTIVE",
+                "current_address_line": address,
+                "current_city": city,
+                "current_state": "Delhi",
+                "current_country": "India",
+                "current_pin_code": f"1100{i:02d}",
+                "permanent_address_line": address,
+                "permanent_city": city,
+                "permanent_state": "Delhi",
+                "permanent_country": "India",
+                "permanent_pin_code": f"1100{i:02d}",
+                "same_as_current": 1
+            }
+
+            status, res = make_request(url, method="POST", payload=payload, token=token)
+            if status in (200, 201):
+                created += 1
+                emp_id = res.get("data", {}).get("employee_id")
+                print(f"[{created}/{count}] Added Teacher: {teacher_name} ({emp_id}) | Subject: {sub} | Phone: {phone} | Salary: 1000")
+                success = True
+                break
+            elif is_duplicate_phone_error(res) or is_duplicate_email_error(res):
+                print(f"  [CONFLICT] Phone/Email already registered for Teacher '{teacher_name}' (Phone: {phone}). Assigning a new random 10-digit number (attempt {attempt}/{max_attempts})...")
+                continue
+            else:
+                print(f"[FAIL] Teacher {i} ({teacher_name}) failed ({status}): {res}")
+                break
+
+        if not success:
+            print(f"[FAIL] Teacher {i} ({teacher_name}) could not be added after {max_attempts} attempts.")
 
     print(f"\n[DONE] Successfully seeded {created}/{count} teachers.")
     return created
@@ -216,14 +290,43 @@ def seed_students(base_url, token, classes, new_students_per_class=5, existing_s
     print(f"==========================================")
     url = f"{base_url.rstrip('/')}/api/school/students"
 
-    global_sr = 1
+    # Query highest/next SR number from the school
+    next_sr_url = f"{base_url.rstrip('/')}/api/school/students/next-sr-no"
+    sr_status, sr_res = make_request(next_sr_url, method="GET", token=token)
+    current_sr = 1
+    if sr_status == 200 and "data" in sr_res and sr_res["data"].get("next_sr_no"):
+        try:
+            current_sr = int(sr_res["data"]["next_sr_no"])
+            print(f"[OK] Detected next available SR number from school: {current_sr}")
+        except (ValueError, TypeError):
+            current_sr = 1
+    else:
+        current_sr = 1
+
     total_created = 0
+    used_phones = set()
 
     for c_idx, cls in enumerate(classes):
         class_id = cls.get("id")
         class_name = cls.get("name")
         sec_name = f" ({cls.get('section')})" if cls.get("section") else ""
         print(f"\n--- Class {class_name}{sec_name} (ID: {class_id}) ---")
+
+        # Fetch existing students in this class to prevent roll number collisions
+        st_url = f"{base_url.rstrip('/')}/api/school/students?class_id={class_id}&limit=200"
+        st_status, st_res = make_request(st_url, method="GET", token=token)
+        existing_students = st_res.get("data", {}).get("students") if isinstance(st_res.get("data"), dict) else st_res.get("data", [])
+        if not isinstance(existing_students, list):
+            existing_students = []
+
+        existing_rolls = set()
+        for s in existing_students:
+            try:
+                existing_rolls.add(int(s.get("roll_no")))
+            except (ValueError, TypeError):
+                pass
+
+        available_roll = 1
 
         # Age based on class index (Class 1 -> ~2020 birth, Class 5 -> ~2016 birth)
         birth_year = 2020 - c_idx
@@ -234,85 +337,111 @@ def seed_students(base_url, token, classes, new_students_per_class=5, existing_s
             + ["Existing Student"] * existing_students_per_class
         )
 
-        for roll, student_category in enumerate(class_categories, start=1):
+        for item_idx, student_category in enumerate(class_categories, start=1):
+            # Find next free roll number for this class
+            while available_roll in existing_rolls:
+                available_roll += 1
+            roll = available_roll
+            existing_rolls.add(roll)
+
             is_male = (roll % 2 == 1)
-            first_name = (MALE_FIRST_NAMES if is_male else FEMALE_FIRST_NAMES)[(global_sr - 1) % 50]
-            mid_name = MIDDLE_NAMES[(global_sr - 1) % len(MIDDLE_NAMES)]
-            last_name = LAST_NAMES[(global_sr - 1) % len(LAST_NAMES)]
+            name_seed = current_sr
+            first_name = (MALE_FIRST_NAMES if is_male else FEMALE_FIRST_NAMES)[name_seed % len(MALE_FIRST_NAMES)]
+            mid_name = MIDDLE_NAMES[name_seed % len(MIDDLE_NAMES)]
+            last_name = LAST_NAMES[name_seed % len(LAST_NAMES)]
             gender = "Male" if is_male else "Female"
 
             # Month and day
-            b_month = (global_sr % 12) + 1
-            b_day = (global_sr % 28) + 1
+            b_month = (name_seed % 12) + 1
+            b_day = (name_seed % 28) + 1
             dob = f"{birth_year}-{b_month:02d}-{b_day:02d}"
 
-            blood = BLOOD_GROUPS[(global_sr - 1) % len(BLOOD_GROUPS)]
-            category = CATEGORIES[(global_sr - 1) % len(CATEGORIES)]
-            religion = RELIGIONS[(global_sr - 1) % len(RELIGIONS)]
-
-            # 12-digit Aadhaar & 10-digit mobile
-            aadhaar_no = f"7000{global_sr:08d}"
-            student_mobile = f"98300{global_sr:05d}"
-            student_email = f"student{global_sr:03d}.sp@shikshapilot.com"
+            blood = BLOOD_GROUPS[name_seed % len(BLOOD_GROUPS)]
+            category = CATEGORIES[name_seed % len(CATEGORIES)]
+            religion = RELIGIONS[name_seed % len(RELIGIONS)]
 
             # Parents
-            f_first = MALE_FIRST_NAMES[(global_sr + 7) % 50]
+            f_first = MALE_FIRST_NAMES[(name_seed + 7) % len(MALE_FIRST_NAMES)]
             father_name = f"{f_first} {mid_name} {last_name}"
-            m_first = FEMALE_FIRST_NAMES[(global_sr + 7) % 50]
+            m_first = FEMALE_FIRST_NAMES[(name_seed + 7) % len(FEMALE_FIRST_NAMES)]
             mother_name = f"{m_first} Devi"
-            occupation = OCCUPATIONS[(global_sr - 1) % len(OCCUPATIONS)]
+            occupation = OCCUPATIONS[name_seed % len(OCCUPATIONS)]
 
             # Address
-            colony = COLONIES[(global_sr - 1) % len(COLONIES)]
-            city = CITIES[(global_sr - 1) % len(CITIES)]
-            address = f"House {200 + global_sr}, {colony}"
-            pin_code = f"1100{(global_sr % 90) + 10:02d}"
+            colony = COLONIES[name_seed % len(COLONIES)]
+            city = CITIES[name_seed % len(CITIES)]
+            address = f"House {200 + name_seed}, {colony}"
+            pin_code = f"1100{(name_seed % 90) + 10:02d}"
 
-            # Note: admission_fee is intentionally omitted; backend auto-applies configured Admission Fee to New Admissions
-            payload = {
-                "first_name": first_name,
-                "middle_name": mid_name,
-                "last_name": last_name,
-                "gender": gender,
-                "dob": dob,
-                "blood_group": blood,
-                "category": category,
-                "religion": religion,
-                "aadhaar_no": aadhaar_no,
-                "student_mobile": student_mobile,
-                "student_email": student_email,
-                "class_id": class_id,
-                "roll_no": str(roll),
-                "sr_no": str(global_sr),
-                "admission_date": "2026-04-01",
-                "student_category": student_category,
-                "status": "ACTIVE",
-                "exit_date": None,
-                "father_name": father_name,
-                "mother_name": mother_name,
-                "parent_occupation": occupation,
-                "current_address_line": address,
-                "current_city": city,
-                "current_state": "Delhi",
-                "current_country": "India",
-                "current_pin_code": pin_code,
-                "permanent_address_line": address,
-                "permanent_city": city,
-                "permanent_state": "Delhi",
-                "permanent_country": "India",
-                "permanent_pin_code": pin_code,
-                "same_as_current": 1
-            }
+            max_attempts = 10
+            student_created = False
 
-            status, res = make_request(url, method="POST", payload=payload, token=token)
-            if status in (200, 201):
-                total_created += 1
-                s_id = res.get("data", {}).get("id")
-                print(f"  [SR #{global_sr:02d}] {first_name} {last_name} | Roll: {roll} | Category: {student_category} | ID: {s_id}")
-            else:
-                print(f"  [FAIL] SR #{global_sr:02d} ({first_name} {last_name}) failed ({status}): {res}")
+            for attempt in range(1, max_attempts + 1):
+                # 10-digit random mobile starting with 6, 7, 8, or 9
+                student_mobile = generate_random_phone(used_phones)
+                rand_id = random.randint(10000, 99999)
+                student_email = f"{first_name.lower()}.{last_name.lower()}{rand_id}@shikshapilot.qa"
+                # 12-digit random Aadhaar
+                aadhaar_first = random.choice(["2", "3", "4", "5", "6", "7", "8", "9"])
+                aadhaar_rest = "".join(random.choices(string.digits, k=11))
+                aadhaar_no = f"{aadhaar_first}{aadhaar_rest}"
 
-            global_sr += 1
+                payload = {
+                    "first_name": first_name,
+                    "middle_name": mid_name,
+                    "last_name": last_name,
+                    "gender": gender,
+                    "dob": dob,
+                    "blood_group": blood,
+                    "category": category,
+                    "religion": religion,
+                    "aadhaar_no": aadhaar_no,
+                    "student_mobile": student_mobile,
+                    "student_email": student_email,
+                    "class_id": class_id,
+                    "roll_no": str(roll),
+                    "sr_no": str(current_sr),
+                    "admission_date": "2026-04-01",
+                    "student_category": student_category,
+                    "status": "ACTIVE",
+                    "exit_date": None,
+                    "father_name": father_name,
+                    "mother_name": mother_name,
+                    "parent_occupation": occupation,
+                    "current_address_line": address,
+                    "current_city": city,
+                    "current_state": "Delhi",
+                    "current_country": "India",
+                    "current_pin_code": pin_code,
+                    "permanent_address_line": address,
+                    "permanent_city": city,
+                    "permanent_state": "Delhi",
+                    "permanent_country": "India",
+                    "permanent_pin_code": pin_code,
+                    "same_as_current": 1
+                }
+
+                status, res = make_request(url, method="POST", payload=payload, token=token)
+                if status in (200, 201):
+                    total_created += 1
+                    s_id = res.get("data", {}).get("id")
+                    print(f"  [SR #{current_sr}] {first_name} {last_name} | Roll: {roll} | Phone: {student_mobile} | Category: {student_category} | ID: {s_id}")
+                    current_sr += 1
+                    student_created = True
+                    break
+                elif is_duplicate_phone_error(res) or is_duplicate_email_error(res):
+                    print(f"  [CONFLICT] Number/Email already registered for '{first_name} {last_name}' (Phone: {student_mobile}). Retrying with a new 10-digit random number (attempt {attempt}/{max_attempts})...")
+                    continue
+                elif is_duplicate_sr_error(res):
+                    print(f"  [CONFLICT] SR #{current_sr} already exists in this school. Incrementing SR and retrying...")
+                    current_sr += 1
+                    continue
+                else:
+                    print(f"  [FAIL] SR #{current_sr} ({first_name} {last_name}) failed ({status}): {res}")
+                    break
+
+            if not student_created:
+                print(f"  [FAIL] Student '{first_name} {last_name}' could not be created after {max_attempts} attempts.")
 
     print(f"\n[DONE] Successfully seeded {total_created}/{total_to_create} students across {len(classes)} classes.")
     return total_created
@@ -380,4 +509,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
