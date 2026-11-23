@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:school_hub/services/http_service.dart' as http;
 import '../services/attendance_service.dart';
+import '../services/attendance_offline_manager.dart';
 import '../utils/class_formatter.dart';
 import '../widgets/profile_avatar_view.dart';
 
@@ -92,8 +93,36 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       _loadStudentData();
     }
 
-    // Auto-retry connection timer
-    _offlineRetryTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+    // Auto-retry connection and auto-sync offline attendance
+    _offlineRetryTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
+      // 1. Sync pending offline submissions whenever possible
+      try {
+        final synced = await AttendanceOfflineManager.syncPendingSubmissions(widget.attendanceService);
+        if (synced.isNotEmpty && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.cloud_done_rounded, color: Colors.white, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Synced offline attendance for ${synced.join(", ")} to database successfully!',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: Colors.green.shade700,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+          _fetchTeacherAttendanceForDate();
+        }
+      } catch (_) {}
+
+      // 2. Retry connection if offline
       if (_isOffline) {
         if (isTeacherRole) {
           if (_classes.isEmpty) {
@@ -106,6 +135,22 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         }
       }
     });
+  }
+
+  bool _isNetworkError(dynamic e) {
+    if (e is SocketException) return true;
+    final errStr = e.toString().toLowerCase();
+    return errStr.contains('socketexception') ||
+        errStr.contains('failed host lookup') ||
+        errStr.contains('connection reset') ||
+        errStr.contains('connection abort') ||
+        errStr.contains('connection refused') ||
+        errStr.contains('network is unreachable') ||
+        errStr.contains('no address associated with hostname') ||
+        errStr.contains('clientexception') ||
+        errStr.contains('timeoutexception') ||
+        errStr.contains('handshakeexception') ||
+        errStr.contains('os error');
   }
 
   Future<void> _markAttendanceNotificationsRead() async {
@@ -209,50 +254,77 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       _isLoadingAttendanceForDate = true;
     });
 
+    List<dynamic> rawClasses = [];
+    List<dynamic> holidaysList = [];
+
     try {
-      final rawClasses = await widget.attendanceService.getTeacherClasses();
-      List<dynamic> holidaysList = [];
+      rawClasses = await widget.attendanceService.getTeacherClasses();
       try {
         holidaysList = await widget.attendanceService.getHolidays();
       } catch (he) {
         debugPrint('Error loading holidays: $he');
       }
 
-      // Filter unsectioned classes if sectioned variants exist for the same class name
-      final Set<String> classesWithSections = {};
-      for (final c in rawClasses) {
-        final name = (c['name'] ?? '').toString().trim().toLowerCase();
-        final sec = (c['section'] ?? '').toString().trim();
-        if (sec.isNotEmpty) {
-          classesWithSections.add(name);
+      await AttendanceOfflineManager.cacheClasses(rawClasses);
+      await AttendanceOfflineManager.cacheHolidays(holidaysList);
+      _isOffline = false;
+    } catch (e) {
+      if (_isNetworkError(e)) {
+        _isOffline = true;
+        rawClasses = await AttendanceOfflineManager.getCachedClasses();
+        holidaysList = await AttendanceOfflineManager.getCachedHolidays();
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(e.toString().replaceAll('Exception:', '').trim())),
+          );
         }
       }
+    }
 
-      final List<dynamic> classesList = sortClassesAscending(
-        rawClasses.where((c) {
-          final name = (c['name'] ?? '').toString().trim().toLowerCase();
-          final sec = (c['section'] ?? '').toString().trim();
-          if (sec.isEmpty && classesWithSections.contains(name)) {
-            return false;
-          }
-          return true;
-        }).toList(),
-      );
+    _applyClassesAndHolidays(rawClasses, holidaysList);
+  }
 
+  void _applyClassesAndHolidays(List<dynamic> rawClasses, List<dynamic> holidaysList) async {
+    // Filter unsectioned classes if sectioned variants exist for the same class name
+    final Set<String> classesWithSections = {};
+    for (final c in rawClasses) {
+      final name = (c['name'] ?? '').toString().trim().toLowerCase();
+      final sec = (c['section'] ?? '').toString().trim();
+      if (sec.isNotEmpty) {
+        classesWithSections.add(name);
+      }
+    }
+
+    final List<dynamic> classesList = sortClassesAscending(
+      rawClasses.where((c) {
+        final name = (c['name'] ?? '').toString().trim().toLowerCase();
+        final sec = (c['section'] ?? '').toString().trim();
+        if (sec.isEmpty && classesWithSections.contains(name)) {
+          return false;
+        }
+        return true;
+      }).toList(),
+    );
+
+    if (mounted) {
       setState(() {
         _classes = classesList;
         _holidays = holidaysList;
-        _isOffline = false;
+        _isLoadingTeacherData = false;
       });
-      if (classesList.isNotEmpty) {
-        _selectedClassId = classesList[0]['id'];
-        final firstClass = classesList[0];
-        _selectedClassName = formatShortClassName(
-          firstClass['name']?.toString(),
-          section: firstClass['section']?.toString(),
-        );
-        await _fetchTeacherStudentsAndHistory();
-      } else {
+    }
+
+    if (classesList.isNotEmpty) {
+      _selectedClassId = classesList[0]['id'];
+      final firstClass = classesList[0];
+      _selectedClassName = formatShortClassName(
+        firstClass['name']?.toString(),
+        section: firstClass['section']?.toString(),
+      );
+      await _fetchTeacherStudentsAndHistory();
+    } else {
+      if (mounted) {
         setState(() {
           _selectedClassId = null;
           _selectedClassName = '';
@@ -260,20 +332,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           _isLoadingAttendanceForDate = false;
         });
       }
-    } catch (e) {
-      if (e is SocketException || e.toString().contains('SocketException') || e.toString().contains('Failed host lookup')) {
-        setState(() {
-          _isOffline = true;
-        });
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceAll('Exception:', '').trim())),
-        );
-      }
-    } finally {
-      setState(() {
-        _isLoadingTeacherData = false;
-      });
     }
   }
 
@@ -306,67 +364,76 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       _isLoadingAttendanceForDate = true;
     });
 
+    List<dynamic> studentsList = [];
     try {
-      final studentsList = await widget.attendanceService.getTeacherStudents(_selectedClassId!);
-      setState(() {
-        _students = studentsList;
-        _tempAttendance.clear();
-      });
-      await _fetchTeacherAttendanceForDate();
+      studentsList = await widget.attendanceService.getTeacherStudents(_selectedClassId!);
+      await AttendanceOfflineManager.cacheStudents(_selectedClassId!, studentsList);
+      _isOffline = false;
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString().replaceAll('Exception:', '').trim())),
-      );
+      if (_isNetworkError(e)) {
+        _isOffline = true;
+        studentsList = await AttendanceOfflineManager.getCachedStudents(_selectedClassId!);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(e.toString().replaceAll('Exception:', '').trim())),
+          );
+        }
+      }
     } finally {
-      setState(() {
-        _isLoadingTeacherData = false;
-      });
+      if (mounted) {
+        setState(() {
+          _students = studentsList;
+          _tempAttendance.clear();
+          _isLoadingTeacherData = false;
+        });
+      }
     }
+
+    await _fetchTeacherAttendanceForDate();
   }
 
   Future<void> _fetchTeacherAttendanceForDate() async {
     if (_selectedClassId == null || _teacherSelectedDate == null) return;
     final dateStr = _formatYmd(_teacherSelectedDate!);
 
+    List<dynamic> history = [];
     try {
-      final history = await widget.attendanceService.getTeacherAttendanceHistory(_selectedClassId!, dateStr);
-      setState(() {
-        _markedHistory = history;
-        final totalStudentsCount = _students.length;
-        final markedCount = history.length;
-        _isSubmittedForSelectedDate = totalStudentsCount > 0 && markedCount >= totalStudentsCount;
-        _isOffline = false;
-
-        // Clear temp state so previous date statuses never leak across dates
-        _tempAttendance.clear();
-
-        // Map actual saved attendance records from DB for the selected date (if any exist)
-        for (var record in history) {
-          final sId = record['student_id'] as int;
-          final status = record['status'] as String;
-          _tempAttendance[sId] = status;
-        }
-      });
+      history = await widget.attendanceService.getTeacherAttendanceHistory(_selectedClassId!, dateStr);
+      await AttendanceOfflineManager.cacheHistory(_selectedClassId!, dateStr, history);
+      _isOffline = false;
     } catch (e) {
-      final errStr = e.toString().toLowerCase();
-      if (e is SocketException || 
-          errStr.contains('socketexception') || 
-          errStr.contains('failed host lookup') || 
-          errStr.contains('connection reset') || 
-          errStr.contains('connection abort') || 
-          errStr.contains('clientexception')) {
-        setState(() {
-          _isOffline = true;
-        });
+      if (_isNetworkError(e)) {
+        _isOffline = true;
+        history = await AttendanceOfflineManager.getCachedHistory(_selectedClassId!, dateStr);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceAll('Exception:', '').trim())),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(e.toString().replaceAll('Exception:', '').trim())),
+          );
+        }
       }
     } finally {
-      setState(() {
-        _isLoadingAttendanceForDate = false;
-      });
+      if (history.isEmpty) {
+        history = await AttendanceOfflineManager.getCachedHistory(_selectedClassId!, dateStr);
+      }
+
+      if (mounted) {
+        setState(() {
+          _markedHistory = history;
+          final totalStudentsCount = _students.length;
+          final markedCount = history.length;
+          _isSubmittedForSelectedDate = totalStudentsCount > 0 && markedCount >= totalStudentsCount;
+
+          _tempAttendance.clear();
+          for (var record in history) {
+            final sId = int.tryParse(record['student_id']?.toString() ?? '') ?? 0;
+            final status = (record['status'] ?? 'Present').toString();
+            if (sId > 0) _tempAttendance[sId] = status;
+          }
+          _isLoadingAttendanceForDate = false;
+        });
+      }
     }
   }
 
@@ -421,63 +488,117 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     });
 
     final dateStr = _formatYmd(_teacherSelectedDate!);
+    final records = _tempAttendance.entries.map((e) => {
+      'student_id': e.key,
+      'status': e.value,
+    }).toList();
 
     try {
-      // Mark attendance sequentially / concurrently for all students in sheet
-      List<Future<void>> markFutures = [];
-      _tempAttendance.forEach((studentId, status) {
-        markFutures.add(
-          widget.attendanceService.markTeacherAttendance(
-            studentId: studentId,
-            classId: _selectedClassId!,
-            dateYyyyMmDd: dateStr,
-            status: status,
-          )
-        );
-      });
-
-      await Future.wait(markFutures);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Attendance Submitted'),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 1),
-        ),
+      // 1. Online Batch Submission
+      await widget.attendanceService.markTeacherAttendanceBatch(
+        classId: _selectedClassId!,
+        dateYyyyMmDd: dateStr,
+        records: records,
       );
 
-      // Refresh data
-      await _fetchTeacherAttendanceForDate();
-    } catch (e) {
-      final errStr = e.toString().replaceAll('Exception:', '').trim();
-      final errLower = errStr.toLowerCase();
-      if (errLower.contains('holiday') || errLower.contains('sunday') || errLower.contains('leave')) {
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('No Attendance Required', style: TextStyle(fontWeight: FontWeight.bold)),
-            content: Text('Attendance is not required for the selected date because it is a scheduled holiday or weekend.\n\n($errStr)'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-        );
-      } else {
+      // Cache online success locally
+      final historyRecords = records.map((r) => {
+        'student_id': r['student_id'],
+        'status': r['status'],
+        'date': dateStr,
+      }).toList();
+      await AttendanceOfflineManager.cacheHistory(_selectedClassId!, dateStr, historyRecords);
+
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errStr),
-            backgroundColor: Colors.red,
+          const SnackBar(
+            content: Text('Attendance Submitted'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 1),
           ),
         );
       }
+
+      await _fetchTeacherAttendanceForDate();
+    } catch (e) {
+      if (_isNetworkError(e)) {
+        // 2. OFFLINE QUEUE: Save offline on device & auto-sync when online
+        await AttendanceOfflineManager.enqueueSubmission(
+          classId: _selectedClassId!,
+          className: _selectedClassName,
+          date: dateStr,
+          attendance: _tempAttendance,
+        );
+
+        if (mounted) {
+          setState(() {
+            _isOffline = true;
+            _isSubmittedForSelectedDate = true;
+            _markedHistory = records.map((r) => {
+              'student_id': r['student_id'],
+              'status': r['status'],
+              'date': dateStr,
+              'is_offline_pending': true,
+            }).toList();
+          });
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: const [
+                  Icon(Icons.cloud_off_rounded, color: Colors.white, size: 20),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'No internet. Attendance saved offline on device and will sync automatically once internet returns!',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: const Color(0xFFD97706),
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      } else {
+        final errStr = e.toString().replaceAll('Exception:', '').trim();
+        final errLower = errStr.toLowerCase();
+        if (errLower.contains('holiday') || errLower.contains('sunday') || errLower.contains('leave')) {
+          if (mounted) {
+            showDialog(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('No Attendance Required', style: TextStyle(fontWeight: FontWeight.bold)),
+                content: Text('Attendance is not required for the selected date because it is a scheduled holiday or weekend.\n\n($errStr)'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: const Text('OK'),
+                  ),
+                ],
+              ),
+            );
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(errStr),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      }
     } finally {
-      setState(() {
-        _isTeacherSubmitting = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isTeacherSubmitting = false;
+        });
+      }
     }
   }
 
@@ -597,17 +718,20 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           // Offline Banner
           if (_isOffline)
             Container(
-              color: Colors.red.shade600,
+              color: const Color(0xFFD97706),
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
+              padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 16),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: const [
                   Icon(Icons.wifi_off_rounded, color: Colors.white, size: 16),
                   SizedBox(width: 8),
-                  Text(
-                    'No internet connection. Retrying...',
-                    style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                  Expanded(
+                    child: Text(
+                      'Offline Mode: You can mark attendance. It will sync automatically when internet restores.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ],
               ),
@@ -1618,7 +1742,35 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   }
 
   Widget _buildTeacherStatusBadge() {
+    final hasPendingOffline = _markedHistory.any((r) => r['is_offline_pending'] == true);
+
     if (_isSubmittedForSelectedDate) {
+      if (hasPendingOffline) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFEF3C7),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFFCD34D)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Icon(Icons.cloud_upload_outlined, size: 16, color: Color(0xFFD97706)),
+              SizedBox(width: 6),
+              Text(
+                'Attendance Saved (Offline - Sync Pending)',
+                style: TextStyle(
+                  color: Color(0xFFB45309),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(

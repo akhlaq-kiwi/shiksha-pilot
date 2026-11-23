@@ -95,6 +95,36 @@ class AttendanceService {
     }
   }
 
+  // Teacher: Mark attendance for an entire class on a date in batch
+  Future<void> markTeacherAttendanceBatch({
+    required int classId,
+    required String dateYyyyMmDd,
+    required List<Map<String, dynamic>> records,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/teacher/attendance');
+    final body = {
+      'class_id': classId,
+      'date': dateYyyyMmDd,
+      'records': records,
+    };
+    final response = await http.post(
+      uri,
+      headers: _headers(),
+      body: json.encode(body),
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      final decoded = json.decode(response.body);
+      final msg = decoded['message'] ?? 'Failed to mark attendance.';
+      final errors = decoded['errors'];
+      if (errors is Map && errors.isNotEmpty) {
+        final details = errors.values.join(', ');
+        throw Exception('$msg: $details');
+      }
+      throw Exception(msg);
+    }
+  }
+
   // Fetch school holidays
   Future<List<dynamic>> getHolidays() async {
     final uri = Uri.parse('$baseUrl/api/school/holidays');

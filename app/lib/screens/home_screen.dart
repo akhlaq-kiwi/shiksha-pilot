@@ -16,6 +16,7 @@ import 'package:school_hub/screens/notification_center_screen.dart';
 import 'package:school_hub/screens/notice_screen.dart';
 import 'package:school_hub/screens/timetable_screen.dart';
 import 'package:school_hub/services/attendance_service.dart';
+import 'package:school_hub/services/attendance_offline_manager.dart';
 import 'package:school_hub/services/notification_helper.dart';
 import 'package:school_hub/services/push_notification_service.dart';
 import 'package:school_hub/services/local_notification_scheduler.dart';
@@ -366,6 +367,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         initialDelay: const Duration(seconds: 5),
         existingWorkPolicy: ExistingWorkPolicy.append,
       );
+    } else if (state == AppLifecycleState.resumed) {
+      _loadSessionInfo();
     }
   }
 
@@ -481,10 +484,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
     }
 
-    // Refresh profile details dynamically in background to sync profile pictures immediately!
+    // Refresh profile details and sync any pending offline attendance dynamically in background
     final token = prefs.getString('auth_token');
     if (token != null && token.isNotEmpty) {
       _syncProfileDetails(token);
+      final effectiveBase = (_workingBaseUrl.isNotEmpty && !_workingBaseUrl.contains('127.0.0.1'))
+          ? _workingBaseUrl
+          : widget.leaveService.baseUrl;
+      AttendanceOfflineManager.syncPendingSubmissions(
+        AttendanceService(baseUrl: effectiveBase, token: token),
+      );
     }
     _fetchUnreadNotificationsCount();
     _fetchUnreadNoticesCount();
