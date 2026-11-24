@@ -4656,33 +4656,7 @@ class SchoolAdminService extends BaseService
         $stmtResetCurrent = $pdo->prepare("UPDATE academic_years SET is_current = 0 WHERE school_id = :sid AND id != :new_id");
         $stmtResetCurrent->execute([':sid' => $schoolId, ':new_id' => $newYearId]);
 
-        // 4. Prefill standard national holidays
-        $defaultHolidays = [
-            ['name' => 'Labour Day', 'date' => "{$startYear}-05-01"],
-            ['name' => 'Independence Day', 'date' => "{$startYear}-08-15"],
-            ['name' => 'Mahatma Gandhi Jayanti', 'date' => "{$startYear}-10-02"],
-            ['name' => 'Christmas Day', 'date' => "{$startYear}-12-25"],
-            ['name' => 'New Year\'s Day', 'date' => "{$endYear}-01-01"],
-            ['name' => 'Republic Day', 'date' => "{$endYear}-01-26"]
-        ];
-
-        $stmtHoliday = $pdo->prepare("
-            INSERT INTO holidays (school_id, academic_year_id, name, date)
-            VALUES (:school_id, :academic_year_id, :name, :date)
-            ON DUPLICATE KEY UPDATE 
-                academic_year_id = VALUES(academic_year_id),
-                name = VALUES(name)
-        ");
-        foreach ($defaultHolidays as $h) {
-            $stmtHoliday->execute([
-                ':school_id' => $schoolId,
-                ':academic_year_id' => $newYearId,
-                ':name' => $h['name'],
-                ':date' => $h['date']
-            ]);
-        }
-
-        // 5. Create Default Timetable/Academic Settings
+        // 4. Create Default Timetable/Academic Settings
         $stmtSettings = $pdo->prepare("
             INSERT INTO school_timetable_settings (school_id, school_start_time, period_duration, interval_duration, interval_after_period, total_periods, start_date)
             VALUES (:school_id, '08:00:00', 40, 20, 4, 8, :start_date)
@@ -4780,30 +4754,8 @@ class SchoolAdminService extends BaseService
         ]);
         $newYearId = (int)$pdo->lastInsertId();
 
-        // Automatically prefill standard national holidays
-        $defaultHolidays = [
-            ['name' => 'Labour Day', 'date' => "{$startYear}-05-01"],
-            ['name' => 'Independence Day', 'date' => "{$startYear}-08-15"],
-            ['name' => 'Mahatma Gandhi Jayanti', 'date' => "{$startYear}-10-02"],
-            ['name' => 'Christmas Day', 'date' => "{$startYear}-12-25"],
-            ['name' => 'New Year\'s Day', 'date' => "{$endYear}-01-01"],
-            ['name' => 'Republic Day', 'date' => "{$endYear}-01-26"]
-        ];
-
-        $stmtHoliday = $pdo->prepare("
-            INSERT INTO holidays (school_id, academic_year_id, name, date)
-            VALUES (:school_id, :academic_year_id, :name, :date)
-        ");
-        foreach ($defaultHolidays as $h) {
-            $stmtHoliday->execute([
-                ':school_id' => $schoolId,
-                ':academic_year_id' => $newYearId,
-                ':name' => $h['name'],
-                ':date' => $h['date']
-            ]);
-        }
-
-        $this->log('Academic year created as Draft with default national holidays', ['name' => $body['name'], 'school_id' => $schoolId]);
+        // Academic year created without default holidays - holidays are user-defined
+        $this->log('Academic year created as Draft', ['name' => $body['name'], 'school_id' => $schoolId]);
         return ['id' => $newYearId, 'name' => $body['name'], 'status' => 'Draft'];
     }
 
@@ -16407,41 +16359,6 @@ Only approve the settlement after reviewing all financial records.
         $stmt->execute([':sid' => $schoolId]);
         $holidays = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        if (count($holidays) === 0 && $workingYear) {
-            // Auto-prefill if empty
-            if (preg_match('/^(\d{4})[-–—](\d{4})$/u', trim($workingYear['name']), $matches)) {
-                $startYear = (int)$matches[1];
-                $endYear = (int)$matches[2];
-            } else {
-                $startYear = (int)date('Y', strtotime($workingYear['start_date']));
-                $endYear = (int)date('Y', strtotime($workingYear['end_date']));
-            }
-            $defaultHolidays = [
-                ['name' => 'Labour Day', 'date' => "{$startYear}-05-01"],
-                ['name' => 'Independence Day', 'date' => "{$startYear}-08-15"],
-                ['name' => 'Mahatma Gandhi Jayanti', 'date' => "{$startYear}-10-02"],
-                ['name' => 'Christmas Day', 'date' => "{$startYear}-12-25"],
-                ['name' => 'New Year\'s Day', 'date' => "{$endYear}-01-01"],
-                ['name' => 'Republic Day', 'date' => "{$endYear}-01-26"]
-            ];
-            $stmtHoliday = $pdo->prepare("
-                INSERT IGNORE INTO holidays (school_id, academic_year_id, name, date)
-                VALUES (:school_id, :academic_year_id, :name, :date)
-            ");
-            foreach ($defaultHolidays as $h) {
-                if ($h['date'] >= $workingYear['start_date'] && $h['date'] <= $workingYear['end_date']) {
-                    $stmtHoliday->execute([
-                        ':school_id' => $schoolId,
-                        ':academic_year_id' => (int)$workingYear['id'],
-                        ':name' => $h['name'],
-                        ':date' => $h['date']
-                    ]);
-                }
-            }
-            $stmt->execute([':sid' => $schoolId]);
-            $holidays = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        }
-
         return $holidays;
     }
 
@@ -18482,8 +18399,8 @@ Only approve the settlement after reviewing all financial records.
             }
         }
 
-        // Also insert role-wide broadcast notifications & FCM topic push if classId is 0 (all classes) or for scheme/admit card/result publication to teachers
-        if ($classId <= 0 || in_array($type, ['SCHEME', 'UNPUBLISH_SCHEME', 'ADMIT_CARD', 'UNPUBLISH_ADMIT_CARD', 'RESULT', 'SCHEDULED'])) {
+        // Also insert role-wide broadcast notifications & FCM topic push if classId is 0 (all classes) or for scheme/result publication to teachers (Admit Cards are never sent to teachers)
+        if (($classId <= 0 || in_array($type, ['SCHEME', 'UNPUBLISH_SCHEME', 'RESULT', 'SCHEDULED'])) && !in_array($type, ['ADMIT_CARD', 'UNPUBLISH_ADMIT_CARD'])) {
             $stmtCheckTeacher = $pdo->prepare("
                 SELECT COUNT(*) FROM dashboard_notifications
                 WHERE school_id = :sid AND user_role = 'TEACHER' AND user_id IS NULL AND title = :title AND message = :msg

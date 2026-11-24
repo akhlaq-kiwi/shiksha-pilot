@@ -1785,12 +1785,25 @@ class TeacherService extends BaseService
             throw new ValidationException([], 'You have no assigned class.');
         }
 
-        // Fetch active working academic year
-        $stmtAy = $pdo->prepare("SELECT id FROM academic_years WHERE school_id = :sid AND (status = 'ACTIVE' OR is_current = 1) ORDER BY start_date DESC LIMIT 1");
-        $stmtAy->execute([':sid' => $schoolId]);
-        $academicYearId = (int)($stmtAy->fetchColumn() ?: 0);
+        // 1. Fetch active working academic year (prefer class's academic year)
+        $academicYearId = 0;
+        if ($classId > 0) {
+            $stmtClassAy = $pdo->prepare("SELECT academic_year_id FROM classes WHERE id = :cid LIMIT 1");
+            $stmtClassAy->execute([':cid' => $classId]);
+            $academicYearId = (int)($stmtClassAy->fetchColumn() ?: 0);
+        }
+        if ($academicYearId <= 0) {
+            $stmtAy = $pdo->prepare("SELECT id FROM academic_years WHERE school_id = :sid AND (status = 'ACTIVE' OR is_current = 1) ORDER BY start_date DESC LIMIT 1");
+            $stmtAy->execute([':sid' => $schoolId]);
+            $academicYearId = (int)($stmtAy->fetchColumn() ?: 0);
+        }
+        if ($academicYearId <= 0) {
+            $stmtAy = $pdo->prepare("SELECT id FROM academic_years WHERE school_id = :sid ORDER BY start_date DESC LIMIT 1");
+            $stmtAy->execute([':sid' => $schoolId]);
+            $academicYearId = (int)($stmtAy->fetchColumn() ?: 0);
+        }
 
-        // Resolve academic year's assigned report card template code
+        // 2. Resolve academic year's assigned report card template code
         $tplCode = null;
         if ($academicYearId > 0) {
             $stmtAyTpl = $pdo->prepare("
@@ -1827,23 +1840,38 @@ class TeacherService extends BaseService
         }
         $tplCode = strtolower((string)($tplCode ?: 'modern'));
 
+        // 3. Auto-seed default session exams if needed
         if ($academicYearId > 0) {
             $refSA = new \ReflectionClass(\App\Domain\SchoolAdmin\Services\SchoolAdminService::class);
             $schoolAdminService = $refSA->newInstanceWithoutConstructor();
             $schoolAdminService->autoSeedDefaultSessionExams($pdo, $schoolId, $academicYearId);
         }
 
-        if ($tplCode === 'cbse_classic') {
+        // Check if there are any child exams (sub-tests) or CBSE family template in this school
+        $stmtHasChildren = $pdo->prepare("SELECT COUNT(*) FROM examinations WHERE school_id = :sid AND parent_id IS NOT NULL");
+        $stmtHasChildren->execute([':sid' => $schoolId]);
+        $hasChildren = ((int)$stmtHasChildren->fetchColumn()) > 0;
+
+        $isCbseFamily = ($tplCode === 'cbse_classic' || str_starts_with($tplCode, 'cbse_') || $hasChildren);
+
+        if ($isCbseFamily) {
             $sqlTerm = "
-                SELECT e.id, e.name, e.description
+                SELECT e.id, e.name, e.description, COALESCE(e.template_code, 'cbse_classic') AS template_code
                 FROM examinations e
                 WHERE e.school_id = :school_id
                   AND e.parent_id IS NULL
-                  AND (e.template_code = 'cbse_classic' OR (e.template_code IS NULL AND (LOWER(e.name) LIKE '%first term%' OR LOWER(e.name) LIKE '%second term%')))
+                  AND (
+                    e.template_code = 'cbse_classic' 
+                    OR e.template_code LIKE 'cbse_%' 
+                    OR e.template_code IS NULL 
+                    OR LOWER(e.name) LIKE '%first term%' 
+                    OR LOWER(e.name) LIKE '%second term%'
+                    OR EXISTS (SELECT 1 FROM examinations c WHERE c.parent_id = e.id)
+                  )
             ";
             $paramsTerm = [':school_id' => $schoolId];
             if ($academicYearId > 0) {
-                $sqlTerm .= " AND e.academic_year_id = :ayid";
+                $sqlTerm .= " AND (e.academic_year_id = :ayid OR e.academic_year_id IS NULL OR e.academic_year_id = 0)";
                 $paramsTerm[':ayid'] = $academicYearId;
             }
             $sqlTerm .= " ORDER BY 
@@ -1863,6 +1891,7 @@ class TeacherService extends BaseService
                        COALESCE(e.end_date, (SELECT MAX(ep.exam_date) FROM examination_papers ep WHERE ep.exam_id = e.id " . ($classId ? "AND (ep.class_id = :class_id_ep_e OR ep.class_id IS NULL OR ep.class_id = 0)" : "") . ")) AS end_date,
                        e.max_marks, e.status AS exam_status,
                        COALESCE(MAX(ecs.scheme_published), 0) AS scheme_published,
+                       COALESCE(MAX(ecs.admit_card_published), 0) AS admit_card_published,
                        (SELECT COUNT(*) FROM examination_papers ep WHERE ep.exam_id = e.id " . ($classId ? "AND (ep.class_id = :class_id_ep1 OR ep.class_id IS NULL OR ep.class_id = 0)" : "") . ") AS papers_count,
                        COALESCE(MAX(CASE WHEN ecs.status = 'Published' THEN 1 ELSE 0 END), 0) AS result_status_val
                 FROM examinations e
@@ -1881,7 +1910,6 @@ class TeacherService extends BaseService
                     (e.start_date IS NOT NULL AND e.start_date != '' AND e.start_date != '0000-00-00')
                     OR (SELECT COUNT(*) FROM examination_papers ep WHERE ep.exam_id = e.id " . ($classId ? "AND (ep.class_id = :class_id_ep2 OR ep.class_id IS NULL OR ep.class_id = 0)" : "") . ") > 0
                   )
-                  AND (e.template_code = 'cbse_classic' OR p.template_code = 'cbse_classic' OR e.template_code IS NULL)
             ";
             $paramsSubs = [':school_id' => $schoolId];
             if ($classId) {
@@ -1893,7 +1921,7 @@ class TeacherService extends BaseService
                 $paramsSubs[':class_id_ep_c'] = $classId;
             }
             if ($academicYearId > 0) {
-                $sqlSubs .= " AND e.academic_year_id = :ayid";
+                $sqlSubs .= " AND (e.academic_year_id = :ayid OR e.academic_year_id IS NULL OR e.academic_year_id = 0)";
                 $paramsSubs[':ayid'] = $academicYearId;
             }
             $sqlSubs .= " GROUP BY e.id, e.parent_id, e.name, e.start_date, e.end_date, e.max_marks, e.status";
@@ -1910,7 +1938,7 @@ class TeacherService extends BaseService
                 $st['parent_id'] = (int)$st['parent_id'];
                 $hasAddedPapers = ((int)($st['papers_count'] ?? 0)) > 0;
                 $st['scheme_published'] = (((int)$st['scheme_published'] === 1) && $hasAddedPapers) ? 1 : 0;
-                $st['admit_card_published'] = $hasAddedPapers ? 1 : 0;
+                $st['admit_card_published'] = (((int)($st['admit_card_published'] ?? 0) === 1) || $hasAddedPapers) ? 1 : 0;
                 $st['result_published'] = (int)($st['result_status_val'] ?? 0);
                 unset($st['result_status_val']);
                 unset($st['papers_count']);
@@ -1928,37 +1956,39 @@ class TeacherService extends BaseService
                 $subTestsByParent[$st['parent_id']][] = $st;
             }
 
-            $resultList = [];
-            foreach ($termExams as $term) {
-                $termId = (int)$term['id'];
-                $subs = $subTestsByParent[$termId] ?? [];
+            if (!empty($termExams)) {
+                $resultList = [];
+                foreach ($termExams as $term) {
+                    $termId = (int)$term['id'];
+                    $subs = $subTestsByParent[$termId] ?? [];
 
-                $resultList[] = [
-                    'id' => $termId,
-                    'name' => $term['name'],
-                    'description' => $term['description'] ?? '',
-                    'template_code' => 'cbse_classic',
-                    'is_terminal' => true,
-                    'sub_tests' => $subs
-                ];
+                    $resultList[] = [
+                        'id' => $termId,
+                        'name' => $term['name'],
+                        'description' => $term['description'] ?? '',
+                        'template_code' => 'cbse_classic',
+                        'is_terminal' => true,
+                        'sub_tests' => $subs
+                    ];
+                }
+
+                return $resultList;
             }
-
-            return $resultList;
         }
 
-        // Fetch all examinations for this school (Modern School Report / flat flow)
+        // Fetch all examinations for this school (Modern School Report / flat flow fallback)
         $sql = "
             SELECT DISTINCT e.id, e.name, 
                    COALESCE(e.start_date, (SELECT MIN(ep.exam_date) FROM examination_papers ep WHERE ep.exam_id = e.id " . ($classId ? "AND (ep.class_id = :class_id_ep_s OR ep.class_id IS NULL OR ep.class_id = 0)" : "") . ")) AS start_date,
                    COALESCE(e.end_date, (SELECT MAX(ep.exam_date) FROM examination_papers ep WHERE ep.exam_id = e.id " . ($classId ? "AND (ep.class_id = :class_id_ep_e OR ep.class_id IS NULL OR ep.class_id = 0)" : "") . ")) AS end_date,
                    e.status AS exam_status,
                    COALESCE(MAX(ecs.scheme_published), 0) AS scheme_published,
+                   COALESCE(MAX(ecs.admit_card_published), 0) AS admit_card_published,
                    COALESCE(MAX(CASE WHEN ecs.status = 'Published' THEN 1 ELSE 0 END), 0) AS result_status_val,
                    COALESCE(e.template_code, 'modern') AS template_code
             FROM examinations e
             LEFT JOIN examination_class_status ecs ON e.id = ecs.exam_id " . ($classId ? "AND ecs.class_id = :class_id" : "") . "
             WHERE e.school_id = :school_id
-              AND e.parent_id IS NULL
               AND (
                 e.status = 'Published' 
                 OR COALESCE(ecs.scheme_published, 0) = 1 
@@ -1966,7 +1996,6 @@ class TeacherService extends BaseService
                 OR ecs.status = 'Published' 
                 OR (SELECT COUNT(*) FROM examination_papers ep WHERE ep.exam_id = e.id " . ($classId ? "AND (ep.class_id = :class_id_ep_c OR ep.class_id IS NULL OR ep.class_id = 0)" : "") . ") > 0
               )
-              AND (e.template_code != 'cbse_classic' OR e.template_code IS NULL)
         ";
         $params = [':school_id' => $schoolId];
         if ($classId) {
@@ -1977,7 +2006,7 @@ class TeacherService extends BaseService
         }
 
         if ($academicYearId > 0) {
-            $sql .= " AND e.academic_year_id = :ayid";
+            $sql .= " AND (e.academic_year_id = :ayid OR e.academic_year_id IS NULL OR e.academic_year_id = 0)";
             $params[':ayid'] = $academicYearId;
         }
 
@@ -1998,6 +2027,7 @@ class TeacherService extends BaseService
         foreach ($exams as &$e) {
             $e['id'] = (int)$e['id'];
             $e['scheme_published'] = (int)$e['scheme_published'];
+            $e['admit_card_published'] = (int)($e['admit_card_published'] ?? 0);
             $e['result_published'] = (int)($e['result_status_val'] ?? 0);
             $e['template_code'] = $e['template_code'] ?: 'modern';
             unset($e['result_status_val']);
@@ -2476,6 +2506,8 @@ class TeacherService extends BaseService
                   AND (link != '/notice' OR link IS NULL)
                   AND (event_key != 'ANNOUNCEMENT_PUBLISHED' OR event_key IS NULL)
                   AND (category != 'ANNOUNCEMENT' OR category IS NULL)
+                  AND (event_key NOT IN ('EXAM_ADMIT_CARD_PUBLISHED', 'EXAM_ADMIT_CARD_UNPUBLISHED') OR event_key IS NULL)
+                  AND (LOWER(COALESCE(title, '')) NOT LIKE '%admit card%')
                 ORDER BY id DESC
                 LIMIT :limit OFFSET :offset
             ");
@@ -2494,6 +2526,8 @@ class TeacherService extends BaseService
               AND (link != '/notice' OR link IS NULL)
               AND (event_key != 'ANNOUNCEMENT_PUBLISHED' OR event_key IS NULL)
               AND (category != 'ANNOUNCEMENT' OR category IS NULL)
+              AND (event_key NOT IN ('EXAM_ADMIT_CARD_PUBLISHED', 'EXAM_ADMIT_CARD_UNPUBLISHED') OR event_key IS NULL)
+              AND (LOWER(COALESCE(title, '')) NOT LIKE '%admit card%')
             ORDER BY id DESC
             LIMIT :limit OFFSET :offset
         ");
@@ -2575,7 +2609,8 @@ class TeacherService extends BaseService
                 } elseif ($module === 'financial_report' || $module === 'financial-report' || $module === 'financial-reports' || $module === 'revenue') {
                     $query .= " AND (event_key LIKE '%FINANCIAL_REPORT%' OR link LIKE '%financial-report%' OR link LIKE '%revenue%' OR LOWER(COALESCE(title, '')) LIKE '%financial report%' OR LOWER(COALESCE(title, '')) LIKE '%settlement%')";
                 } elseif ($module === 'exams' || $module === 'exam') {
-                    $query .= " AND (event_key LIKE '%EXAM%' OR category = 'EXAM' OR (COALESCE(category, '') != 'TIMETABLE' AND (link LIKE '%exam%' OR LOWER(COALESCE(title, '')) LIKE '%exam%' OR LOWER(COALESCE(title, '')) LIKE '%examination%' OR LOWER(COALESCE(title, '')) LIKE '%admit card%' OR LOWER(COALESCE(title, '')) LIKE '%report card%' OR LOWER(COALESCE(title, '')) LIKE '%scheme%' OR LOWER(COALESCE(title, '')) LIKE '%datesheet%')))";
+                    $query .= " AND (event_key LIKE '%EXAM%' OR category = 'EXAM' OR (COALESCE(category, '') != 'TIMETABLE' AND (link LIKE '%exam%' OR LOWER(COALESCE(title, '')) LIKE '%exam%' OR LOWER(COALESCE(title, '')) LIKE '%examination%' OR LOWER(COALESCE(title, '')) LIKE '%report card%' OR LOWER(COALESCE(title, '')) LIKE '%scheme%' OR LOWER(COALESCE(title, '')) LIKE '%datesheet%')))";
+                    $query .= " AND (event_key NOT IN ('EXAM_ADMIT_CARD_PUBLISHED', 'EXAM_ADMIT_CARD_UNPUBLISHED') OR event_key IS NULL) AND (LOWER(COALESCE(title, '')) NOT LIKE '%admit card%')";
                 } elseif ($module === 'leave' || $module === 'leaves' || $module === 'leave_request' || $module === 'leave-request') {
                     $query .= " AND (event_key LIKE '%LEAVE%' OR event_key = 'HOLIDAY_ANNOUNCED' OR category = 'LEAVE' OR category = 'LEAVE_MANAGEMENT' OR (COALESCE(category, '') NOT IN ('EXAM', 'TIMETABLE', 'HOMEWORK', 'ACHIEVEMENT', 'FEES') AND (link LIKE '%leave%' OR LOWER(COALESCE(title, '')) LIKE '%leave%' OR LOWER(COALESCE(title, '')) LIKE '%holiday%')))";
                 } elseif ($module === 'all' || $module === 'notifications') {

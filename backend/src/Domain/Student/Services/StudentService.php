@@ -2597,7 +2597,24 @@ class StudentService extends BaseService
         $academicYearId = (int) ($student['academic_year_id'] ?? 0);
         $pdo = $this->repo->getPdo();
 
-        // 1. Resolve academic year's assigned report card template code
+        // 1. Resolve working academic year for the student/class
+        if ($academicYearId <= 0 && $classId > 0) {
+            $stmtClassAy = $pdo->prepare("SELECT academic_year_id FROM classes WHERE id = :cid LIMIT 1");
+            $stmtClassAy->execute([':cid' => $classId]);
+            $academicYearId = (int)($stmtClassAy->fetchColumn() ?: 0);
+        }
+        if ($academicYearId <= 0) {
+            $stmtAy = $pdo->prepare("SELECT id FROM academic_years WHERE school_id = :sid AND (status = 'ACTIVE' OR is_current = 1) ORDER BY start_date DESC LIMIT 1");
+            $stmtAy->execute([':sid' => $schoolId]);
+            $academicYearId = (int)($stmtAy->fetchColumn() ?: 0);
+        }
+        if ($academicYearId <= 0) {
+            $stmtAy = $pdo->prepare("SELECT id FROM academic_years WHERE school_id = :sid ORDER BY start_date DESC LIMIT 1");
+            $stmtAy->execute([':sid' => $schoolId]);
+            $academicYearId = (int)($stmtAy->fetchColumn() ?: 0);
+        }
+
+        // 2. Resolve template code
         $tplCode = null;
         if ($academicYearId > 0) {
             $stmtAyTpl = $pdo->prepare("
@@ -2640,18 +2657,32 @@ class StudentService extends BaseService
             $schoolAdminService->autoSeedDefaultSessionExams($pdo, $schoolId, $academicYearId);
         }
 
-        if ($tplCode === 'cbse_classic') {
+        // Check if there are any child exams (sub-tests) or CBSE family template in this school
+        $stmtHasChildren = $pdo->prepare("SELECT COUNT(*) FROM examinations WHERE school_id = :sid AND parent_id IS NOT NULL");
+        $stmtHasChildren->execute([':sid' => $schoolId]);
+        $hasChildren = ((int)$stmtHasChildren->fetchColumn()) > 0;
+
+        $isCbseFamily = ($tplCode === 'cbse_classic' || str_starts_with($tplCode, 'cbse_') || $hasChildren);
+
+        if ($isCbseFamily) {
             // Fetch top level terminal exams (FIRST TERM EXAMINATION, SECOND TERM EXAMINATION)
             $sqlTerm = "
-                SELECT e.id, e.name, e.description
+                SELECT e.id, e.name, e.description, COALESCE(e.template_code, 'cbse_classic') AS template_code
                 FROM examinations e
                 WHERE e.school_id = :school_id
                   AND e.parent_id IS NULL
-                  AND (e.template_code = 'cbse_classic' OR (e.template_code IS NULL AND (LOWER(e.name) LIKE '%first term%' OR LOWER(e.name) LIKE '%second term%')))
+                  AND (
+                    e.template_code = 'cbse_classic' 
+                    OR e.template_code LIKE 'cbse_%' 
+                    OR e.template_code IS NULL 
+                    OR LOWER(e.name) LIKE '%first term%' 
+                    OR LOWER(e.name) LIKE '%second term%'
+                    OR EXISTS (SELECT 1 FROM examinations c WHERE c.parent_id = e.id)
+                  )
             ";
             $paramsTerm = [':school_id' => $schoolId];
             if ($academicYearId > 0) {
-                $sqlTerm .= " AND e.academic_year_id = :ayid";
+                $sqlTerm .= " AND (e.academic_year_id = :ayid OR e.academic_year_id IS NULL OR e.academic_year_id = 0)";
                 $paramsTerm[':ayid'] = $academicYearId;
             }
             $sqlTerm .= " ORDER BY 
@@ -2684,22 +2715,23 @@ class StudentService extends BaseService
                     OR COALESCE(ecs.scheme_published, 0) = 1
                     OR COALESCE(ecs.admit_card_published, 0) = 1
                     OR ecs.status = 'Published'
+                    OR (SELECT COUNT(*) FROM examination_papers ep WHERE ep.exam_id = e.id AND (ep.class_id = :class_id_ep_c OR ep.class_id IS NULL OR ep.class_id = 0)) > 0
                   )
                   AND (
                     (e.start_date IS NOT NULL AND e.start_date != '' AND e.start_date != '0000-00-00')
                     OR (SELECT COUNT(*) FROM examination_papers ep WHERE ep.exam_id = e.id AND (ep.class_id = :class_id_ep OR ep.class_id IS NULL OR ep.class_id = 0)) > 0
                   )
-                  AND (e.template_code = 'cbse_classic' OR p.template_code = 'cbse_classic' OR e.template_code IS NULL)
             ";
             $paramsSubs = [
                 ':class_id' => $classId,
                 ':class_id_ep' => $classId,
+                ':class_id_ep_c' => $classId,
                 ':class_id_ep_s' => $classId,
                 ':class_id_ep_e' => $classId,
                 ':school_id' => $schoolId
             ];
             if ($academicYearId > 0) {
-                $sqlSubs .= " AND e.academic_year_id = :ayid";
+                $sqlSubs .= " AND (e.academic_year_id = :ayid OR e.academic_year_id IS NULL OR e.academic_year_id = 0)";
                 $paramsSubs[':ayid'] = $academicYearId;
             }
             $sqlSubs .= " ORDER BY e.id ASC";
@@ -2730,22 +2762,24 @@ class StudentService extends BaseService
                 $subTestsByParent[$st['parent_id']][] = $st;
             }
 
-            $resultList = [];
-            foreach ($termExams as $term) {
-                $termId = (int)$term['id'];
-                $subs = $subTestsByParent[$termId] ?? [];
-                
-                $resultList[] = [
-                    'id' => $termId,
-                    'name' => $term['name'],
-                    'description' => $term['description'] ?? '',
-                    'template_code' => 'cbse_classic',
-                    'is_terminal' => true,
-                    'sub_tests' => $subs
-                ];
-            }
+            if (!empty($termExams)) {
+                $resultList = [];
+                foreach ($termExams as $term) {
+                    $termId = (int)$term['id'];
+                    $subs = $subTestsByParent[$termId] ?? [];
+                    
+                    $resultList[] = [
+                        'id' => $termId,
+                        'name' => $term['name'],
+                        'description' => $term['description'] ?? '',
+                        'template_code' => 'cbse_classic',
+                        'is_terminal' => true,
+                        'sub_tests' => $subs
+                    ];
+                }
 
-            return $resultList;
+                return $resultList;
+            }
         }
 
         // Modern School Report (or default flat template flow):
@@ -2765,19 +2799,19 @@ class StudentService extends BaseService
                 OR COALESCE(ecs.scheme_published, 0) = 1
                 OR COALESCE(ecs.admit_card_published, 0) = 1
                 OR ecs.status = 'Published'
+                OR (SELECT COUNT(*) FROM examination_papers ep WHERE ep.exam_id = e.id AND (ep.class_id = :class_id_ep_c OR ep.class_id IS NULL OR ep.class_id = 0)) > 0
               )
-              AND e.parent_id IS NULL
-              AND (e.template_code != 'cbse_classic' OR e.template_code IS NULL)
         ";
         $params = [
             ':class_id' => $classId,
             ':class_id_ep_s' => $classId,
             ':class_id_ep_e' => $classId,
+            ':class_id_ep_c' => $classId,
             ':school_id' => $schoolId
         ];
 
         if ($academicYearId > 0) {
-            $sql .= " AND e.academic_year_id = :ayid";
+            $sql .= " AND (e.academic_year_id = :ayid OR e.academic_year_id IS NULL OR e.academic_year_id = 0)";
             $params[':ayid'] = $academicYearId;
         }
 

@@ -79,6 +79,27 @@ class LeaveService {
     }
   }
 
+  Future<void> updateHoliday({
+    required int id,
+    required String name,
+    required String date,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/school/holidays/$id');
+    final response = await http.put(
+      uri,
+      headers: _headers,
+      body: json.encode({
+        'name': name,
+        'date': date,
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      _handleErrorResponse(response, 'Failed to update holiday.');
+      throw Exception('Failed to update holiday.');
+    }
+  }
+
   Future<void> deleteHoliday(int id) async {
     final uri = Uri.parse('$baseUrl/api/school/holidays/$id');
     final response = await http.delete(uri, headers: _headers);

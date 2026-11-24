@@ -258,12 +258,12 @@ class _ExamListScreenState extends State<ExamListScreen> {
                     Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF0FDFA),
+                        color: const Color(0xFFFEF3C7),
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: const Icon(
                         Icons.class_rounded,
-                        color: Color(0xFF0F766E),
+                        color: Color(0xFFD97706),
                         size: 28,
                       ),
                     ),
@@ -294,7 +294,7 @@ class _ExamListScreenState extends State<ExamListScreen> {
                     ),
                     const Icon(
                       Icons.chevron_right_rounded,
-                      color: Color(0xFF0F766E),
+                      color: Color(0xFF94A3B8),
                       size: 26,
                     ),
                   ],
@@ -409,9 +409,9 @@ class _ExamListScreenState extends State<ExamListScreen> {
                             Container(
                               width: double.infinity,
                               decoration: const BoxDecoration(
-                                color: Color(0xFFF0FDFA),
+                                color: Color(0xFFFFFBEB),
                                 border: Border(
-                                  bottom: BorderSide(color: Color(0xFFCCFBF1), width: 1),
+                                  bottom: BorderSide(color: Color(0xFFFDE68A), width: 1),
                                 ),
                               ),
                               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -420,14 +420,14 @@ class _ExamListScreenState extends State<ExamListScreen> {
                                 children: [
                                   Row(
                                     children: [
-                                      const Icon(Icons.school_rounded, size: 18, color: Color(0xFF0F766E)),
+                                      const Icon(Icons.school_rounded, size: 18, color: Color(0xFFD97706)),
                                       const SizedBox(width: 8),
                                       Text(
                                         'Class: $selectedClassName',
                                         style: const TextStyle(
                                           fontWeight: FontWeight.bold,
                                           fontSize: 14,
-                                          color: Color(0xFF0F766E),
+                                          color: Color(0xFFD97706),
                                         ),
                                       ),
                                     ],
@@ -449,7 +449,7 @@ class _ExamListScreenState extends State<ExamListScreen> {
                                       style: TextStyle(
                                         fontWeight: FontWeight.w800,
                                         fontSize: 13,
-                                        color: Color(0xFF0F766E),
+                                        color: Color(0xFFD97706),
                                       ),
                                     ),
                                   ),
@@ -506,8 +506,8 @@ class _ExamListScreenState extends State<ExamListScreen> {
                                               borderRadius: BorderRadius.circular(16),
                                               child: InkWell(
                                                 borderRadius: BorderRadius.circular(16),
-                                                onTap: () {
-                                                  Navigator.push(
+                                                onTap: () async {
+                                                  await Navigator.push(
                                                     context,
                                                     MaterialPageRoute(
                                                       builder: (context) => TermSubTestsScreen(
@@ -521,6 +521,7 @@ class _ExamListScreenState extends State<ExamListScreen> {
                                                       ),
                                                     ),
                                                   );
+                                                  _loadExams();
                                                 },
                                                 child: Padding(
                                                   padding: const EdgeInsets.all(20.0),
@@ -529,46 +530,30 @@ class _ExamListScreenState extends State<ExamListScreen> {
                                                       Container(
                                                         padding: const EdgeInsets.all(14),
                                                         decoration: BoxDecoration(
-                                                          color: const Color(0xFFF0FDFA),
+                                                          color: const Color(0xFFFEF3C7),
                                                           borderRadius: BorderRadius.circular(14),
                                                         ),
                                                         child: const Icon(
                                                           Icons.assignment_rounded,
-                                                          color: Color(0xFF0F766E),
+                                                          color: Color(0xFFD97706),
                                                           size: 28,
                                                         ),
                                                       ),
                                                       const SizedBox(width: 16),
                                                       Expanded(
-                                                        child: Column(
-                                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                                          children: [
-                                                            Text(
-                                                              termName,
-                                                              style: const TextStyle(
-                                                                fontSize: 17,
-                                                                fontWeight: FontWeight.w800,
-                                                                color: Colors.black87,
-                                                                letterSpacing: 0.2,
-                                                              ),
-                                                            ),
-                                                            if (termDesc.isNotEmpty) ...[
-                                                              const SizedBox(height: 4),
-                                                              Text(
-                                                                termDesc,
-                                                                style: TextStyle(
-                                                                  fontSize: 13,
-                                                                  color: Colors.grey.shade600,
-                                                                  fontWeight: FontWeight.w500,
-                                                                ),
-                                                              ),
-                                                            ],
-                                                          ],
+                                                        child: Text(
+                                                          termName,
+                                                          style: const TextStyle(
+                                                            fontSize: 17,
+                                                            fontWeight: FontWeight.w800,
+                                                            color: Color(0xFF0F172A),
+                                                            letterSpacing: 0.2,
+                                                          ),
                                                         ),
                                                       ),
                                                       const Icon(
                                                         Icons.chevron_right_rounded,
-                                                        color: Color(0xFF0F766E),
+                                                        color: Color(0xFF94A3B8),
                                                         size: 24,
                                                       ),
                                                     ],
@@ -755,30 +740,6 @@ class TermSubTestsScreen extends StatelessWidget {
     }
   }
 
-  Color _getStatusColor(String status) {
-    switch (status.toUpperCase()) {
-      case 'UPCOMING':
-        return const Color(0xFF0F766E);
-      case 'CURRENT':
-        return Colors.green.shade600;
-      case 'COMPLETED':
-      default:
-        return Colors.grey.shade600;
-    }
-  }
-
-  Color _getStatusBgColor(String status) {
-    switch (status.toUpperCase()) {
-      case 'UPCOMING':
-        return const Color(0xFFF0FDFA);
-      case 'CURRENT':
-        return Colors.green.shade50;
-      case 'COMPLETED':
-      default:
-        return Colors.grey.shade100;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -816,31 +777,22 @@ class TermSubTestsScreen extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: const BoxDecoration(
-                        color: Color(0xFFF0FDFA),
+                        color: Color(0xFFFEF3C7),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
                         Icons.assignment_late_outlined,
                         size: 64,
-                        color: Color(0xFF0F766E),
+                        color: Color(0xFFD97706),
                       ),
                     ),
                     const SizedBox(height: 24),
-                    Text(
+                    const Text(
                       'No Exams Published Yet',
                       style: TextStyle(
                         fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey.shade800,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'No examination or test has been published under $termName by school administration.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F172A),
                       ),
                     ),
                   ],
@@ -855,21 +807,18 @@ class TermSubTestsScreen extends StatelessWidget {
                 final name = test['name'] ?? 'Test';
                 final start = test['start_date'] ?? '';
                 final end = test['end_date'] ?? '';
-                final status = test['status'] ?? 'Upcoming';
-                final maxMarks = test['max_marks'];
-                final statusColor = _getStatusColor(status);
-                final statusBg = _getStatusBgColor(status);
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
+                        color: Colors.black.withOpacity(0.03),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
                       ),
                     ],
                   ),
@@ -900,92 +849,64 @@ class TermSubTestsScreen extends StatelessWidget {
                           children: [
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
                                 Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        name,
-                                        style: const TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.w800,
-                                          color: Colors.black87,
-                                        ),
-                                      ),
-                                      if (maxMarks != null) ...[
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          'Max Marks: ${maxMarks.toString().replaceAll('.00', '')}',
-                                          style: const TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600,
-                                            color: Color(0xFF0F766E),
-                                          ),
-                                        ),
-                                      ],
-                                    ],
+                                  child: Text(
+                                    name.toUpperCase(),
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF0F172A),
+                                      letterSpacing: 0.3,
+                                    ),
                                   ),
                                 ),
                                 const Icon(
                                   Icons.chevron_right_rounded,
-                                  color: Colors.grey,
+                                  color: Color(0xFF94A3B8),
                                 ),
                               ],
                             ),
                             if (start.isNotEmpty) ...[
                               const SizedBox(height: 12),
                               Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
-                                  Icon(
+                                  const Icon(
                                     Icons.calendar_month_rounded,
                                     size: 16,
-                                    color: Colors.grey.shade500,
+                                    color: Color(0xFFD97706),
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
-                                    end.isNotEmpty ? '${_formatDate(start)}  →  ${_formatDate(end)}' : _formatDate(start),
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey.shade600,
-                                      fontWeight: FontWeight.bold,
+                                    _formatDate(start),
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: Color(0xFF475569),
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
+                                  if (end.isNotEmpty) ...[
+                                    const SizedBox(width: 6),
+                                    const Icon(
+                                      Icons.arrow_right_alt_rounded,
+                                      size: 20,
+                                      color: Color(0xFF475569),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      _formatDate(end),
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        color: Color(0xFF475569),
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ],
-                            const SizedBox(height: 14),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: statusBg,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: statusColor.withOpacity(0.2)),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: BoxDecoration(
-                                      color: statusColor,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    status,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: statusColor,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
                           ],
                         ),
                       ),

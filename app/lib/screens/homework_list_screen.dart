@@ -1043,8 +1043,13 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         title: const Text(
-          'Homework',
-          style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF1E293B)),
+          'HOMEWORK',
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 16,
+            letterSpacing: 0.5,
+            color: Color(0xFF1E293B),
+          ),
         ),
         backgroundColor: Colors.white,
         foregroundColor: const Color(0xFF1E293B),
@@ -1325,24 +1330,26 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFEF3C7),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: const Color(0xFFFDE68A)),
-                  ),
-                  child: Text(
-                    className.isNotEmpty ? className : 'All Classes',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFFB45309),
-                      letterSpacing: 0.2,
+                if (_isTeacher) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFFDE68A)),
+                    ),
+                    child: Text(
+                      className.isNotEmpty ? className : 'All Classes',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFFB45309),
+                        letterSpacing: 0.2,
+                      ),
                     ),
                   ),
-                ),
+                ],
                 if (canEditOrDelete) ...[
                   const SizedBox(width: 6),
                   PopupMenuButton<String>(
@@ -1393,9 +1400,9 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF0FDF4),
+                  color: const Color(0xFFFFFBEB),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFBBF7D0)),
+                  border: Border.all(color: const Color(0xFFFDE68A)),
                 ),
                 child: Row(
                   children: [
@@ -1404,7 +1411,7 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
                       onTap: () => _toggleAudioPlay(id, audioAtt['file_path'] ?? ''),
                       child: CircleAvatar(
                         radius: 18,
-                        backgroundColor: const Color(0xFF0F766E),
+                        backgroundColor: const Color(0xFFD97706),
                         child: Icon(
                           isPlayingThis ? Icons.pause_rounded : Icons.play_arrow_rounded,
                           color: Colors.white,
@@ -1419,14 +1426,14 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.mic_rounded, color: Color(0xFF0F766E), size: 14),
+                              const Icon(Icons.mic_rounded, color: Color(0xFFB45309), size: 14),
                               const SizedBox(width: 4),
                               const Text(
                                 'Voice Note',
                                 style: TextStyle(
                                   fontSize: 11.5,
                                   fontWeight: FontWeight.w700,
-                                  color: Color(0xFF0F766E),
+                                  color: Color(0xFFB45309),
                                 ),
                               ),
                               if (isPlayingThis) ...[
@@ -1443,7 +1450,7 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
                             LinearProgressIndicator(
                               value: (_audioPosition.inMilliseconds / _audioDuration.inMilliseconds).clamp(0.0, 1.0),
                               backgroundColor: const Color(0xFFE2E8F0),
-                              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF0F766E)),
+                              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFD97706)),
                               minHeight: 3,
                             ),
                           ],

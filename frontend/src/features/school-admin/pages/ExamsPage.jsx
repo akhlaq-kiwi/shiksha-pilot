@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Plus, ArrowLeft, Calendar, Clock, BookOpen, UserCheck, 
@@ -235,7 +235,8 @@ const suggestNextExamDate = (exam, papers, holidays) => {
   const endDate = new Date(endYear, endMonth, endDay);
 
   const holidaysSet = new Set((holidays || []).map(h => h.date));
-  const usedDates = new Set((papers || []).map(p => p.exam_date));
+  const safePapers = Array.isArray(papers) ? papers : (papers?.papers || papers?.data || []);
+  const usedDates = new Set(safePapers.map(p => p.exam_date));
 
   while (current <= endDate) {
     const yStr = current.getFullYear();
@@ -651,7 +652,17 @@ export default function ExamsPage() {
   const [submitting, setSubmitting] = useState(false);
 
   // Local Timetable State
-  const [timetablePapers, setTimetablePapers] = useState([]);
+  const [timetablePapers, _setTimetablePapers] = useState([]);
+  const setTimetablePapers = useCallback((val) => {
+    if (typeof val === 'function') {
+      _setTimetablePapers(prev => {
+        const res = val(prev);
+        return Array.isArray(res) ? res : (res?.papers || res?.data || []);
+      });
+    } else {
+      _setTimetablePapers(Array.isArray(val) ? val : (val?.papers || val?.data || []));
+    }
+  }, []);
   const [newPaper, setNewPaper] = useState({
     subject_id: '',
     exam_date: '',
@@ -1841,7 +1852,8 @@ export default function ExamsPage() {
       
       // Reload updated list
       const refreshedList = await schoolService.getExamTimetable(selectedExam.id, parseInt(selectedClassId));
-      setTimetablePapers(refreshedList || []);
+      const papers = Array.isArray(refreshedList) ? refreshedList : (refreshedList?.papers || refreshedList?.data || []);
+      setTimetablePapers(papers);
       
       // Clear state
       setEditingPaper(null);
@@ -1850,7 +1862,7 @@ export default function ExamsPage() {
 
       setNewPaper({
         subject_id: '',
-        exam_date: suggestNextExamDate(selectedExam, refreshedList || [], holidays),
+        exam_date: suggestNextExamDate(selectedExam, papers, holidays),
         start_time: newPaper.start_time || '09:00',
         end_time: newPaper.end_time || '11:00',
         evaluation_type: 'marks',
@@ -2062,7 +2074,8 @@ export default function ExamsPage() {
       
       // Reload updated list
       const refreshedList = await schoolService.getExamTimetable(selectedExam.id, parseInt(selectedClassId));
-      setTimetablePapers(refreshedList || []);
+      const papers = Array.isArray(refreshedList) ? refreshedList : (refreshedList?.papers || refreshedList?.data || []);
+      setTimetablePapers(papers);
       setSuccess('Exam paper deleted successfully.');
     } catch (err) {
       console.error(err);
@@ -2297,7 +2310,8 @@ export default function ExamsPage() {
         remarks: studentRow.remarks
       });
       const refreshedList = await schoolService.getExamTimetable(selectedExam.id, parseInt(selectedClassId));
-      setTimetablePapers(refreshedList || []);
+      const papers = Array.isArray(refreshedList) ? refreshedList : (refreshedList?.papers || refreshedList?.data || []);
+      setTimetablePapers(papers);
     } catch (err) {
       console.error(err);
       setError(err.message || 'Auto-save failed.');
@@ -3331,13 +3345,9 @@ export default function ExamsPage() {
                                 <TableCell className="text-xs font-mono text-text-muted whitespace-nowrap">{formatDateString(st.end_date)}</TableCell>
                                 <TableCell className="whitespace-nowrap">
                                   <span 
-                                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold uppercase cursor-pointer hover:opacity-80 transition-opacity ${
+                                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold uppercase ${
                                       String(st?.status || '').toLowerCase() === 'published' ? 'bg-green-500/10 text-green-600' : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800'
                                     }`}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleToggleExamPublishStatus(st);
-                                    }}
                                   >
                                     {st.status || 'Draft'}
                                   </span>
@@ -3346,20 +3356,12 @@ export default function ExamsPage() {
                                   <div onClick={(evt) => evt.stopPropagation()} className="flex items-center justify-end gap-2">
                                     {!isReadOnly && (
                                       <DropdownMenu>
+                                        <DropdownItem onClick={() => handleOpenClassWorkspace(st)}>
+                                          Open Workspace
+                                        </DropdownItem>
                                         <DropdownItem onClick={() => handleEditExamClick(st)}>
                                           Edit Test
                                         </DropdownItem>
-                                        {String(st?.status || '').toLowerCase() === 'published' ? (
-                                          <DropdownItem onClick={() => handleToggleExamPublishStatus(st)} className="text-rose-600 font-semibold hover:bg-rose-50 dark:hover:bg-rose-950/30">
-                                            Move to Draft
-                                          </DropdownItem>
-                                        ) : (
-                                          (st?.start_date && st?.end_date && String(st.start_date).trim() !== '' && String(st.start_date).trim() !== '-' && String(st.end_date).trim() !== '' && String(st.end_date).trim() !== '-') && (
-                                            <DropdownItem onClick={() => handleToggleExamPublishStatus(st)} className="text-emerald-600 font-semibold hover:bg-emerald-50 dark:hover:bg-emerald-950/30">
-                                              Publish Test
-                                            </DropdownItem>
-                                          )
-                                        )}
                                         {!isCBSEClassic && (
                                           <DropdownItem 
                                             className="text-rose-600 font-semibold hover:bg-rose-50 dark:hover:bg-rose-950/30"
@@ -3431,17 +3433,6 @@ export default function ExamsPage() {
                               <DropdownItem onClick={() => handleEditExamClick(e)}>
                                 Edit Examination
                               </DropdownItem>
-                            )}
-                            {String(e.status || '').toLowerCase() === 'published' ? (
-                              <DropdownItem onClick={() => handlePublishMasterExam(e, 'Draft')} className="text-rose-600 font-semibold hover:bg-rose-50">
-                                Revert to Draft
-                              </DropdownItem>
-                            ) : (
-                              (e.start_date && e.end_date && String(e.start_date).trim() !== '' && String(e.start_date).trim() !== '-' && String(e.end_date).trim() !== '' && String(e.end_date).trim() !== '-') && (
-                                <DropdownItem onClick={() => handlePublishMasterExam(e, 'Published')} className="text-emerald-600 font-semibold hover:bg-emerald-50">
-                                  Publish Examination
-                                </DropdownItem>
-                              )
                             )}
                           </DropdownMenu>
                         </div>
@@ -4119,13 +4110,13 @@ export default function ExamsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {timetablePapers.length === 0 ? (
+                  {(!Array.isArray(timetablePapers) || timetablePapers.length === 0) ? (
                     <TableRow className="hover:bg-transparent">
                       <TableCell colSpan={6} className="text-center py-8 text-text-muted">
                         No papers scheduled for this examination yet. Use the form above to add papers.
                       </TableCell>
                     </TableRow>
-                  ) : timetablePapers.map((paper, idx) => {
+                  ) : (Array.isArray(timetablePapers) ? timetablePapers : []).map((paper, idx) => {
                     const isGradePaper = paper.evaluation_type === 'grade' || parseFloat(paper.max_marks) === 0;
                     return (
                       <TableRow key={idx} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/50 transition-colors">
@@ -4211,7 +4202,7 @@ export default function ExamsPage() {
                 <CustomSelect 
                   value={selectedSubjectId} 
                   onChange={handleSubjectChange}
-                  options={timetablePapers.map(p => {
+                  options={(Array.isArray(timetablePapers) ? timetablePapers : (timetablePapers?.papers || [])).map(p => {
                     const isDone = Boolean(
                       p?.marks_completed === true || 
                       p?.marks_completed === 1 || 
@@ -4237,8 +4228,8 @@ export default function ExamsPage() {
                     COMPLETED SUBJECT:
                   </span>
                   <span className="text-2xl font-bold font-display text-primary leading-none align-baseline">
-                    {timetablePapers.filter(p => p.marks_completed).length}
-                    <span className="text-sm font-bold text-text-muted ml-1">/{timetablePapers.length}</span>
+                    {(Array.isArray(timetablePapers) ? timetablePapers : (timetablePapers?.papers || [])).filter(p => p.marks_completed).length}
+                    <span className="text-sm font-bold text-text-muted ml-1">/{(Array.isArray(timetablePapers) ? timetablePapers : (timetablePapers?.papers || [])).length}</span>
                   </span>
                 </div>
               </Card>
@@ -4263,7 +4254,7 @@ export default function ExamsPage() {
                 <TableBody>
                   {marksSheet.students.map((s, idx) => {
                     const isReadOnlyField = false;
-                    const currentPaper = timetablePapers.find(p => String(p?.subject_id ?? p?.id ?? '') === String(selectedSubjectId));
+                    const currentPaper = (Array.isArray(timetablePapers) ? timetablePapers : (timetablePapers?.papers || [])).find(p => String(p?.subject_id ?? p?.id ?? '') === String(selectedSubjectId));
                     const isGradeSheet = marksSheet.evaluation_type === 'grade' || parseFloat(marksSheet.max_marks) === 0 || currentPaper?.evaluation_type === 'grade';
 
                     return (

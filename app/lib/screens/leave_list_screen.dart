@@ -1117,6 +1117,397 @@ class _LeaveListScreenState extends State<LeaveListScreen> with SingleTickerProv
     );
   }
 
+  void _showEditHolidaySheet(Map<String, dynamic> holiday) {
+    final int hId = int.tryParse(holiday['id']?.toString() ?? '') ?? 0;
+    final titleController = TextEditingController(text: holiday['name'] ?? '');
+    DateTime? selectedDate = DateTime.tryParse(holiday['date']?.toString() ?? '');
+    String? formError;
+    bool isSaving = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final keyboardPadding = MediaQuery.of(context).viewInsets.bottom;
+            final dateText = selectedDate == null
+                ? 'Select date'
+                : _formatDate('${selectedDate!.year}-${selectedDate!.month.toString().padLeft(2, '0')}-${selectedDate!.day.toString().padLeft(2, '0')}');
+
+            return Container(
+              margin: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 20),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: EdgeInsets.fromLTRB(20, 14, 20, 24 + keyboardPadding),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    const Text(
+                      'Edit Official Holiday',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Update official holiday details.',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                    ),
+                    const SizedBox(height: 16),
+
+                    if (formError != null) ...[
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF2F2),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFFECACA)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.error_outline_rounded, size: 16, color: Colors.redAccent),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                formError!,
+                                style: const TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
+
+                    const Text(
+                      'LEAVE TITLE *',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: titleController,
+                      decoration: InputDecoration(
+                        hintText: 'e.g., Winter Vacation / Eid-ul-Fitr',
+                        hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFD97706), width: 1.5),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    const Text(
+                      'HOLIDAY DATE *',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    InkWell(
+                      onTap: () async {
+                        final now = DateTime.now();
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: selectedDate ?? now,
+                          firstDate: DateTime(now.year, now.month, now.day),
+                          lastDate: DateTime(now.year + 5),
+                          builder: (context, child) {
+                            return Theme(
+                              data: Theme.of(context).copyWith(
+                                colorScheme: const ColorScheme.light(
+                                  primary: Color(0xFFD97706),
+                                  onPrimary: Colors.white,
+                                  onSurface: Color(0xFF0F172A),
+                                ),
+                              ),
+                              child: child!,
+                            );
+                          },
+                        );
+                        if (picked != null) {
+                          setSheetState(() {
+                            selectedDate = picked;
+                          });
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFCBD5E1)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.calendar_month_rounded, size: 16, color: Color(0xFF64748B)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                dateText,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: selectedDate == null ? FontWeight.normal : FontWeight.w600,
+                                  color: selectedDate == null ? const Color(0xFF94A3B8) : const Color(0xFF0F172A),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: isSaving ? null : () => Navigator.pop(context),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: Color(0xFFCBD5E1)),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
+                            child: const Text(
+                              'Cancel',
+                              style: TextStyle(color: Color(0xFF475569), fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: isSaving
+                                ? null
+                                : () async {
+                                    final title = titleController.text.trim();
+                                    if (title.isEmpty) {
+                                      setSheetState(() => formError = 'Please enter holiday title.');
+                                      return;
+                                    }
+                                    if (selectedDate == null) {
+                                      setSheetState(() => formError = 'Please select holiday date.');
+                                      return;
+                                    }
+
+                                    setSheetState(() {
+                                      isSaving = true;
+                                      formError = null;
+                                    });
+
+                                    final dStr = '${selectedDate!.year}-${selectedDate!.month.toString().padLeft(2, '0')}-${selectedDate!.day.toString().padLeft(2, '0')}';
+                                    try {
+                                      await widget.leaveService.updateHoliday(
+                                        id: hId,
+                                        name: title,
+                                        date: dStr,
+                                      );
+                                      if (context.mounted) Navigator.pop(context);
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Official holiday updated successfully.'),
+                                            backgroundColor: Color(0xFFD97706),
+                                            behavior: SnackBarBehavior.floating,
+                                          ),
+                                        );
+                                        _loadHolidays();
+                                      }
+                                    } catch (e) {
+                                      setSheetState(() {
+                                        formError = e.toString().replaceAll('Exception: ', '');
+                                        isSaving = false;
+                                      });
+                                    }
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFD97706),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
+                            child: isSaving
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                  )
+                                : const Text(
+                                    'Save Changes',
+                                    style: TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showDeleteHolidayDialog(Map<String, dynamic> holiday) {
+    final int hId = int.tryParse(holiday['id']?.toString() ?? '') ?? 0;
+    final String hName = holiday['name'] ?? 'Holiday';
+    final String hDate = holiday['date'] ?? '';
+    bool isDeleting = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              backgroundColor: Colors.white,
+              surfaceTintColor: Colors.transparent,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              titlePadding: const EdgeInsets.fromLTRB(22, 22, 22, 10),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
+              actionsPadding: const EdgeInsets.fromLTRB(22, 10, 22, 18),
+              title: Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF2F2),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFFECACA), width: 1.5),
+                    ),
+                    child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFDC2626), size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Delete Holiday',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              content: RichText(
+                text: TextSpan(
+                  style: const TextStyle(fontSize: 13.5, color: Color(0xFF475569), height: 1.45),
+                  children: [
+                    const TextSpan(text: 'Are you sure you want to delete '),
+                    TextSpan(
+                      text: '"$hName"',
+                      style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                    ),
+                    TextSpan(text: ' on ${_formatDate(hDate)}?\n\nThis action cannot be undone.'),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isDeleting ? null : () => Navigator.pop(ctx),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: isDeleting
+                      ? null
+                      : () async {
+                          setDialogState(() => isDeleting = true);
+                          try {
+                            await widget.leaveService.deleteHoliday(hId);
+                            if (ctx.mounted) Navigator.pop(ctx);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Holiday deleted successfully.'),
+                                  backgroundColor: Color(0xFFD97706),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                              _loadHolidays();
+                            }
+                          } catch (e) {
+                            setDialogState(() => isDeleting = false);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(e.toString().replaceAll('Exception: ', '')),
+                                  backgroundColor: const Color(0xFFDC2626),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFDC2626),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: isDeleting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        )
+                      : const Text('Delete', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _showLeaveDetails(LeaveRequest leave) {
     final bool isStudent = leave.applicantRole.toUpperCase() == 'STUDENT';
     final bool isTeacher = leave.applicantRole.toUpperCase() == 'TEACHER';
@@ -1629,6 +2020,14 @@ class _LeaveListScreenState extends State<LeaveListScreen> with SingleTickerProv
             bgColor = Colors.white;
           }
 
+          final bool canManage = _isPrincipal ||
+              widget.userRole.toUpperCase() == 'TEACHER' ||
+              widget.userRole.toUpperCase() == 'SCHOOL_ADMIN' ||
+              widget.userRole.toUpperCase() == 'SUPER_ADMIN';
+
+          // If the holiday date has passed, cannot edit or delete (matching web rule)
+          final bool canEditOrDelete = canManage && !isPast;
+
           return Container(
             margin: const EdgeInsets.only(bottom: 12),
             decoration: BoxDecoration(
@@ -1687,6 +2086,66 @@ class _LeaveListScreenState extends State<LeaveListScreen> with SingleTickerProv
                       ],
                     ),
                   ),
+                  if (canEditOrDelete)
+                    PopupMenuButton<String>(
+                      icon: const Icon(
+                        Icons.more_vert_rounded,
+                        color: Color(0xFF64748B),
+                        size: 20,
+                      ),
+                      padding: EdgeInsets.zero,
+                      color: Colors.white,
+                      surfaceTintColor: Colors.transparent,
+                      elevation: 6,
+                      shadowColor: Colors.black.withOpacity(0.12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        side: const BorderSide(color: Color(0xFFF1F5F9)),
+                      ),
+                      onSelected: (val) {
+                        if (val == 'edit') {
+                          _showEditHolidaySheet(holiday);
+                        } else if (val == 'delete') {
+                          _showDeleteHolidayDialog(holiday);
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        const PopupMenuItem<String>(
+                          value: 'edit',
+                          child: Row(
+                            children: [
+                              Icon(Icons.edit_outlined, size: 18, color: Color(0xFFD97706)),
+                              SizedBox(width: 10),
+                              Text(
+                                'Edit',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem<String>(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFDC2626)),
+                              SizedBox(width: 10),
+                              Text(
+                                'Delete',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFFDC2626),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                 ],
               ),
             ),

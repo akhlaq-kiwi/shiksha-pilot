@@ -53,6 +53,7 @@ class _MarksSpreadsheetScreenState extends State<MarksSpreadsheetScreen> {
   final Map<int, TextEditingController> _remarkControllers = {};
   final Map<int, FocusNode> _markFocusNodes = {};
   final Map<int, bool> _absentStates = {};
+  final ScrollController _subjectScrollController = ScrollController();
 
   @override
   void initState() {
@@ -78,6 +79,7 @@ class _MarksSpreadsheetScreenState extends State<MarksSpreadsheetScreen> {
     for (final f in _markFocusNodes.values) {
       f.dispose();
     }
+    _subjectScrollController.dispose();
     super.dispose();
   }
 
@@ -745,6 +747,8 @@ class _MarksSpreadsheetScreenState extends State<MarksSpreadsheetScreen> {
             border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
           ),
           child: SingleChildScrollView(
+            key: const PageStorageKey('marks_spreadsheet_subjects_scroll'),
+            controller: _subjectScrollController,
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
             child: Row(

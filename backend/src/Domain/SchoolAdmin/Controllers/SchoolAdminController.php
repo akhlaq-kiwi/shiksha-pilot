@@ -417,7 +417,7 @@ class SchoolAdminController extends BaseController
     public function createHoliday(Request $request, Response $response): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'TEACHER', 'PRINCIPAL']);
 
         $body = RequestParser::body($request);
         $result = $this->service->createHoliday($user, $body);
@@ -428,7 +428,7 @@ class SchoolAdminController extends BaseController
     public function updateHoliday(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'TEACHER', 'PRINCIPAL']);
 
         $id = (int)($args['id'] ?? 0);
         $body = RequestParser::body($request);
@@ -440,7 +440,7 @@ class SchoolAdminController extends BaseController
     public function deleteHoliday(Request $request, Response $response, array $args): Response
     {
         $user = $this->authenticate($request);
-        $this->requireRole($user, ['SCHOOL_ADMIN']);
+        $this->requireRole($user, ['SCHOOL_ADMIN', 'TEACHER', 'PRINCIPAL']);
 
         $id = (int)($args['id'] ?? 0);
         $result = $this->service->deleteHoliday($user, $id);
@@ -1464,9 +1464,9 @@ class SchoolAdminController extends BaseController
             }
         }
 
-        // Principal official holidays management route authorization
+        // Principal & Teacher official holidays management route authorization
         if (str_contains($uri, '/api/school/holidays')) {
-            if ($userRole === 'SCHOOL_ADMIN' || $userRole === 'PRINCIPAL' || $this->service->isPrincipal($user)) {
+            if ($userRole === 'SCHOOL_ADMIN' || $userRole === 'PRINCIPAL' || $userRole === 'TEACHER' || $this->service->isPrincipal($user)) {
                 if ($this->service->checkSubscriptionExpired($user)) {
                     throw new \App\Shared\Exceptions\ForbiddenException('Subscription Expired. Access Denied.');
                 }

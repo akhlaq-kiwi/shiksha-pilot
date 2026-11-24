@@ -236,8 +236,18 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
     try {
       final data = await widget.attendanceService.getStudentAttendance(widget.selectedStudentId);
+      List<dynamic> holidaysList = [];
+      try {
+        holidaysList = await widget.attendanceService.getHolidays();
+      } catch (e) {
+        debugPrint('Error loading holidays in student view: $e');
+      }
+
       setState(() {
         _studentRecords = data;
+        if (holidaysList.isNotEmpty) {
+          _holidays = holidaysList;
+        }
         _isOffline = false;
       });
     } catch (e) {
@@ -353,12 +363,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   bool _isHolidayDate(DateTime d) {
     final targetStr = _formatYmd(d);
-
-    // Check standard national holidays (15 August, 2 October, 25 December, 1 January, 26 January, 1 May)
-    final mmDd = '${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-    if (mmDd == '08-15' || mmDd == '10-02' || mmDd == '12-25' || mmDd == '01-01' || mmDd == '01-26' || mmDd == '05-01') {
-      return true;
-    }
 
     return _holidays.any((h) {
       if (h == null) return false;
@@ -691,6 +695,17 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         return rec['status'] as String? ?? '';
       }
     }
+
+    // Sunday is a holiday
+    if (date.weekday == DateTime.sunday) {
+      return 'HOLIDAY';
+    }
+
+    // Check user-created official school holidays
+    if (_isHolidayDate(date)) {
+      return 'HOLIDAY';
+    }
+
     return '';
   }
 
@@ -1103,102 +1118,76 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   Widget _buildMonthCalendarGrid(DateTime month) {
     final weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-    final firstDayOfMonth = DateTime(month.year, month.month, 1);
     final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
-    final startOffset = firstDayOfMonth.weekday % 7; // 0 for Sun, 1 for Mon, ..., 6 for Sat
-    final prevMonthLastDay = DateTime(month.year, month.month, 0).day;
-    final totalGridItems = ((startOffset + daysInMonth) > 35) ? 42 : 35;
 
-    return Column(
-      children: [
-        // Days of week header
-        Container(
-          color: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            children: weekDays.map((day) {
-              return Expanded(
-                child: Text(
-                  day,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                    color: Colors.grey.shade800,
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      child: GridView.builder(
+        physics: const BouncingScrollPhysics(),
+        padding: EdgeInsets.zero,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 7,
+          childAspectRatio: 0.78,
+          crossAxisSpacing: 4,
+          mainAxisSpacing: 4,
         ),
-        const Divider(height: 1, color: Color(0xFFE0E0E0)),
-        // Calendar Grid
-        Expanded(
-          child: GridView.builder(
-            physics: const NeverScrollableScrollPhysics(),
-            padding: EdgeInsets.zero,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 7,
-              childAspectRatio: 0.85,
+        itemCount: daysInMonth,
+        itemBuilder: (context, index) {
+          final dayNumber = index + 1;
+          final cellDate = DateTime(month.year, month.month, dayNumber);
+          final weekdayName = weekDays[cellDate.weekday % 7];
+          final isSunday = cellDate.weekday == DateTime.sunday;
+
+          final isToday = cellDate.year == _studentToday.year &&
+              cellDate.month == _studentToday.month &&
+              cellDate.day == _studentToday.day;
+
+          final status = _getStudentStatusForDate(cellDate);
+          final isHoliday = isSunday || status == 'HOLIDAY';
+
+          return Container(
+            decoration: BoxDecoration(
+              color: isToday
+                  ? Colors.blue.shade50.withOpacity(0.5)
+                  : (isHoliday ? const Color(0xFFFFF7ED) : Colors.white),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: isToday
+                    ? const Color(0xFF2196F3)
+                    : (isHoliday ? const Color(0xFFFFEDD5) : const Color(0xFFE2E8F0)),
+                width: isToday ? 1.5 : 1.0,
+              ),
             ),
-            itemCount: totalGridItems,
-            itemBuilder: (context, index) {
-              int dayNumber;
-              bool isCurrentMonth = false;
-              DateTime cellDate;
-
-              if (index < startOffset) {
-                dayNumber = prevMonthLastDay - (startOffset - 1 - index);
-                cellDate = DateTime(month.year, month.month - 1, dayNumber);
-              } else if (index < startOffset + daysInMonth) {
-                dayNumber = index - startOffset + 1;
-                isCurrentMonth = true;
-                cellDate = DateTime(month.year, month.month, dayNumber);
-              } else {
-                dayNumber = index - (startOffset + daysInMonth) + 1;
-                cellDate = DateTime(month.year, month.month + 1, dayNumber);
-              }
-
-              final isToday = cellDate.year == _studentToday.year &&
-                  cellDate.month == _studentToday.month &&
-                  cellDate.day == _studentToday.day;
-
-              final status = isCurrentMonth ? _getStudentStatusForDate(cellDate) : '';
-
-              return Container(
-                decoration: BoxDecoration(
-                  color: isToday ? Colors.blue.shade50.withOpacity(0.4) : Colors.white,
-                  border: Border.all(
-                    color: isToday ? const Color(0xFF2196F3) : Colors.grey.shade300,
-                    width: isToday ? 1.5 : 0.5,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  weekdayName,
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w700,
+                    color: isHoliday ? const Color(0xFFDC2626) : const Color(0xFF64748B),
                   ),
                 ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 4),
-                    Text(
-                      '$dayNumber',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: isToday || isCurrentMonth ? FontWeight.bold : FontWeight.normal,
-                        color: isCurrentMonth
-                            ? (isToday ? const Color(0xFF2196F3) : Colors.black87)
-                            : Colors.grey.shade400,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    if (isCurrentMonth && status.isNotEmpty) ...[
-                      _buildStatusBadge(status),
-                    ],
-                  ],
+                const SizedBox(height: 1),
+                Text(
+                  '$dayNumber',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                    color: isToday ? const Color(0xFF2196F3) : const Color(0xFF0F172A),
+                  ),
                 ),
-              );
-            },
-          ),
-        ),
-      ],
+                const SizedBox(height: 3),
+                if (status.isNotEmpty)
+                  _buildStatusBadge(status)
+                else
+                  const SizedBox(height: 20),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -1207,22 +1196,25 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     String text;
     final st = status.toUpperCase();
 
-    if (st == 'PRESENT') {
+    if (st == 'PRESENT' || st == 'P') {
       bg = const Color(0xFF4CAF50);
       text = 'P';
-    } else if (st == 'ABSENT') {
+    } else if (st == 'ABSENT' || st == 'A') {
       bg = const Color(0xFFF44336);
       text = 'A';
-    } else if (st == 'LEAVE') {
+    } else if (st == 'LEAVE' || st == 'L') {
       bg = const Color(0xFFFF9800);
       text = 'L';
+    } else if (st == 'HOLIDAY' || st == 'H') {
+      bg = const Color(0xFF64748B);
+      text = 'H';
     } else {
       return const SizedBox.shrink();
     }
 
     return Container(
-      width: 22,
-      height: 22,
+      width: 20,
+      height: 20,
       decoration: BoxDecoration(
         color: bg,
         shape: BoxShape.circle,
@@ -1233,7 +1225,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         style: const TextStyle(
           color: Colors.white,
           fontWeight: FontWeight.bold,
-          fontSize: 11,
+          fontSize: 10,
         ),
       ),
     );

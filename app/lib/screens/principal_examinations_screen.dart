@@ -90,6 +90,7 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
   final Map<int, bool> _absentStates = {};
   final Map<int, FocusNode> _markFocusNodes = {};
   final Set<int> _savingMarkStudentIds = {};
+  final ScrollController _marksSubjectScrollController = ScrollController();
 
   // Report Cards view states
   List<dynamic> _reportCards = [];
@@ -139,6 +140,7 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
     for (var c in _remarkControllers.values) {
       c.dispose();
     }
+    _marksSubjectScrollController.dispose();
     super.dispose();
   }
 
@@ -1491,40 +1493,28 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
         return;
       }
 
-      final examName = (exam?['name'] ?? _selectedExam?['name'] ?? 'EXAMINATION').toString().toUpperCase();
-      final schoolName = (schoolProfile?['name'] ?? 'SCHOOL TIMETABLE').toString().toUpperCase();
-      final ayName = (exam?['academic_year_name'] ?? '').toString();
+      final examName = (exam?['name'] ?? _selectedExam?['name'] ?? 'EXAMINATION')
+          .toString()
+          .replaceAll('–', '-')
+          .replaceAll('—', '-')
+          .replaceAll('−', '-')
+          .toUpperCase();
+      final schoolName = (schoolProfile?['name'] ?? 'SCHOOL TIMETABLE')
+          .toString()
+          .replaceAll('–', '-')
+          .replaceAll('—', '-')
+          .replaceAll('−', '-')
+          .toUpperCase();
+      final ayName = (exam?['academic_year_name'] ?? _selectedExam?['academic_year_name'] ?? '')
+          .toString()
+          .replaceAll('–', '-')
+          .replaceAll('—', '-')
+          .replaceAll('−', '-');
 
-      final StringBuffer html = StringBuffer();
-      html.writeln('<!DOCTYPE html><html><head><meta charset="utf-8">');
-      html.writeln('<style>');
-      html.writeln('@page { size: A4 landscape; margin: 8mm; }');
-      html.writeln('body { font-family: sans-serif; margin: 0; padding: 0; color: #18181b; }');
-      html.writeln('.card { border: 3px double #71717a; padding: 14px; border-radius: 4px; }');
-      html.writeln('.header { text-align: center; border-bottom: 2px solid #27272a; padding-bottom: 8px; margin-bottom: 12px; }');
-      html.writeln('.school-title { font-size: 18px; font-weight: 800; letter-spacing: 0.5px; margin: 0; }');
-      html.writeln('.exam-title { font-size: 14px; font-weight: 700; margin: 4px 0 0 0; color: #27272a; }');
-      html.writeln('.ay-title { font-size: 11px; font-weight: 600; color: #71717a; margin-top: 2px; }');
-      html.writeln('table { width: 100%; border-collapse: collapse; text-align: center; font-size: 10px; margin-top: 8px; }');
-      html.writeln('th, td { border: 1px solid #a1a1aa; padding: 6px 4px; vertical-align: middle; text-align: center; }');
-      html.writeln('th { background-color: #e4e4e7; font-weight: 800; }');
-      html.writeln('.class-cell { background-color: #f4f4f5; font-weight: 800; white-space: nowrap; }');
-      html.writeln('.subject-cell { font-weight: 700; color: #09090b; }');
-      html.writeln('.empty-cell { color: #a1a1aa; }');
-      html.writeln('</style></head><body>');
+      final pdf = pw.Document();
 
-      html.writeln('<div class="card">');
-      html.writeln('<div class="header">');
-      html.writeln('<div class="school-title">$schoolName</div>');
-      html.writeln('<div class="exam-title">$examName EXAMINATION SCHEME</div>');
-      if (ayName.isNotEmpty) {
-        html.writeln('<div class="ay-title">Academic Year: $ayName</div>');
-      }
-      html.writeln('</div>');
-
-      html.writeln('<table>');
-      html.writeln('<thead><tr>');
-      html.writeln('<th style="width: 14%;">CLASS</th>');
+      // Formatted date headers
+      final List<String> headerDates = [];
       for (var d in dates) {
         final dStr = d.toString();
         final parsed = DateTime.tryParse(dStr);
@@ -1532,41 +1522,105 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
         if (parsed != null) {
           const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
           const weekdays = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-          formattedDate = '${weekdays[parsed.weekday - 1]}, ${parsed.day} ${months[parsed.month - 1]}';
+          formattedDate = '${weekdays[parsed.weekday - 1]}\n${parsed.day} ${months[parsed.month - 1]}';
         }
-        html.writeln('<th>$formattedDate</th>');
+        headerDates.add(formattedDate);
       }
-      html.writeln('</tr></thead>');
-      html.writeln('<tbody>');
 
+      final tableHeaders = ['CLASS', ...headerDates];
+
+      final List<List<String>> tableData = [];
       for (var cls in classes) {
         final clsMap = cls as Map<String, dynamic>;
         final clsName = (clsMap['display_name'] ?? clsMap['name'] ?? 'Class').toString();
         final datePaperMap = (clsMap['date_paper_map'] as Map<String, dynamic>?) ?? {};
 
-        html.writeln('<tr>');
-        html.writeln('<td class="class-cell">$clsName</td>');
+        final List<String> row = [clsName];
         for (var d in dates) {
           final pData = datePaperMap[d.toString()] as Map<String, dynamic>?;
           if (pData != null && pData['subject_name'] != null) {
-            final sName = pData['subject_name'].toString();
-            html.writeln('<td class="subject-cell">$sName</td>');
+            row.add(pData['subject_name'].toString());
           } else {
-            html.writeln('<td class="empty-cell">-</td>');
+            row.add('-');
           }
         }
-        html.writeln('</tr>');
+        tableData.add(row);
       }
 
-      html.writeln('</tbody></table>');
-      html.writeln('</div></body></html>');
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4.landscape,
+          margin: const pw.EdgeInsets.all(20),
+          build: (pw.Context context) {
+            return [
+              pw.Container(
+                alignment: pw.Alignment.center,
+                padding: const pw.EdgeInsets.only(bottom: 12),
+                decoration: const pw.BoxDecoration(
+                  border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey700, width: 1.5)),
+                ),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.center,
+                  children: [
+                    pw.Text(
+                      schoolName,
+                      style: pw.TextStyle(
+                        fontSize: 16,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.black,
+                      ),
+                    ),
+                    pw.SizedBox(height: 4),
+                    pw.Text(
+                      '$examName EXAMINATION SCHEME',
+                      style: pw.TextStyle(
+                        fontSize: 13,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.grey800,
+                      ),
+                    ),
+                    if (ayName.isNotEmpty) ...[
+                      pw.SizedBox(height: 2),
+                      pw.Text(
+                        'Academic Year: $ayName',
+                        style: const pw.TextStyle(
+                          fontSize: 10,
+                          color: PdfColors.grey600,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              pw.SizedBox(height: 12),
+              pw.TableHelper.fromTextArray(
+                border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+                headers: tableHeaders,
+                data: tableData,
+                headerStyle: pw.TextStyle(
+                  fontSize: 9,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.black,
+                ),
+                headerDecoration: const pw.BoxDecoration(
+                  color: PdfColors.grey200,
+                ),
+                cellStyle: const pw.TextStyle(
+                  fontSize: 8.5,
+                  color: PdfColors.black,
+                ),
+                cellAlignment: pw.Alignment.center,
+                headerAlignment: pw.Alignment.center,
+                cellPadding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+              ),
+            ];
+          },
+        ),
+      );
 
       final filename = '${examName.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_')}_Scheme.pdf';
       await Printing.layoutPdf(
-        onLayout: (format) async => await Printing.convertHtml(
-          format: PdfPageFormat.a4.landscape,
-          html: html.toString(),
-        ),
+        onLayout: (format) async => pdf.save(),
         name: filename,
         format: PdfPageFormat.a4.landscape,
       );
@@ -3322,6 +3376,18 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
       final statuses = await widget.examService.getExamClassStatuses(examId);
       setState(() {
         _examClassStatuses = statuses;
+        // Optimistically update status in _exams list for immediate reflection
+        for (var term in _exams) {
+          if (term['sub_tests'] != null && term['sub_tests'] is List) {
+            for (var st in term['sub_tests']) {
+              if (st['id'] == examId) {
+                st['status'] = targetStatus;
+              }
+            }
+          } else if (term['id'] == examId) {
+            term['status'] = targetStatus;
+          }
+        }
       });
       _showAppSnackBar('Results status updated to $targetStatus successfully!');
     } catch (e) {
@@ -3369,6 +3435,7 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
         if (!didPop) {
           if (_activeView == 'classes') {
             setState(() => _activeView = 'dashboard');
+            _loadDashboardData();
           } else if (_activeView == 'timetable' || _activeView == 'marks' || _activeView == 'reports') {
             setState(() => _activeView = 'classes');
             _loadClassMarksStatus(_selectedClassId);
@@ -3388,6 +3455,7 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
                 Navigator.pop(context);
               } else if (_activeView == 'classes') {
                 setState(() => _activeView = 'dashboard');
+                _loadDashboardData();
               } else {
                 if (_activeView == 'marks') {
                   FocusScope.of(context).unfocus();
@@ -5969,6 +6037,8 @@ class _PrincipalExaminationsScreenState extends State<PrincipalExaminationsScree
             border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
           ),
           child: SingleChildScrollView(
+            key: const PageStorageKey('principal_marks_subject_scroll'),
+            controller: _marksSubjectScrollController,
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
             child: Row(

@@ -172,7 +172,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
             return Container(
               height: MediaQuery.of(context).size.height * 0.8,
               decoration: const BoxDecoration(
-                color: Colors.white,
+                color: Color(0xFFFAF8F5),
                 borderRadius: BorderRadius.only(
                   topLeft: Radius.circular(24),
                   topRight: Radius.circular(24),
@@ -185,25 +185,62 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
+                      color: const Color(0xFFCBD5E1),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Examination Timetable Scheme',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.black87),
+                  const SizedBox(height: 14),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFEF3C7),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.calendar_month_rounded, color: Color(0xFFD97706), size: 20),
+                            ),
+                            const SizedBox(width: 12),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Examination Timetable Scheme',
+                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  widget.examName,
+                                  style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        IconButton(
+                          icon: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFF1F5F9),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.close, size: 16, color: Color(0xFF64748B)),
+                          ),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    widget.examName,
-                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
-                  ),
-                  const Divider(height: 24),
+                  const Divider(height: 16, color: Color(0xFFE2E8F0)),
                   Expanded(
                     child: isTeacher
                         ? (publishedClassSchemes.isEmpty
-                            ? const Center(child: Text('No published examination schemes found.'))
+                            ? const Center(child: Text('No published examination schemes found.', style: TextStyle(color: Color(0xFF64748B))))
                             : ListView.builder(
                                 padding: const EdgeInsets.all(16),
                                 itemCount: publishedClassSchemes.length,
@@ -219,12 +256,12 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                       color: Colors.white,
                                       borderRadius: BorderRadius.circular(16),
                                       border: Border.all(
-                                        color: isExpanded ? const Color(0xFF0F766E) : Colors.grey.shade200,
+                                        color: isExpanded ? const Color(0xFFD97706) : const Color(0xFFE2E8F0),
                                         width: isExpanded ? 1.5 : 1,
                                       ),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Colors.black.withOpacity(0.03),
+                                          color: Colors.black.withOpacity(0.02),
                                           blurRadius: 6,
                                           offset: const Offset(0, 2),
                                         ),
@@ -249,12 +286,12 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                                     Container(
                                                       padding: const EdgeInsets.all(8),
                                                       decoration: BoxDecoration(
-                                                        color: isExpanded ? const Color(0xFFF0FDFA) : Colors.grey.shade100,
+                                                        color: isExpanded ? const Color(0xFFFEF3C7) : const Color(0xFFF1F5F9),
                                                         borderRadius: BorderRadius.circular(10),
                                                       ),
                                                       child: Icon(
                                                         Icons.class_rounded,
-                                                        color: isExpanded ? const Color(0xFF0F766E) : Colors.grey.shade600,
+                                                        color: isExpanded ? const Color(0xFFD97706) : const Color(0xFF64748B),
                                                         size: 20,
                                                       ),
                                                     ),
@@ -264,27 +301,27 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                                       style: TextStyle(
                                                         fontSize: 15,
                                                         fontWeight: FontWeight.bold,
-                                                        color: isExpanded ? const Color(0xFF0F766E) : Colors.black87,
+                                                        color: isExpanded ? const Color(0xFFD97706) : const Color(0xFF0F172A),
                                                       ),
                                                     ),
                                                   ],
                                                 ),
                                                 Icon(
                                                   isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                                                  color: isExpanded ? const Color(0xFF0F766E) : Colors.grey.shade500,
+                                                  color: isExpanded ? const Color(0xFFD97706) : const Color(0xFF94A3B8),
                                                 ),
                                               ],
                                             ),
                                           ),
                                         ),
                                         if (isExpanded) ...[
-                                          const Divider(height: 1),
+                                          const Divider(height: 1, color: Color(0xFFE2E8F0)),
                                           Padding(
                                             padding: const EdgeInsets.all(12),
                                             child: papers.isEmpty
                                                 ? const Padding(
                                                     padding: EdgeInsets.all(16),
-                                                    child: Text('No scheduled papers for this class.', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                                                    child: Text('No scheduled papers for this class.', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
                                                   )
                                                 : Column(
                                                     children: papers.map((paper) => _buildPaperItemCard(paper)).toList(),
@@ -297,7 +334,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                 },
                               ))
                         : (scheme.isEmpty
-                            ? const Center(child: Text('No timetable entries found.'))
+                            ? const Center(child: Text('No timetable entries found.', style: TextStyle(color: Color(0xFF64748B))))
                             : ListView.builder(
                                 padding: const EdgeInsets.all(16),
                                 itemCount: scheme.length,
@@ -327,16 +364,23 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             sub,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.black87),
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
           ),
           const SizedBox(height: 12),
           Row(
@@ -348,30 +392,30 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                   children: [
                     Row(
                       children: [
-                        Text(
+                        const Text(
                           'Date: ',
-                          style: TextStyle(fontSize: 13, color: Colors.indigo.shade800, fontWeight: FontWeight.bold),
+                          style: TextStyle(fontSize: 12.5, color: Color(0xFFD97706), fontWeight: FontWeight.w700),
                         ),
                         Expanded(
                           child: Text(
                             _formatDate(date),
-                            style: TextStyle(fontSize: 13, color: Colors.grey.shade700, fontWeight: FontWeight.bold),
+                            style: const TextStyle(fontSize: 12.5, color: Color(0xFF334155), fontWeight: FontWeight.w600),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     Row(
                       children: [
-                        Text(
+                        const Text(
                           'Max: ',
-                          style: TextStyle(fontSize: 12, color: Colors.indigo.shade800, fontWeight: FontWeight.bold),
+                          style: TextStyle(fontSize: 12.5, color: Color(0xFFD97706), fontWeight: FontWeight.w700),
                         ),
                         Expanded(
                           child: Text(
                             '${_formatMarks(maxM)} Marks',
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
+                            style: const TextStyle(fontSize: 12.5, color: Color(0xFF334155), fontWeight: FontWeight.w600),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -387,30 +431,30 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                   children: [
                     Row(
                       children: [
-                        Text(
+                        const Text(
                           'Time: ',
-                          style: TextStyle(fontSize: 13, color: Colors.indigo.shade800, fontWeight: FontWeight.bold),
+                          style: TextStyle(fontSize: 12.5, color: Color(0xFFD97706), fontWeight: FontWeight.w700),
                         ),
                         Expanded(
                           child: Text(
                             '${_formatTime(start)} - ${_formatTime(end)}',
-                            style: TextStyle(fontSize: 13, color: Colors.grey.shade700, fontWeight: FontWeight.bold),
+                            style: const TextStyle(fontSize: 12.5, color: Color(0xFF334155), fontWeight: FontWeight.w600),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     Row(
                       children: [
-                        Text(
+                        const Text(
                           'Pass: ',
-                          style: TextStyle(fontSize: 12, color: Colors.indigo.shade800, fontWeight: FontWeight.bold),
+                          style: TextStyle(fontSize: 12.5, color: Color(0xFFD97706), fontWeight: FontWeight.w700),
                         ),
                         Expanded(
                           child: Text(
                             '${_formatMarks(passM)} Marks',
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
+                            style: const TextStyle(fontSize: 12.5, color: Color(0xFF334155), fontWeight: FontWeight.w600),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -3562,7 +3606,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
 
                     // 1. Exam Scheme Card (Always accessible)
                     _buildFeatureCard(
-                      title: 'Exam Scheme',
+                      title: 'EXAM SCHEME',
                       subtitle: schemePub ? 'View examination timetable scheme' : 'Not Published Yet',
                       icon: Icons.calendar_month_rounded,
                       isPublished: schemePub,
@@ -3573,7 +3617,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                     // 1b. Enter Marks Card (TEACHER only - Requires papers added)
                     if (widget.userRole == 'TEACHER' || widget.userRole == 'PRINCIPAL')
                       _buildFeatureCard(
-                        title: 'Enter Marks',
+                        title: 'ENTER MARKS',
                         subtitle: hasPapers ? 'Input student marks for assigned class' : 'No Papers Added Yet',
                         icon: Icons.edit_note_rounded,
                         isPublished: hasPapers,
@@ -3584,7 +3628,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                     // 2. Admit Card Card (STUDENT/PARENT only)
                     if (widget.userRole != 'TEACHER' && widget.userRole != 'PRINCIPAL')
                       _buildFeatureCard(
-                        title: 'Admit Card',
+                        title: 'ADMIT CARD',
                         subtitle: admitPub ? 'View room & seat allocations' : 'Not Published Yet',
                         icon: Icons.badge_rounded,
                         isPublished: admitPub,
@@ -3611,7 +3655,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                     // 3. Result Card (STUDENT/PARENT only - Hidden for Teachers to protect fee dues compliance)
                     if (widget.userRole != 'TEACHER' && widget.userRole != 'PRINCIPAL')
                       _buildFeatureCard(
-                        title: 'Exam Result',
+                        title: 'EXAM RESULT',
                         subtitle: resultPub ? 'View your report card' : 'Not Published Yet',
                         icon: Icons.workspace_premium_rounded,
                         isPublished: resultPub,
@@ -3706,7 +3750,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        title,
+                        title.toUpperCase(),
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w900,
